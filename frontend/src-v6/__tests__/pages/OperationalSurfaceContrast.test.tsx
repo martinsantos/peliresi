@@ -7,7 +7,7 @@ import DashboardPage from '../../pages/dashboard/DashboardPage';
 import ManifiestosPage from '../../pages/manifiestos/ManifiestosPage';
 
 const mocks = vi.hoisted(() => {
-  const trip = (estado: string, numero: string) => ({ data: { items: [{ id: 'qa-trip', numero, estado, createdAt: '2026-10-05T12:00:00Z', generador: { razonSocial: 'QA Generador' }, operador: { razonSocial: 'QA Operador' }, residuos: [] }], total: 1, totalPages: 1 }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
+  const trip = (estado: string, numero: string) => ({ data: { items: [{ id: 'qa-trip', numero, estado, createdAt: '2026-10-05T12:00:00Z', generador: { razonSocial: 'QA Generador' }, operador: { razonSocial: 'QA Operador' }, residuos: [] }], total: 1, totalPages: 1 }, isLoading: false, isFetching: false, isFetchedAfterMount: true, isError: false, refetch: vi.fn() });
   return { verify: vi.fn(), query: vi.fn(), active: trip('EN_TRANSITO', 'QA-ACTIVE-001'), pending: trip('APROBADO', 'QA-PENDING-001') };
 });
 vi.mock('@tanstack/react-query', () => ({
@@ -59,7 +59,7 @@ it('uses readable, touch-sized certification controls with a semantic selected f
 it('keeps active and assigned trip references readable without changing their meaning', () => {
   render(<MemoryRouter><DashboardPage /></MemoryRouter>);
   expect(screen.getByRole('heading', { name: 'En tránsito: 1 manifiesto' })).toBeVisible();
-  expect(screen.getByRole('heading', { name: 'Listos para retirar: 1 manifiesto' })).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Por revisar: 1 manifiesto' })).toBeVisible();
   const active = screen.getByRole('button', { name: 'Ir al viaje QA-ACTIVE-001' });
   const assigned = screen.getByRole('button', { name: 'Abrir viaje asignado QA-PENDING-001' });
   expect(active).toBeEnabled(); expect(active).toHaveClass('bg-primary-50', 'text-primary-800');

@@ -33,7 +33,7 @@ export const TransportistaTripQueue: React.FC<TransportistaTripQueueProps> = ({ 
       <Card>
         <CardContent className="p-4 text-center">
           <p className="text-sm font-bold text-neutral-800">Sin viajes asignados</p>
-          <p className="mt-1 text-sm text-neutral-600">Los manifiestos listos para retirar o en tránsito aparecerán acá.</p>
+          <p className="mt-1 text-sm text-neutral-600">Los manifiestos por revisar o en tránsito aparecerán acá.</p>
         </CardContent>
       </Card>
     );
@@ -41,7 +41,7 @@ export const TransportistaTripQueue: React.FC<TransportistaTripQueueProps> = ({ 
 
   const sections = [
     { label: 'En tránsito', trips: activeTrips, total: activeTotal ?? activeTrips.length, Icon: Radio, tone: 'border-primary-200 bg-primary-50 text-primary-800', action: 'Abrir seguimiento' },
-    { label: 'Listos para retirar', trips: pendingTrips, total: pendingTotal ?? pendingTrips.length, Icon: Truck, tone: 'border-warning-200 bg-warning-50 text-warning-900', action: 'Ver retiro' },
+    { label: 'Por revisar', trips: pendingTrips, total: pendingTotal ?? pendingTrips.length, Icon: Truck, tone: 'border-warning-200 bg-warning-50 text-warning-900', action: 'Revisar' },
   ];
   return <section aria-label="Viajes del transportista" className="space-y-4">
     {sections.filter(section => section.trips.length > 0).map(section => <div key={section.label}>

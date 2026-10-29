@@ -61,3 +61,9 @@ it.each(['propuesta_partes', 'adenda_manifiesto'])('routes representative %s pus
  const data = { tipo, version: 1, fase: 'creada', evento: 'CREADA', accesosEmpresa: [{ empresaId: 'co', actividadId: 'a' }] };
  expect(manifestPushContent({ ...notice, rol: 'GENERADOR', datos: JSON.stringify(data) })?.url).toBe('/notificaciones/notice');
 });
+it('uses the owned notice for a reversion without exposing the private reason', () => {
+ const data = { tipo: 'reversion_manifiesto', version: 1, destino: 'representante', nota: 'PRIVATE', accesosEmpresa: [{ empresaId: 'co', actividadId: 'a' }] };
+ const content = manifestPushContent({ ...notice, rol: 'GENERADOR', datos: JSON.stringify(data) });
+ expect(content?.url).toBe('/notificaciones/notice'); expect(content?.title).toBe('Estado del manifiesto corregido');
+ expect(JSON.stringify(content)).not.toContain('PRIVATE');
+});

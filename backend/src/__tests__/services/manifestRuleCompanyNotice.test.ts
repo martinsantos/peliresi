@@ -30,6 +30,13 @@ it('masks the response of marking a representative notice as read', () => {
  expect(JSON.stringify(maskManifestRuleCompanyNotice(notice))).not.toContain('QA-PRIVATE');
  expect(maskManifestRuleCompanyNotice(notice).manifiestoId).toBeNull();
 });
+it('masks a reversion notice after the representative loses access', async () => {
+ const reversion = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ ...data, tipo: 'reversion_manifiesto' }) };
+ recipients.mockResolvedValue(new Map([['manifest', []]]));
+ const masked = (await withManifestRuleCompanyNoticeContext({} as any, [reversion]))[0];
+ expect(masked.manifiestoId).toBeNull(); expect(JSON.stringify(masked)).not.toContain('QA-PRIVATE');
+ expect(JSON.stringify(maskManifestRuleCompanyNotice(reversion))).not.toContain('QA-PRIVATE');
+});
 it('does not turn malformed or stale metadata into authorization', () => {
  expect(matchingManifestRuleAccesses({ ...data, version: 2 }, [access])).toEqual([]);
  expect(matchingManifestRuleAccesses({ ...data, accesosEmpresa: [{ ...access, actividadId: '../other' }] }, [access])).toEqual([]);

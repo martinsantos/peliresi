@@ -101,18 +101,20 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   const [showReversionModal, setShowReversionModal] = useState(false);
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const legacyDraftBlocked = m.estado === 'BORRADOR' && !m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && manifestProposalsVisible({training});
+  const legacyBlocked = ['BORRADOR','APROBADO'].includes(m.estado || '') && !m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1');
+  const originWithoutCarrier = m.estado === 'APROBADO' && !!isInSitu && !m.transportistaId;
+  const proposalsVisible = manifestProposalsVisible({training});
 
   return (
     <>
       <Card>
         <CardHeader title="Acciones" icon={<ClipboardCheck size={22}/>} />
         <CardContent>
-          {m.estado === 'BORRADOR' && !m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <section aria-label="Estado del borrador" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-            <h3 className="font-bold">{legacyDraftBlocked ? 'Este borrador necesita una nueva propuesta' : isInSitu ? 'Tratamiento en origen · sin transporte' : 'Borrador pendiente de firma'}</h3>
-            <p className="mt-1">{legacyDraftBlocked ? 'Creá una nueva propuesta con generador, transporte y operador. Las tres partes deben aprobar antes de iniciar; este borrador se conserva.' : 'El generador debe revisar y firmar para continuar. Todavía no se inició la operación.'}</p>
-            {!legacyDraftBlocked && <p className="mt-1">{isInSitu ? 'Después de la firma, el operador podrá registrar la recepción in situ.' : 'Este borrador conserva el circuito anterior; no es una propuesta enviada para tres aprobaciones.'}</p>}
+          {legacyBlocked && <section aria-label="Aprobaciones pendientes" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <h3 className="font-bold">Este manifiesto necesita una nueva propuesta</h3>
+            <p className="mt-1">{proposalsVisible ? 'Creá una nueva propuesta con generador, transporte y operador.' : 'Contactá a Ambiente para habilitar una nueva propuesta con generador, transporte y operador.'} Las tres partes deben aprobar antes de iniciar; este registro se conserva.</p>
           </section>}
+          {originWithoutCarrier && !legacyBlocked && !proposalsVisible && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Esta propuesta anterior no tiene transporte aprobador. Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.</p>}
           {m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           {['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','CANCELADO','RECHAZADO'].includes(m.estado || '') && <div className="mb-4"><ManifestNextStep work={{estado:m.estado,modalidad:m.modalidad,pesajePendiente:m.residuos?.some(r=>!r.cantidadRecibida)}} role={userRol}/></div>}
           {deliveryPending && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Hay una entrega guardada en este dispositivo. Revisá la sincronización antes de continuar.</p>}
@@ -124,8 +126,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             userRol={userRol}
             isActionPending={isActionPending}
             deliveryUnavailable={deliveryPending || deliveryChecking || deliveryCheckError}
-            legacyDraftBlocked={legacyDraftBlocked}
-            pickupBlocked={!!(m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo)))}
+            legacyDraftBlocked={legacyBlocked}
+            pickupBlocked={legacyBlocked || originWithoutCarrier || !!(m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo)))}
             isInSitu={isInSitu}
             isCancelling={isCancelling}
             mutations={{

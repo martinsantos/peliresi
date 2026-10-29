@@ -267,7 +267,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     family='manifiestos'; title='Certificación disponible'; path='/manifiestos/'+encodeURIComponent(notice.manifiestoId)+'?certificado='+encodeURIComponent(data.documentoId)+'#certificaciones';
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
-  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto' || data.tipo === 'ADENDA_POST_FACTO' || data.tipo === 'estado_manifiesto')) {
+  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto' || data.tipo === 'ADENDA_POST_FACTO' || data.tipo === 'estado_manifiesto' || data.tipo === 'reversion_manifiesto')) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto';
     path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId) + (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) ? '/adendas' + (typeof data.adendaId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.adendaId) ? '?adenda=' + data.adendaId : '') : '');
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'relevo_transporte' && typeof data.tramoId === 'string') {
@@ -379,6 +379,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : data.tipo === 'ADENDA_POST_FACTO' ? ['Nueva corriente en adenda para la autoridad', 'Se registró una aprobación individual sobre una corriente nueva. Revisá el informe y su seguimiento; no modifica habilitaciones ni acredita unanimidad.']
     : data.tipo === 'estado_manifiesto' && data.estado === 'EN_TRATAMIENTO' ? ['Tratamiento iniciado', 'El operador inició el tratamiento. Consultá el manifiesto y las acciones disponibles.']
     : data.tipo === 'estado_manifiesto' && data.estado === 'CANCELADO' ? ['Manifiesto cancelado', 'Consultá el motivo y el historial del manifiesto.']
+    : data.tipo === 'reversion_manifiesto' && data.version === 1 ? ['Estado del manifiesto corregido', 'Administración corrigió el estado. Revisá el historial y las acciones disponibles.']
     : data.tipo === 'adenda_manifiesto' && Object.prototype.hasOwnProperty.call(addendumEvents, event) ? addendumEvents[event]
     : data.tipo === 'certificado_manifiesto' ? [data.tipoCertificado === 'FINAL' ? 'Certificación final total disponible' : 'Certificación parcial disponible', 'El operador emitió el documento firmado. Ingresá al manifiesto para consultarlo y descargarlo.']
     : data.tipo === 'relevo_transporte' ? ['Cambio de transporte en tránsito', 'La transportista de origen registró un relevo. Revisá el tramo y su seguimiento en SITREP.']
@@ -407,7 +408,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"reversion_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

@@ -1,7 +1,7 @@
 import { ManifestProposalApprovals } from '../manifiestos/components/ManifestProposalApprovals';
 import { TransportLegs } from '../manifiestos/components/TransportLegs';
 import { useTransportLegs } from '../../services/transport-handoff.service';
-import { manifestFeatureVisible } from '../../utils/manifestFeatures';
+import { manifestFeatureVisible, manifestProposalsVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Viaje en Curso (Transportista)
  * Conectado a API real con GPS tracking
@@ -456,6 +456,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const cantidadesDeclaradas = declaredQuantities(m.residuos || [])
     .map(({ unidad, cantidad }) => `${formatDeclaredQuantity(cantidad)} ${unidad}`).join(' · ') || 'Sin cantidades informadas';
   const eventos: EventoManifiesto[] = Array.isArray(m.eventos) ? m.eventos : [];
+  const hasProposal = eventos.some(e => e.tipo === 'PROPUESTA_PARTES_V1');
+  const canConfirmPickup = hasProposal && ['FIRMA','APROBACION_TRANSPORTISTA','APROBACION_OPERADOR'].every(tipo => eventos.some(e => e.tipo === tipo))
+    && eventos.some(e => ['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo));
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
@@ -468,7 +471,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
             <p className="break-words text-xs text-neutral-500 font-medium">{m.numero || id}</p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h2 className="text-lg font-bold text-neutral-900">
-                {m.estado === EstadoManifiesto.APROBADO ? 'Confirmar retiro' :
+                {m.estado === EstadoManifiesto.APROBADO ? (canConfirmPickup ? 'Confirmar retiro' : 'Revisar aprobaciones') :
                  m.estado === EstadoManifiesto.EN_TRANSITO ? 'En tránsito' :
                  m.estado === EstadoManifiesto.ENTREGADO ? 'Entrega confirmada' : 'Estado del viaje'}
               </h2>
@@ -518,8 +521,13 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
         </dl>}
         {eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && m.estado === EstadoManifiesto.APROBADO && <ManifestProposalApprovals id={id!} estado={m.estado} onSign={()=>{}}/>}
+        {m.estado === EstadoManifiesto.APROBADO && !hasProposal && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+          <p className="font-semibold">Este manifiesto necesita una nueva propuesta</p>
+          <p className="mt-1">{manifestProposalsVisible(currentUser) ? 'Creá una nueva propuesta con las tres partes.' : 'Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.'} El registro anterior se conserva.</p>
+          <Link to={mp(`/manifiestos/${id}`)} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">Ver manifiesto</Link>
+        </div>}
         {/* APROBADO state: Show confirm pickup */}
-        {m.estado === EstadoManifiesto.APROBADO && (!eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') || eventos.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo))) && (
+        {m.estado === EstadoManifiesto.APROBADO && canConfirmPickup && (
           <>
             <Card variant="elevated" className="border-2 border-primary-200">
               <CardContent className="p-5 text-center">

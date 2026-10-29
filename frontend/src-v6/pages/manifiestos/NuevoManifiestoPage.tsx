@@ -365,7 +365,7 @@ const NuevoManifiestoForm: React.FC = () => {
       });
 
       if (result.creationRecovered) toast.success('Manifiesto recuperado', `${result.numero || result.id}. El envío ya se había guardado; no se creó otro ni se repitieron avisos.`);
-      else toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? 'Generador, transporte y operador deben aprobar desde sus cuentas.' : 'Todavía falta la firma del generador para continuar.'}`);
+      else toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? 'Generador, transporte y operador deben aprobar desde sus cuentas.' : 'Para iniciar necesitás una nueva propuesta con las tres partes.'}`);
       if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de este dispositivo. No vuelvas a enviar el formulario anterior.');
       navigate(mp(`/manifiestos/${result.id}`), { state: { manifestListReturn: returnTo } });
     } catch (err: any) {
@@ -454,6 +454,10 @@ const NuevoManifiestoForm: React.FC = () => {
         </div>
       </header>
 
+      {!proposalsAvailable && <div role="status" className="mb-3 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+        <p className="font-semibold">Las propuestas de las tres partes no están habilitadas</p>
+        <p className="mt-1">Podés conservar un borrador, pero no iniciar la operación con una sola firma. Contactá a Ambiente para habilitar las propuestas.</p>
+      </div>}
       {draft.conflict && <div className="mb-3"><DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} /></div>}
       {draft.draft.pendingCreate && <div ref={pendingSendNotice} tabIndex={-1} role="status" className="mb-3 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
         <p className="font-semibold">{createManifiesto.isPending ? 'Enviando manifiesto…' : 'Envío sin confirmar'}</p>
@@ -754,7 +758,7 @@ const NuevoManifiestoForm: React.FC = () => {
               {formData.modalidad === 'IN_SITU' && (
                 <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
                   <MapPin size={16} className="shrink-0 mt-0.5" />
-                  <span><strong>Sin traslado.</strong> El operador trabajará en el domicilio del generador. {partyProposal?'Las tres partes reciben un aviso y deben aprobar; el transporte no realiza un viaje.':'Se guardará un borrador pendiente de la firma del generador.'}</span>
+                  <span><strong>Sin traslado.</strong> El operador trabajará en el domicilio del generador. {partyProposal?'Las tres partes reciben un aviso y deben aprobar; el transporte no realiza un viaje.':'El borrador se conserva. Para iniciar necesitás una nueva propuesta con las tres partes.'}</span>
                 </div>
               )}
 

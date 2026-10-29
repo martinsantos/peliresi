@@ -14,6 +14,7 @@ const isLegacyCompanyNotice = (notice: Pick<Notice, 'tipo'>, data: Data | null):
 export const isManifestRuleCompanyNotice = (notice: Pick<Notice, 'tipo'>, data: Data | null): boolean => {
  if (isLegacyCompanyNotice(notice, data)) return true;
  if (data?.destino !== 'representante') return false;
+ if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'reversion_manifiesto') return true;
  if (notice.tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo))) return true;
  const stateTypes: Record<string, string> = { EN_TRANSITO: 'MANIFIESTO_EN_TRANSITO', ENTREGADO: 'MANIFIESTO_ENTREGADO',
   RECIBIDO: 'MANIFIESTO_RECIBIDO', EN_TRATAMIENTO: 'INFO_GENERAL', TRATADO: 'MANIFIESTO_TRATADO', CANCELADO: 'INFO_GENERAL' };

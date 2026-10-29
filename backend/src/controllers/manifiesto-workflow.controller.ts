@@ -3,7 +3,6 @@ import { approveManifestProposal, assertManifestProposalApproved } from './manif
 import { updateRollingHash } from '../services/manifestIntegrity.service';
 import { MANIFEST_PROPOSAL, manifestProposalsEnabled } from '../domain/manifestProposal';
 import { Response, NextFunction } from 'express';
-import QRCode from 'qrcode';
 import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -11,9 +10,9 @@ import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
 import { notificationService } from '../services/notification-dispatcher.service';
 import { notifyManifestOperationalEvent } from '../services/manifestOperationalNotice.service';
-import { notifyManifestState } from '../services/manifestStateNotice.service';
+import { notifyManifestReversion, notifyManifestState } from '../services/manifestStateNotice.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
-import { computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
+import { computeClosureHash, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
 import { prepareManifiestoSignature } from '../domain/manifiestoSignature';
@@ -42,7 +41,6 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const userId = req.user.id;
     const firma = await prepareManifiestoSignature(req.body?.firma);
     if (await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) {
       const manifiesto = await approveManifestProposal(req, firma);
@@ -50,101 +48,11 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       return;
     }
 
-    // A pre-proposal draft has no recorded decisions by the other parties.
-    // Do not turn it into a new active operation with a single signature.
-    if (manifestProposalsEnabled()) {
-      throw new AppError('Este borrador anterior no tiene las tres aprobaciones. Creá una nueva propuesta con las tres partes; el borrador se conserva.', 409);
-    }
-
-    // Generate QR before transaction (async, no DB write)
-    // We need manifiesto.numero first — fetch outside tx to avoid holding tx open during QR generation
-    const manifiestoPreview = await prisma.manifiesto.findUnique({
-      where: { id },
-      select: { id: true, numero: true, estado: true },
-    });
-
-    if (!manifiestoPreview) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiestoPreview.estado !== 'BORRADOR') {
-      throw new AppError('Solo se pueden firmar manifiestos en estado borrador', 400);
-    }
-
-    const qrData = JSON.stringify({
-      numero: manifiestoPreview.numero,
-      id: manifiestoPreview.id,
-      timestamp: new Date().toISOString()
-    });
-    const qrCode = await QRCode.toDataURL(qrData);
-
-    // Atomic conditional update: WHERE { id, estado: 'BORRADOR' } ensures only one
-    // concurrent request can transition the state. If the manifest was already signed
-    // by a concurrent request, Prisma throws P2025 (record not found matching WHERE).
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
-      let updated;
-      try {
-        updated = await tx.manifiesto.update({
-          where: { id, estado: 'BORRADOR' },
-          data: {
-            estado: 'APROBADO',
-            fechaFirma: new Date(),
-            qrCode
-          },
-          include: {
-            generador: true,
-            transportista: true,
-            operador: true,
-            residuos: {
-              include: {
-                tipoResiduo: true
-              }
-            }
-          }
-        });
-      } catch (err: any) {
-        if (err?.code === 'P2025') {
-          throw new AppError('Solo se pueden firmar manifiestos en estado borrador', 400);
-        }
-        throw err;
-      }
-
-      const evento = await tx.eventoManifiesto.create({
-        data: {
-          manifiestoId: id,
-          tipo: 'FIRMA',
-          descripcion: firma
-            ? 'Manifiesto aprobado por la cuenta autenticada con firma manuscrita adjunta'
-            : 'Manifiesto aprobado por la cuenta autenticada, sin firma manuscrita adjunta',
-          usuarioId: userId,
-          ...(firma ? { firmaImagen: firma.imagen, firmaSha256: firma.sha256 } : {}),
-        }
-      });
-
-      await updateRollingHash(tx, id, 'APROBADO', updated.fechaFirma!, updated.observaciones, evento.id);
-
-      return updated;
-    });
-
-    res.json({
-      success: true,
-      data: { manifiesto: manifiestoActualizado }
-    });
-
-    domainEvents.emit({
-      type: 'MANIFIESTO_ESTADO_CAMBIADO',
-      manifiestoId: manifiestoActualizado.id,
-      estadoAnterior: 'BORRADOR',
-      estadoNuevo: 'APROBADO',
-      numero: manifiestoActualizado.numero,
-      userId,
-    });
-
-    // Sello GENESIS — fire-and-forget
-    setImmediate(() => {
-      const hash = hashManifiesto(manifiestoActualizado);
-      registrarSello(id, 'GENESIS', hash).catch(() => {});
-    });
+    // A historical draft does not record consent from all three parties. The
+    // operational feature flag must never permit a single signature to activate it.
+    throw new AppError(manifestProposalsEnabled()
+      ? 'Este borrador anterior no tiene las tres aprobaciones. Creá una nueva propuesta con las tres partes; el borrador se conserva.'
+      : 'Este borrador anterior no tiene las tres aprobaciones. Contactá a Ambiente para habilitar una nueva propuesta con las tres partes; el borrador se conserva.', 409);
 
   } catch (error) {
     next(error);
@@ -413,8 +321,7 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
     const { manifiesto: manifiestoActualizado, noticeIds } = await prisma.$transaction(async (tx) => {
       // Validate manifiesto exists, is APROBADO, and is IN_SITU
       await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
-      // New in-situ proposals need all three decisions and an explicit start.
-      // Historical records without a proposal marker retain their contract.
+      // In-situ reception needs all three decisions and an explicit start.
       await assertManifestProposalApproved(tx, id);
       const current = await tx.manifiesto.findUnique({
         where: { id },
@@ -867,7 +774,10 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
       `;
       if (locked.length === 0) throw new AppError('Manifiesto no encontrado', 404);
 
-      const manifiesto = await tx.manifiesto.findUnique({ where: { id } });
+      const manifiesto = await tx.manifiesto.findUnique({ where: { id }, include: {
+        generador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } },
+        operador: { select: { usuarioId: true } },
+      } });
       if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
 
       if(await tx.eventoManifiesto.findFirst({where:{manifiestoId:id,tipo:CERTIFICATE_EVENT}})) throw new AppError('El manifiesto tiene certificados emitidos; se conserva su recorrido firmado',409);
@@ -896,10 +806,12 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
         },
       });
       await updateRollingHash(tx, id, estadoNuevo, new Date(), updated.observaciones, evento.id);
-      return { updated, estadoAnterior };
+      const noticeIds = await notifyManifestReversion(tx, manifiesto, estadoAnterior, estadoNuevo, evento.id, req.user.id);
+      return { updated, estadoAnterior, noticeIds };
     });
 
     invalidateGpsCache(id);
+    scheduleCommittedManifestPush(result.noticeIds);
     res.json({ success: true, data: { manifiesto: result.updated } });
 
     domainEvents.emit({
@@ -909,6 +821,7 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
       estadoNuevo,
       numero: result.updated.numero,
       userId: req.user.id,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);

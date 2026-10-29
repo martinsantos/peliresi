@@ -27,13 +27,14 @@ export function rejectionReason(value: string) {
 }
 export function manifestWork(m: ManifestWork, role: string) {
   const inSitu = m.modalidad === 'IN_SITU';
-  const missing = m.partes?.filter(p => !p.aprobada).map(p => partyNames[p.rol] || p.rol) || [];
+  const required = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'];
+  const missing = m.partes ? required.filter(role => !m.partes?.some(part => part.rol === role && part.aprobada)).map(role => partyNames[role]) : [];
   const result = (label: string, responsible: string, detail: string, tone: 'pending' | 'active' | 'done' | 'blocked' = 'active') => ({ label, responsible, detail, tone });
   if (m.rechazo) return result('Propuesta detenida', 'Partes vinculadas', 'Hay una participación rechazada. Revisá el motivo antes de preparar otra propuesta.', 'blocked');
   if (m.requiereNuevaPropuesta) return result('Necesita nueva propuesta', 'Partes vinculadas', 'Creá una nueva propuesta con las tres partes; el registro anterior se conserva.', 'blocked');
-  if (m.estado === 'APROBADO' && m.partes && (!m.partes.length || missing.length)) return result('Revisar aprobaciones', missing.join(', ') || 'Administración', 'No se puede iniciar hasta comprobar todas las aprobaciones.', 'blocked');
+  if (m.estado === 'APROBADO' && m.partes && (m.partes.length !== required.length || missing.length)) return result('Revisar aprobaciones', missing.join(', ') || 'Administración', 'No se puede iniciar hasta comprobar todas las aprobaciones.', 'blocked');
   switch (m.estado) {
-    case 'BORRADOR': return result('Borrador · firma del generador pendiente', 'Generador', 'Revisá y firmá el borrador para continuar.', 'pending');
+    case 'BORRADOR': return result('Necesita nueva propuesta', 'Partes vinculadas', 'El borrador anterior se conserva; se necesitan las tres aprobaciones antes de iniciar.', 'blocked');
     case 'PENDIENTE_APROBACION': return result(m.requiereMiAprobacion ? 'Te toca aprobar' : 'En espera', missing.join(', ') || 'Partes vinculadas', m.requiereMiAprobacion ? 'Revisá los datos antes de confirmar tu participación.' : 'Cada parte pendiente debe aprobar desde su cuenta. El retiro todavía no está habilitado.', 'pending');
     case 'APROBADO':
       if (m.partes && !m.inicio) return result('Listo para iniciar', 'Cualquiera de las partes vinculadas', inSitu ? 'Coordiná la recepción en origen con la otra parte. No hay viaje ni GPS.' : 'Iniciá la coordinación cuando acuerden la operación. Todavía no comienza el viaje.');

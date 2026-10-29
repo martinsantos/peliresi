@@ -78,19 +78,26 @@ describe('manifest transport compatibility after changing residues', () => {
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('choferId');
   });
 
-  it('explains in-situ as a draft without transport before submitting it', async () => {
+  it('explains that an in-situ draft needs a new proposal before starting', async () => {
     prepareDestination(/^Transporte Y8$/);
     expect(screen.getByRole('button', { name: /^Con traslado/ })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
     expect(screen.getByRole('alert')).toHaveTextContent('Ya asignaste un transporte');
     fireEvent.click(screen.getByRole('button', { name: 'Continuar sin transporte' }));
-    expect(screen.getByText(/Se guardará un borrador pendiente de la firma del generador/)).toBeVisible();
+    expect(screen.getByText(/El borrador se conserva. Para iniciar necesitás una nueva propuesta con las tres partes/)).toBeVisible();
     expect(screen.queryByLabelText('Transportista *')).not.toBeInTheDocument();
     choose('Operador / Destino *', /Operador QA/);
     fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
     expect(mocks.create.mock.calls[0][0].modalidad).toBe('IN_SITU');
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('transportistaId');
+  });
+
+  it('warns before entry that disabled proposals cannot start with a single signature', () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','false');
+    render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);
+    expect(screen.getByText('Las propuestas de las tres partes no están habilitadas')).toBeVisible();
+    expect(screen.getByText(/Podés conservar un borrador, pero no iniciar la operación con una sola firma/)).toBeVisible();
   });
 
   it('preserves the three assigned parties when cancelling a change to in-situ', async () => {

@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const recipients = vi.hoisted(() => vi.fn());
 vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: recipients }));
-import { notifyManifestState } from '../../services/manifestStateNotice.service';
+import { notifyManifestReversion, notifyManifestState } from '../../services/manifestStateNotice.service';
 
 const generator = { empresaId: 'gco', actividadId: 'ga', rol: 'GENERADOR', razonSocial: 'QA Generador', establecimientoId: 'site' };
 const operator = { empresaId: 'oco', actividadId: 'oa', rol: 'OPERADOR', razonSocial: 'QA Operador' };
@@ -39,4 +39,25 @@ it('uses a stable id for the event and user, but a distinct id for a later trans
 it('propagates an inbox insertion failure to roll back the transition', async () => {
  tx.notificacion.createMany.mockRejectedValueOnce(new Error('inbox unavailable'));
  await expect(notifyManifestState(tx, manifest, 'EN_TRANSITO', 'event', 'carrier')).rejects.toThrow('inbox unavailable');
+});
+
+it.each([
+ ['APROBADO', 'BORRADOR'], ['EN_TRANSITO', 'APROBADO'], ['ENTREGADO', 'EN_TRANSITO'],
+ ['RECIBIDO', 'ENTREGADO'], ['EN_TRATAMIENTO', 'RECIBIDO'], ['TRATADO', 'EN_TRATAMIENTO'],
+ ['TRATADO', 'RECIBIDO'], ['RECHAZADO', 'ENTREGADO'],
+] as const)('records reversion %s to %s for parties, representatives and admins', async (previous, next) => {
+ const ids = await notifyManifestReversion(tx, manifest, previous, next, 'event', 'admin');
+ const notices = tx.notificacion.createMany.mock.calls[0][0].data;
+ expect(notices.map((n: any) => n.usuarioId).sort()).toEqual(['admin', 'generator', 'carrier', 'operator', 'rep'].sort());
+ expect(new Set(ids).size).toBe(ids.length);
+ expect(notices.every((n: any) => n.titulo === 'Estado del manifiesto corregido' && n.tipo === 'INFO_GENERAL')).toBe(true);
+ expect(JSON.parse(notices.find((n: any) => n.usuarioId === 'rep').datos)).toMatchObject({
+  tipo: 'reversion_manifiesto', version: 1, estadoAnterior: previous, estadoNuevo: next,
+  eventoId: 'event', destino: 'representante', accesosEmpresa: [generator, operator],
+ });
+ expect(notices.every((n: any) => !n.mensaje.includes('Retiro confirmado'))).toBe(true);
+});
+it('propagates failure when recording a reversion notice', async () => {
+ tx.notificacion.createMany.mockRejectedValueOnce(new Error('inbox unavailable'));
+ await expect(notifyManifestReversion(tx, manifest, 'ENTREGADO', 'EN_TRANSITO', 'event', 'admin')).rejects.toThrow('inbox unavailable');
 });

@@ -370,7 +370,8 @@ const ManifiestoDetailPage: React.FC = () => {
   // Redirect TRANSPORTISTA to the trip view for actionable states
   const isTransportista = userRol === 'TRANSPORTISTA';
   const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
-  if (!isLoading && manifiesto && isTransportista && !isInSitu && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
+  const historicalApproved = m.estado === EstadoManifiesto.APROBADO && !m.eventos?.some(e => e.tipo === 'PROPUESTA_PARTES_V1');
+  if (!isLoading && manifiesto && isTransportista && !isInSitu && !historicalApproved && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
     const prefix = isApp ? '/app' : '';
     return <Navigate to={`${prefix}/transporte/viaje/${id}`} replace />;
   }
@@ -422,8 +423,8 @@ const ManifiestoDetailPage: React.FC = () => {
         <Button variant="ghost" aria-label={`Volver a ${returnContext.label}`} onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>{returnContext.label}</Button>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
-          <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
-            {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
+          <Badge variant="soft" color={historicalApproved ? 'warning' : getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
+            {historicalApproved ? 'Aprobado · registro anterior' : formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
           </Badge>
           {m.modalidad === 'IN_SITU' && <Badge variant="soft" color="info">En origen · sin traslado</Badge>}
           {isError && (

@@ -103,11 +103,12 @@ describe('three independently authenticated parties',()=>{
   mock.events.push({tipo:'RECHAZO_PARTE'});
   await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
  });
- it('does not attach new approval requirements to old records',async()=>{
-  mock.events=[];await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ it.each(['true','false'])('does not start a historical record without three recorded approvals when proposals are %s',async flag=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED',flag);
+  mock.events=[];await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('tres aprobaciones')});
  });
- it.each(['FIJO','IN_SITU'] as const)('does not activate a historical %s draft with only one signature when proposals are enabled',async modalidad=>{
-  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+ it.each([['FIJO','true'],['FIJO','false'],['IN_SITU','true'],['IN_SITU','false']] as const)('does not activate a historical %s draft with proposals %s',async (modalidad,flag)=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED',flag);
   mock.events=[];Object.assign(mock.manifest,{estado:'BORRADOR',modalidad});
   const {firmarManifiesto}=await import('../controllers/manifiesto-workflow.controller');
   const next=vi.fn(),json=vi.fn();
@@ -186,9 +187,9 @@ describe('operational three-party proposals', () => {
   vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','false');
   await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
  });
- it('leaves a legacy record on its existing pickup contract', async () => {
+ it('blocks starting a legacy record without recorded approvals', async () => {
   mock.events=[];
-  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
  });
 });
 
@@ -362,11 +363,11 @@ describe('in-situ agreement with three approvals and no trip',()=>{
   expect(json.mock.calls[0][0].data).toMatchObject({requiereNuevaPropuesta:true,puedeAprobar:null,puedeRechazar:true});
   expect(mock.events).toHaveLength(1);
  });
- it('preserves an already initiated historical operation without rewriting its signatures',async()=>{
+ it('preserves the historical signatures but blocks starting reception without a transport approver',async()=>{
   const legacy={...p,modalidad:'IN_SITU' as const,transportistaId:null};
   Object.assign(mock.manifest,legacy,{estado:'APROBADO'});mock.events[0].descripcion=JSON.stringify(legacy);
   mock.events.push({tipo:'FIRMA'},{tipo:'APROBACION_OPERADOR'},{tipo:'INICIO_COORDINACION'});
-  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
   expect(mock.events).toHaveLength(4);
  });
 });
@@ -377,10 +378,10 @@ it('requires active participant records as well as active accounts',async()=>{
  await expect(validateProposalParties(mock.tx,p)).rejects.toMatchObject({statusCode:400});
 });
 
-it('keeps legacy approved trips and in-situ receipts visible in the operational agenda',async()=>{
+it('identifies old approved trips and in-situ receipts as requiring a new three-party proposal',async()=>{
  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
  const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
  mock.tx.manifiesto.findMany=vi.fn(async()=>['FIJO','IN_SITU'].map(modalidad=>({...mock.manifest,estado:'APROBADO',modalidad,eventos:[],residuos:[]})));
  const json=vi.fn(),next=vi.fn();await inOperationalSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
- expect(next).not.toHaveBeenCalled();expect(json.mock.calls[0][0].data.items.map((m:any)=>[m.action,m.partes])).toEqual([['Retiro pendiente',null],['Recepción in situ pendiente',null]]);
+ expect(next).not.toHaveBeenCalled();expect(json.mock.calls[0][0].data.items.map((m:any)=>[m.action,m.partes,m.requiereNuevaPropuesta])).toEqual([['Necesita nueva propuesta',null,true],['Necesita nueva propuesta',null,true]]);
 });

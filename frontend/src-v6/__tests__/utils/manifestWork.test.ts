@@ -16,7 +16,7 @@ describe('shared operational guidance never replaces server authorization',()=>{
     expect(manifestWork({estado:'APROBADO',partes:approved,inicio:'2026-10-25'},'TRANSPORTISTA')).toMatchObject({label:'Confirmar retiro',responsible:'Transporte'});
   });
   it('keeps in-situ responsibility without inventing transport',()=>{
-    expect(manifestWork({estado:'APROBADO',modalidad:'IN_SITU',inicio:'2026-10-25',partes:approved.filter(p=>p.rol!=='TRANSPORTISTA')},'OPERADOR')).toMatchObject({label:'Confirmar recepción en origen',responsible:'Operador'});
+    expect(manifestWork({estado:'APROBADO',modalidad:'IN_SITU',inicio:'2026-10-25',partes:approved.filter(p=>p.rol!=='TRANSPORTISTA')},'OPERADOR')).toMatchObject({label:'Revisar aprobaciones',responsible:'Transporte',tone:'blocked'});
   });
   it.each(['ENTREGADO','RECIBIDO','EN_TRATAMIENTO','TRATADO'])('assigns post-delivery work to operator, even for other viewers: %s',estado=>{
     for(const role of [...roles,'ADMIN'])expect(manifestWork({estado},role).responsible).toBe('Operador');

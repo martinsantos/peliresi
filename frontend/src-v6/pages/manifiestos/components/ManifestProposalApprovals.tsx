@@ -30,7 +30,8 @@ export function ManifestProposalApprovals({ id, onSign }: { id: string; estado?:
   if(query.isPending)return <p role="status" className="py-3 text-sm text-neutral-600">Comprobando aprobaciones…</p>;
   if(!query.data)return <p role="alert" className="py-3 text-sm">No se encontraron las aprobaciones de esta propuesta. <Button variant="outline" onClick={()=>void query.refetch()}>Actualizar aprobaciones</Button></p>;
   const data=query.data,approved=data.partes.filter(p=>p.aprobada).length;
-  const unanimous = !data.requiereNuevaPropuesta && data.partes.length > 0 && approved === data.partes.length && !data.rechazo;
+  const unanimous = !data.requiereNuevaPropuesta && data.partes.length === 3
+    && ['GENERADOR','TRANSPORTISTA','OPERADOR'].every(role => data.partes.some(part => part.rol === role && part.aprobada)) && !data.rechazo;
   if(!['PENDIENTE_APROBACION','APROBADO'].includes(data.estado)&&!data.rechazo)return <section aria-label="Aprobaciones de las partes" className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-4"><span className="text-sm font-medium text-neutral-700">Aprobaciones registradas</span><PartyApprovalStatus partes={data.partes} compact showSummary/></section>;
   async function act(action:'approve'|'reject'|'start'){
     if(lock.current)return;lock.current=true;setBusy(true);setError('');

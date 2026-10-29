@@ -18,6 +18,19 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('renders a reversion through the owned notice and rechecks the original company access without sending', async () => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
+    const n = { ...notice, id: 'reversion-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'reversion_manifiesto', version: 1, destino: 'representante', accesosEmpresa: [access], motivo: 'PRIVATE' }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, generador: { usuarioId: 'owner' }, operador: { usuarioId: 'operator' } });
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+    expect(await notificationSourceEligible(n, 'manifiestos')).toBe(true);
+    const content = notificationMailContent(n)!;
+    expect(content.html).toContain('/notificaciones/reversion-notice'); expect(content.html).not.toContain('PRIVATE');
+    expect(mailText(content.html)).toContain('Estado del manifiesto corregido');
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [{ ...access, establecimientoId: 'other' }] }]);
+    expect(await notificationSourceEligible(n, 'manifiestos')).toBe(false); expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['propuesta_partes', 'adenda_manifiesto', 'certificado_manifiesto'])(
     'suppresses %s mail if only a different company activity is now authorized', async tipo => {
       const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa', establecimientoId: 'site' };

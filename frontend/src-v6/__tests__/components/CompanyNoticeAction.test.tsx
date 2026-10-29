@@ -55,6 +55,14 @@ it.each(['propuesta_partes','adenda_manifiesto'])('uses a specific action and pr
  expect(screen.queryByRole('button',{name:/certificado/})).toBeNull();
  expect(mocks.get).not.toHaveBeenCalled();
 });
+it('opens a representative reversion through the verified company context in web and app', () => {
+ const n = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'reversion_manifiesto', version: 1, destino: 'representante', accesosEmpresa: [access] }) };
+ for (const prefix of ['', '/app']) {
+  expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/notificaciones/n');
+  expect(resolveNotificationPath(n, prefix, undefined, true)).toBe(prefix + '/manifiestos/m');
+ }
+ expect(notificationCompanyAccesses(n)).toEqual([access]);
+});
 
 it.each(['duracion_transito_configurada', 'alerta_regla_manifiesto'])('opens a configured rule through the verified company context in web and app: %s', tipo => {
  const n = { ...notice, tipo: 'ALERTA_SISTEMA', datos: JSON.stringify({ tipo, version: 1, destino: 'representante', accesosEmpresa: [access], url: '/wrong' }) };

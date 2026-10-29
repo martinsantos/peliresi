@@ -37,7 +37,7 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
     await assertCanAccessManifiesto(prisma, req.user, req.params.id);
     const value = await prisma.$transaction(tx => load(tx, req.params.id));
     const role = value ? proposalRole(req.user, value.proposal) : null;
-    const legacyBlocked = !!value && legacyInSituWithoutCarrier(value.proposal) && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)) && ['PENDIENTE_APROBACION','APROBADO'].includes(value.manifest.estado);
+    const legacyBlocked = !!value && legacyInSituWithoutCarrier(value.proposal) && ['PENDIENTE_APROBACION','APROBADO'].includes(value.manifest.estado);
     const unanimous = !!value && !legacyBlocked && !value.events.some(e => e.tipo === 'RECHAZO_PARTE')
       && proposalRoles(value.proposal).every(rol => value.events.some(e => e.tipo === APPROVAL_EVENTS[rol]));
     res.json({ success: true, data: value ? {
@@ -120,7 +120,10 @@ export async function approveManifestParty(req: AuthRequest, res: Response, next
 /** Also guards direct HTTP pickup and any later administrative state reversal. */
 export async function assertManifestProposalApproved(tx: Tx, id: string) {
   const value = await load(tx, id);
-  if (value && legacyInSituWithoutCarrier(value.proposal) && !value.events.some(e=>COORDINATION_EVENTS.includes(e.tipo))) throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
+  if (!value) throw new AppError(manifestProposalsEnabled()
+    ? 'Este manifiesto anterior no registra las tres aprobaciones. Creá una nueva propuesta con las tres partes; el registro se conserva.'
+    : 'Este manifiesto anterior no registra las tres aprobaciones. Contactá a Ambiente para habilitar una nueva propuesta con las tres partes; el registro se conserva.', 409);
+  if (legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
   if (value && (value.events.some(e => e.tipo === 'RECHAZO_PARTE') || !proposalRoles(value.proposal).every(role => value.events.some(e => e.tipo === APPROVAL_EVENTS[role])))) throw new AppError('Falta la aprobación de una de las partes vinculadas; no se puede comenzar', 409);
   if(value && !value.events.some(e=>COORDINATION_EVENTS.includes(e.tipo))) throw new AppError('Las partes aprobaron: falta iniciar la coordinación antes de continuar',409);
 }
@@ -212,9 +215,9 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     detail='Falta aprobar: '+partes.filter(p=>!p.aprobada).map(p=>labels[p.rol]).join(', ')+'. No se puede iniciar.';
    }
    const inicio=m.eventos.find(e=>COORDINATION_EVENTS.includes(e.tipo))?.createdAt||null;
-   const legacyBlocked=(m.estado==='BORRADOR'&&!proposal)||(!!proposal&&legacyInSituWithoutCarrier(proposal)&&!inicio&&['PENDIENTE_APROBACION','APROBADO'].includes(m.estado));
+   const legacyBlocked=(['BORRADOR','APROBADO'].includes(m.estado)&&!proposal)||(!!proposal&&legacyInSituWithoutCarrier(proposal)&&['PENDIENTE_APROBACION','APROBADO'].includes(m.estado));
    if(legacyBlocked){
-    action='Necesita nueva propuesta';detail=m.estado==='BORRADOR'?'Este borrador anterior no tiene las tres aprobaciones. Creá una nueva propuesta con las tres partes; el borrador se conserva.':LEGACY_IN_SITU_MESSAGE;
+    action='Necesita nueva propuesta';detail=!proposal?'Este manifiesto anterior no registra las tres aprobaciones. Creá una nueva propuesta con las tres partes; el registro se conserva.':LEGACY_IN_SITU_MESSAGE;
    }
    const requiereMiAprobacion=!legacyBlocked&&!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
    return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereNuevaPropuesta:legacyBlocked,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];

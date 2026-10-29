@@ -31,6 +31,10 @@ export function manifestPushContent(notice: Pick<NoticeForMail, 'tipo' | 'datos'
     url: ownedNotice || url, prioridad: 'NORMAL',
   };
   if (notice.tipo !== 'INFO_GENERAL') return null;
+  if (data.tipo === 'reversion_manifiesto' && data.version === 1) return {
+    title: 'Estado del manifiesto corregido', body: 'Administración corrigió el estado. Revisá el historial y las acciones disponibles.',
+    url: ownedNotice || url, prioridad: 'NORMAL',
+  };
   if (data.tipo === 'relevo_transporte' && typeof data.tramoId === 'string') return {
     title: 'Cambio de transporte en tránsito', body: 'La transportista de origen registró un relevo. Revisá su seguimiento.',
     url: notice.rol === 'TRANSPORTISTA' ? '/transporte/perfil' : url, prioridad: 'ALTA',
