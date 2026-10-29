@@ -60,6 +60,9 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /otra pestaña mantiene abierto el seguimiento individual/i);
   assert.match(recovery, /se intenta guardar la última lectura no enviada/i);
   assert.match(recovery, /no comprueba otros dispositivos ni perfiles de navegador/i);
+  assert.match(recovery, /otra ventana está sincronizando esa misma cuenta/i);
+  assert.match(recovery, /si la espera supera diez segundos/i);
+  assert.match(recovery, /no se puede leer la copia local, aparece un error/i);
   assert.match(recovery, /no puede comprobar desde aquí lo que siga pendiente en otro dispositivo o perfil de navegador/i);
   assert.match(recovery, /no se puede verificar el viaje o el servidor/i);
   const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));

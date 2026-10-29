@@ -11,4 +11,14 @@ describe('OfflineSyncNotice', () => {
     fireEvent.click(screen.getByRole('button', { name:'Reintentar', exact:true }));
     expect(retry).toHaveBeenCalledOnce();
   });
+
+  it('shows a storage error even when the pending count could not be read', () => {
+    const retry = vi.fn(async () => {});
+    render(<OfflineSyncNotice status={{ processed:0, pending:0, retryable:0, terminal:0, auth:0, skipped:0,
+      syncing:false, lastError:'No se pudo abrir la copia local.', retry }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('No pudimos revisar la sincronización');
+    expect(screen.getByRole('status')).toHaveTextContent('No se pudo abrir la copia local.');
+    fireEvent.click(screen.getByRole('button', { name:'Reintentar', exact:true }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
 });

@@ -91,3 +91,102 @@ it('keeps an offline delivery pending while another page has this trip GPS, then
   expect(retried.processed).toBe(1); expect(retried.pending).toBe(0);
   expect(mock.post).toHaveBeenCalledExactlyOnceWith('/manifiestos/trip/confirmar-entrega', {});
 });
+
+function mockQueue(initial: Array<{id:number;type:string;endpoint:string;data:unknown;userId:string;createdAt:string;failureKind?:'retryable'|'terminal'|'auth'}>) {
+  let actions = [...initial];
+  const reads = vi.fn();
+  vi.stubGlobal('indexedDB', { open:vi.fn(() => {
+    const request: { result:unknown; onsuccess?:()=>void } = { result:{ transaction:() => {
+      const transaction: { oncomplete?:()=>void; objectStore:()=>unknown } = { objectStore:() => ({
+        getAll:() => { reads(); const read: { result:unknown; onsuccess?:()=>void } = { result:[...actions] }; queueMicrotask(() => read.onsuccess?.()); return read; },
+        delete:(id:number) => { actions = actions.filter(action=>action.id!==id); queueMicrotask(() => transaction.oncomplete?.()); },
+        put:(value:typeof actions[number]) => { actions = [...actions.filter(action=>action.id!==value.id),value]; queueMicrotask(() => transaction.oncomplete?.()); },
+      }) };
+      return transaction;
+    } } };
+    queueMicrotask(() => request.onsuccess?.()); return request;
+  }) });
+  return { reads, remaining:()=>actions };
+}
+
+it('waits for the first tab to remove its action before the second reads the queue', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]); let acknowledge!:()=>void;
+  mock.post.mockImplementationOnce(()=>new Promise<void>(resolve=>{acknowledge=resolve;}));
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const first=processSyncQueue('account-a');
+  await vi.waitFor(()=>expect(mock.post).toHaveBeenCalledOnce());
+  const second=processSyncQueue('account-a');
+  await Promise.resolve();expect(store.reads).toHaveBeenCalledOnce();
+  acknowledge(); const [firstResult,secondResult]=await Promise.all([first,second]);
+  expect(firstResult.processed).toBe(1);expect(secondResult.pending).toBe(0);
+  expect(mock.post).toHaveBeenCalledOnce();expect(store.remaining()).toEqual([]);
+});
+
+it('does not inspect or send a waiting account after its active context changes', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]);let acknowledge!:()=>void,current=true;
+  mock.post.mockImplementationOnce(()=>new Promise<void>(resolve=>{acknowledge=resolve;}));
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const first=processSyncQueue('account-a');await vi.waitFor(()=>expect(mock.post).toHaveBeenCalledOnce());
+  const second=processSyncQueue('account-a',false,()=>current);current=false;acknowledge();
+  await Promise.all([first,second]);
+  expect(store.reads).toHaveBeenCalledOnce();expect(mock.post).toHaveBeenCalledOnce();
+});
+
+it('lets distinct accounts synchronize their own actions independently', async () => {
+  const store=mockQueue([
+    {id:1,type:'POST',endpoint:'/manifiestos/trip-a/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'},
+    {id:2,type:'POST',endpoint:'/manifiestos/trip-b/confirmar-entrega',data:{},userId:'account-b',createdAt:'2026-10-28T00:00:00Z'},
+  ]);
+  let finishA!:()=>void;
+  mock.post.mockImplementation((url:string)=>url.includes('trip-a')?new Promise<void>(resolve=>{finishA=resolve;}):Promise.resolve());
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const first=processSyncQueue('account-a');await vi.waitFor(()=>expect(mock.post).toHaveBeenCalledOnce());
+  const second=await processSyncQueue('account-b');
+  expect(second.processed).toBe(1);expect(store.remaining().map(action=>action.id)).toEqual([1]);
+  finishA();expect((await first).processed).toBe(1);expect(store.remaining()).toEqual([]);
+  expect(mock.post.mock.calls.map(call=>call[0])).toEqual(['/manifiestos/trip-a/confirmar-entrega','/manifiestos/trip-b/confirmar-entrega']);
+});
+
+it('preserves queued work and explains when the browser cannot coordinate synchronization', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]);Object.defineProperty(navigator,'locks',{configurable:true,value:undefined});
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const result=await processSyncQueue('account-a');
+  expect(result).toMatchObject({processed:0,pending:1,retryable:1,skipped:1});
+  expect(result.lastError).toMatch(/navegador.*coordinar/i);
+  expect(mock.post).not.toHaveBeenCalled();expect(store.remaining()).toEqual([action]);
+});
+
+it('preserves existing failure categories when synchronization cannot be coordinated', async () => {
+  const common={type:'POST',data:{},createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([
+    {...common,id:1,endpoint:'/one',userId:'account-a',failureKind:'terminal'},
+    {...common,id:2,endpoint:'/two',userId:'account-a',failureKind:'auth'},
+    {...common,id:3,endpoint:'/three',userId:'account-a'},
+    {...common,id:4,endpoint:'/other',userId:'account-b',failureKind:'terminal'},
+  ]);
+  Object.defineProperty(navigator,'locks',{configurable:true,value:undefined});
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const result=await processSyncQueue('account-a');
+  expect(result).toMatchObject({processed:0,pending:3,retryable:1,terminal:1,auth:1,skipped:3});
+  expect(result.lastError).toMatch(/navegador.*coordinar/i);
+  expect(mock.post).not.toHaveBeenCalled();expect(store.remaining()).toHaveLength(4);
+});
+
+it('offers a retry instead of waiting indefinitely for another page', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]);let release!:()=>void;
+  const held=navigator.locks.request('sitrep:offline-sync:account-a',{mode:'exclusive'},async()=>new Promise<void>(resolve=>{release=resolve;}));
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+  try {
+    const pending=processSyncQueue('account-a');
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result=await pending;
+    expect(result).toMatchObject({processed:0,pending:1,retryable:1,skipped:1});
+    expect(result.lastError).toMatch(/otra ventana.*reintentá/i);
+    expect(mock.post).not.toHaveBeenCalled();expect(store.remaining()).toEqual([action]);
+  } finally {release();await held;vi.useRealTimers();}
+});

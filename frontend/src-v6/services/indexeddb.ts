@@ -280,6 +280,41 @@ export async function clearSyncQueue(): Promise<void> {
 class SyncContextChangedError extends Error {}
 
 export async function processSyncQueue(currentUserId: string | number, manual = false, isCurrent: () => boolean = () => true): Promise<SyncQueueResult> {
+  const empty = (): SyncQueueResult => ({ processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0 });
+  const cannotSync = async (message: string): Promise<SyncQueueResult> => {
+    if (!isCurrent()) return empty();
+    const owned = (await getSyncQueue()).filter(action => isSyncActionOwnedBy(action.userId, currentUserId));
+    if (!isCurrent()) return empty();
+    const terminal = owned.filter(action => action.failureKind === 'terminal').length;
+    const auth = owned.filter(action => action.failureKind === 'auth').length;
+    return { ...empty(), pending: owned.length, retryable: owned.length - terminal - auth, terminal, auth, skipped: owned.length,
+      ...(owned.length ? { lastError: message } : {}) };
+  };
+  const unavailable = () => cannotSync('Este navegador no puede coordinar la sincronización entre ventanas. Actualizalo o usá un navegador compatible.');
+  const busy = () => cannotSync('Otra ventana está sincronizando esta cuenta. Esperá a que termine y reintentá.');
+  if (typeof navigator === 'undefined' || typeof navigator.locks?.request !== 'function') return unavailable();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  let entered = false;
+  try {
+    // Acquire before reading the queue and retain the lock through each
+    // acknowledged deletion or failure update. A waiting page reads fresh
+    // actions instead of replaying another page's stale snapshot.
+    return await navigator.locks.request<Promise<SyncQueueResult>>(`sitrep:offline-sync:${encodeURIComponent(String(currentUserId))}`,
+      { mode: 'exclusive', signal: controller.signal }, async lock => {
+        entered = true;
+        clearTimeout(timer);
+        if (!lock) return unavailable();
+        if (!isCurrent()) return empty();
+        return processSyncQueueLocked(currentUserId, manual, isCurrent);
+      });
+  } catch (error) {
+    if (entered) throw error;
+    return controller.signal.aborted ? busy() : unavailable();
+  } finally { clearTimeout(timer); }
+}
+
+async function processSyncQueueLocked(currentUserId: string | number, manual: boolean, isCurrent: () => boolean): Promise<SyncQueueResult> {
   const queue = await getSyncQueue();
   const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId));
   const result: SyncQueueResult = { processed: 0, pending: owned.length, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
