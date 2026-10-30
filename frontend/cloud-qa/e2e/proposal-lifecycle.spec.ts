@@ -139,9 +139,14 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
    await expect(p).toHaveURL(new RegExp('/manifiestos/'+m.id+'/adendas\\?adenda='+id+'$'));
    await expect(card(p,id)).toBeVisible();
    await p.getByRole('button',{name:'Ver todas las adendas',exact:true}).click();
+   await expect(p).toHaveURL(new RegExp('/manifiestos/'+m.id+'/adendas$'));
+   await expect(p.getByRole('status').filter({hasText:'Cargando adendas…'})).toHaveCount(0);
+   await expect(card(p,id).getByRole('heading',{name:/^Adenda [0-9]+$/})).toBeVisible({timeout:20000});
   }
   await openAdendaNotice(gen,'Nueva adenda en tu manifiesto',finding.id);
   await card(gen,finding.id).getByLabel('Motivo de resolución',{exact:true}).fill('QA verificar cantidad de la corriente hallada');
+  await expect(card(gen,finding.id).getByLabel('Motivo de resolución',{exact:true})).toHaveValue('QA verificar cantidad de la corriente hallada');
+  await expect(card(gen,finding.id).getByRole('button',{name:'Observar',exact:true})).toBeEnabled();
   await post(gen,'/'+finding.id+'/revisiones',()=>card(gen,finding.id).getByRole('button',{name:'Observar',exact:true}).click());
   await openAdendaNotice(op,'Adenda observada',finding.id);
   await expect(card(op,finding.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Observada',{timeout:12000});
@@ -152,6 +157,8 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
   expect(rectification.rectificaId).toBe(finding.id);
   await expect(card(gen,rectification.id)).toBeVisible({timeout:12000});
   await card(gen,rectification.id).getByLabel('Motivo de resolución',{exact:true}).fill('QA cantidad rectificada revisada');
+  await expect(card(gen,rectification.id).getByLabel('Motivo de resolución',{exact:true})).toHaveValue('QA cantidad rectificada revisada');
+  await expect(card(gen,rectification.id).getByRole('button',{name:'Aprobar post facto',exact:true})).toBeEnabled();
   await post(gen,'/'+rectification.id+'/revisiones',()=>card(gen,rectification.id).getByRole('button',{name:'Aprobar post facto',exact:true}).click());
   await openAdendaNotice(op,'Adenda aprobada',rectification.id);
   await expect(card(op,rectification.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Aprobada post facto',{timeout:12000});

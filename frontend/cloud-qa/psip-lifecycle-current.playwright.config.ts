@@ -1,0 +1,7 @@
+import { defineConfig } from '@playwright/test';
+import path from 'node:path';
+import base from './proposal.playwright.config';
+export default defineConfig({ ...base, testMatch: ['psip-lifecycle-current.spec.ts'], timeout: 300_000,
+  outputDir: path.join(process.env.QA_ARTIFACTS!, 'psip-lifecycle-current'),
+  reporter: [['line'], ['json', { outputFile: path.join(process.env.QA_ARTIFACTS!, 'psip-lifecycle-current.json') }]],
+});
