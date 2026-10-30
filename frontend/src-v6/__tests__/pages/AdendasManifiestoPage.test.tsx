@@ -1,21 +1,70 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AdendasManifiestoPage from '../../pages/manifiestos/AdendasManifiestoPage';
 const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), training: false,role:'OPERADOR' }));
-vi.mock('../../services/api', () => ({ api: mock }));
+vi.mock('../../services/api', () => ({ api: mock, getAccessToken: () => 'qa.' + btoa(JSON.stringify({ id:'qa-user',rol:mock.role })) + '.qa' }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user',rol:mock.role, training: mock.training } }) }));
+// Hook and browser tests cover the asynchronous lock; these tests exercise
+// the page's behavior with an editor already granted ownership.
+vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: (_key:string,enabled:boolean) => ({
+  status:enabled&&navigator.locks?.request?'owned':'unavailable',canWrite:()=>enabled&&!!navigator.locks?.request,retry:vi.fn(),
+}) }));
 const record = { id: 'qa-adenda', motivo: 'Diferencia de carga', rectificaId: null, version: 0, estadoRevision: 'PENDIENTE', puedeResolver: false,
   creadoPorId: 'qa-carrier', createdAt: '2026-10-15T00:00:00Z', residuos: [{ corriente: 'Y2', cantidad: 12, unidad: 'kg' }],
   declaracion: { numero: 'QA-1', residuos: [{ corriente: 'Y1', cantidad: 10, unidad: 'kg' }] }, revisiones: [] };
 const data = { adendas: [record], total: 1, puedeRegistrar: false, manifiesto: { numero: 'QA-1', estado: 'TRATADO' } };
+
+it('preserves other review notes after a decision succeeds', async () => {
+  const other = { ...record, id: 'qa-other', puedeResolver: true };
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, puedeResolver: true }, other], total: 2 } } });
+  mock.post.mockResolvedValue({ data: {} }); view();
+  const first = await screen.findByRole('region', { name: 'Adenda qa-adenda' });
+  const second = screen.getByRole('region', { name: 'Adenda qa-other' });
+  fireEvent.change(within(first).getByLabelText('Motivo de resolución'), { target: { value: 'Decisión primera' } });
+  fireEvent.change(within(second).getByLabelText('Motivo de resolución'), { target: { value: 'Nota independiente' } });
+  fireEvent.click(within(first).getByRole('button', { name: 'Observar' }));
+  await screen.findByText(/La acción quedó registrada/);
+  expect(within(first).getByLabelText('Motivo de resolución')).toHaveValue('');
+  expect(within(second).getByLabelText('Motivo de resolución')).toHaveValue('Nota independiente');
+});
+
+it('recognizes a committed review from history after final certification without posting again', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, puedeResolver: true }] } } });
+  mock.post.mockRejectedValueOnce(new Error('response lost')); view();
+  fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Revisión guardada' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Observar' }));
+  await screen.findByRole('button', { name: 'Comprobar envío' });
+  const posted = mock.post.mock.calls[0][1];
+  const confirmed = { ...record, version: 1, puedeResolver: false,
+    revisiones: [{ ...posted, autorId: 'qa-user', fecha: '2026-10-30' }] };
+  mock.get.mockResolvedValue({ data: { data: { ...data, finalLiberado: true, adendas: [confirmed] } } });
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
+  await screen.findByText(/La acción quedó registrada/);
+  expect(mock.post).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button', { name: 'Comprobar envío' })).not.toBeInTheDocument();
+});
+
+it('retains an uncertain command when a retry receives a conflict', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, puedeResolver: true }] } } });
+  mock.post.mockRejectedValueOnce(new Error('response lost')).mockRejectedValueOnce({ response: { status: 409, data: { message: 'La revisión cambió' } } });
+  view(); fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Decisión pendiente' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Observar' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Comprobar envío' }));
+  await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2));
+  expect(mock.post.mock.calls[1]).toEqual(mock.post.mock.calls[0]);
+  expect(screen.getByRole('button', { name: 'Comprobar envío' })).toBeEnabled();
+  expect(screen.getByLabelText('Motivo de resolución')).toBeDisabled();
+});
 function view() {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } })}>
     <MemoryRouter initialEntries={['/manifiestos/qa-id/adendas']}><Routes><Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} /></Routes></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { localStorage.clear();mock.role='OPERADOR';mock.training = false; vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true'); mock.get.mockResolvedValue({ data: { data } }); });
+beforeEach(() => { localStorage.clear();sessionStorage.clear();mock.role='OPERADOR';mock.training = false; vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true');
+  Object.defineProperty(navigator,'locks',{configurable:true,value:{request:async (name:string,_options:unknown,callback:(lock:unknown)=>Promise<void>)=>callback({name})}});
+  mock.get.mockResolvedValue({ data: { data } }); });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 it('flag off makes no request', () => { vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'false'); view(); expect(mock.get).not.toHaveBeenCalled(); });
 it('keeps original and observed loads separate; read-only participant has no write controls', async () => {
@@ -32,7 +81,7 @@ it('failed resolution retains the reason and idempotency key, never shows false 
   fireEvent.change(note, { target: { value: 'Revisión con evidencia' } });
   fireEvent.click(screen.getByRole('button', { name: 'Aprobar post facto' })); await screen.findByRole('alert');
   expect(note).toHaveValue('Revisión con evidencia'); expect(screen.getByText('Pendiente de revisión')).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Aprobar post facto' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
   await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2)); expect(mock.post.mock.calls[0]).toEqual(mock.post.mock.calls[1]);
 });
 it('successful write invalidates even a fresh list and shows the server resolution', async () => {
@@ -208,7 +257,7 @@ it('a remote revision cannot silently rebase a decision already being written', 
   const reviewable = { ...record, puedeResolver: true };
   mock.get.mockResolvedValueOnce({ data: { data: { ...data, adendas: [reviewable] } } })
     .mockResolvedValue({ data: { data: { ...data, adendas: [{ ...reviewable, version: 1, estadoRevision: 'OBSERVADA' }] } } });
-  mock.post.mockRejectedValueOnce({ response: { data: { message: 'La revisión cambió; recargá antes de resolver' } } }).mockResolvedValue({ data: {} });
+  mock.post.mockRejectedValueOnce({ response: { status:409, data: { message: 'La revisión cambió; recargá antes de resolver' } } }).mockResolvedValue({ data: {} });
   view(); fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Mi decisión escrita sobre versión cero' } });
   fireEvent.click(screen.getByRole('button', { name: 'Aprobar post facto' })); await screen.findByRole('alert');
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar revisiones' })); await screen.findByText('Observada');
@@ -243,7 +292,7 @@ it('keeps the same request id after a failed decision and app reopen',async()=>{
  const page=view();fireEvent.change(await screen.findByLabelText('Motivo de resolución'),{target:{value:'Mi decisión conservada'}});
  fireEvent.click(screen.getByRole('button',{name:'Observar'}));await screen.findByRole('alert');const first=mock.post.mock.calls[0][1];page.unmount();
  view();expect(await screen.findByLabelText('Motivo de resolución')).toHaveValue('Mi decisión conservada');
- fireEvent.click(screen.getByRole('button',{name:'Observar'}));await waitFor(()=>expect(mock.post).toHaveBeenCalledTimes(2));expect(mock.post.mock.calls[1][1]).toEqual(first);
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));await waitFor(()=>expect(mock.post).toHaveBeenCalledTimes(2));expect(mock.post.mock.calls[1][1]).toEqual(first);
 });
 
 it('requires a deliberate choice before replacing another tab’s draft',async()=>{
@@ -264,8 +313,8 @@ it('reuses the other tab’s attempted request after deliberately loading that d
  fireEvent.change(await screen.findByLabelText('Motivo de resolución'),{target:{value:'Texto local'}});
  const key=Object.keys(localStorage).find(k=>k.startsWith('sitrep:adenda-form:'))!;
  const other=JSON.parse(localStorage.getItem(key)!);other.revision='other-request';other.value.notes[record.id]='Texto externo';
- other.value.pending={id:'qa-stable-request',signature:JSON.stringify({path:'/manifiestos/qa-id/adendas/qa-adenda/revisiones',body:{version:0,decision:'OBSERVADA',nota:'Texto externo'}})};
+ other.value.pending={id:'00000000-0000-4000-8000-000000000005',signature:JSON.stringify({path:'/manifiestos/qa-id/adendas/qa-adenda/revisiones',body:{version:0,decision:'OBSERVADA',nota:'Texto externo'}})};
  localStorage.setItem(key,JSON.stringify(other));fireEvent(window,new StorageEvent('storage',{key}));
- fireEvent.click(await screen.findByRole('button',{name:'Cargar la otra versión'}));fireEvent.click(screen.getByRole('button',{name:'Observar'}));
- await waitFor(()=>expect(mock.post).toHaveBeenCalledTimes(1));expect(mock.post.mock.calls[0][1].id).toBe('qa-stable-request');
+ fireEvent.click(await screen.findByRole('button',{name:'Cargar la otra versión'}));fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ await waitFor(()=>expect(mock.post).toHaveBeenCalledTimes(1));expect(mock.post.mock.calls[0][1].id).toBe('00000000-0000-4000-8000-000000000005');
 });

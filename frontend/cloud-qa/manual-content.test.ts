@@ -28,6 +28,17 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('addenda distinguish local drafts from an uncertain or confirmed submission', () => {
+  const guide = guides.find((g: any) => g.id === 'adendas-hallazgos-partes');
+  const step = guide.steps.find((s: any) => s.title === 'Guardar y recuperar la adenda');
+  const text = JSON.stringify(step);
+  assert.match(text, /Comprobar envío/);
+  assert.match(text, /misma referencia y el contenido original/);
+  assert.match(text, /no despacha una solicitud nueva/);
+  assert.match(text, /sólo una pestaña con esta versión puede editar/);
+  assert.match(text, /no se sincroniza entre dispositivos/);
+  assert.doesNotMatch(text, /Dura siete días/);
+});
 test('eventual records without a site require full company authorization', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'eventuales-aprobaciones-avisos'));
   assert.match(text, /eventuales no identifican una sede/);
