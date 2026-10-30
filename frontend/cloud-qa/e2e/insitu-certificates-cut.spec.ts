@@ -33,8 +33,9 @@ test('origin final certificate reaches all linked parties and its real mail link
    await page.setContent(readFileSync(path.join(out,proof.mails[role]),'utf8'));
    const link=page.locator(`[data-mail-action="${info.project.name==='app'?'app':'web'}"]`);
    await expect(link).toHaveCount(1);const target=new URL((await link.getAttribute('href'))!);
-   expect(target.pathname).toBe(prefix(info)+'/manifiestos/'+proof.id);
-   expect(target.searchParams.get('certificado')).toBe(proof.finalId);
+   const companyNotice=proof.mailDestinations[role]==='notice';
+   expect(target.pathname).toBe(prefix(info)+(companyNotice?'/notificaciones/'+proof.notices[role]:'/manifiestos/'+proof.id));
+   if(!companyNotice)expect(target.searchParams.get('certificado')).toBe(proof.finalId);
    await page.screenshot({path:info.outputPath('correo-'+role+'.png'),fullPage:true});
    await link.click();await expect(page).toHaveURL(/\/login$/);
    await page.getByLabel('Correo electrónico o CUIT').fill(role+'@night-qa.invalid');
@@ -44,6 +45,12 @@ test('origin final certificate reaches all linked parties and its real mail link
    await expect(page).toHaveURL(target.href);
    const welcome=page.getByRole('button',{name:'Saltar introducción',exact:true});
    if(await welcome.isVisible())await welcome.click();
+   if(companyNotice){
+    await expect(page.getByRole('region',{name:'Aviso recibido'})).toContainText('Certificación final total disponible');
+    const roleName=role==='generador'?'Generador':'Transporte';
+    await page.getByRole('button',{name:new RegExp('^(Usar '+roleName+' y abrir certificado|Abrir certificado)$')}).click();
+    await expect(page).toHaveURL(new RegExp('/manifiestos/'+proof.id+'\\?certificado='+proof.finalId+'#certificaciones$'));
+   }
    const card=page.locator('[data-certificate-id="'+proof.finalId+'"]');await expect(card).toBeVisible();
    expect(await hashDownload(page)).toBe(proof.finalSha256);
    await expect(page.getByRole('button',{name:'Emitir certificación parcial',exact:true})).toHaveCount(0);
@@ -51,8 +58,9 @@ test('origin final certificate reaches all linked parties and its real mail link
    await readablePageHeading(page);await page.screenshot({path:info.outputPath('certificado-'+role+'.png'),animations:'disabled'});
    await page.goto(prefix(info)+'/notificaciones/'+proof.notices[role]);
    await expect(page.getByRole('region',{name:'Aviso recibido'})).toContainText('Certificación final total disponible');
-   await page.getByRole('link',{name:'Ver certificación y descargar →',exact:true}).click();
-   await expect(page).toHaveURL(target.href);await expect(card).toBeVisible();
+   if(companyNotice)await page.getByRole('button',{name:/^(Usar (Generador|Transporte) y abrir certificado|Abrir certificado)$/}).click();
+   else await page.getByRole('link',{name:'Ver certificación y descargar →',exact:true}).click();
+   await expect(page).toHaveURL(new RegExp('/manifiestos/'+proof.id+'\\?certificado='+proof.finalId+'#certificaciones$'));await expect(card).toBeVisible();
   }
   const context=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});contexts.push(context);
   const operator=await context.newPage();operator.on('pageerror',error=>errors.push(error.message));await login(operator,info,'operador');

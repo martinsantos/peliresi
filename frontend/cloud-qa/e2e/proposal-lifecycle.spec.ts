@@ -58,7 +58,8 @@ async function create(page:Page,info:TestInfo,role:Role){
  expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');
  await markSynthetic(result.manifiesto.id,result.manifiesto.numero);return result.manifiesto;
 }
-for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+creator+' creates; each party approves, inbox updates, transport starts',async({browser},info)=>{
+const lifecycleCreators: readonly Role[] = process.env.QA_LIFECYCLE_ALL_CREATORS === 'true' ? roles : ['operador'];
+for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+creator+' creates; each party approves, inbox updates, transport starts',async({browser},info)=>{
  const contexts=[],pages={} as Record<Role,Page>,homes={} as Record<Role,string>,errors:string[]=[];
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
  try{
@@ -231,7 +232,16 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
    for(const role of ['generador','transportista'] as const){
     const p=pages[role],notice=p.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:record.numero});
     await expect(notice).toBeVisible({timeout:40000});await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
-    await expect(p).toHaveURL(new RegExp('/manifiestos/'+m.id+'\\?certificado='+record.id+'#certificaciones$'));
+    const certificateUrl=new RegExp('/manifiestos/'+m.id+'\\?certificado='+record.id+'#certificaciones$');
+    await p.waitForURL(url=>certificateUrl.test(url.pathname+url.search+url.hash)||/\/notificaciones\/[^/]+$/.test(url.pathname));
+    if (/\/notificaciones\/[^/]+$/.test(new URL(p.url()).pathname)) {
+     await expect(p.getByRole('heading',{name:kind==='PARCIAL'?'Certificación parcial disponible':'Certificación final total disponible',exact:true})).toBeVisible();
+     const roleName=role==='generador'?'Generador':'Transporte';
+     const selectContext=p.getByRole('button',{name:new RegExp('^(Usar '+roleName+' y abrir certificado|Abrir certificado)$')});
+     await expect(selectContext).toHaveCount(1);
+     await selectContext.click();
+    }
+    await expect(p).toHaveURL(certificateUrl);
     await expect(p.locator('[data-certificate-id="'+record.id+'"]')).toBeVisible();expect(await downloadHash(p,label)).toBe(record.pdfSha256);
     await expect(p.getByRole('button',{name:'Emitir certificación parcial',exact:true})).toHaveCount(0);
     await proof(p,info,kind.toLowerCase()+'-received-'+role);
@@ -249,7 +259,7 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   expect(details.residuos[0].tipoResiduo.codigo).toBe('Y1');
   expect(Number(details.residuos[0].cantidad)).toBe(21);
   expect(Number(details.residuos[0].cantidadRecibida)).toBe(22);
-  writeFileSync(info.outputPath('complete-lifecycle.json'),JSON.stringify({id:m.id,numero:m.numero,surface:info.project.name,certificates,partialQuantity:7,originalDeclaration:21,received:22,treatedFinding:{corriente:'Y12',cantidad:1},finding:finding.id,rectification:rectification.id,originalRemainsObserved:true,samePdfAcrossParties:true,noticesWithoutReload:true,actualRoles:true,externalDelivery:false}));
+  writeFileSync(info.outputPath('complete-lifecycle.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,certificates,partialQuantity:7,originalDeclaration:21,received:22,treatedFinding:{corriente:'Y12',cantidad:1},finding:finding.id,rectification:rectification.id,originalRemainsObserved:true,samePdfAcrossParties:true,noticesWithoutReload:true,actualRoles:true,externalDelivery:false}));
 
   expect(errors).toEqual([]);writeFileSync(info.outputPath('proof.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,realLogins:3,cap:false,liveWithoutReload:true,errors}));
  }finally{for(const c of contexts)await c.close();}

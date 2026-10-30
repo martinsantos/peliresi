@@ -53,7 +53,7 @@ try{
   const parcial=(await api('operador',`/manifiestos/${m.id}/certificados`,'POST',{id:randomUUID(),tipo:'PARCIAL',firma:signature,metodo:method,cantidades:[{residuoId:residue.id,cantidad:Math.min(4,quantity)}]},201));
   await api('operador',`/manifiestos/${m.id}/cerrar`,'POST',{});
   const final=(await api('operador',`/manifiestos/${m.id}/certificados`,'POST',{id:randomUUID(),tipo:'FINAL',firma:signature,metodo:method,cantidades:[{residuoId:residue.id,cantidad:quantity}]},201));
-  const notices:Record<string,string>={},mails:Record<string,string>={};
+  const notices:Record<string,string>={},mails:Record<string,string>={},mailDestinations:Record<string,string>={};
   for(const role of roles){
    const list=await api(role,`/manifiestos/${m.id}/certificados`);
    assert.ok(list.some((item:any)=>item.id===parcial.id));assert.ok(list.some((item:any)=>item.id===final.id));
@@ -71,7 +71,11 @@ try{
     const notice=found[0],metadata=JSON.parse(notice.datos!);
     assert.equal(metadata.documentoId,final.id);assert.equal(metadata.tipoCertificado,'FINAL');
     const mail=notificationMailContent({...notice.usuario,...notice});
-    assert.ok(mail);assert.match(mail.html,/certificado=/);assert.match(mail.html,/certificaciones/);
+    assert.ok(mail);
+    const companyAccess=Array.isArray(metadata.accesosEmpresa)&&metadata.accesosEmpresa.length>0;
+    if(companyAccess)assert.ok(mail.html.includes('/notificaciones/'+notice.id));
+    else {assert.match(mail.html,/certificado=/);assert.match(mail.html,/certificaciones/);}
+    mailDestinations[role]=companyAccess?'notice':'manifest';
     notices[role]=notice.id;
     const file='insitu-final-mail-'+proof.surface+'-'+role+'.html';writeFileSync(path.join(out,file),mail.html);mails[role]=file;
    }
@@ -80,7 +84,7 @@ try{
   assert.equal(current.estado,'TRATADO');assert.equal(current.fechaRetiro,null);
   assert.equal(await db.trackingGPS.count({where:{manifiestoId:m.id}}),0);
   assert.equal(await db.tramoTransporte.count({where:{manifiestoId:m.id}}),0);
-  results.push({surface:proof.surface,id:m.id,numero:m.numero,partialId:parcial.id,finalId:final.id,finalSha256:final.pdfSha256,notices,mails,noTripOrGps:true});
+  results.push({surface:proof.surface,id:m.id,numero:m.numero,partialId:parcial.id,finalId:final.id,finalSha256:final.pdfSha256,notices,mails,mailDestinations,noTripOrGps:true});
  }
  assert.equal(await db.emailQueue.count({where:{intentos:{gt:0}}}),0);
  assert.equal(await db.emailQueue.count({where:{sentAt:{not:null}}}),0);

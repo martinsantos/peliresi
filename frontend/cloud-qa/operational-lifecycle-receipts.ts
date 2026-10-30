@@ -17,7 +17,12 @@ const browser = path.join(root, 'manifest-complete');
 const proofs = readdirSync(browser, { withFileTypes: true }).filter(entry => entry.isDirectory())
   .map(entry => path.join(browser, entry.name, 'complete-lifecycle.json')).filter(existsSync)
   .map(file => JSON.parse(readFileSync(file, 'utf8')));
-assert.deepEqual(proofs.map(proof => proof.surface).sort(), ['app', 'web-desktop']);
+const allCreators = process.env.QA_LIFECYCLE_ALL_CREATORS === 'true';
+if (allCreators) {
+  assert.deepEqual(proofs.map(proof => `${proof.surface}:${proof.creator}`).sort(),
+    ['app:generador', 'app:operador', 'app:transportista',
+      'web-desktop:generador', 'web-desktop:operador', 'web-desktop:transportista']);
+} else assert.deepEqual(proofs.map(proof => proof.surface).sort(), ['app', 'web-desktop']);
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
 const results: unknown[] = [];
 try {
@@ -49,13 +54,13 @@ try {
     const digest = createHash('sha256').update(certificate.pdf).digest('hex');
     assert.equal(digest, certificate.pdfSha256);
     assert.equal(digest, finalProof.sha256);
-    const pdf = path.join(root, 'final-' + proof.surface + '.pdf');
+    const pdf = path.join(root, 'final-' + proof.surface + (allCreators ? '-' + proof.creator : '') + '.pdf');
     writeFileSync(pdf, certificate.pdf);
     const text = execFileSync('pdftotext', ['-raw', pdf, '-'], { encoding: 'utf8' }).replace(/\s+/g, ' ');
     assert.match(text, /Y1\s+22\s+kg/);
     assert.match(text, /Y12\s+1\s+kg/);
     assert.match(text, /SIN VALIDEZ OFICIAL/);
-    results.push({ surface: proof.surface, manifest: proof.numero, certificate: certificate.numero, sha256: digest,
+    results.push({ surface: proof.surface, creator: proof.creator, manifest: proof.numero, certificate: certificate.numero, sha256: digest,
       declaration: 'Y1 21 kg', received: 'Y1 22 kg', treatedFinding: 'Y12 1 kg', original: 'OBSERVADA', rectification: 'APROBADA' });
   }
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);

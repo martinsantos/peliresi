@@ -127,7 +127,15 @@ for(const creator of roles)test('in-situ proposal: '+creator+' creates; three pa
    const notice=reader.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero}).filter({hasText:'Manifiesto pendiente de tu aprobación'});
    await expect(notice).toBeVisible();
    await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
-   await expect(reader).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+   const manifestUrl=new RegExp('/manifiestos/'+m.id+'$');
+   await reader.waitForURL(url=>manifestUrl.test(url.pathname)||/\/notificaciones\/[^/]+$/.test(url.pathname));
+   if (/\/notificaciones\/[^/]+$/.test(new URL(reader.url()).pathname)) {
+    await expect(reader.getByRole('heading',{name:'Manifiesto pendiente de tu aprobación',exact:true})).toBeVisible();
+    const roleName=role==='generador'?'Generador':role==='transportista'?'Transporte':'Operador';
+    const selectContext=reader.getByRole('button',{name:new RegExp('^(Usar '+roleName+' y abrir manifiesto|Abrir manifiesto)$')});
+    await expect(selectContext).toHaveCount(1);await selectContext.click();
+   }
+   await expect(reader).toHaveURL(manifestUrl);
    const panel=reader.getByRole('region',{name:'Aprobaciones de las partes'});
    await expect(panel).toContainText('0 de 3 aprobaciones');
    for(const name of ['Generador','Transporte','Operador'])await expect(panel.getByLabel(name+': Pendiente',{exact:true})).toBeVisible();

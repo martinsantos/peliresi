@@ -129,6 +129,48 @@ try{
    await channel('email');await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('entrega fue registrada');
    await page.locator('#role').selectOption('');await page.locator('#family').selectOption('');
  });
+ await check('current state transitions and reversions cover parties, administrators and representatives',async()=>{
+   const states=['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','TRATADO','CANCELADO','CANCELADO-ADMIN'];
+   const parties=['GENERADOR','TRANSPORTISTA','OPERADOR'];
+   for(const state of states){
+     const sample=data.cases.filter((entry:any)=>entry.id.startsWith('estado-vigente-'+state+'-')
+       && !entry.id.startsWith('estado-vigente-representante-'));
+     assert.ok(sample.some((entry:any)=>entry.roles.includes('ADMIN')),'missing administrator '+state);
+     for(const role of parties){
+       const item=data.cases.find((entry:any)=>entry.id==='estado-vigente-representante-'+state+'-'+role);
+       assert.ok(item,'missing representative '+state+' '+role);
+       const metadata=JSON.parse(item.notice.datos);
+       assert.equal(metadata.tipo,'estado_manifiesto');assert.equal(metadata.destino,'representante');
+       assert.equal(metadata.accesosEmpresa[0].rol,role);
+       assert.equal(item.paths[role],'/notificaciones/'+item.notice.id);
+       assert.ok(item.mailRefs[role],'missing state email '+state+' '+role);
+     }
+   }
+   for(const [previous,next] of [['APROBADO','BORRADOR'],['EN_TRANSITO','APROBADO'],['ENTREGADO','EN_TRANSITO'],
+     ['RECIBIDO','ENTREGADO'],['EN_TRATAMIENTO','RECIBIDO'],['TRATADO','EN_TRATAMIENTO'],
+     ['TRATADO','RECIBIDO'],['RECHAZADO','ENTREGADO']]){
+     for(const role of [...parties,'ADMIN']){
+       const item=data.cases.find((entry:any)=>entry.id==='reversion-vigente-'+previous+'-'+next+'-'+role);
+       assert.ok(item,'missing correction '+previous+' '+next+' '+role);
+       assert.equal(item.notice.titulo,'Estado del manifiesto corregido');
+       assert.equal(JSON.parse(item.notice.datos).estadoAnterior,previous);
+       assert.equal(JSON.parse(item.notice.datos).estadoNuevo,next);
+       assert.ok(item.mailRefs[role],'missing correction email');
+     }
+     for(const role of parties){
+       const item=data.cases.find((entry:any)=>entry.id==='reversion-vigente-representante-'+previous+'-'+next+'-'+role);
+       assert.ok(item,'missing correction representative');
+       assert.equal(JSON.parse(item.notice.datos).accesosEmpresa[0].rol,role);
+       assert.equal(item.paths[role],'/notificaciones/'+item.notice.id);
+     }
+   }
+   assert.ok(data.coverage.discoveredProducers.some((file:string)=>file.endsWith('/manifestStateNotice.service.ts')));
+   await page.locator('#role').selectOption('TRANSPORTISTA');await page.locator('#family').selectOption('Manifiestos · operación');
+   await select('reversion-vigente-representante-ENTREGADO-EN_TRANSITO-TRANSPORTISTA');await channel('inbox');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Estado del manifiesto corregido');
+   await channel('email');await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Administración corrigió el estado');
+   await page.locator('#role').selectOption('');await page.locator('#family').selectOption('');
+ });
  await check('origin certificates include the approving carrier when one is linked',async()=>{
    for(const kind of ['PARCIAL','FINAL']){
      const current=data.cases.find((entry:any)=>entry.id==='certificado-insitu-'+kind);
@@ -214,6 +256,6 @@ try{
  await check('no runtime errors or external network requests',async()=>{assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);assert.deepEqual(overflows,[]);});
  console.log(JSON.stringify({checks:checks.length,overflows}));
 }finally{
- fs.writeFileSync(path.join(dir,'qa-result.json'),JSON.stringify({browserPath:'Playwright en QA remoto aislado; navegación del producto comprobada por separado en IAB',viewports:[{width:1440,height:1000},{width:390,height:844}],sampleWidth:375,source:data.coverage.source,checks,overflows,errors,externalRequests:requests},null,2));
+ fs.writeFileSync(path.join(dir,'qa-result.json'),JSON.stringify({browserPath:'Playwright en QA remoto aislado; no es Android físico',viewports:[{width:1440,height:1000},{width:390,height:844}],sampleWidth:375,source:data.coverage.source,checks,overflows,errors,externalRequests:requests},null,2));
  await browser.close();
 }

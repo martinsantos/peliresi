@@ -113,6 +113,48 @@ for(const role of parties){
  const notice=capture.find(item=>item.usuarioId==='REP-'+role);if(!notice)throw Error('Missing delivery representative '+role);
  add('entrega-representante-'+role,'Manifiestos · operación',[role],deliverySource,notice,undefined,'Ejemplo de una persona representante con autorización para esta actividad. El acceso se comprueba nuevamente al abrir el aviso.','Sujeto a representación habilitada');
 }
+const stateSource='backend/src/services/manifestStateNotice.service.ts';
+const stateProducer=moduleLoad(stateSource);
+for(const [sample,state,author] of [
+ ['EN_TRANSITO','EN_TRANSITO','TRANSPORTISTA'],['ENTREGADO','ENTREGADO','TRANSPORTISTA'],
+ ['RECIBIDO','RECIBIDO','OPERADOR'],['EN_TRATAMIENTO','EN_TRATAMIENTO','OPERADOR'],
+ ['TRATADO','TRATADO','OPERADOR'],['CANCELADO','CANCELADO','GENERADOR'],
+ ['CANCELADO-ADMIN','CANCELADO','ADMIN'],
+]){
+ capture=[];await stateProducer.notifyManifestState(db,manifest,state,'EVENTO-ESTADO-'+sample,author);
+ const direct=[...parties.filter(role=>role!==author),'ADMIN'];
+ const expected=[...direct,...parties.map(role=>'REP-'+role)].sort();
+ if(JSON.stringify(capture.map(item=>item.usuarioId).sort())!==JSON.stringify(expected))throw Error('Unexpected state audience '+sample);
+ for(const role of direct){
+  const notice=capture.find(item=>item.usuarioId===role);
+  add('estado-vigente-'+sample+'-'+role,'Manifiestos · operación',[role],stateSource,notice,undefined,
+   'Aviso transaccional de cambio de estado. Autor del ejemplo: '+author+'. El cierre de tratamiento no emite por sí solo una certificación.');
+ }
+ for(const role of parties){
+  const notice=capture.find(item=>item.usuarioId==='REP-'+role);
+  add('estado-vigente-representante-'+sample+'-'+role,'Manifiestos · operación',[role],stateSource,notice,undefined,
+   'Persona representante de esta actividad. Debe conservar su autorización para abrir el aviso.','Sujeto a representación habilitada');
+ }
+}
+const validReversions=variable('backend/src/domain/manifiestoWorkflow.ts','VALID_MANIFEST_REVERSIONS');
+for(const [previous,targets] of Object.entries(validReversions) as [string,string[]][]){
+ for(const next of targets){
+  const sample=previous+'-'+next;
+  capture=[];await stateProducer.notifyManifestReversion(db,manifest,previous,next,'EVENTO-REVERSION-'+sample,'ADMIN');
+  const direct=[...parties,'ADMIN'],expected=[...direct,...parties.map(role=>'REP-'+role)].sort();
+  if(JSON.stringify(capture.map(item=>item.usuarioId).sort())!==JSON.stringify(expected))throw Error('Unexpected reversion audience '+sample);
+  for(const role of direct){
+   const notice=capture.find(item=>item.usuarioId===role);
+   add('reversion-vigente-'+sample+'-'+role,'Manifiestos · operación',[role],stateSource,notice,undefined,
+    'Corrección administrativa de '+previous+' a '+next+'. No representa una nueva entrega o retiro.');
+  }
+  for(const role of parties){
+   const notice=capture.find(item=>item.usuarioId==='REP-'+role);
+   add('reversion-vigente-representante-'+sample+'-'+role,'Manifiestos · operación',[role],stateSource,notice,undefined,
+    'Corrección administrativa con acceso por representación. Revisá el estado y el historial.','Sujeto a representación habilitada');
+  }
+ }
+}
 const operationsSource='backend/src/services/manifestOperationalNotice.service.ts';
 const operationsProducer=moduleLoad(operationsSource);
 for(const [sample,kind,recipient,author,extra] of [

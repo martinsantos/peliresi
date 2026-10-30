@@ -6,9 +6,10 @@ import { assertCloudDatabase, assertCloudEnvironment, backendRequire, externalKe
 
 // Verify only the isolated run. This audit never opens a production connection.
 await assertCloudDatabase();
-const out = '/work/sitrep/.qa-operational-ui-current2026102942';
+const candidate = process.env.SITREP_QA_RUN === 'closure-candidate-32b12b81';
+const out = candidate ? '/work/sitrep/.qa-operational-ui-current2026102950' : '/work/sitrep/.qa-operational-ui-current2026102942';
 assert.equal(process.env.QA_ARTIFACTS, out);
-assert.equal(process.env.GITHUB_SHA, 'c64352127bf390839cf309339bf5768d045d6618');
+assert.equal(process.env.GITHUB_SHA, candidate ? '32b12b81161b01648608286f1c36e8eec1839044' : 'c64352127bf390839cf309339bf5768d045d6618');
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
 const read = (file: string) => JSON.parse(readFileSync(path.join(out, file), 'utf8'));
 const processes = read('processes.json');
@@ -26,7 +27,7 @@ for (const { pid } of processes) {
   for (const key of externalKeys) assert.equal(env[key], '');
 }
 const browserCounts: Record<string, number> = {
-  'manifest-complete.json': 2,
+  'manifest-complete.json': candidate ? 6 : 2,
   'proposal-e2e-initial.json': 6,
   'insitu-certificates-browser.json': 2,
   'fleet-browser.json': 2,
@@ -47,12 +48,14 @@ assert.equal(operational.complete, true);
 assert.deepEqual(operational.created.map((item: { creator: string }) => item.creator).sort(),
   ['generador', 'operador', 'transportista']);
 const receipts = read('receipts-verified.json');
-assert.equal(receipts.results.length, 2);
+assert.equal(receipts.results.length, candidate ? 6 : 2);
+if (candidate) assert.deepEqual(receipts.results.map((receipt: {surface: string; creator: string}) => `${receipt.surface}:${receipt.creator}`).sort(),
+  ['app:generador', 'app:operador', 'app:transportista', 'web-desktop:generador', 'web-desktop:operador', 'web-desktop:transportista']);
 for (const receipt of receipts.results) {
   assert.equal(receipt.original, 'OBSERVADA'); assert.equal(receipt.rectification, 'APROBADA');
   assert.equal(receipt.declaration, 'Y1 21 kg'); assert.equal(receipt.received, 'Y1 22 kg');
   assert.equal(receipt.treatedFinding, 'Y12 1 kg');
-  const file = receipt.surface === 'app' ? 'final-app.pdf' : 'final-web-desktop.pdf';
+  const file = 'final-' + receipt.surface + (candidate ? '-' + receipt.creator : '') + '.pdf';
   assert.equal(createHash('sha256').update(readFileSync(path.join(out, file))).digest('hex'), receipt.sha256);
 }
 const inSituCertificates = read('insitu-certificates.json');
