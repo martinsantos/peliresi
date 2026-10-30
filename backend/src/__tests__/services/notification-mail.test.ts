@@ -487,6 +487,34 @@ describe('signature reminder mail freshness',()=>{
   });
 });
 
+describe('operation reminder mail', () => {
+  it.each(['FIJO', 'IN_SITU'])('keeps %s context and suppresses changed, closed or revoked cases', async modalidad => {
+    const planned = new Date(Date.now() + 3600000);
+    const fechaDia = planned.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' });
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
+    const n = { ...notice, id: 'operation-notice', usuarioId: 'rep', rol: 'OPERADOR', manifiestoId: 'm', tipo: 'ALERTA_SISTEMA',
+      datos: JSON.stringify({ tipo: 'recordatorio_operacion', version: 1, modalidad, fechaDia, destino: 'representante', accesosEmpresa: [access] }) };
+    const manifest = { isDemoData: false, estado: 'APROBADO', modalidad, fechaEstimadaRetiro: planned,
+      generador: { usuarioId: 'owner' }, operador: { usuarioId: 'other' } };
+    mocks.manifest.mockResolvedValue(manifest); mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(true);
+    const content = notificationMailContent(n)!; expect(content.html).toContain('/notificaciones/operation-notice');
+    expect(content.html).toContain(fechaDia); expect(content.html).not.toContain('PRIVATE');
+    if (modalidad === 'IN_SITU') expect(mailText(content.html)).toMatch(/No hay retiro, traslado ni GPS/i);
+    for (const changed of [{ estado: 'EN_TRANSITO' }, { modalidad: modalidad === 'FIJO' ? 'IN_SITU' : 'FIJO' },
+      { fechaEstimadaRetiro: new Date(planned.getTime() + 86400000) }, { fechaEstimadaRetiro: new Date(Date.now() - 1000) }, { isDemoData: true }]) {
+      mocks.manifest.mockResolvedValue({ ...manifest, ...changed }); expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    }
+    const far = new Date(Date.now() + 25 * 3600000);
+    mocks.manifest.mockResolvedValue({ ...manifest, fechaEstimadaRetiro: far });
+    expect(await notificationSourceEligible({ ...n, datos: JSON.stringify({ ...JSON.parse(n.datos), fechaDia: far.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) }) }, 'alertas')).toBe(false);
+    mocks.manifest.mockResolvedValue(manifest); mocks.companyRecipients.mockResolvedValue([]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    expect(notificationMailContent({ ...n, datos: JSON.stringify({ tipo: 'recordatorio_operacion', version: 1, modalidad, fechaDia: '<script>' }) })).toBeNull();
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+});
+
 it('rechecks renewal representative access and decision before future mail without sending', async () => {
   const n = { ...notice, usuarioId: 'member', rol: 'TRANSPORTISTA', tipo: 'MODIFICACION_APROBADA', datos: JSON.stringify({ renovacionId: 'r' }) };
   mocks.renewal.mockResolvedValue({ id: 'r', estado: 'APROBADA', tipoActor: 'OPERADOR', operadorId: 'o', operador: { usuarioId: 'owner' } });

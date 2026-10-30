@@ -535,3 +535,12 @@ test('signature reminders explain authorized representatives and the two phases'
   assert.match(text, /empresa, actividad y sede/); assert.match(text, /una sola vez por persona/);
   assert.match(text, /no una declaración automática de infracción/);
 });
+
+test('operation reminders distinguish the planned date from pickup and origin treatment', () => {
+  const guide = guides.find((g: any) => g.id === 'avisos-enlaces-plazos');
+  const step = guide.steps.find((s: any) => s.title === 'Leer los plazos y el seguimiento');
+  const text = step.body.join(' ');
+  assert.match(text, /fecha próxima/); assert.match(text, /no hay retiro, traslado ni GPS/);
+  assert.match(text, /no aprueba la propuesta ni inicia el viaje/);
+  assert.match(text, /recordatorios anteriores conservan su texto original/);
+});

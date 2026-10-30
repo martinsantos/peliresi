@@ -32,7 +32,7 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
 function representativeManifestAlert(tipo: string, data: Record<string, unknown>): boolean {
  if (data.destino !== 'representante' || data.version !== 1) return false;
  if (tipo === 'INFO_GENERAL' && data.tipo === 'reversion_manifiesto') return true;
- if (tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo))) return true;
+ if (tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto', 'recordatorio_operacion'].includes(String(data.tipo))) return true;
  if (tipo === 'VENCIMIENTO_PROXIMO' && data.tipo === 'recordatorio_firma') return true;
  const stateTypes: Record<string, string> = { EN_TRANSITO: 'MANIFIESTO_EN_TRANSITO', ENTREGADO: 'MANIFIESTO_ENTREGADO',
   RECIBIDO: 'MANIFIESTO_RECIBIDO', EN_TRATAMIENTO: 'INFO_GENERAL', TRATADO: 'MANIFIESTO_TRATADO', CANCELADO: 'INFO_GENERAL' };

@@ -104,6 +104,22 @@ describe('assignment notification delivery', () => {
     setup();
     expect(await screen.findByRole('button', { name: 'Notificaciones (140 sin leer)', exact: true })).toBeVisible();
   });
+  it('offers a separate, safe coordinate link without nesting it inside the notice button', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, titulo: 'Retiro previsto', manifiestoId: 'manifest',
+      datos: JSON.stringify({ mapsUrl: 'https://maps.google.com/?q=-33,-68' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    const link = await screen.findByRole('link', { name: 'Ver ubicación del generador' });
+    expect(link).toHaveAttribute('href', 'https://maps.google.com/?q=-33,-68');
+    expect(link.closest('button')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Retiro previsto/ }));
+    expect(screen.getByTestId('path')).toHaveTextContent('/app/manifiestos/manifest');
+  });
+  it('does not render an arbitrary URL from notice data as a map link', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, datos: JSON.stringify({ mapsUrl: 'https://elsewhere.invalid/?q=-33,-68' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    await screen.findByText(notice.titulo);
+    expect(screen.queryByRole('link', { name: 'Ver ubicación del generador' })).toBeNull();
+  });
   it('uses the readable inverse error token for the small unread counter', async () => {
     service.list.mockResolvedValue({ items: [notice], noLeidas: 140 });
     setup();

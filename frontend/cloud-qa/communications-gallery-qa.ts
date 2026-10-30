@@ -133,6 +133,14 @@ try{
      }
    }
  });
+ await check('operation reminders distinguish origin treatment from a physical pickup',async()=>{
+   for(const modality of ['FIJO','IN_SITU'])for(const suffix of ['', '-representante']){
+     const item=data.cases.find((entry:any)=>entry.id==='operacion-prevista-'+modality+suffix);assert.ok(item);
+     const html=data.blobs[item.mailRefs.GENERADOR.ref];
+     assert.match(html,modality==='IN_SITU'?/No hay retiro, traslado ni GPS/:/El viaje comienza al confirmar el retiro/);
+     if(suffix)assert.equal(item.paths.GENERADOR,'/notificaciones/'+item.notice.id);
+   }
+ });
  await check('current delivery and operational producers include their scoped representative notices',async()=>{
    for(const [id,role] of [
      ['entrega-representante-GENERADOR','GENERADOR'],['entrega-representante-TRANSPORTISTA','TRANSPORTISTA'],

@@ -67,3 +67,10 @@ it('uses the owned notice for a reversion without exposing the private reason', 
  expect(content?.url).toBe('/notificaciones/notice'); expect(content?.title).toBe('Estado del manifiesto corregido');
  expect(JSON.stringify(content)).not.toContain('PRIVATE');
 });
+it.each(['FIJO', 'IN_SITU'])('prepares %s reminder push only through the representative notice', modalidad => {
+ const data = { tipo: 'recordatorio_operacion', version: 1, modalidad, destino: 'representante', nota: 'PRIVATE', accesosEmpresa: [{ empresaId: 'co', actividadId: 'a' }] };
+ const content = manifestPushContent({ ...notice, rol: 'GENERADOR', tipo: 'ALERTA_SISTEMA', datos: JSON.stringify(data) });
+ expect(content?.url).toBe('/notificaciones/notice'); expect(JSON.stringify(content)).not.toContain('PRIVATE');
+ if (modalidad === 'IN_SITU') expect(content?.body).toMatch(/No hay retiro ni traslado/i);
+ expect(mocks.send).not.toHaveBeenCalled();
+});

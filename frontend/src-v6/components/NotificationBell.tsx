@@ -95,6 +95,21 @@ function formatTimeAgo(dateStr: string): string {
   return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
+/** Only the known coordinate map shortcut is accepted from stored notices. */
+function noticeMapUrl(notif: Notificacion): string | null {
+  try {
+    const value = JSON.parse(notif.datos || '{}').mapsUrl;
+    if (typeof value !== 'string') return null;
+    const url = new URL(value), keys = [...url.searchParams.keys()];
+    if (url.origin !== 'https://maps.google.com' || url.username || url.password || url.pathname !== '/' || url.hash
+      || keys.length !== 1 || keys[0] !== 'q') return null;
+    const pieces = (url.searchParams.get('q') || '').split(',');
+    if (pieces.length !== 2 || pieces.some(piece => !piece.trim())) return null;
+    const [lat, lng] = pieces.map(Number);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? url.toString() : null;
+  } catch { return null; }
+}
+
 // ========================================
 // COMPONENT
 // ========================================
@@ -248,10 +263,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                   const isUnread = !notif.leida;
                   const gpsContext = gpsNoticeContext(notif);
                   const manifestReference = notificationManifestReference(notif);
+                  const mapsUrl = noticeMapUrl(notif);
 
                   return (
+                    <div key={notif.id}>
                     <button
-                      key={notif.id}
                       onClick={() => handleNotificationClick(notif)}
                       className={`
                         w-full text-left px-4 py-3 hover:bg-neutral-50 transition-colors
@@ -276,25 +292,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                           <p className={`text-sm text-neutral-700 mt-1 ${isGpsNotice(notif) ? 'break-words' : 'line-clamp-2'}`}>
                             {notif.mensaje}
                           </p>
-                          {(() => {
-                            try {
-                              const d = notif.datos ? JSON.parse(notif.datos) : null;
-                              if (!d?.mapsUrl) return null;
-                              return (
-                                <a href={d.mapsUrl} target="_blank" rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] text-primary-600 mt-0.5 hover:underline"
-                                  onClick={(e) => e.stopPropagation()}>
-                                  <MapPin size={11} /> Ver ubicacion
-                                </a>
-                              );
-                            } catch { return null; }
-                          })()}
                           <p className="text-xs text-neutral-600 mt-1">
                             {formatTimeAgo(notif.createdAt)}
                           </p>
                         </div>
                       </div>
                     </button>
+                    {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+                      className="ml-14 inline-flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                      <MapPin size={15} aria-hidden="true" /> Ver ubicación del generador
+                    </a>}
+                    </div>
                   );
                 })}
               </div>

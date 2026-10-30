@@ -21,6 +21,7 @@ import { EVENTUAL_NOTICE_LABELS, eventualNoticeAudience, eventualNoticeEvent } f
 import { matchingEventualRecipient } from './eventualNoticeContext.service';
 import { manifestFeatureEnabled } from '../lib/manifestTraining';
 import { RENEWAL_NOTICE_LABELS, renewalNoticeReference, validRenewalNotice } from '../domain/renewalNotice';
+import { OPERATION_REMINDER_WINDOW_MS, operationReminderDate } from '../domain/operationReminder';
 
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
@@ -47,6 +48,7 @@ function inspectionAudience(notice: NoticeForMail, inspection: InspectionMailSco
 /** Recheck the source at enqueue AND delivery, including reassignment/revocation. */
 export async function notificationSourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   const data = JSON.parse(notice.datos || '{}');
+  if (data.tipo === 'recordatorio_operacion' && (!notice.manifiestoId || !notice.usuarioId)) return false;
   if (family === 'representacion') return process.env.ENTERPRISE_ENABLED === 'true' && companyNoticeEligible(prisma, notice.usuarioId, data);
   if (family === 'manifiestos' && data.tipo === 'manifiesto_eventual') {
     if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED') || !validEventualMail(data) || !notice.usuarioId) return false;
@@ -70,7 +72,7 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
   }
   if (notice.manifiestoId) {
     const manifest = await prisma.manifiesto.findUnique({ where: { id: notice.manifiestoId }, select: {
-      isDemoData: true, estado: true, fechaFirma: true, generador: { select: { usuarioId: true } },
+      isDemoData: true, estado: true, fechaFirma: true, modalidad: true, fechaEstimadaRetiro: true, generador: { select: { usuarioId: true } },
       transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
     } });
     if (!manifest || manifest.isDemoData) return false;
@@ -87,6 +89,13 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
       const currentPhase = days >= 30 ? 'TREINTA_DIAS' : days >= 23 ? 'SEMANA' : null;
       if (data.version !== 1 || !currentPhase || data.fase !== currentPhase || manifest.fechaFirma?.toISOString() !== data.fechaFirma
         || !['APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'].includes(manifest.estado)) return false;
+    }
+    if (data.tipo === 'recordatorio_operacion') {
+      const planned = manifest.fechaEstimadaRetiro;
+      if (notice.tipo !== 'ALERTA_SISTEMA' || data.version !== 1 || !['FIJO', 'IN_SITU'].includes(String(data.modalidad))
+        || manifest.estado !== 'APROBADO' || manifest.modalidad !== data.modalidad || !planned
+        || !Number.isFinite(planned.getTime()) || planned.getTime() < Date.now()
+        || planned.getTime() > Date.now() + OPERATION_REMINDER_WINDOW_MS || operationReminderDate(planned) !== data.fechaDia) return false;
     }
     if (!representativeRule && !isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
       // A registered replacement can see its own leg history in the carrier
@@ -253,6 +262,8 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   if (data.tipo === 'antecedente_fiscalizacion' && !validIntakeMail(data)) return null;
   if (data.tipo === 'manifiesto_eventual' && !validEventualMail(data)) return null;
   if (data.tipo === 'representacion_empresa' && !validCompanyNotice(data)) return null;
+  if (data.tipo === 'recordatorio_operacion' && (!notice.manifiestoId || notice.tipo !== 'ALERTA_SISTEMA' || data.version !== 1
+    || !['FIJO', 'IN_SITU'].includes(String(data.modalidad)) || typeof data.fechaDia !== 'string' || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(data.fechaDia))) return null;
   if (data.tipo === 'ADENDA_POST_FACTO' && (data.correoVersion !== 1 || typeof data.adendaId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.adendaId))) return null;
   let family: string, path: string, title: string;
   if (notice.tipo === 'INFO_GENERAL' && validCompanyNotice(data)) {
@@ -376,6 +387,9 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']
+    : data.tipo === 'recordatorio_operacion' && data.version === 1 ? data.modalidad === 'IN_SITU'
+      ? ['Tratamiento en origen previsto', 'Revisá las aprobaciones y coordiná el inicio. No hay retiro, traslado ni GPS.']
+      : ['Retiro previsto', 'Revisá las aprobaciones y coordiná con las partes. El viaje comienza al confirmar el retiro.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
     : data.tipo === 'manifiesto_eventual' && validEventualMail(data) ? EVENTUAL_NOTICE_LABELS[String(data.evento) as keyof typeof EVENTUAL_NOTICE_LABELS]
     : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
@@ -398,8 +412,10 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   const reference = data.tipo === 'recordatorio_firma' && data.version === 1 && typeof data.fechaFirma === 'string' && Number.isFinite(Date.parse(data.fechaFirma))
     ? '<p><strong>Firma:</strong> ' + escapeMail(new Date(data.fechaFirma).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }))
       + '<br><strong>30 días desde la firma:</strong> ' + escapeMail(new Date(Date.parse(data.fechaFirma) + 30 * 86400000).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' })) + '.</p>' : '';
+  const operationReference = data.tipo === 'recordatorio_operacion' && typeof data.fechaDia === 'string'
+    ? '<p><strong>Fecha prevista:</strong> ' + escapeMail(data.fechaDia) + '.</p>' : '';
   const renewalReference = renewalMessage && validRenewalNotice(data) ? '<p><strong>' + escapeMail(renewalNoticeReference(data)) + '</strong></p>' : '';
-  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1>${renewalReference}<p>${escapeMail(message[1])}</p>${deadline}${reference}${mailAction(path, renewalMessage?.[2] || fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
+  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1>${renewalReference}<p>${escapeMail(message[1])}</p>${deadline}${reference}${operationReference}${mailAction(path, renewalMessage?.[2] || fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
 }
 
 export async function queueCommittedNotificationEmails(): Promise<number> {

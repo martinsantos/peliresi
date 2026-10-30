@@ -30,6 +30,10 @@ export function manifestPushContent(notice: Pick<NoticeForMail, 'tipo' | 'datos'
     title: status.title, body: 'Abrí el manifiesto para consultar el cambio y las acciones disponibles.',
     url: ownedNotice || url, prioridad: 'NORMAL',
   };
+  if (notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'recordatorio_operacion' && data.version === 1
+    && (data.modalidad === 'FIJO' || data.modalidad === 'IN_SITU')) return data.modalidad === 'IN_SITU'
+    ? { title: 'Tratamiento en origen previsto', body: 'Revisá las aprobaciones y coordiná el inicio. No hay retiro ni traslado.', url: ownedNotice || url, prioridad: 'ALTA' }
+    : { title: 'Retiro previsto', body: 'Revisá las aprobaciones y coordiná con las partes.', url: ownedNotice || url, prioridad: 'ALTA' };
   if (notice.tipo !== 'INFO_GENERAL') return null;
   if (data.tipo === 'reversion_manifiesto' && data.version === 1) return {
     title: 'Estado del manifiesto corregido', body: 'Administración corrigió el estado. Revisá el historial y las acciones disponibles.',

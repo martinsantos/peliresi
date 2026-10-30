@@ -16,7 +16,7 @@ export const isManifestRuleCompanyNotice = (notice: Pick<Notice, 'tipo'>, data: 
  if (isLegacyCompanyNotice(notice, data)) return true;
  if (data?.destino !== 'representante') return false;
  if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'reversion_manifiesto') return true;
- if (notice.tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo))) return true;
+ if (notice.tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto', 'recordatorio_operacion'].includes(String(data.tipo))) return true;
  if (notice.tipo === 'VENCIMIENTO_PROXIMO' && data.tipo === 'recordatorio_firma') return true;
  const stateTypes: Record<string, string> = { EN_TRANSITO: 'MANIFIESTO_EN_TRANSITO', ENTREGADO: 'MANIFIESTO_ENTREGADO',
   RECIBIDO: 'MANIFIESTO_RECIBIDO', EN_TRATAMIENTO: 'INFO_GENERAL', TRATADO: 'MANIFIESTO_TRATADO', CANCELADO: 'INFO_GENERAL' };

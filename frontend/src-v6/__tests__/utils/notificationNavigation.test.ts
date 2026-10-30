@@ -18,6 +18,14 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app'])('opens an operation reminder through the representative context on %s', prefix => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa' };
+    const notice = { ...base, tipo: 'ALERTA_SISTEMA' as Notificacion['tipo'], manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'recordatorio_operacion', version: 1, modalidad: 'IN_SITU', fechaDia: '31/10/2026', destino: 'representante', accesosEmpresa: [access] }) };
+    expect(notificationCompanyAccesses(notice)).toEqual([access]);
+    expect(resolveNotificationPath(notice, prefix, 'OPERADOR')).toBe(prefix + '/notificaciones/n-1');
+    expect(resolveNotificationPath(notice, prefix, 'OPERADOR', true)).toBe(prefix + '/manifiestos/m');
+  });
   it.each(['', '/app'])('opens a representative signature reminder in its authorized context on %s', prefix => {
     const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa', establecimientoId: 'site', establecimiento: 'Norte' };
     const notice = { ...base, tipo: 'VENCIMIENTO_PROXIMO' as Notificacion['tipo'], manifiestoId: 'm',

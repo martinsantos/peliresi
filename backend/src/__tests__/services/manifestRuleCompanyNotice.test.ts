@@ -45,6 +45,14 @@ it('masks a representative signature reminder when its original authorization is
  expect(JSON.stringify(masked)).not.toContain('QA-PRIVATE');
  expect(JSON.stringify(maskManifestRuleCompanyNotice(reminder))).not.toContain('QA-PRIVATE');
 });
+it('masks an operation reminder when its original company authorization is revoked', async () => {
+ const reminder = { ...notice, tipo: 'ALERTA_SISTEMA', datos: JSON.stringify({ ...data, tipo: 'recordatorio_operacion', modalidad: 'IN_SITU', fechaDia: '31/10/2026' }) };
+ recipients.mockResolvedValue(new Map([['manifest', []]]));
+ const masked = (await withManifestRuleCompanyNoticeContext({} as any, [reminder]))[0];
+ expect(masked.titulo).toBe('Aviso no disponible'); expect(masked.manifiestoId).toBeNull();
+ expect(JSON.stringify(masked)).not.toContain('QA-PRIVATE');
+ expect(JSON.stringify(maskManifestRuleCompanyNotice(reminder))).not.toContain('QA-PRIVATE');
+});
 it('does not turn malformed or stale metadata into authorization', () => {
  expect(matchingManifestRuleAccesses({ ...data, version: 2 }, [access])).toEqual([]);
  expect(matchingManifestRuleAccesses({ ...data, accesosEmpresa: [{ ...access, actividadId: '../other' }] }, [access])).toEqual([]);

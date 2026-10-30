@@ -225,8 +225,14 @@ for(const type of ['mismo-transporte','registrado','externo'])add('relevo-'+type
 add('relevo-registrado-receptor','Transporte · relevos',['TRANSPORTISTA'],'backend/src/controllers/transport-handoff.controller.ts',{titulo:'Cambio de transporte en tránsito',mensaje:manifest.numero+': Auxilio Andino · ejemplo. La transportista de origen registró el traspaso.',manifiestoId:manifest.id,datos:{tipo:'relevo_transporte',tramoId:'TRAMO-MUESTRA',url:'/transporte/perfil'}},undefined,'Transportista registrado que recibe o entrega el tramo, distinto del autor del traspaso. El enlace lleva a Mi transporte.','Sujeto a la configuración del entorno');
 
 const reminder='backend/src/jobs/recordatorio.job.ts';
-add('retiro-manana-transporte','Transporte · recordatorios',['TRANSPORTISTA'],reminder,{...inlineNotice(reminder,'Recordatorio: retiro manana',{m:manifest,fecha:'23/10/2026',gen:manifest.generador}),manifiestoId:manifest.id,datos:{tipo:'recordatorio_retiro',fechaRetiro:'23/10/2026'}},undefined,'Retiro previsto para mañana.');
-for(const insitu of [false,true])add('retiro-manana-generador-'+insitu,'Transporte · recordatorios',['GENERADOR'],reminder,{...inlineNotice(reminder,'Recordatorio: retiro programado manana',{m:manifest,fecha:'23/10/2026',trans:insitu?null:manifest.transportista}),manifiestoId:manifest.id,datos:{tipo:'recordatorio_retiro',fechaRetiro:'23/10/2026'}},undefined,insitu?'Variante in situ.':'Variante con transporte.');
+const operationText=moduleLoad('backend/src/domain/operationReminder.ts').operationReminderText;
+for(const modalidad of ['FIJO','IN_SITU'])for(const representante of [false,true]){
+ const label=operationText(modalidad,manifest.numero,'23/10/2026');
+ add('operacion-prevista-'+modalidad+(representante?'-representante':''),'Transporte · recordatorios',parties,reminder,
+  {...label,tipo:'ALERTA_SISTEMA',prioridad:'ALTA',manifiestoId:manifest.id,datos:{tipo:'recordatorio_operacion',version:1,modalidad,fechaDia:'23/10/2026',
+   ...(representante?{destino:'representante',accesosEmpresa:[{empresaId:'EMPRESA-MUESTRA',actividadId:'ACTIVIDAD-MUESTRA',rol:'GENERADOR',razonSocial:'Empresa · ejemplo'}]}:{})}},undefined,
+  modalidad==='IN_SITU'?'Tratamiento en origen: no hay retiro, traslado ni GPS.':'Retiro previsto; el viaje comienza al confirmar el retiro.',representante?'Sujeto a representación de empresas habilitada':'Disponible en código');
+}
 const sub='backend/src/subscribers/alerta.subscriber.ts';
 for(const [id,title,roles,event]of [
  ['incidente','⚠️ Incidente en Tránsito',['OPERADOR','ADMIN'],{descripcion:'Rotura de una manguera; vehículo detenido.'}],
