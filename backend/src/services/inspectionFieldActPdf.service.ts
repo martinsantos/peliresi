@@ -402,23 +402,61 @@ function statusBanner(doc: PDFKit.PDFDocument, presentation: InspectionFieldActP
   doc.y = y + 48;
 }
 
-function row(doc: PDFKit.PDFDocument, cells: Array<{ label: string; value: string; weight?: number }>, minimumHeight = 30) {
+function row(
+  doc: PDFKit.PDFDocument,
+  cells: Array<{ label: string; value: string; weight?: number }>,
+  minimumHeight: number,
+  newPage: () => void,
+) {
   const totalWeight = cells.reduce((sum, cell) => sum + (cell.weight || 1), 0);
   const available = doc.page.width - 68;
   const widths = cells.map((cell) => available * (cell.weight || 1) / totalWeight);
-  doc.font('Helvetica').fontSize(7.5);
-  const heights = cells.map((cell, index) => doc.heightOfString(cell.value, { width: widths[index] - 12 }));
-  const height = Math.max(minimumHeight, Math.max(...heights) + 21);
-  const y = doc.y;
-  let x = 34;
-  cells.forEach((cell, index) => {
-    const width = widths[index];
-    doc.rect(x, y, width, height).fillAndStroke(COLORS.white, COLORS.line);
-    doc.font('Helvetica-Bold').fontSize(6.5).fillColor(COLORS.muted).text(cell.label.toUpperCase(), x + 6, y + 5, { width: width - 12 });
-    doc.font('Helvetica').fontSize(8.3).fillColor(COLORS.ink).text(cell.value, x + 6, y + 15, { width: width - 12, lineGap: 1 });
-    x += width;
-  });
-  doc.y = y + height;
+  // Measure using the exact font used to draw each line. PDFKit's automatic
+  // flow cannot paginate a table row: it leaves its border and other cells on
+  // the old page while moving text onto an unheaded page.
+  doc.font('Helvetica').fontSize(8.3);
+  const lines = cells.map((cell, index) => wrappedLines(doc, cell.value, widths[index] - 12));
+  const offsets = cells.map(() => 0);
+  const lineHeight = doc.currentLineHeight(true) + 1;
+  let continued = false;
+  while (lines.some((cell, index) => offsets[index] < cell.length)) {
+    const bottom = doc.page.height - 82;
+    const availableHeight = bottom - doc.y;
+    const capacity = Math.floor((availableHeight - 21) / lineHeight);
+    const remaining = Math.max(...lines.map((cell, index) => cell.length - offsets[index]));
+    if (availableHeight < minimumHeight || capacity < Math.min(2, remaining)) {
+      newPage();
+      continue;
+    }
+    const lineCount = Math.min(capacity, remaining);
+    const height = Math.max(minimumHeight, 21 + lineCount * lineHeight);
+    const y = doc.y;
+    let x = 34;
+    cells.forEach((cell, index) => {
+      const width = widths[index];
+      const fragment = lines[index].slice(offsets[index], offsets[index] + lineCount);
+      doc.rect(x, y, width, height).fillAndStroke(COLORS.white, COLORS.line);
+      doc.font('Helvetica-Bold').fontSize(6.5).fillColor(COLORS.muted)
+        .text(`${cell.label.toUpperCase()}${continued && fragment.length ? ' · CONT.' : ''}`, x + 6, y + 5,
+          { width: width - 12, lineBreak: false });
+      doc.font('Helvetica').fontSize(8.3).fillColor(COLORS.ink);
+      if (fragment.length) {
+        fragment.forEach((line, lineIndex) => {
+          if (line) doc.text(line, x + 6, y + 15 + lineIndex * lineHeight, { width: width - 12, lineBreak: false });
+        });
+        offsets[index] += fragment.length;
+      } else if (continued) {
+        doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted)
+          .text('Ver página anterior', x + 6, y + 15, { width: width - 12, lineBreak: false });
+      }
+      x += width;
+    });
+    doc.y = y + height;
+    if (lines.some((cell, index) => offsets[index] < cell.length)) {
+      newPage();
+      continued = true;
+    }
+  }
 }
 
 function splitToken(doc: PDFKit.PDFDocument, token: string, width: number): string[] {
@@ -509,25 +547,29 @@ function writeFormalityDetail(
   inspectionNumber: string,
   presentation: InspectionFieldActPresentation,
   branding: InspectionPdfBranding,
+  trailingSpace = 0,
 ) {
   doc.font('Helvetica-Bold').fontSize(6.4).fillColor(COLORS.muted);
   const detailLabel = formality.resolved ? 'CONSTANCIA REGISTRADA' : 'CONSTANCIA / PENDIENTE';
-  doc.text(detailLabel, 40, doc.y, { width: doc.page.width - 80, lineBreak: false });
-  doc.y += 11;
+  const labelY = doc.y;
+  doc.text(detailLabel, 40, labelY, { width: doc.page.width - 80, lineBreak: false });
+  doc.y = labelY + 11;
   doc.font('Helvetica').fontSize(8.2).fillColor(COLORS.ink);
   const detail = formality.unresolvedReason
     ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
     : formality.detail;
   const lines = wrappedLines(doc, detail, doc.page.width - 80);
-  for (const line of lines) {
-    if (doc.y + 12 > doc.page.height - 82) {
+  for (const [index, line] of lines.entries()) {
+    const reserve = index === lines.length - 1 ? trailingSpace : 0;
+    if (doc.y + 12 + reserve > doc.page.height - 82) {
       doc.addPage();
       article44PageHeader(doc, actNumber, inspectionNumber, presentation, branding, true);
       formalityHeading(doc, formality, true);
       doc.font('Helvetica').fontSize(8.2).fillColor(COLORS.ink);
     }
-    if (line) doc.text(line, 40, doc.y, { width: doc.page.width - 80, lineBreak: false });
-    doc.y += 11;
+    const lineY = doc.y;
+    if (line) doc.text(line, 40, lineY, { width: doc.page.width - 80, lineBreak: false });
+    doc.y = lineY + 11;
   }
   doc.y += 9;
 }
@@ -548,44 +590,49 @@ function article44Section(
     doc.y += 7;
   }
   const note = 'Esta sección reproduce únicamente datos consignados en el acta de campo. "No consignado" o "pendiente" no presume hechos, firmas, entrega de copias ni notificaciones. El control indicado es de completitud documental y no sustituye una valoración jurídica.';
+  doc.font('Helvetica').fontSize(7.2);
   const noteHeight = Math.max(37, doc.heightOfString(note, { width: doc.page.width - 100 }) + 17);
-  doc.roundedRect(40, doc.y, doc.page.width - 80, noteHeight, 4).fill(COLORS.soft);
+  const noteY = doc.y;
+  doc.roundedRect(40, noteY, doc.page.width - 80, noteHeight, 4).fill(COLORS.soft);
   doc.font('Helvetica').fontSize(7.2).fillColor(COLORS.ink)
-    .text(note, 50, doc.y + 8, { width: doc.page.width - 100, lineGap: 1 });
-  doc.y += noteHeight + 10;
+    .text(note, 50, noteY + 8, { width: doc.page.width - 100, lineGap: 1 });
+  doc.y = noteY + noteHeight + 10;
 
-  presentation.formalities.forEach((formality) => {
-    doc.font('Helvetica').fontSize(8.2);
-    const detail = formality.unresolvedReason
-      ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
-      : formality.detail;
-    const blockHeight = 43 + 11 + wrappedLines(doc, detail, doc.page.width - 80).length * 11 + 9;
-    // Keep a compact formality together. Longer statements still paginate,
-    // repeating their own heading on each continuation page.
-    if (doc.y + Math.min(blockHeight, doc.page.height - 82 - 216) > doc.page.height - 82) {
-      doc.addPage();
-      article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
-    }
-    formalityHeading(doc, formality);
-    writeFormalityDetail(doc, formality, actNumber, inspection.numero, presentation, branding);
-  });
-
-  if (doc.y + 52 > doc.page.height - 82) {
-    doc.addPage();
-    article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
-  }
   const summary = presentation.unresolved.length
     ? `Pendientes documentales: ${presentation.unresolved.map((entry) => entry.label).join('; ')}.`
     : presentation.hasAdverseOutcomes
       ? `Los seis controles tienen datos suficientes. Constancias adversas: ${presentation.adverse.map((entry) => entry.label).join('; ')}. Esto no implica cumplimiento de la formalidad material.`
       : 'No se detectaron pendientes en los seis controles estructurados incluidos en esta sección.';
+  doc.font('Helvetica-Bold').fontSize(7.2);
   const summaryHeight = Math.max(38, doc.heightOfString(summary, { width: doc.page.width - 100 }) + 20);
-  doc.roundedRect(40, doc.y, doc.page.width - 80, summaryHeight, 4)
+  presentation.formalities.forEach((formality, index) => {
+    doc.font('Helvetica').fontSize(8.2);
+    const detail = formality.unresolvedReason
+      ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
+      : formality.detail;
+    const blockHeight = 43 + 11 + wrappedLines(doc, detail, doc.page.width - 80).length * 11 + 9;
+    const reserve = index === presentation.formalities.length - 1 ? summaryHeight + 18 : 0;
+    // Keep a compact formality together. Longer statements still paginate,
+    // repeating their heading. Keep the final summary with the last formality.
+    if (doc.y + Math.min(blockHeight + reserve, doc.page.height - 82 - 216) > doc.page.height - 82) {
+      doc.addPage();
+      article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
+    }
+    formalityHeading(doc, formality);
+    writeFormalityDetail(doc, formality, actNumber, inspection.numero, presentation, branding, reserve);
+  });
+
+  if (doc.y + summaryHeight > doc.page.height - 82) {
+    doc.addPage();
+    article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
+  }
+  const summaryY = doc.y;
+  doc.roundedRect(40, summaryY, doc.page.width - 80, summaryHeight, 4)
     .fill(presentation.unresolved.length || presentation.hasAdverseOutcomes ? COLORS.warningSoft : COLORS.successSoft);
   doc.font('Helvetica-Bold').fontSize(7.2)
     .fillColor(presentation.unresolved.length || presentation.hasAdverseOutcomes ? COLORS.warning : COLORS.green)
-    .text(summary, 50, doc.y + 9, { width: doc.page.width - 100, lineGap: 1 });
-  doc.y += summaryHeight + 8;
+    .text(summary, 50, summaryY + 9, { width: doc.page.width - 100, lineGap: 1 });
+  doc.y = summaryY + summaryHeight + 8;
 }
 
 function signatureBlock(
@@ -607,10 +654,11 @@ function signatureBlock(
     // before the signature fields when the block must move to a new page.
     band(doc, 'Cierre documental y firmas');
     doc.y += 9;
-    doc.roundedRect(40, doc.y, doc.page.width - 80, 42, 4).fill(COLORS.soft);
+    const noteY = doc.y;
+    doc.roundedRect(40, noteY, doc.page.width - 80, 42, 4).fill(COLORS.soft);
     doc.font('Helvetica').fontSize(7.2).fillColor(COLORS.ink)
-      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Este PDF no incorpora una firma gráfica ni presume validación cuando el expediente la marca como pendiente.', 50, doc.y + 9, { width: doc.page.width - 100, lineGap: 1.2 });
-    doc.y += 51;
+      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Este PDF no incorpora una firma gráfica ni presume validación cuando el expediente la marca como pendiente.', 50, noteY + 9, { width: doc.page.width - 100, lineGap: 1.2 });
+    doc.y = noteY + 51;
   }
   const actualY = doc.y + 18;
   const responsible = value(act.atendidoPor || act.titular || actor.representanteLegalNombre, 'Causante / responsable');
@@ -677,8 +725,9 @@ function writePaginatedText(
         observationsHeader(doc, actNumber, branding, continuation);
         doc.font('Helvetica').fontSize(9).fillColor(COLORS.ink);
       }
-      doc.text(line, 40, doc.y, { width: maxWidth, lineBreak: false });
-      doc.y += lineHeight;
+      const lineY = doc.y;
+      doc.text(line, 40, lineY, { width: maxWidth, lineBreak: false });
+      doc.y = lineY + lineHeight;
       line = '';
     };
     words.forEach((word) => {
@@ -788,62 +837,77 @@ export async function streamInspectionActPdf(
   institutionalHeader(doc, actNumber, branding, `Expediente digital ${inspection.numero}`);
   statusBanner(doc, presentation);
   doc.y = drawInspectionPdfQrCard(doc, traceQr, traceFingerprint, { y: doc.y, title: 'VERIFICAR TRAZABILIDAD DEL ACTA' }) + 8;
-  row(doc, [
+  const newCoverPage = () => {
+    doc.addPage();
+    institutionalHeader(doc, actNumber, branding, `CONTINUACIÓN · ${inspection.numero}`);
+    band(doc, 'Datos del acta · continuación');
+  };
+  const coverBand = (title: string) => {
+    if (doc.y + 18 + 44 > doc.page.height - 82) newCoverPage();
+    band(doc, title);
+  };
+  const coverRow = (cells: Array<{ label: string; value: string; weight?: number }>, minimumHeight = 30) =>
+    row(doc, cells, minimumHeight, newCoverPage);
+  coverRow([
     { label: 'Fecha', value: started.date },
     { label: 'Hora', value: started.time },
     { label: 'Código postal', value: value(act.codigoPostal) },
   ]);
-  band(doc, 'Domicilio inspeccionado');
-  row(doc, [
+  coverBand('Domicilio inspeccionado');
+  coverRow([
     { label: 'Departamento', value: value(act.departamento) },
     { label: 'Calle / domicilio', value: value(act.calle || inspection.ubicacion || actor.domicilio), weight: 2 },
     { label: 'N.º', value: value(act.numeroDomicilio) },
   ]);
-  band(doc, 'Empresa / entidad inspeccionada');
-  row(doc, [
+  coverBand('Empresa / entidad inspeccionada');
+  coverRow([
     { label: 'Razón social', value: value(actor.razonSocial), weight: 2 },
     { label: 'CUIT', value: value(actor.cuit) },
     { label: 'Teléfono', value: value(actor.telefono) },
   ]);
-  row(doc, [
+  coverRow([
     { label: 'Titular / propiedad de', value: value(act.titular || actor.representanteLegalNombre || actor.razonSocial), weight: 2 },
     { label: 'DNI', value: value(act.dniTitular || actor.representanteLegalDNI) },
     { label: 'Correo', value: value(actor.email) },
   ]);
-  row(doc, [
+  coverRow([
     { label: 'Atendido por', value: value(act.atendidoPor), weight: 2 },
     { label: 'DNI', value: value(act.dniAtendido) },
     { label: 'Cargo', value: value(act.cargoAtendido) },
   ]);
-  band(doc, 'Inspectores intervinientes');
-  row(doc, [
+  coverBand('Inspectores intervinientes');
+  coverRow([
     { label: 'Inspector/a asignado/a', value: value(`${inspection.inspector?.nombre || ''} ${inspection.inspector?.apellido || ''}`) },
     { label: 'Área', value: value(act.area) },
   ]);
-  band(doc, 'Alcance de la constatación');
-  row(doc, [
+  coverBand('Alcance de la constatación');
+  coverRow([
     { label: 'Lugar de afectación', value: value(act.lugarAfectacion), weight: 2 },
     { label: 'Motivo de inspección', value: value(act.motivoInspeccion), weight: 2 },
     { label: 'Infraestructura', value: act.infraestructura === 'SI' ? 'Sí' : act.infraestructura === 'NO' ? 'No' : 'No verificada' },
   ], 34);
-  row(doc, [
+  coverRow([
     { label: 'Detalle de infraestructura', value: value(act.detalleInfraestructura), weight: 2 },
     { label: 'Estado', value: value(act.estadoInfraestructura) },
   ], 35);
-  row(doc, [
+  coverRow([
     { label: 'Generación / corrientes observadas', value: value(act.generacion), weight: 2 },
     { label: 'Acta antecedente', value: value(act.actaAnterior) },
   ], 34);
   const failedItems = inspection.items.filter((item: any) => item.resultado === 'NO_CUMPLE');
   const requirementsFallback = failedItems.length ? `Ver observaciones. Controles no conformes registrados: ${failedItems.map((item: any) => item.codigo).join(', ')}.` : 'Sin requerimientos expresos consignados.';
-  row(doc, [{ label: 'Requerimientos consignados', value: value(act.requerimientos, requirementsFallback) }], 42);
+  coverRow([{ label: 'Requerimientos consignados', value: value(act.requerimientos, requirementsFallback) }], 42);
   const notice = typeof act.plazoDescargoDias === 'number'
     ? `En este acto se deja constancia del plazo de ${act.plazoDescargoDias} día${act.plazoDescargoDias === 1 ? '' : 's'} hábil${act.plazoDescargoDias === 1 ? '' : 'es'} registrado para formular descargo y ofrecer la prueba pertinente.`
     : 'Plazo de presentación o descargo no consignado en el expediente. Debe completarse antes de su notificación formal.';
+  doc.font('Helvetica-Bold').fontSize(7.4);
+  const noticeHeight = Math.max(37, doc.heightOfString(notice, { width: doc.page.width - 88 }) + 18);
+  // Keep the deadline context and the following signatures on one headed page.
+  if (doc.y + noticeHeight + 140 > doc.page.height - 82) newCoverPage();
   const noticeY = doc.y + 6;
-  doc.roundedRect(34, noticeY, doc.page.width - 68, 37, 4).fill(COLORS.soft);
+  doc.roundedRect(34, noticeY, doc.page.width - 68, noticeHeight, 4).fill(COLORS.soft);
   doc.font('Helvetica-Bold').fontSize(7.4).fillColor(COLORS.ink).text(notice, 44, noticeY + 9, { width: doc.page.width - 88, align: 'center' });
-  doc.y = noticeY + 42;
+  doc.y = noticeY + noticeHeight + 5;
   const signatureMovedToNewPage = signatureBlock(doc, inspection, act, branding, actNumber);
 
   // Keep the documentary section on the signature page when the cover page
