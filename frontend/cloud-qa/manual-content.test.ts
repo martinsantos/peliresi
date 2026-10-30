@@ -37,6 +37,8 @@ test('eventual records without a site require full company authorization', () =>
   assert.match(text, /avisos anteriores pueden no incluir representaciones/i);
   assert.match(text, /borrador se guarda en este dispositivo para la cuenta, actividad y contexto actuales/);
   assert.match(text, /Comprobar envío: se reutilizan la referencia y los datos originales/);
+  assert.match(text, /nota y la diferencia que estás preparando se guardan en este navegador/);
+  assert.match(text, /Comprobar acción con la misma referencia/);
   assert.match(text, /borrar los datos del navegador o de la app también elimina esa copia local/);
   assert.match(text, /sólo ves los eventuales en los que participa esa actividad/);
   assert.match(text, /un reintento usa la actividad original/);

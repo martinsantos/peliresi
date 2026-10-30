@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import BajaIntensidadPage from '../../pages/manifiestos/BajaIntensidadPage';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { emptyEventualDraft, eventualDraftScope, eventualSubmissionKey } from '../../services/eventualDraft';
+import { eventualActionSubmissionKey } from '../../services/eventualActionDraft';
 const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), user: { id: 'qa-operator', rol: 'OPERADOR' } }));
 vi.mock('../../services/api', () => ({ api: mock, getAccessToken: () => 'qa.' + btoa(JSON.stringify({ id: mock.user.id })) + '.qa' }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mock.user }) }));
@@ -259,11 +260,62 @@ it('failed write retains note, same request id on retry, no false confirmation',
   mock.post.mockRejectedValue(new Error('offline')); view(true); await screen.findByText('Operación: Recibido');
   fireEvent.change(screen.getByLabelText('Nota de la acción'), { target: { value: 'Evidencia conservada' } });
   fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' }));
-  await screen.findByRole('alert'); expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Evidencia conservada');
+  await screen.findByText(/acción podría haberse registrado/i); expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Evidencia conservada');
   expect(screen.getByText('Operación: Recibido')).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobar acción' }));
   await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2));
   expect(mock.post.mock.calls[0]).toEqual(mock.post.mock.calls[1]);
+});
+it('recovers an unsent note and difference only in the same activity', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ const first=view(true); fireEvent.change(await screen.findByLabelText('Nota de la acción'),{target:{value:'Diferencia en origen'}});
+ fireEvent.click(screen.getByRole('button',{name:'Registrar diferencia'}));
+ fireEvent.change(screen.getByLabelText('Corriente'),{target:{value:'Y12'}}); fireEvent.change(screen.getByLabelText('Cantidad'),{target:{value:'8'}}); first.unmount();
+ mock.user = { id:'qa-person', rol:'OPERADOR', actorId:'op-1' } as typeof mock.user;
+ const other=view(true); expect(await screen.findByLabelText('Nota de la acción')).toHaveValue(''); other.unmount();
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ view(true); expect(await screen.findByLabelText('Nota de la acción')).toHaveValue('Diferencia en origen');
+ expect(screen.getByLabelText('Corriente')).toHaveValue('Y12'); expect(screen.getByLabelText('Cantidad')).toHaveValue(8);
+});
+it('does not mix notes from different eventual records', async () => {
+ const first=view(true); fireEvent.change(await screen.findByLabelText('Nota de la acción'),{target:{value:'Nota del primero'}}); first.unmount();
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const second=render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/manifiestos/baja-intensidad?registro=00000000-0000-4000-8000-000000000002']}><BajaIntensidadPage /></MemoryRouter></QueryClientProvider>);
+ expect(await screen.findByLabelText('Nota de la acción')).toHaveValue(''); second.unmount();
+ view(true); expect(await screen.findByLabelText('Nota de la acción')).toHaveValue('Nota del primero');
+});
+it('reuses an uncertain action after the page is closed', async () => {
+ mock.post.mockRejectedValueOnce(new Error('offline')); const first=view(true);
+ fireEvent.change(await screen.findByLabelText('Nota de la acción'),{target:{value:'Acción a recuperar'}});
+ fireEvent.click(screen.getByRole('button',{name:'Registrar tratado'})); await screen.findByText(/acción podría haberse registrado/i);
+ const original=mock.post.mock.calls[0]; first.unmount();
+ mock.post.mockResolvedValueOnce({ data:{ data:{ registro:{ ...entry, version:1, etapa:'TRATADO' } } } });
+ view(true); expect(await screen.findByLabelText('Nota de la acción')).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar acción'}));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2)); expect(mock.post.mock.calls[1]).toEqual(original);
+ await screen.findByText('Operación: Tratado');
+});
+it.each([400,403,409,422])('does not discard an uncertain action after a later %i', async status => {
+ mock.post.mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce({response:{status,data:{message:'No se pudo verificar'}}});
+ const first=view(true); fireEvent.change(await screen.findByLabelText('Nota de la acción'),{target:{value:'Acción pendiente'}});
+ fireEvent.click(screen.getByRole('button',{name:'Registrar tratado'})); await screen.findByText(/acción podría haberse registrado/i);
+ const original=mock.post.mock.calls[0]; fireEvent.click(screen.getByRole('button',{name:'Comprobar acción'}));
+ await screen.findByText('No se pudo verificar'); expect(mock.post.mock.calls[1]).toEqual(original); first.unmount();
+ view(true); expect(await screen.findByLabelText('Nota de la acción')).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Comprobar acción'})).toBeEnabled();
+});
+it.each(['{invalid','', '{"version":1}'])('blocks actions if their stored reference is unreadable: %s', async raw => {
+ const scope=eventualDraftScope(inspectionWorkspaceOwner(mock.user as never),mock.user.id,'qa.' + btoa(JSON.stringify({id:mock.user.id})) + '.qa');
+ const key='sitrep:eventual-action:v1:' + scope + ':' + id;
+ localStorage.setItem(eventualActionSubmissionKey(key),raw); view(true);
+ expect(await screen.findByText(/No pudimos leer o guardar el borrador o la referencia de la acción/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Registrar tratado'})).toBeDisabled(); expect(mock.post).not.toHaveBeenCalled();
+});
+it('refuses to send an action if another tab owns the lock', async () => {
+ Object.defineProperty(navigator,'locks',{configurable:true,value:{request:async (_name:string,_options:unknown,callback:(lock:unknown)=>Promise<void>)=>callback(null)}});
+ view(true); fireEvent.change(await screen.findByLabelText('Nota de la acción'),{target:{value:'No enviar'}});
+ fireEvent.click(screen.getByRole('button',{name:'Registrar tratado'}));
+ expect(await screen.findByText(/Otra pestaña está enviando/)).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
 });
 it('an HTTP error is not presented as zero records', async () => {
   mock.get.mockRejectedValue(new Error('unavailable')); view();
@@ -445,16 +497,16 @@ it('a rejected eventual never offers another pending party an impossible approva
  expect(screen.getByRole('button', { name: 'Registrar retirado' })).toBeDisabled();
 });
 
-it('recovers a committed command after a lost response without resubmitting or erasing newer edits', async () => {
+it('recognizes a committed command in history after a lost response without resubmitting', async () => {
  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
  mock.post.mockRejectedValue(new Error('response lost')); view(true, client);
  fireEvent.change(await screen.findByLabelText('Nota de la acción'), { target: { value: 'Nota enviada' } });
- fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' })); await screen.findByRole('alert');
+ fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' })); await screen.findByText(/acción podría haberse registrado/i);
  const commandId = mock.post.mock.calls[0][1].id;
- fireEvent.change(screen.getByLabelText('Nota de la acción'), { target: { value: 'Otra nota todavía sin enviar' } });
+ expect(screen.getByLabelText('Nota de la acción')).toBeDisabled();
  mock.get.mockResolvedValue({ data: { data: { registro: { ...entry, version: 1, etapa: 'TRATADO', eventos: [{ id: commandId, tipo: 'AVANCE', etapa: 'TRATADO', fecha: '2026-10-22T15:00:00Z', nota: 'Nota enviada' }] } } } });
  await client.invalidateQueries({ queryKey: ['baja-intensidad'] });
  expect(await screen.findByText('La acción ya estaba guardada. Recuperamos la confirmación sin duplicarla.')).toBeVisible();
- expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Otra nota todavía sin enviar');
+ expect(screen.getByLabelText('Nota de la acción')).toHaveValue('');
  expect(mock.post).toHaveBeenCalledTimes(1);
 });

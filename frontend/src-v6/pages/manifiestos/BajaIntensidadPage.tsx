@@ -11,6 +11,8 @@ import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { clearEventualSubmission, emptyEventualDraft, emptyEventualWaste, eventualDraftScope, eventualSubmissionKey, mayReplaceEventualDraft,
   readEventualSubmission, retainEventualDraft, validEventualDraft, writeEventualSubmission,
   type EventualParticipant as Participant, type EventualSlot as Slot, type EventualWaste as Waste, type EventualPayload, type PendingEventualCreate } from '../../services/eventualDraft';
+import { clearEventualActionSubmission, emptyEventualActionDraft, eventualActionSubmissionKey, mayReplaceEventualActionDraft, readEventualActionSubmission,
+  validEventualActionDraft, writeEventualActionSubmission, type EventualActionBody, type PendingEventualAction } from '../../services/eventualActionDraft';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
@@ -83,11 +85,14 @@ function WasteFields({ value, onChange }: { value: Waste; onChange: (v: Waste) =
 }
 export default function BajaIntensidadPage() {
   const { currentUser } = useAuth();
+  const [params] = useSearchParams();
   const owner = currentUser ? eventualDraftScope(inspectionWorkspaceOwner(currentUser), currentUser.id, getAccessToken()) : '';
+  const shared = useRef({ owner, cleanupWarning:false, confirmedCreate:null as string | null });
+  if (shared.current.owner !== owner) shared.current = { owner, cleanupWarning:false, confirmedCreate:null };
   if (!owner) return <p role="status" className="p-4">Ingresá nuevamente para recuperar tu actividad y sus borradores.</p>;
-  return <BajaIntensidadWorkspace key={owner} />;
+  return <BajaIntensidadWorkspace key={JSON.stringify([owner,params.get('registro')])} shared={shared.current} />;
 }
-function BajaIntensidadWorkspace() {
+function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; confirmedCreate:string | null } }) {
   const { currentUser } = useAuth();
   const mp = useMobilePrefix();
   const [params, setParams] = useSearchParams();
@@ -121,27 +126,71 @@ function BajaIntensidadWorkspace() {
     return () => { window.removeEventListener('storage', receive); window.removeEventListener('focus', refresh); };
   }, [draftKey]);
   const [discardDraft, setDiscardDraft] = useState(false);
-  const [confirmedCreate, setConfirmedCreate] = useState<string | null>(null);
-  const [wastes, setWastes] = useState<Waste[]>([emptyEventualWaste()]);
-  const [nota, setNota] = useState('');
-  const [draftVersion, setDraftVersion] = useState<number | undefined>();
-  const [difference, setDifference] = useState(false);
+  const [discardAction, setDiscardAction] = useState(false);
+  const actionKey = 'sitrep:eventual-action:v1:' + eventualDraftScope(owner, currentUser!.id, getAccessToken()) + ':' + (id || 'lista');
+  const actionDraft = useRecoverableForm(actionKey, emptyEventualActionDraft(), validEventualActionDraft,
+    { retainExpired: () => true, rejectUnreadable:true });
+  const readAction = () => { try { return { pending:readEventualActionSubmission(actionKey), error:false }; } catch { return { pending:null, error:true }; } };
+  const [actionSubmission, setActionSubmission] = useState(readAction);
+  const [autoCheckFailed, setAutoCheckFailed] = useState(false);
+  const [confirmedAction, setConfirmedAction] = useState<string | null>(null);
+  useEffect(() => {
+    const refresh = () => setActionSubmission(readAction());
+    const receive = (event:StorageEvent) => { if (event.key === eventualActionSubmissionKey(actionKey)) refresh(); };
+    window.addEventListener('storage',receive); window.addEventListener('focus',refresh);
+    return () => { window.removeEventListener('storage',receive); window.removeEventListener('focus',refresh); };
+  },[actionKey]);
+  const { nota, residuos:wastes, diferencia:difference } = actionDraft.value;
+  const draftVersion = actionDraft.value.version ?? undefined;
+  const setNota = (change:React.SetStateAction<string>) => actionDraft.update(v => ({ ...v, nota:typeof change === 'function' ? change(v.nota) : change }));
+  const setWastes: React.Dispatch<React.SetStateAction<Waste[]>> = change => { actionDraft.update(v => ({ ...v, residuos:typeof change === 'function' ? change(v.residuos) : change })); };
+  const setDifference = (change:React.SetStateAction<boolean>) => actionDraft.update(v => ({ ...v, diferencia:typeof change === 'function' ? change(v.diferencia) : change }));
+  const setDraftVersion = (change:React.SetStateAction<number | undefined>) => actionDraft.update(v => {
+    const next = typeof change === 'function' ? change(v.version ?? undefined) : change;
+    return { ...v, version: next ?? null };
+  });
   const [error, setError] = useState('');
   const [recovered, setRecovered] = useState('');
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  const cleanupWarning = useRef(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  useEffect(() => { setNota(''); setDraftVersion(undefined); setDifference(false); setWastes([emptyEventualWaste()]); setError('');
-    setRecovered(cleanupWarning.current ? 'La operación se guardó. Conservamos las copias locales que no pudimos limpiar; revisalas antes de enviar otra operación.' : ''); cleanupWarning.current = false; }, [id]);
-  // Retained on failed requests. Repeating the same command cannot duplicate facts.
-  const request = useRef<{ signature: string; id: string } | undefined>(undefined);
+  useEffect(() => {
+    setRecovered(shared.cleanupWarning ? 'La operación se guardó. Conservamos las copias locales que no pudimos limpiar; revisalas antes de enviar otra operación.' : '');
+    shared.cleanupWarning = false;
+  }, []);
+  const finishAction = (sent:PendingEventualAction, recoveredFromHistory = false) => {
+    setConfirmedAction(sent.id);
+    const saved=actionDraft.update(current => {
+      if (current.pending?.id !== sent.id) return current;
+      const next={ ...current }; delete next.pending;
+      if (next.nota === sent.body.nota) next.nota='';
+      if (sent.body.tipo === 'DIFERENCIA' && JSON.stringify(next.residuos) === JSON.stringify(sent.body.residuos)) {
+        next.diferencia=false; next.residuos=[emptyEventualWaste()];
+      }
+      if (!next.nota && !next.diferencia) next.version=null;
+      return next;
+    });
+    if (!saved.saved || saved.conflict) setAutoCheckFailed(true);
+    try {
+      const stored=readEventualActionSubmission(actionKey);
+      if (stored?.id === sent.id) clearEventualActionSubmission(actionKey,sent.id);
+      setActionSubmission(readAction());
+    }
+    catch { setAutoCheckFailed(true); setActionSubmission(readAction()); }
+    setError('');
+    setRecovered(saved.saved && !saved.conflict
+      ? recoveredFromHistory ? 'La acción ya estaba guardada. Recuperamos la confirmación sin duplicarla.' : 'La acción quedó registrada.'
+      : 'La acción se guardó. Revisá las copias locales antes de continuar.');
+  };
   async function send(path: string, body: Record<string, unknown>, created = false, checking = false) {
-    if (lock.current || (created && (draft.error || submission.error || (draft.conflict && !submission.pending)))) return;
+    if (lock.current || (created && (draft.error || submission.error || (draft.conflict && !submission.pending)))
+      || (!created && (actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)))) return;
+    if (!created) setAutoCheckFailed(false);
     lock.current = true; setBusy(true); setError(''); setRecovered('');
     const perform = async () => {
       let pending: PendingEventualCreate | undefined, fresh = false, ownsDraft = false;
+      let action: PendingEventualAction | undefined, actionFresh = false;
       if (created) {
         let stored: PendingEventualCreate | null;
         try { stored = readEventualSubmission(draftKey); }
@@ -179,10 +228,28 @@ function BajaIntensidadWorkspace() {
         }
         }
       }
-      const signature = JSON.stringify({ path, body });
-      if (!created && request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
+      else {
+        let stored: PendingEventualAction | null;
+        try { stored = readEventualActionSubmission(actionKey); }
+        catch { setActionSubmission({ pending:null,error:true }); setError('No pudimos leer la referencia de la acción. No se envió otra.'); return; }
+        if (stored && !checking) { setActionSubmission({ pending:stored,error:false }); setError('Hay una acción sin confirmar. Comprobala antes de continuar.'); return; }
+        if (stored) action=stored;
+        else {
+          const saved=actionDraft.update(current => {
+            action=current.pending;
+            if (!action) { actionFresh=true; action={ id:crypto.randomUUID(), body:structuredClone(body) as EventualActionBody }; }
+            return { ...current, version:current.version ?? action.body.version, pending:action };
+          });
+          if (!saved.saved || saved.conflict || !action) {
+            if (actionFresh) actionDraft.update(current => { const next={...current}; if (next.pending?.id === action?.id) delete next.pending; return next; });
+            setError('Todavía no se envió. Revisá el borrador y su almacenamiento antes de reintentar.'); return;
+          }
+          try { writeEventualActionSubmission(actionKey,action); setActionSubmission({ pending:action,error:false }); }
+          catch { setActionSubmission(readAction()); setError('No pudimos guardar la referencia de la acción. No se envió otra.'); return; }
+        }
+      }
       try {
-        const result: Entry = (await api.post(path, created ? { ...pending!.body, id: pending!.id } : { ...body, id: request.current!.id })).data.data.registro;
+        const result: Entry = (await api.post(path, created ? { ...pending!.body, id: pending!.id } : { ...action!.body, id:action!.id })).data.data.registro;
         if (!alive.current) return;
         await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner] });
         if (!alive.current) return;
@@ -190,13 +257,14 @@ function BajaIntensidadWorkspace() {
         void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner], refetchType: 'none' });
         qc.setQueryData(['baja-intensidad', currentUser?.id, owner, result.id], { registro: result });
         if (created) {
-          setConfirmedCreate(pending!.id);
-          if (!ownsDraft || !draft.clear()) cleanupWarning.current = true;
+          shared.confirmedCreate = pending!.id;
+          if (!ownsDraft || !draft.clear()) shared.cleanupWarning = true;
           try { clearEventualSubmission(draftKey, pending!.id); setSubmission({ pending: null, error: false }); }
-          catch { cleanupWarning.current = true; setSubmission(readSubmission()); }
+          catch { shared.cleanupWarning = true; setSubmission(readSubmission()); }
+          changeParams({ registro: result.id }); setCreating(false);
+        } else {
+          finishAction(action!);
         }
-        changeParams({ registro: result.id }); setCreating(false); setDifference(false); setNota(''); setDraftVersion(undefined);
-        request.current = undefined;
       } catch (caught) {
         if (!alive.current) return;
         const failure = caught as { response?: { status?: number; data?: { message?: string } } };
@@ -208,13 +276,18 @@ function BajaIntensidadWorkspace() {
             draft.update(current => { const next = { ...current }; delete next.pendingCreate; return next; });
           } catch { setSubmission(readSubmission()); }
         }
+        if (!created && actionFresh && [400,409,422].includes(failure.response?.status || 0)) {
+          try {
+            clearEventualActionSubmission(actionKey,action!.id); setActionSubmission({ pending:null,error:false });
+            actionDraft.update(current => { const next={...current}; delete next.pending; return next; });
+          } catch { setActionSubmission(readAction()); }
+        }
         setError(failure.response?.data?.message || 'No se pudo confirmar. Tus datos siguen aquí; podés reintentar.');
       }
     };
     try {
-      if (!created) await perform();
-      else if (!navigator.locks?.request) setError('Este navegador no puede proteger el envío entre pestañas. Usá un navegador compatible para continuar; el borrador queda guardado aquí.');
-      else await navigator.locks.request('sitrep:eventual-submit:' + draftKey, { mode: 'exclusive', ifAvailable: true }, async grant => {
+      if (!navigator.locks?.request) setError('Este navegador no puede proteger el envío entre pestañas. Usá un navegador compatible para continuar; el borrador queda guardado aquí.');
+      else await navigator.locks.request('sitrep:eventual-submit:' + (created ? draftKey : actionKey), { mode: 'exclusive', ifAvailable: true }, async grant => {
         if (!alive.current) return;
         if (!grant) { setError('Otra pestaña está enviando este borrador. Esperá a que termine y volvé a comprobarlo.'); return; }
         await perform();
@@ -225,18 +298,19 @@ function BajaIntensidadWorkspace() {
   }
   const entry = query.isError ? undefined : query.data?.registro;
   useEffect(() => {
-    const sent = request.current;
-    if (busy || !sent || !entry?.eventos.some(item => item.id === sent.id)) return;
-    // A lost HTTP response is not a failed transaction. Match the exact command ID
-    // before acknowledging it; preserve any edits made after the failed response.
-    const command = JSON.parse(sent.signature).body as { nota?: string; tipo?: string; residuos?: Waste[] };
-    const changedNote = nota !== (command.nota || '');
-    const changedLoad = command.tipo === 'DIFERENCIA' && JSON.stringify(wastes) !== JSON.stringify(command.residuos);
-    if (!changedNote) setNota('');
-    if (command.tipo === 'DIFERENCIA' && !changedLoad) setDifference(false);
-    if (!changedNote && !changedLoad) setDraftVersion(undefined); request.current = undefined; setError('');
-    setRecovered('La acción ya estaba guardada. Recuperamos la confirmación sin duplicarla.');
-  }, [entry, busy, nota, wastes]);
+    const sent=actionSubmission.pending || actionDraft.value.pending;
+    if (busy || autoCheckFailed || !entry || !sent || !entry.eventos.some(event => event.id === sent.id) || !navigator.locks?.request) return;
+    let cancelled=false;
+    void navigator.locks.request('sitrep:eventual-submit:' + actionKey,{mode:'exclusive',ifAvailable:true},async grant => {
+      if (!grant || cancelled || !alive.current) return;
+      try {
+        const stored=readEventualActionSubmission(actionKey);
+        if ((!stored && actionDraft.value.pending?.id === sent.id) || stored?.id === sent.id) finishAction(sent,true);
+      }
+      catch { if (alive.current) setActionSubmission(readAction()); }
+    }).catch(() => { if (alive.current) { setAutoCheckFailed(true); setError('No pudimos comprobar la acción en este navegador.'); } });
+    return () => { cancelled=true; };
+  },[entry,busy,autoCheckFailed,actionSubmission.pending,actionDraft.value.pending,actionKey]);
   const staleDraft = draftVersion !== undefined && !!entry && draftVersion !== entry.version;
   const beginEdit = () => setDraftVersion(previous => previous ?? entry?.version);
   const actualPage = query.data?.page ?? listPage;
@@ -246,11 +320,13 @@ function BajaIntensidadWorkspace() {
     return { ...current, residuos: typeof change === 'function' ? change(current.residuos) : change };
   });
   const pendingCreate = submission.pending || draft.value.pendingCreate;
+  const pendingAction = actionSubmission.pending || actionDraft.value.pending;
+  const actionBlocked = busy || actionDraft.error || actionSubmission.error || actionDraft.conflict || !!pendingAction;
   const hasDraft = draft.saved || draft.restored || draft.conflict || !!pendingCreate || submission.error;
   const approval = entry?.aprobacion && entry.aprobacion.estado !== 'NO_REQUIERE' ? entry.aprobacion : undefined;
   const factsBlocked = approval?.estado === 'PENDIENTE' || approval?.estado === 'RECHAZADO';
   const event = (body: Record<string, unknown>) => {
-    if (!entry || staleDraft) return;
+    if (!entry || staleDraft || actionBlocked) return;
     return send(endpoint + '/' + entry.id + '/eventos', { ...body, version: draftVersion ?? entry.version });
   };
   const wasteInputs = (rows: Waste[], update: React.Dispatch<React.SetStateAction<Waste[]>>) => <div className="space-y-3">{rows.map((waste, index) => <fieldset key={index} className="space-y-2">
@@ -284,12 +360,12 @@ function BajaIntensidadWorkspace() {
     {tracking && <SeguimientoExterno />}
     <p className="text-sm text-neutral-600">Referencia interna · Sin número oficial. Registrar no implica aprobación ni habilitación.</p>
     {recovered && <p role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900">{recovered}</p>}
-    {error && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
+    {error && !(pendingAction && error === 'No se pudo confirmar. Tus datos siguen aquí; podés reintentar.') && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
     {!tracking && query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {!tracking && query.isLoading && <p role="status">Cargando registros…</p>}
     {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, {}, true); }}>
       {draft.conflict && <DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload}
-        canReload={!draft.value.pendingCreate || draft.value.pendingCreate.id === confirmedCreate}
+        canReload={!draft.value.pendingCreate || draft.value.pendingCreate.id === shared.confirmedCreate}
         canKeep={!submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)} onKeep={() => {
           if (!submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)) draft.overwrite();
           else setError('Hay un envío sin confirmar en otra versión. Cargá esa versión antes de continuar.');
@@ -297,7 +373,7 @@ function BajaIntensidadWorkspace() {
       {(draft.error || submission.error) && <div role="alert" className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900 space-y-2"><p>No pudimos leer o guardar el borrador o la referencia del envío en este dispositivo. Conservá esta pantalla abierta y reintentá antes de enviar.</p>
         <Button type="button" variant="outline" onClick={() => { draft.update(draft.value); setSubmission(readSubmission()); }}>Reintentar guardado</Button></div>}
       {pendingCreate && <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 space-y-2">
-        <p>{pendingCreate.id === confirmedCreate
+        <p>{pendingCreate.id === shared.confirmedCreate
           ? 'La operación ya fue confirmada. Revisá las copias locales antes de continuar.'
           : 'La operación podría haberse guardado. Comprobá el mismo envío antes de modificar los datos; no se creará otra.'}</p>
         {submission.pending && submission.pending.id !== draft.value.pendingCreate?.id && <p className="break-words">Motivo del envío a comprobar: {submission.pending.body.motivo}</p>}
@@ -355,7 +431,28 @@ function BajaIntensidadWorkspace() {
       </div>
     </Card>}
     {entry && <div className="space-y-4">
-      {staleDraft && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">El registro cambió mientras escribías. Revisá las novedades; conservamos tu nota y la carga observada. <Button variant="outline" disabled={busy} onClick={() => { setDraftVersion(entry.version); request.current = undefined; setError(''); }}>Usar versión actual</Button></div>}
+      {actionDraft.conflict && <DraftConflictNotice durable={actionDraft.conflictSaved} count={actionDraft.conflictCount} onReload={actionDraft.reload}
+        canReload={!actionDraft.value.pending || actionDraft.value.pending.id === confirmedAction}
+        canKeep={!actionSubmission.pending && mayReplaceEventualActionDraft(actionKey,actionDraft.value.pending?.id)}
+        onKeep={() => { if (!actionSubmission.pending && mayReplaceEventualActionDraft(actionKey,actionDraft.value.pending?.id)) actionDraft.overwrite(); }} />}
+      {(actionDraft.error || actionSubmission.error) && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm">
+        No pudimos leer o guardar el borrador o la referencia de la acción. Conservá esta pantalla abierta y reintentá.
+        <Button type="button" variant="outline" onClick={() => { actionDraft.update(actionDraft.value); setActionSubmission(readAction()); }}>Reintentar guardado</Button>
+      </div>}
+      {pendingAction && <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 space-y-2">
+        <p>{pendingAction.id === confirmedAction ? 'La acción ya fue confirmada. Revisá las copias locales antes de continuar.'
+          : 'La acción podría haberse registrado. Comprobá el mismo envío antes de continuar.'}</p>
+        {actionSubmission.pending && actionSubmission.pending.id !== actionDraft.value.pending?.id && <p className="break-words">Nota de la acción a comprobar: {actionSubmission.pending.body.nota}</p>}
+        <Button type="button" disabled={busy || actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)}
+          onClick={() => void send(endpoint + '/' + entry.id + '/eventos',{},false,true)}>Comprobar acción</Button>
+      </div>}
+      {!pendingAction && (actionDraft.saved || actionDraft.restored) && (!!nota || difference) && <div role="status" className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">
+        Borrador de acción guardado en este dispositivo; todavía no enviado.
+        {!discardAction ? <Button variant="ghost" size="sm" disabled={actionDraft.conflict || actionDraft.error} onClick={() => setDiscardAction(true)}>Descartar borrador</Button>
+          : <span>¿Borrar lo cargado? <Button size="sm" variant="outline" onClick={() => { if (actionDraft.clear()) setDiscardAction(false); }}>Sí, descartar</Button>
+            <Button size="sm" variant="outline" onClick={() => setDiscardAction(false)}>Conservar</Button></span>}
+      </div>}
+      {staleDraft && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">El registro cambió mientras escribías. Revisá las novedades; conservamos tu nota y la carga observada. <Button variant="outline" disabled={actionBlocked} onClick={() => { setDraftVersion(entry.version); setError(''); }}>Usar versión actual</Button></div>}
       <Card><p className="text-xs break-all text-neutral-600">{entry.referencia}</p><h2 className="font-bold text-lg mt-2">{entry.datos.generador.nombre || 'Generador por identificar'}</h2>
         <p>{entry.datos.transportista.nombre || 'Transportista por identificar'} · {entry.datos.patente || 'Patente pendiente'}</p>
         {entry.datos.operador && <p>{entry.datos.operador.nombre || 'Operador por identificar'}</p>}
@@ -380,29 +477,29 @@ function BajaIntensidadWorkspace() {
         {approval.estado === 'APROBADO' && entry.etapa === 'REGISTRADO' && entry.puedeRegistrar && <p className="text-sm font-semibold text-primary-800 mt-3">Listo para registrar el retiro</p>}
         {approval.estado === 'RECHAZADO' && <div className="text-sm text-error-800 mt-3"><p className="font-semibold">Operación detenida</p><p>Rechazado por una parte: se conserva como antecedente y no avanza.</p></div>}
         {approval.estado === 'PENDIENTE' && !!entry.puedeAprobar?.length && <div className="flex flex-wrap gap-2 mt-3">{entry.puedeAprobar.map(parte => <React.Fragment key={parte}>
-          <Button disabled={busy || staleDraft} onClick={() => void event({ tipo: 'APROBAR_PARTE', parte, nota })}>Aprobar como {partLabels[parte].toLowerCase()}</Button>
-          <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RECHAZAR_PARTE', parte, nota })}>Rechazar como {partLabels[parte].toLowerCase()}</Button>
+          <Button disabled={actionBlocked || staleDraft} onClick={() => void event({ tipo: 'APROBAR_PARTE', parte, nota })}>Aprobar como {partLabels[parte].toLowerCase()}</Button>
+          <Button variant="outline" disabled={actionBlocked || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RECHAZAR_PARTE', parte, nota })}>Rechazar como {partLabels[parte].toLowerCase()}</Button>
         </React.Fragment>)}</div>}
       </Card>}
-      {(entry.puedeRegistrar || entry.puedeResolver || !!entry.puedeAprobar?.length) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} value={nota} onChange={e => { beginEdit(); setNota(e.target.value); }} />}
+      {(entry.puedeRegistrar || entry.puedeResolver || !!entry.puedeAprobar?.length) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} disabled={actionBlocked} value={nota} onChange={e => { beginEdit(); setNota(e.target.value); }} />}
       {entry.puedeRegistrar && <Card><div className="flex flex-wrap gap-3">
-        {nextStages[entry.etapa] && <Button disabled={busy || staleDraft || factsBlocked} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
-        <Button variant="outline" disabled={factsBlocked} onClick={() => { beginEdit(); setDifference(v => !v); }}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
+        {nextStages[entry.etapa] && <Button disabled={actionBlocked || staleDraft || factsBlocked} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
+        <Button variant="outline" disabled={actionBlocked || factsBlocked} onClick={() => { beginEdit(); setDifference(v => !v); }}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
       </div>
       {difference && <form className="space-y-3 mt-4" onSubmit={e => { e.preventDefault(); void event({ tipo: 'DIFERENCIA', nota, residuos: wastes }); }}>
         <p className="text-sm">Carga observada completa; no se suma automáticamente al original.</p>
-        {wasteInputs(wastes, setWastes)}<Button type="submit" disabled={busy || staleDraft || !nota.trim()}>Guardar diferencia</Button>
+        <fieldset disabled={actionBlocked}>{wasteInputs(wastes, setWastes)}</fieldset><Button type="submit" disabled={actionBlocked || staleDraft || !nota.trim()}>Guardar diferencia</Button>
       </form>}</Card>}
       <Card><h2 className="flex items-center gap-2 text-base font-semibold mb-3"><ClipboardCheck size={20} aria-hidden="true" className="shrink-0 text-primary-700" />Revisión posterior</h2><div className="space-y-4">
         {entry.revisiones.map((review, i) => <section key={review.objetivo} aria-label={i === 0 ? 'Revisión original' : 'Revisión diferencia ' + i} className="border-b border-neutral-200 pb-3 last:border-0">
           <h3 className="font-medium">{i === 0 ? 'Registro original' : 'Diferencia ' + i}</h3>
           <p className="text-sm mb-2">{review.estado === 'APROBADA' ? 'Conformidad aprobada' : review.estado === 'OBSERVADA' ? 'Observada · requiere atención' : review.estado === 'RECHAZADA' ? 'Conformidad rechazada · hechos conservados' : 'Pendiente de conformidad'}{review.solicitada ? ' · Revisión solicitada' : ''}</p>
           <div className="flex flex-wrap gap-2">
-            {entry.puedeRegistrar && !factsBlocked && <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
+            {entry.puedeRegistrar && !factsBlocked && <Button variant="outline" disabled={actionBlocked || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
             {entry.puedeResolver && review.solicitada && <>
-              <Button disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'APROBADA', nota })}>Aprobar post facto</Button>
-              <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'OBSERVADA', nota })}>Observar</Button>
-              <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'RECHAZADA', nota })}>Rechazar conformidad</Button>
+              <Button disabled={actionBlocked || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'APROBADA', nota })}>Aprobar post facto</Button>
+              <Button variant="outline" disabled={actionBlocked || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'OBSERVADA', nota })}>Observar</Button>
+              <Button variant="outline" disabled={actionBlocked || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'RECHAZADA', nota })}>Rechazar conformidad</Button>
             </>}
           </div>
         </section>)}
