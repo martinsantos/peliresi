@@ -40,6 +40,22 @@ describe('useInspectionDraftOwnership', () => {
     else Reflect.deleteProperty(navigator, 'locks');
   });
 
+  it('refreshes under the acquired lock before exposing the editor as owned', async () => {
+    const manager = lockManager(); installLocks(manager);
+    const onAcquire = vi.fn(() => expect(manager.held.has('sitrep:inspection-draft:draft-1')).toBe(true));
+    const hook = renderHook(() => useInspectionDraftOwnership('draft-1', true, onAcquire));
+    await waitFor(() => expect(hook.result.current.status).toBe('owned'));
+    expect(onAcquire).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the lock and fails closed if the acquisition callback fails', async () => {
+    const manager = lockManager(); installLocks(manager);
+    const hook = renderHook(() => useInspectionDraftOwnership('draft-1', true, () => { throw Error('storage'); }));
+    await waitFor(() => expect(hook.result.current.status).toBe('unavailable'));
+    expect(hook.result.current.canWrite()).toBe(false);
+    expect(manager.held.size).toBe(0);
+  });
+
   it('allows only one instance to write the same local draft and never steals its lock', async () => {
     const manager = lockManager();
     installLocks(manager);

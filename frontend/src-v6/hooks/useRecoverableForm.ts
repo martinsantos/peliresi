@@ -6,8 +6,13 @@ const pendingConflicts = new Map<string, { value: unknown; revision: string | nu
 /** A keyed form must remount when its verified account/role/record scope changes.
  * Saves input immediately (mobile shutdown has no reliable unload event). Never stores files. */
 export function useRecoverableForm<T>(key: string, initial: T, validate: (value: unknown) => value is T,
-  options?: { retainExpired?: (value: T) => boolean; rejectUnreadable?: boolean }) {
+  options?: { retainExpired?: (value: T) => boolean; rejectUnreadable?: boolean; canWrite?: () => boolean }) {
   const journal = draftConflicts(key, validate, options?.retainExpired, !!options?.rejectUnreadable);
+  // The permission can change while a storage event handler from an earlier
+  // render is still installed. Never let that handler write without the lock.
+  const writePermission = useRef(options?.canWrite);
+  writePermission.current = options?.canWrite;
+  const canWrite = () => writePermission.current?.() ?? true;
   const writer = useRef(crypto.randomUUID());
   const read = (): RecordValue<T> | null => {
     const raw = localStorage.getItem(key);
@@ -64,6 +69,7 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
     return true;
   };
   const persist = (next: T | null, force = false) => {
+    if (!canWrite()) return false;
     try {
       if (next !== null && options?.rejectUnreadable && !validate(next)) throw new Error('Borrador incompleto');
       if (options?.rejectUnreadable) journal.list();
@@ -78,6 +84,7 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
     } catch { setError(true); setSaved(false); return false; }
   };
   const update = (change: SetStateAction<T>) => {
+    if (!canWrite()) return { saved: false, conflict: conflicted.current };
     const next = typeof change === 'function' ? (change as (v: T) => T)(current.current) : change;
     current.current = next; edited.current = true; setValue(next);
     // Keep an invalid intermediate value on screen, never serialize it over a
@@ -86,6 +93,7 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
     const saved=persist(next);return {saved,conflict:conflicted.current};
   };
   const reload = () => {
+    if (!canWrite()) return;
     try {
       const latest = read(); const next = latest?.value ?? initial;
       current.current = next; revision.current = latest?.revision ?? null; edited.current = false;
@@ -103,9 +111,30 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
     if (!acknowledge()) return false;
     current.current = initial; setValue(initial); return true;
   };
+  // Called immediately after an editor acquires its lock. Reading at mount is
+  // not sufficient: the previous editor may have saved while this tab waited.
+  // Unlike reload, this does not discard a preserved conflict as a side effect.
+  const synchronize = () => {
+    if (!canWrite()) return;
+    try {
+      const latest = read();
+      if (edited.current) {
+        if ((latest?.revision ?? null) !== revision.current) preserveConflict();
+        return;
+      }
+      const entries = journal.list();
+      const next = entries[0] ?? null;
+      selected.current = next;
+      current.current = next?.value ?? latest?.value ?? initial;
+      revision.current = latest?.revision ?? null;
+      edited.current = !!next; conflicted.current = !!next;
+      setValue(current.current); setSaved(!!latest?.value && !next); setRestored(!!latest?.value || !!next);
+      setConflict(!!next); setConflictSaved(!!next); setConflictCount(entries.length); setError(false);
+    } catch { setError(true); }
+  };
   useEffect(() => {
     const receive = (event: StorageEvent) => {
-      if (event.key !== key) return;
+      if (event.key !== key || !canWrite()) return;
       try {
         const latest = read();
         if ((latest?.revision ?? null) === revision.current) return;
@@ -121,5 +150,5 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [error, conflict, conflictSaved]);
-  return { value, update, clear, acknowledge, saved, error, restored, conflict, conflictSaved, conflictCount, reload, overwrite: () => persist(current.current, true) };
+  return { value, update, clear, acknowledge, synchronize, saved, error, restored, conflict, conflictSaved, conflictCount, reload, overwrite: () => persist(current.current, true) };
 }

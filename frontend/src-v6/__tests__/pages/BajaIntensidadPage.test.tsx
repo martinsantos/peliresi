@@ -9,6 +9,12 @@ import { eventualActionSubmissionKey } from '../../services/eventualActionDraft'
 const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), user: { id: 'qa-operator', rol: 'OPERADOR' } }));
 vi.mock('../../services/api', () => ({ api: mock, getAccessToken: () => 'qa.' + btoa(JSON.stringify({ id: mock.user.id })) + '.qa' }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mock.user }) }));
+// Page unit tests exercise the form and submission guards. Browser tests and
+// the ownership hook tests exercise actual asynchronous cross-tab acquisition.
+vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: (_key: string, enabled: boolean) => ({
+  status: enabled && navigator.locks?.request ? 'owned' : 'unavailable',
+  canWrite: () => enabled && !!navigator.locks?.request, retry: vi.fn(),
+}) }));
 const id = '00000000-0000-4000-8000-000000000001';
 const entry = { id, referencia: 'BI-' + id, version: 0, etapa: 'RECIBIDO', puedeRegistrar: true, puedeResolver: false,
   datos: { generador: { nombre: 'QA externo', identificacion: 'Declarada', domicilio: 'QA' },
@@ -147,6 +153,7 @@ it('does not dispatch a creation if the reference cannot be stored', async () =>
 });
 it('does not dispatch if another tab holds the send lock or the browser cannot provide it', async () => {
  mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.get.mockResolvedValue({ data: { data: { registros: [], total: 0 } } });
  const first = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
  fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
  fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA bloqueo' } });
@@ -155,8 +162,9 @@ it('does not dispatch if another tab holds the send lock or the browser cannot p
  expect(await screen.findByText(/Otra pestaña está enviando/)).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
  first.unmount(); Object.defineProperty(navigator, 'locks', { configurable:true, value:undefined });
  view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
- fireEvent.click(screen.getByRole('button',{name:'Guardar operación'}));
- expect(await screen.findByText(/navegador no puede proteger el envío/)).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
+ expect(await screen.findByText(/navegador no permite proteger la edición/)).toBeVisible();
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toHaveValue('QA bloqueo');
+ expect(screen.getByRole('button',{name:'Guardar operación'})).toBeDisabled(); expect(mock.post).not.toHaveBeenCalled();
 });
 it('does not navigate or mix a pending creation when its response arrives after changing role', async () => {
  mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
@@ -312,7 +320,7 @@ it.each(['{invalid','', '{"version":1}'])('blocks actions if their stored refere
  expect(screen.getByRole('button',{name:'Registrar tratado'})).toBeDisabled(); expect(mock.post).not.toHaveBeenCalled();
 });
 it('refuses to send an action if another tab owns the lock', async () => {
- Object.defineProperty(navigator,'locks',{configurable:true,value:{request:async (_name:string,_options:unknown,callback:(lock:unknown)=>Promise<void>)=>callback(null)}});
+ Object.defineProperty(navigator,'locks',{configurable:true,value:{request:async (name:string,_options:unknown,callback:(lock:unknown)=>Promise<void>)=>callback(name.startsWith('sitrep:eventual-submit:') ? null : {name})}});
  view(true); fireEvent.change(await screen.findByLabelText('Nota de la acción'),{target:{value:'No enviar'}});
  fireEvent.click(screen.getByRole('button',{name:'Registrar tratado'}));
  expect(await screen.findByText(/Otra pestaña está enviando/)).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();

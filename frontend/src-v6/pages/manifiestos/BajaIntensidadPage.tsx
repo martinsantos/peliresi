@@ -7,6 +7,7 @@ import { api, getAccessToken } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useRecoverableForm } from '../../hooks/useRecoverableForm';
+import { useInspectionDraftOwnership, type InspectionDraftOwnershipStatus } from '../../hooks/useInspectionDraftOwnership';
 import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { clearEventualSubmission, emptyEventualDraft, emptyEventualWaste, eventualDraftScope, eventualSubmissionKey, mayReplaceEventualDraft,
   readEventualSubmission, retainEventualDraft, validEventualDraft, writeEventualSubmission,
@@ -83,6 +84,20 @@ function WasteFields({ value, onChange }: { value: Waste; onChange: (v: Waste) =
     </select></label>
   </div>;
 }
+function EventualEditingNotice({ status, retry }: { status: InspectionDraftOwnershipStatus; retry: () => void }) {
+  if (status === 'owned') return null;
+  if (status === 'checking') return <p role="status" className="text-sm text-neutral-600">Preparando la edición segura…</p>;
+  return <div role="alert" className="space-y-2 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-900">
+    {status === 'blocked' ? <>
+      <p>Este borrador está abierto en otra pestaña. Cerrala y volvé a comprobar para editar aquí.</p>
+      <Button type="button" variant="outline" onClick={retry}>Volver a comprobar</Button>
+    </> : <>
+      <p>Este navegador no permite proteger la edición entre pestañas. Abrí SITREP en un navegador compatible para continuar.</p>
+      <p>Los borradores de este dispositivo no se trasladan automáticamente. Si hay un envío sin confirmar, no lo repitas: conservá este dispositivo y consultá a soporte.</p>
+      <Button type="button" variant="outline" onClick={retry}>Volver a comprobar</Button>
+    </>}
+  </div>;
+}
 export default function BajaIntensidadPage() {
   const { currentUser } = useAuth();
   const [params] = useSearchParams();
@@ -115,8 +130,11 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
     retry: false, staleTime: 0, refetchInterval: 5000, refetchIntervalInBackground: false });
   const [creating, setCreating] = useState(false);
   const draftKey = 'sitrep:eventual-form:v1:' + eventualDraftScope(owner, currentUser!.id, getAccessToken());
+  const createSync = useRef<() => void>(() => {});
+  const createOwnership = useInspectionDraftOwnership('eventual:' + draftKey, enabled && !siteLimited && creating && !id, () => createSync.current());
   const draft = useRecoverableForm(draftKey, emptyEventualDraft(), validEventualDraft,
-    { retainExpired: retainEventualDraft, rejectUnreadable: true });
+    { retainExpired: retainEventualDraft, rejectUnreadable: true, canWrite: createOwnership.canWrite });
+  createSync.current = draft.synchronize;
   const readSubmission = () => { try { return { pending: readEventualSubmission(draftKey), error: false }; } catch { return { pending: null, error: true }; } };
   const [submission, setSubmission] = useState(readSubmission);
   useEffect(() => {
@@ -128,8 +146,11 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   const [discardDraft, setDiscardDraft] = useState(false);
   const [discardAction, setDiscardAction] = useState(false);
   const actionKey = 'sitrep:eventual-action:v1:' + eventualDraftScope(owner, currentUser!.id, getAccessToken()) + ':' + (id || 'lista');
+  const actionSync = useRef<() => void>(() => {});
+  const actionOwnership = useInspectionDraftOwnership('eventual:' + actionKey, enabled && !siteLimited && !!id, () => actionSync.current());
   const actionDraft = useRecoverableForm(actionKey, emptyEventualActionDraft(), validEventualActionDraft,
-    { retainExpired: () => true, rejectUnreadable:true });
+    { retainExpired: () => true, rejectUnreadable:true, canWrite: actionOwnership.canWrite });
+  actionSync.current = actionDraft.synchronize;
   const readAction = () => { try { return { pending:readEventualActionSubmission(actionKey), error:false }; } catch { return { pending:null, error:true }; } };
   const [actionSubmission, setActionSubmission] = useState(readAction);
   const [autoCheckFailed, setAutoCheckFailed] = useState(false);
@@ -184,6 +205,8 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
       : 'La acción se guardó. Revisá las copias locales antes de continuar.');
   };
   async function send(path: string, body: Record<string, unknown>, created = false, checking = false) {
+    const ownership = created ? createOwnership : actionOwnership;
+    if (!ownership.canWrite()) return;
     if (lock.current || (created && (draft.error || submission.error || (draft.conflict && !submission.pending)))
       || (!created && (actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)))) return;
     if (!created) setAutoCheckFailed(false);
@@ -250,9 +273,9 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
       }
       try {
         const result: Entry = (await api.post(path, created ? { ...pending!.body, id: pending!.id } : { ...action!.body, id:action!.id })).data.data.registro;
-        if (!alive.current) return;
+        if (!alive.current || !ownership.canWrite()) return;
         await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner] });
-        if (!alive.current) return;
+        if (!alive.current || !ownership.canWrite()) return;
         // Lists must not retain the shared 60-second cache after an operation or resolution.
         void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner], refetchType: 'none' });
         qc.setQueryData(['baja-intensidad', currentUser?.id, owner, result.id], { registro: result });
@@ -266,7 +289,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
           finishAction(action!);
         }
       } catch (caught) {
-        if (!alive.current) return;
+        if (!alive.current || !ownership.canWrite()) return;
         const failure = caught as { response?: { status?: number; data?: { message?: string } } };
         // A later rejection cannot establish whether an earlier attempt committed.
         // Only a validation rejection on the very first attempt permits editing.
@@ -288,7 +311,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
     try {
       if (!navigator.locks?.request) setError('Este navegador no puede proteger el envío entre pestañas. Usá un navegador compatible para continuar; el borrador queda guardado aquí.');
       else await navigator.locks.request('sitrep:eventual-submit:' + (created ? draftKey : actionKey), { mode: 'exclusive', ifAvailable: true }, async grant => {
-        if (!alive.current) return;
+        if (!alive.current || !ownership.canWrite()) return;
         if (!grant) { setError('Otra pestaña está enviando este borrador. Esperá a que termine y volvé a comprobarlo.'); return; }
         await perform();
       });
@@ -299,10 +322,10 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   const entry = query.isError ? undefined : query.data?.registro;
   useEffect(() => {
     const sent=actionSubmission.pending || actionDraft.value.pending;
-    if (busy || autoCheckFailed || !entry || !sent || !entry.eventos.some(event => event.id === sent.id) || !navigator.locks?.request) return;
+    if (busy || autoCheckFailed || !entry || !sent || !entry.eventos.some(event => event.id === sent.id) || !navigator.locks?.request || !actionOwnership.canWrite()) return;
     let cancelled=false;
     void navigator.locks.request('sitrep:eventual-submit:' + actionKey,{mode:'exclusive',ifAvailable:true},async grant => {
-      if (!grant || cancelled || !alive.current) return;
+      if (!grant || cancelled || !alive.current || !actionOwnership.canWrite()) return;
       try {
         const stored=readEventualActionSubmission(actionKey);
         if ((!stored && actionDraft.value.pending?.id === sent.id) || stored?.id === sent.id) finishAction(sent,true);
@@ -310,7 +333,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
       catch { if (alive.current) setActionSubmission(readAction()); }
     }).catch(() => { if (alive.current) { setAutoCheckFailed(true); setError('No pudimos comprobar la acción en este navegador.'); } });
     return () => { cancelled=true; };
-  },[entry,busy,autoCheckFailed,actionSubmission.pending,actionDraft.value.pending,actionKey]);
+  },[entry,busy,autoCheckFailed,actionSubmission.pending,actionDraft.value.pending,actionKey,actionOwnership.status]);
   const staleDraft = draftVersion !== undefined && !!entry && draftVersion !== entry.version;
   const beginEdit = () => setDraftVersion(previous => previous ?? entry?.version);
   const actualPage = query.data?.page ?? listPage;
@@ -321,7 +344,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   });
   const pendingCreate = submission.pending || draft.value.pendingCreate;
   const pendingAction = actionSubmission.pending || actionDraft.value.pending;
-  const actionBlocked = busy || actionDraft.error || actionSubmission.error || actionDraft.conflict || !!pendingAction;
+  const actionBlocked = actionOwnership.status !== 'owned' || busy || actionDraft.error || actionSubmission.error || actionDraft.conflict || !!pendingAction;
   const hasDraft = draft.saved || draft.restored || draft.conflict || !!pendingCreate || submission.error;
   const approval = entry?.aprobacion && entry.aprobacion.estado !== 'NO_REQUIERE' ? entry.aprobacion : undefined;
   const factsBlocked = approval?.estado === 'PENDIENTE' || approval?.estado === 'RECHAZADO';
@@ -352,7 +375,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   return <div className="max-w-4xl mx-auto py-5 space-y-4 pb-24">
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-xl font-bold text-neutral-900">Manifiestos eventuales</h1>
+      <h2 className="text-xl font-bold text-neutral-900">{id ? 'Detalle del eventual' : creating ? 'Registrar operación' : tracking ? 'Seguimiento de participantes' : 'Registros'}</h2>
       {!id && !tracking && creators.includes(currentUser?.rol || '') && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : hasDraft ? 'Continuar borrador' : 'Registrar operación'}</Button>}
       {id && <Button variant="outline" onClick={() => changeParams({ registro: null })}>Ver registros</Button>}
     </div>
@@ -364,29 +387,30 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
     {!tracking && query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {!tracking && query.isLoading && <p role="status">Cargando registros…</p>}
     {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, {}, true); }}>
+      <EventualEditingNotice status={createOwnership.status} retry={createOwnership.retry} />
       {draft.conflict && <DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload}
-        canReload={!draft.value.pendingCreate || draft.value.pendingCreate.id === shared.confirmedCreate}
-        canKeep={!submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)} onKeep={() => {
+        canReload={createOwnership.status === 'owned' && (!draft.value.pendingCreate || draft.value.pendingCreate.id === shared.confirmedCreate)}
+        canKeep={createOwnership.status === 'owned' && !submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)} onKeep={() => {
           if (!submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)) draft.overwrite();
           else setError('Hay un envío sin confirmar en otra versión. Cargá esa versión antes de continuar.');
         }} />}
       {(draft.error || submission.error) && <div role="alert" className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900 space-y-2"><p>No pudimos leer o guardar el borrador o la referencia del envío en este dispositivo. Conservá esta pantalla abierta y reintentá antes de enviar.</p>
-        <Button type="button" variant="outline" onClick={() => { draft.update(draft.value); setSubmission(readSubmission()); }}>Reintentar guardado</Button></div>}
+        <Button type="button" variant="outline" disabled={createOwnership.status !== 'owned'} onClick={() => { draft.update(draft.value); setSubmission(readSubmission()); }}>Reintentar guardado</Button></div>}
       {pendingCreate && <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 space-y-2">
         <p>{pendingCreate.id === shared.confirmedCreate
           ? 'La operación ya fue confirmada. Revisá las copias locales antes de continuar.'
           : 'La operación podría haberse guardado. Comprobá el mismo envío antes de modificar los datos; no se creará otra.'}</p>
         {submission.pending && submission.pending.id !== draft.value.pendingCreate?.id && <p className="break-words">Motivo del envío a comprobar: {submission.pending.body.motivo}</p>}
-        <Button type="button" disabled={busy || (draft.conflict && !submission.pending) || draft.error || submission.error} onClick={() => void send(endpoint, {}, true, true)}>Comprobar envío</Button>
+        <Button type="button" disabled={createOwnership.status !== 'owned' || busy || (draft.conflict && !submission.pending) || draft.error || submission.error} onClick={() => void send(endpoint, {}, true, true)}>Comprobar envío</Button>
       </div>}
       {!pendingCreate && (draft.saved || draft.restored) && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary-50 px-3 text-sm text-primary-900">
         <p role="status" className="py-2">{draft.restored ? 'Borrador recuperado' : 'Borrador guardado'} · En este dispositivo; todavía no se envió.</p>
-        {!discardDraft ? <button type="button" className="min-h-11 font-semibold underline" onClick={() => setDiscardDraft(true)}>Descartar</button>
+        {!discardDraft ? <button type="button" disabled={createOwnership.status !== 'owned'} className="min-h-11 font-semibold underline disabled:opacity-50" onClick={() => setDiscardDraft(true)}>Descartar</button>
           : <div className="flex flex-wrap items-center gap-2 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span>
             <Button type="button" size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => { if (draft.clear()) setDiscardDraft(false); }}>Sí, descartar</Button></div>}
+            <Button type="button" size="sm" variant="outline" disabled={createOwnership.status !== 'owned'} onClick={() => { if (draft.clear()) setDiscardDraft(false); }}>Sí, descartar</Button></div>}
       </div>}
-      {(!submission.pending || submission.pending.id === draft.value.pendingCreate?.id) && <fieldset className="space-y-5 min-w-0" disabled={busy || !!pendingCreate || draft.conflict}>
+      {(!submission.pending || submission.pending.id === draft.value.pendingCreate?.id) && <fieldset className="space-y-5 min-w-0" disabled={createOwnership.status !== 'owned' || busy || !!pendingCreate || draft.conflict}>
         <div className="grid sm:grid-cols-2 gap-5">{formSlots.map(slot => <ParticipantFields key={slot} title={slotTitles[slot]} value={draft.value.declared[slot]} external={draft.value.external[slot]}
           onChange={value => draft.update(current => ({ ...current, declared: { ...current.declared, [slot]: value } }))}
           onExternalChange={value => draft.update(current => ({ ...current, external: { ...current.external, [slot]: value } }))} />)}</div>
@@ -431,25 +455,26 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
       </div>
     </Card>}
     {entry && <div className="space-y-4">
+      {(entry.puedeRegistrar || entry.puedeResolver || !!entry.puedeAprobar?.length || !!pendingAction) && <EventualEditingNotice status={actionOwnership.status} retry={actionOwnership.retry} />}
       {actionDraft.conflict && <DraftConflictNotice durable={actionDraft.conflictSaved} count={actionDraft.conflictCount} onReload={actionDraft.reload}
-        canReload={!actionDraft.value.pending || actionDraft.value.pending.id === confirmedAction}
-        canKeep={!actionSubmission.pending && mayReplaceEventualActionDraft(actionKey,actionDraft.value.pending?.id)}
+        canReload={actionOwnership.status === 'owned' && (!actionDraft.value.pending || actionDraft.value.pending.id === confirmedAction)}
+        canKeep={actionOwnership.status === 'owned' && !actionSubmission.pending && mayReplaceEventualActionDraft(actionKey,actionDraft.value.pending?.id)}
         onKeep={() => { if (!actionSubmission.pending && mayReplaceEventualActionDraft(actionKey,actionDraft.value.pending?.id)) actionDraft.overwrite(); }} />}
       {(actionDraft.error || actionSubmission.error) && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm">
         No pudimos leer o guardar el borrador o la referencia de la acción. Conservá esta pantalla abierta y reintentá.
-        <Button type="button" variant="outline" onClick={() => { actionDraft.update(actionDraft.value); setActionSubmission(readAction()); }}>Reintentar guardado</Button>
+        <Button type="button" variant="outline" disabled={actionOwnership.status !== 'owned'} onClick={() => { actionDraft.update(actionDraft.value); setActionSubmission(readAction()); }}>Reintentar guardado</Button>
       </div>}
       {pendingAction && <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 space-y-2">
         <p>{pendingAction.id === confirmedAction ? 'La acción ya fue confirmada. Revisá las copias locales antes de continuar.'
           : 'La acción podría haberse registrado. Comprobá el mismo envío antes de continuar.'}</p>
         {actionSubmission.pending && actionSubmission.pending.id !== actionDraft.value.pending?.id && <p className="break-words">Nota de la acción a comprobar: {actionSubmission.pending.body.nota}</p>}
-        <Button type="button" disabled={busy || actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)}
+        <Button type="button" disabled={actionOwnership.status !== 'owned' || busy || actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)}
           onClick={() => void send(endpoint + '/' + entry.id + '/eventos',{},false,true)}>Comprobar acción</Button>
       </div>}
       {!pendingAction && (actionDraft.saved || actionDraft.restored) && (!!nota || difference) && <div role="status" className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">
         Borrador de acción guardado en este dispositivo; todavía no enviado.
-        {!discardAction ? <Button variant="ghost" size="sm" disabled={actionDraft.conflict || actionDraft.error} onClick={() => setDiscardAction(true)}>Descartar borrador</Button>
-          : <span>¿Borrar lo cargado? <Button size="sm" variant="outline" onClick={() => { if (actionDraft.clear()) setDiscardAction(false); }}>Sí, descartar</Button>
+        {!discardAction ? <Button variant="ghost" size="sm" disabled={actionOwnership.status !== 'owned' || actionDraft.conflict || actionDraft.error} onClick={() => setDiscardAction(true)}>Descartar borrador</Button>
+          : <span>¿Borrar lo cargado? <Button size="sm" variant="outline" disabled={actionOwnership.status !== 'owned'} onClick={() => { if (actionDraft.clear()) setDiscardAction(false); }}>Sí, descartar</Button>
             <Button size="sm" variant="outline" onClick={() => setDiscardAction(false)}>Conservar</Button></span>}
       </div>}
       {staleDraft && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">El registro cambió mientras escribías. Revisá las novedades; conservamos tu nota y la carga observada. <Button variant="outline" disabled={actionBlocked} onClick={() => { setDraftVersion(entry.version); setError(''); }}>Usar versión actual</Button></div>}

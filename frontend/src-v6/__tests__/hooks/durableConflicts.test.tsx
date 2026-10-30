@@ -10,6 +10,39 @@ const manifest: ManifestDraft = { step: 1, form: { generador: '', generadorId: '
 beforeEach(() => { vi.restoreAllMocks(); localStorage.clear(); sessionStorage.clear(); });
 
 describe('durable unresolved drafts', () => {
+  it('does not edit or resolve shared storage without ownership and refreshes after acquisition', () => {
+    const key = 'guarded-eventual';
+    const record = (revision: string, text: string) => JSON.stringify({ version: 1, revision, savedAt: Date.now(), value: { text } });
+    localStorage.setItem(key, record('first', 'Antes'));
+    let owned = false;
+    const page = renderHook(() => useRecoverableForm(key, initial, valid, { canWrite: () => owned }));
+    localStorage.setItem(key, record('second', 'Guardado por la otra pestaña'));
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key })));
+    act(() => { expect(page.result.current.update({ text: 'No autorizado' }).saved).toBe(false); });
+    act(() => { expect(page.result.current.clear()).toBe(false); page.result.current.reload(); });
+    expect(JSON.parse(localStorage.getItem(key)!).value.text).toBe('Guardado por la otra pestaña');
+    owned = true;
+    act(() => page.result.current.synchronize());
+    expect(page.result.current.value.text).toBe('Guardado por la otra pestaña');
+    act(() => page.result.current.update({ text: 'Continuación segura' }));
+    expect(JSON.parse(localStorage.getItem(key)!).value.text).toBe('Continuación segura');
+  });
+
+  it('keeps preserved conflicts when acquiring ownership', () => {
+    const key = 'guarded-conflict';
+    localStorage.setItem(key, JSON.stringify({ version: 1, revision: 'canonical', savedAt: Date.now(), value: { text: 'Actual' } }));
+    const journal = draftConflicts(key, valid);
+    journal.save({ text: 'Copia pendiente' }, 'other-tab');
+    let owned = false;
+    const page = renderHook(() => useRecoverableForm(key, initial, valid, { canWrite: () => owned }));
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key })));
+    expect(journal.list()).toHaveLength(1);
+    owned = true; act(() => page.result.current.synchronize());
+    expect(page.result.current.conflict).toBe(true);
+    expect(page.result.current.value.text).toBe('Copia pendiente');
+    expect(journal.list()).toHaveLength(1);
+  });
+
   it('acknowledges a confirmed write without changing visible inputs or resurrecting them on reopen', () => {
     const key = 'acknowledged-company';
     const page = renderHook(() => useRecoverableForm(key, initial, valid));
