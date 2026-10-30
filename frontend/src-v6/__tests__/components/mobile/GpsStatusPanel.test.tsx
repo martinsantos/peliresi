@@ -87,6 +87,20 @@ describe('GpsStatusPanel', () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ['stale', 'Última ubicación sin actualizar'],
+    ['unknown', 'Hora de ubicación no verificable'],
+  ] as const)('explains a %s device fix and offers one retry', (status, label) => {
+    const retry = vi.fn();
+    render(<GpsStatusPanel status={status} sendStatus="idle" position={[-33,-69]}
+      details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={0} lastSyncAt={null} onRetry={retry} />);
+    expect(screen.getByRole('status')).toHaveTextContent(label);
+    expect(screen.queryByText('GPS activo')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar GPS' }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it('does not present a stopped tracker as active while the trip is paused', () => {
     render(<GpsStatusPanel status="active" sendStatus="ok" position={[-33,-69]}
       details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}

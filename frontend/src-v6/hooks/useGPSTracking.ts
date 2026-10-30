@@ -502,7 +502,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
       const key = measuredAt === null ? `unknown:${++unidentifiedObservationSequence.current}`
         : JSON.stringify([measuredAt, latitude, longitude, accuracy, speed, heading, altitude]);
       if (observationRef.current?.key !== key) observationRef.current = { key, puntoId: null };
-      const details = { accuracy, speed, heading, altitude, lastUpdate: new Date(measuredAt ?? Date.now()) };
+      const details = { accuracy, speed, heading, altitude, lastUpdate: measuredAt === null ? null : new Date(measuredAt) };
       currentPositionRef.current = point;
       gpsDetailsRef.current = details;
       setCurrentPosition(point);

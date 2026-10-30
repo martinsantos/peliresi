@@ -188,6 +188,20 @@ describe('useGPSTracking', () => {
     unmount();
   });
 
+  it('does not invent a capture time when the device omits it', async () => {
+    vi.mocked(navigator.geolocation.watchPosition).mockImplementation(() => 11);
+    vi.mocked(navigator.geolocation.getCurrentPosition).mockImplementation((success) => {
+      success({ coords: { latitude: -32.9, longitude: -68.8, accuracy: 12,
+        speed: null, heading: null, altitude: null, altitudeAccuracy: null }, timestamp: NaN } as GeolocationPosition);
+    });
+    const { result, unmount } = renderHook(() => useGPSTracking({ ownerId: 'carrier-a',
+      manifiestoId: 'trip-no-time', estado: EstadoManifiesto.EN_TRANSITO, viajeStatus: 'ACTIVO' }));
+    await waitFor(() => expect(result.current.status).toBe('active'));
+    expect(result.current.position).toEqual([-32.9, -68.8]);
+    expect(result.current.details.lastUpdate).toBeNull();
+    unmount();
+  });
+
   it('exposes restored pending GPS metadata before sync completes', async () => {
     vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('offline'));
     localStorage.setItem(

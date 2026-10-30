@@ -74,7 +74,7 @@ test('an individual trip resumes GPS in one step after permission is granted', a
     await retry.click();
     await expect(page.getByText('GPS activo', { exact: true })).toBeVisible();
     await expect.poll(() => sent, { timeout: 45000 }).toBeGreaterThanOrEqual(1);
-    await expect(page.getByText(/^Actualizado \d/)).toBeVisible();
+    await expect(page.getByText(/^Enviado \d/)).toBeVisible();
     const state = await page.evaluate(() => ({ watches: (window as any).__qaGps.watches, clears: (window as any).__qaGps.clears }));
     expect(state.watches).toBe(2); expect(state.clears).toBeGreaterThanOrEqual(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

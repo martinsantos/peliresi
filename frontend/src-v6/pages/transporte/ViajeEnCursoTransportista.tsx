@@ -56,6 +56,7 @@ import { useConnectivity } from '../../hooks/useConnectivity';
 import { useQueryOwner } from '../../hooks/useQueryOwner';
 import { supportRequestContext } from '../../utils/supportSession';
 import { getApiErrorMessage } from '../../utils/api-error';
+import { gpsEventCoordinates, gpsFixFreshness } from '../../utils/gpsFreshness';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -241,6 +242,19 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const gpsDetails = gps.details;
   const gpsSendStatus = gps.sendStatus;
   const cleanupGps = gps.cleanupGps;
+  const gpsForEvent = {
+    position: currentPosition,
+    status: gpsStatus,
+    lastUpdate: gpsDetails.lastUpdate,
+    tripActive: m.estado === EstadoManifiesto.EN_TRANSITO && viajeStatus === 'ACTIVO' && !hasHandoff && !handoffUnknown,
+  };
+  // Delivery can wait for pending uploads: check the newest fix when the
+  // request is actually dispatched, not the fix captured by the first click.
+  const gpsForEventRef = useRef(gpsForEvent);
+  gpsForEventRef.current = gpsForEvent;
+  const eventLocation = gpsEventCoordinates(gpsForEvent);
+  const fixFreshness = gpsFixFreshness(gpsDetails.lastUpdate);
+  const displayGpsStatus = gpsStatus === 'active' && fixFreshness !== 'fresh' ? fixFreshness : gpsStatus;
 
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -287,14 +301,14 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const handleConfirmarRetiro = async () => {
     if (!currentUser || !syncOwner) return toast.error('Sesión no disponible', 'Volvé a ingresar antes de continuar.');
     try {
+      const location = gpsEventCoordinates(gpsForEventRef.current);
       const result = await offlineSafeMutation(
         () => confirmarRetiro.mutateAsync({
           id: id!,
-          latitud: currentPosition?.[0],
-          longitud: currentPosition?.[1],
+          ...location,
           observaciones: 'Retiro confirmado desde app móvil',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser.id, contextOwner: syncOwner }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { ...location, observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser.id, contextOwner: syncOwner }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — El retiro se confirmará al reconectar');
@@ -332,7 +346,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         }
         return;
       }
-      const delivery = { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' };
+      const delivery = { ...gpsEventCoordinates(gpsForEventRef.current), observaciones: 'Entrega confirmada desde app móvil' };
       const result = await confirmarEntrega.mutateAsync({ id: id!, ...delivery });
       if (result.status === 'pending') {
         ++queueCheckVersion.current;
@@ -387,8 +401,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         id: id!,
         tipo: incidenteTipo,
         descripcion: descripcionFinal,
-        latitud: currentPosition?.[0],
-        longitud: currentPosition?.[1],
+        ...gpsEventCoordinates(gpsForEventRef.current),
       });
       toast.success('Incidente registrado');
       setShowIncidenteModal(false);
@@ -407,8 +420,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         id: id!,
         tipo: newStatus === 'PAUSADO' ? 'PAUSA' : 'REANUDACION',
         descripcion: newStatus === 'PAUSADO' ? 'Viaje pausado por el transportista' : 'Viaje reanudado',
-        latitud: currentPosition?.[0],
-        longitud: currentPosition?.[1],
+        ...gpsEventCoordinates(gpsForEventRef.current),
       });
       setViajeStatus(newStatus);
       try {
@@ -509,7 +521,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${gpsOwner}:${id}`} ownerId={currentUser.id} contextOwner={gpsOwner} manifestId={id} />}
         {trackingDuringPending && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">El seguimiento sigue abierto en esta pantalla para conservar las ubicaciones. Sincronizalas y cerrá esta pantalla antes de continuar con la entrega.</p>}
         {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && !handoffUnknown && (deliveryQueue === 'none' || trackingDuringPending) && <GpsStatusPanel
-          status={gpsStatus}
+          status={displayGpsStatus}
           sendStatus={gpsSendStatus}
           sendError={gps.sendError}
           position={currentPosition}
@@ -631,7 +643,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
                     >
                       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {trackPoints.length > 1 && <Polyline positions={trackPoints} color="#0D8A4F" weight={4} opacity={0.8} />}
-                      {currentPosition && <Marker position={currentPosition} icon={ACTOR_ICONS.enTransito}><Popup>Tu posición actual</Popup></Marker>}
+                      {currentPosition && <Marker position={currentPosition} icon={ACTOR_ICONS.enTransito}><Popup>Última ubicación disponible del teléfono</Popup></Marker>}
                       <RecenterMap position={currentPosition} onUserInteract={handleMapInteract} followUser={followUser} />
                     </MapContainer>
                     {!followUser && currentPosition && (
@@ -711,11 +723,11 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               </div>
               <h3 id="confirmar-entrega-titulo" className="text-xl font-bold text-neutral-900 mb-2">Confirmar Entrega?</h3>
               <p className="text-neutral-600 text-sm mb-4">Se confirmará la entrega en {m.operador?.razonSocial || 'destino'}</p>
-              {currentPosition && (
+              {eventLocation ? (
                 <p className="text-xs text-neutral-400 mb-4">
-                  Ubicación: {currentPosition[0].toFixed(4)}, {currentPosition[1].toFixed(4)}
+                  Se adjuntará la ubicación si sigue siendo reciente al confirmar.
                 </p>
-              )}
+              ) : <p className="text-xs text-neutral-600 mb-4">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
               {deliveryError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
               <div className="space-y-3">
                 {deliveryError && gps.storageError && (!gps.storageIssue || gps.storageIssue === 'storage') && <Button variant="outline" fullWidth onClick={handleRetryGps} disabled={isActionPending || retryingGps}>
@@ -783,11 +795,11 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
                     className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none text-sm"
                   />
                 </div>
-                {currentPosition && gpsStatus === 'active' && (
+                {eventLocation ? (
                   <p className="text-xs text-neutral-400 flex items-center gap-1">
-                    <MapPin size={12} /> Se adjuntará la ubicación actual al incidente
+                    <MapPin size={12} /> Se adjuntará la ubicación si sigue siendo reciente al registrar.
                   </p>
-                )}
+                ) : <p className="text-xs text-neutral-600">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
               </div>
               <div className="space-y-2">
                 <Button fullWidth onClick={handleRegistrarIncidente} disabled={registrarIncidente.isPending}>

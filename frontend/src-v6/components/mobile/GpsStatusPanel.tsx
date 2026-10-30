@@ -6,8 +6,10 @@ import { AndroidPermissionGuide } from './AndroidPermissionGuide';
 import { headingToCompass, type GpsDetails, type GpsStatus } from '../../hooks/useGPSTracking';
 import type { GpsStorageIssue } from '../../services/gpsQueue';
 
+type GpsDisplayStatus = GpsStatus | 'stale' | 'unknown';
+
 interface GpsStatusPanelProps {
-  status: GpsStatus;
+  status: GpsDisplayStatus;
   sendStatus: 'ok' | 'error' | 'idle';
   sendError?: string | null;
   position: [number, number] | null;
@@ -22,10 +24,12 @@ interface GpsStatusPanelProps {
   storageIssue?: GpsStorageIssue | null;
 }
 
-const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.ReactNode }> = {
+const STATUS_COPY: Record<GpsDisplayStatus, { label: string; tone: string; icon: React.ReactNode }> = {
   checking: { label: 'Verificando GPS', tone: 'bg-neutral-100 text-neutral-700', icon: <Loader2 size={14} className="animate-spin" /> },
   acquiring: { label: 'Buscando señal GPS', tone: 'bg-warning-50 text-warning-700', icon: <LocateFixed size={14} className="animate-pulse" /> },
   active: { label: 'GPS activo', tone: 'bg-success-50 text-success-700', icon: <span className="h-2.5 w-2.5 rounded-full bg-success-500 animate-pulse" /> },
+  stale: { label: 'Última ubicación sin actualizar', tone: 'bg-warning-50 text-warning-700', icon: <AlertTriangle size={14} /> },
+  unknown: { label: 'Hora de ubicación no verificable', tone: 'bg-warning-50 text-warning-700', icon: <AlertTriangle size={14} /> },
   denied: { label: 'Permiso GPS denegado', tone: 'bg-error-50 text-error-700', icon: <WifiOff size={14} /> },
   unavailable: { label: 'GPS no disponible', tone: 'bg-error-50 text-error-700', icon: <WifiOff size={14} /> },
   error: { label: 'Error GPS', tone: 'bg-error-50 text-error-700', icon: <AlertTriangle size={14} /> },
@@ -33,7 +37,7 @@ const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.
 
 function formatLastSync(lastSyncAt: Date | null) {
   if (!lastSyncAt) return 'Sin sincronizar';
-  return `Actualizado ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+  return `Enviado ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
@@ -75,7 +79,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
             </div>
           </div>
 
-          {onRetry && (retryStorage || (!storageError && ['denied', 'unavailable', 'error'].includes(status))) && (
+          {onRetry && (retryStorage || (!storageError && ['denied', 'unavailable', 'error', 'stale', 'unknown'].includes(status))) && (
             <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
               className="mt-3 min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
               {retrying ? 'Reintentando GPS' : retryStorage ? 'Reintentar guardado' : 'Reintentar GPS'}
@@ -105,6 +109,9 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
 
           {status === 'acquiring' && (
             <p className="mt-2 text-xs text-warning-700">Esperando el primer punto GPS del dispositivo.</p>
+          )}
+          {(status === 'stale' || status === 'unknown') && (
+            <p className="mt-2 text-xs text-warning-700">Reintentá para obtener una ubicación reciente del dispositivo.</p>
           )}
         </CardContent>
       </Card>
