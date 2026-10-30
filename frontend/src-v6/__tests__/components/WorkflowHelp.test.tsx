@@ -37,10 +37,15 @@ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('orients %s to a notified requ
  expect(screen.queryByText('Videos tutoriales')).not.toBeInTheDocument();
  expect(!!screen.queryByRole('button',{name:'¿Cómo agrego un vehículo a mi flota?'})).toBe(rol==='TRANSPORTISTA');
  if(rol==='TRANSPORTISTA'){
+  fireEvent.change(screen.getByRole('textbox',{name:'Buscar en la ayuda'}),{target:{value:'GPS'}});
   fireEvent.click(screen.getByRole('button',{name:'¿Qué hago si el GPS falla durante el viaje?'}));
   const answer=screen.getByText(/en el detalle del viaje revisá la hora de la última sincronización/);
   expect(answer).toHaveTextContent('En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece.');
-  expect(answer).toHaveTextContent('Administración puede consultar la posición en Monitor.');
+  expect(answer).toHaveTextContent('Al reconectar, revisá los puntos pendientes y la confirmación del envío');
+  expect(answer).toHaveTextContent('No se garantiza conservar todas las lecturas durante una desconexión.');
+  expect(answer).toHaveTextContent('conservá este dispositivo y consultá a soporte antes de entregar.');
+  expect(answer).toHaveTextContent('Administración puede consultar la posición recibida en Monitor, que puede ser anterior.');
+  expect(answer).not.toHaveTextContent('Los puntos pendientes se reenvían al recuperar conexión');
  }
 });
 

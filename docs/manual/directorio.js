@@ -123,10 +123,11 @@ function toggleNavGroup(title) {
 
 // Collapsible toggle (global, for FAQ etc.)
 function toggleCollapsible(el) {
-  el.classList.toggle('open');
+  var open = el.classList.toggle('open');
+  el.setAttribute('aria-expanded', String(open));
   var body = el.nextElementSibling;
   if (body && body.classList.contains('collapsible-body')) {
-    body.classList.toggle('open');
+    body.classList.toggle('open', open);
   }
 }
 
@@ -162,10 +163,17 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window.location.hash) requestAnimationFrame(settleHashTarget);
 
   // Abrir todos los collapsibles (FAQ) por defecto
-  document.querySelectorAll('.collapsible-header').forEach(function(h) {
+  document.querySelectorAll('.collapsible-header').forEach(function(h, index) {
     h.classList.add('open');
     var body = h.nextElementSibling;
     if (body && body.classList.contains('collapsible-body')) {
+      if (!body.id) {
+        var id = 'manual-accordion-' + (index + 1);
+        while (document.getElementById(id)) id += '-';
+        body.id = id;
+      }
+      h.setAttribute('aria-controls', body.id);
+      h.setAttribute('aria-expanded', 'true');
       body.classList.add('open');
     }
   });

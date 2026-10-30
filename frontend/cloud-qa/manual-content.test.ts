@@ -28,6 +28,28 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('directory accordions use native buttons with an accessible initial state', () => {
+  const directory = read('directorio.html');
+  const controls = directory.match(/<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible\(this\)">/g) || [];
+  assert.equal(controls.length, 98);
+  assert.doesNotMatch(directory, /<div class="collapsible-header"/);
+  assert.match(read('directorio.js'), /setAttribute\('aria-expanded', String\(open\)\)/);
+  assert.match(read('directorio.css'), /\.collapsible-header:focus-visible/);
+  assert.match(read('directorio.css'), /@media\(max-width:900px\)\{\.back-to-top\.visible\{display:none;\}\}/);
+  assert.match(directory, /href="#mainContent" class="nav-link">Volver al inicio del directorio/);
+});
+test('directory introduction distinguishes three approvals, GPS receipt and certificate publication', () => {
+  const directory = read('directorio.html');
+  const introduction = directory.split('<h4>Procesos Cubiertos</h4>')[1].split('</table>')[0];
+  const generator = directory.split('<section id="guia-generador"')[1].split('</section>')[0];
+  assert.match(introduction, /Las tres partes vinculadas deben aprobarla/);
+  assert.match(introduction, /Cerrar el manifiesto no emite el documento por sí solo/);
+  assert.match(introduction, /última ubicación recibida/);
+  assert.match(generator, /Generador, transporte y operador deben aprobar explícitamente/);
+  assert.match(generator, /lectura no reemplaza una aprobación/i);
+  assert.match(generator, /el cierre por sí solo no la emite/i);
+  assert.doesNotMatch(generator, /Una vez firmado, el manifiesto pasa a APROBADO/i);
+});
 test('certificate recovery explains the receipt when the document list is available or unavailable', () => {
   const guide = guides.find((g: any) => g.id === 'certificados-operador-partes');
   const step = guide.steps.find((s: any) => s.title === 'Recuperar una emisión al cerrar web o app');
@@ -162,6 +184,16 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /no se puede leer la copia local, aparece un error/i);
   assert.match(recovery, /no puede comprobar desde aquí lo que siga pendiente en otro dispositivo o perfil de navegador/i);
   assert.match(recovery, /no se puede verificar el viaje o el servidor/i);
+  assert.match(recovery, /no se garantiza conservar todas las lecturas durante la desconexión/i);
+  assert.match(recovery, /una ubicación antigua sin confirmar no se reenvía como actual/i);
+  assert.match(recovery, /el primer envío sin confirmar por carga/i);
+  assert.doesNotMatch(recovery, /los puntos pendientes se sincronizan al volver la conexión/i);
+  const directory = read('directorio.html');
+  assert.match(directory, /la capacidad del entorno de destino todavía no está verificada/i);
+  assert.match(directory, /la certificación del circuito nuevo requiere emisión expresa del operador/i);
+  assert.match(directory, /una ubicación anterior no puede confirmarse, conservá el dispositivo y consultá a soporte/i);
+  assert.doesNotMatch(directory, /hasta 5 puntos|máximo 5 puntos|maximo 5 puntos|gps_pending_\{|50\+ transportistas/i);
+  assert.doesNotMatch(directory, /Generacion automatica del Certificado|Genera Certificado de Disposicion/i);
   const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));
   assert.match(monitor, /Monitor y Centro de Control/);
   assert.match(monitor, /hora de captura no está disponible/i);

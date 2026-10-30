@@ -64,7 +64,7 @@ const faqs = [
       },
       {
         q: '¿Qué hago si el GPS falla durante el viaje?',
-        a: 'Revisá el indicador de ubicación y la conexión. Si se denegó el permiso, habilitalo en el navegador o teléfono. En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece. Los puntos pendientes se reenvían al recuperar conexión; en el detalle del viaje revisá la hora de la última sincronización. Administración puede consultar la posición en Monitor. Mantener la app abierta facilita el seguimiento: no se garantiza GPS con la app cerrada.'
+        a: 'Revisá el indicador de ubicación y la conexión. Si se denegó el permiso, habilitalo en el navegador o teléfono. En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece. Al reconectar, revisá los puntos pendientes y la confirmación del envío; en el detalle del viaje revisá la hora de la última sincronización. Si la pantalla indica que una ubicación anterior no puede confirmarse, conservá este dispositivo y consultá a soporte antes de entregar. No se garantiza conservar todas las lecturas durante una desconexión. Administración puede consultar la posición recibida en Monitor, que puede ser anterior. Mantené la app abierta: no se garantiza GPS con la app cerrada.'
       },
       {
         q: '¿Cómo registro un incidente durante el transporte?',
@@ -207,6 +207,7 @@ const AyudaPage: React.FC = () => {
       {/* Search */}
       <div className="max-w-2xl">
         <Input
+          aria-label="Buscar en la ayuda"
           placeholder="Buscar en la ayuda..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}

@@ -11,4 +11,6 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: dir, QA_COMPAT_BACKEND: '../../production' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-certificate-receipt-ux-20261030', QA_COMPAT_BACKEND: 'certificate-receipt-ux' }), /backend\/dist-qa-closure-d7d29dde\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'certificate-receipt-ux' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-help-gps-consistency-20261030', QA_COMPAT_BACKEND: 'help-gps-consistency' }), /backend\/dist-qa-closure-d7d29dde\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'help-gps-consistency' }));
 });

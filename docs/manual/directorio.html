@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="sitrep-mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="directorio.css?v=730edcc8a1b6">
+<link rel="stylesheet" href="directorio.css?v=1c64386aadbf">
 </head>
 <body data-page="directory">
 
@@ -49,6 +49,7 @@
 <!-- Sidebar -->
 <nav class="sidebar" id="sidebar">
   <div class="directory-sidebar-heading">Directorio completo <span>Índice de temas</span></div>
+  <a href="#mainContent" class="nav-link">Volver al inicio del directorio</a>
   <div class="sidebar-search">
     <label class="sr-only" for="searchInput">Buscar en el directorio</label>
     <input type="search" id="searchInput" placeholder="Buscar un tema...">
@@ -603,10 +604,10 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <h4>Procesos Cubiertos</h4>
 <p>SITREP abarca la totalidad del ciclo de vida de los residuos peligrosos:</p>
 <ul>
-<li><strong>Creacion de manifiestos electronicos y firma digital:</strong> Los generadores crean manifiestos en formato electronico con todos los datos normativos requeridos (tipo de residuo, cantidad, transportista, operador destino) y los firman electronicamente para dar inicio al proceso.</li>
-<li><strong>Seguimiento GPS en tiempo real del transporte:</strong> Durante el transporte, el sistema captura la posicion GPS del vehiculo cada 30 segundos, permitiendo a todos los actores visualizar la ubicacion del residuo en un mapa interactivo.</li>
+<li><strong>Manifiestos electrónicos:</strong> generador, transporte u operador pueden iniciar una propuesta. Las tres partes vinculadas deben aprobarla antes de iniciar la coordinación, también para el tratamiento en origen.</li>
+<li><strong>Seguimiento GPS:</strong> durante el viaje, el transporte puede compartir su ubicación. Las cuentas autorizadas consultan la última posición recibida; puede ser anterior a la captura del teléfono.</li>
 <li><strong>Verificacion de peso y documentacion de discrepancias:</strong> Al llegar a la planta del operador, se registra el peso real del residuo y se compara automaticamente con el peso declarado, documentando cualquier diferencia significativa.</li>
-<li><strong>Registro de tratamiento y certificados de disposicion:</strong> El operador registra el metodo de tratamiento aplicado conforme al catalogo autorizado y, al completar el proceso, el sistema genera el Certificado de Tratamiento y Disposicion Final en formato PDF.</li>
+<li><strong>Tratamiento y certificaciones:</strong> el operador registra el tratamiento y decide cuándo firmar y publicar cada certificación. Cerrar el manifiesto no emite el documento por sí solo.</li>
 <li><strong>Reportes estadisticos y cumplimiento regulatorio:</strong> El sistema genera reportes detallados sobre manifiestos, residuos tratados, transporte, generadores, operadores, tratamientos, departamentos y mapas de actores, con exportacion a PDF y CSV.</li>
 </ul>
 
@@ -616,10 +617,10 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <tbody>
 <tr><td><strong>Trazabilidad completa</strong></td><td>Seguimiento de cada kilogramo de residuo peligroso desde su generacion hasta su disposicion final, con registro inmutable de cada evento.</td></tr>
 <tr><td><strong>Eliminacion del papel</strong></td><td>Reemplazo total de los manifiestos en papel por formularios electronicos con firma digital, reduciendo errores y tiempos de procesamiento.</td></tr>
-<tr><td><strong>Transparencia en tiempo real</strong></td><td>Todos los actores pueden ver el estado actual de cada manifiesto, la ubicacion del transporte y el progreso del tratamiento.</td></tr>
+<tr><td><strong>Seguimiento compartido</strong></td><td>Las partes autorizadas consultan el estado de sus manifiestos y la última ubicación recibida cuando esté disponible.</td></tr>
 <tr><td><strong>Cumplimiento normativo</strong></td><td>Generacion automatica de documentacion conforme a Ley 24.051, con categorias Y1-Y48 y caracteristicas H1-H13.</td></tr>
 <tr><td><strong>Fiscalizacion efectiva</strong></td><td>Centro de control con mapa en tiempo real, deteccion de anomalias y auditoria completa de todas las operaciones.</td></tr>
-<tr><td><strong>Acceso movil</strong></td><td>Aplicacion web progresiva (PWA) optimizada para trabajo en campo, con soporte offline y tracking GPS continuo.</td></tr>
+<tr><td><strong>Acceso móvil</strong></td><td>La aplicación web progresiva facilita el trabajo en campo. Sin conexión o con la aplicación cerrada, comprobá los pendientes y la recepción de ubicaciones.</td></tr>
 </tbody>
 </table>
 
@@ -764,19 +765,19 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <li>Completar los datos: tipo de residuo (categorias Y conforme Ley 24.051), cantidad y unidad de medida.</li>
 <li>Seleccionar el <strong>transportista habilitado</strong> de la lista desplegable.</li>
 <li>Seleccionar el <strong>operador destino</strong> (planta de tratamiento autorizada).</li>
-<li>Revisar el resumen completo y <strong>firmar electronicamente</strong>.</li>
-<li>El sistema genera automaticamente el <strong>codigo QR</strong> y notifica al transportista asignado.</li>
-<li>Seguir el estado del manifiesto desde <strong>Manifiestos</strong>: ver timeline de eventos y ubicacion GPS en tiempo real.</li>
+<li>Revisar y crear la propuesta. Generador, transporte y operador deben aprobar explícitamente, incluso si el tratamiento es en origen.</li>
+<li>Consultar en la agenda y en el detalle quién aprobó y quién debe actuar. Un aviso recibido o leído no constituye una aprobación.</li>
+<li>Seguir el estado del manifiesto desde <strong>Manifiestos</strong>: consultar eventos y última ubicación recibida cuando esté disponible.</li>
 </ol>
 
 <h4>Consejos para el Generador</h4>
 <div class="info-card role-card-generador">
 <ul>
-<li><strong>Verificar datos antes de firmar:</strong> Una vez firmado, el manifiesto pasa a APROBADO y no puede editarse. Revisar cuidadosamente tipo de residuo, cantidad, transportista y operador en el paso 5 de revision.</li>
+<li><strong>Verificar antes de aprobar:</strong> revisá tipo de residuo, cantidad, transporte y operador. La aprobación de una sola parte no activa la coordinación.</li>
 <li><strong>Usar el codigo QR:</strong> Al aprobar el manifiesto, se genera un QR unico. Imprimir y adjuntar al envase del residuo para facilitar la trazabilidad fisica.</li>
-<li><strong>Monitorear en tiempo real:</strong> Una vez que el transportista confirma el retiro, es posible seguir la ubicacion del vehiculo en el mapa GPS desde la pagina de detalle del manifiesto.</li>
-<li><strong>Descargar el certificado:</strong> Cuando el operador cierra el manifiesto (estado TRATADO), descargar el Certificado de Disposicion Final como respaldo documental del cumplimiento normativo.</li>
-<li><strong>Revisar notificaciones:</strong> El sistema envia notificaciones automaticas en cada cambio de estado. Mantener el navegador abierto o instalar la PWA para recibir actualizaciones.</li>
+<li><strong>Consultar la ubicación:</strong> después del retiro, el detalle muestra la última posición recibida cuando está disponible; puede no ser la posición actual.</li>
+<li><strong>Descargar la certificación:</strong> cuando el operador la firme y publique, las partes autorizadas pueden descargarla. El cierre por sí solo no la emite.</li>
+<li><strong>Revisar Avisos:</strong> abrí la campana para consultar los avisos y la acción pendiente. Su lectura no reemplaza una aprobación.</li>
 </ul>
 </div>
 </section>
@@ -789,11 +790,11 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <ol>
 <li>Ingresar con credenciales de transportista (web o app movil).</li>
 <li>Ver los manifiestos asignados en el <strong>Dashboard</strong> (en mobile aparece un banner de viaje destacado).</li>
-<li>Al llegar al generador: <strong>Confirmar Retiro</strong> &rarr; se activa el GPS automaticamente.</li>
-<li>Durante el transporte: el GPS envia la posicion cada <strong>30 segundos</strong> al servidor.</li>
+<li>Al recibir la carga: <strong>Confirmar Retiro</strong>; abrí el seguimiento, permití ubicación y comprobá el envío.</li>
+<li>Durante el viaje: con GPS activo se intenta enviar periódicamente. Revisá que SITREP haya recibido la ubicación.</li>
 <li>Es posible pausar y reanudar el tracking si se realizan paradas intermedias.</li>
 <li>Si hay incidentes durante el viaje: <strong>Registrar Incidente</strong> con descripcion detallada.</li>
-<li>Al llegar al operador: <strong>Confirmar Entrega</strong> &rarr; el GPS se desactiva automaticamente.</li>
+<li>Al llegar al operador: revisá los pendientes del dispositivo y confirmá la entrega; comprobá la respuesta de SITREP.</li>
 <li>Escanear el codigo QR con la camara para acceso rapido al manifiesto.</li>
 </ol>
 
@@ -802,7 +803,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <ul>
 <li><strong>Instalar la PWA:</strong> Para la mejor experiencia en campo, instalar SITREP como aplicacion en el telefono desde <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a>. Esto habilita el modo offline y acceso rapido desde la pantalla de inicio.</li>
 <li><strong>Permisos GPS:</strong> Al confirmar el retiro, el navegador solicitara permisos de ubicacion. Es imprescindible aceptar para que el tracking funcione correctamente. Si se deniegan por error, ir a configuracion del navegador para habilitarlos manualmente.</li>
-<li><strong>Mantener la aplicacion abierta:</strong> El GPS se envia cada 30 segundos mientras la aplicacion esta activa. Si se cierra o se pone en segundo plano, los puntos pendientes se guardan localmente y se envian al reabrir la app.</li>
+<li><strong>Mantener la aplicación abierta:</strong> no se garantiza el seguimiento al cerrarla ni conservar todas las lecturas sin conexión. Al reconectar, revisá los pendientes y la confirmación; si una ubicación anterior no se confirma, conservá el dispositivo y consultá a soporte.</li>
 <li><strong>Usar pausa en paradas:</strong> Si se realizan paradas intermedias (combustible, descanso), usar el boton de Pausa para registrar el incidente. Reanudar al continuar el viaje.</li>
 <li><strong>Registrar incidentes inmediatamente:</strong> Ante cualquier incidencia durante el transporte (accidente, demora, desvio de ruta), registrar el incidente con descripcion detallada lo antes posible.</li>
 <li><strong>Escanear QR al llegar:</strong> Al llegar a la planta del operador, escanear el QR del manifiesto para verificar rapidamente los datos antes de confirmar la entrega.</li>
@@ -1063,7 +1064,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 </ul>
 
 <h4>8 Pestanas de Reportes</h4>
-<div class="collapsible-header" onclick="toggleCollapsible(this)">1. Manifiestos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">1. Manifiestos</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Manifiestos</p>
 <p>Vista principal de reportes con indicadores clave de rendimiento (KPIs) que muestran totales por estado. Incluye un grafico de dona interactivo (Recharts) que visualiza la distribucion de manifiestos por estado, un grafico de barras que agrupa los manifiestos por tipo de residuo (categoria Y), y una tabla paginada con todos los manifiestos del periodo seleccionado.</p>
@@ -1071,45 +1072,45 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <p><strong>Nota tecnica:</strong> El campo <code>porTipoResiduo</code> retorna objetos <code>{ cantidad, unidad }</code>, no numeros planos.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">2. Residuos Tratados</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">2. Residuos Tratados</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Residuos Tratados</p>
 <p>Reporte especializado en el tratamiento de residuos. Incluye KPIs de tratamiento (total recibido, total tratado, pendiente de tratamiento), un indicador gauge que muestra la tasa de tratamiento como porcentaje, grafico de dona con distribucion por tipo de residuo tratado, y tabla detallada de cada operacion de tratamiento con metodo aplicado, fecha y operador responsable.</p>
 <p><strong>Datos del endpoint:</strong> <code>GET /api/reportes/tratados</code> con paginacion. El campo <code>totalPorTipo</code> retorna numeros planos.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">3. Transporte</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">3. Transporte</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Transporte</p>
 <p>Analisis del desempeno del servicio de transporte. KPIs de viajes totales, completados, en curso y tasa de completitud. Grafico de barras que compara la completitud de cada transportista. Tabla detallada por transportista con nombre, CUIT, viajes asignados, completados, tasa de completitud representada con barras de progreso visuales, y tiempo promedio de viaje.</p>
 <p><strong>Datos del endpoint:</strong> <code>GET /api/reportes/transporte</code>. Usa <code>_count</code> de Prisma para eficiencia en lugar de cargar manifiestos completos.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">4. Generadores</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">4. Generadores</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Generadores</p>
 <p>Analisis de la actividad de los generadores de residuos peligrosos. KPIs de generadores activos, manifiestos generados, volumen total. Grafico circular de distribucion por categorias de generadores. Tabla detallada con razon social, CUIT, categoria, numero de manifiestos, volumen total generado y estado de cumplimiento.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">5. Operadores</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">5. Operadores</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Operadores</p>
 <p>Analisis del desempeno de las plantas de tratamiento. KPIs de operadores activos, manifiestos recibidos y tratados. Grafico circular por tipo de operador. Grafico de barras comparativo recibidos vs. tratados por operador. Tabla con razon social, CUIT, manifiestos recibidos, manifiestos tratados, tasa de tratamiento y tipos de residuos autorizados.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">6. Tratamientos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">6. Tratamientos</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Tratamientos</p>
 <p>Desglose de los metodos de tratamiento aplicados en el periodo. Incluye listado de metodos utilizados, frecuencia de aplicacion, operadores que los ejecutan y tipos de residuos tratados por cada metodo. La informacion se presenta cuando hay datos de tratamiento disponibles en el periodo seleccionado.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">7. Departamentos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">7. Departamentos</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Departamentos</p>
 <p>Visualizacion geografica de la actividad por departamentos de Mendoza. Mapa coropletico que colorea cada departamento segun el nivel de actividad (manifiestos generados). Tabla de ranking con los departamentos ordenados por volumen de actividad. Al hacer clic en un departamento, se abre el modal <code>DepartamentoDetalleModal</code> con desglose completo de generadores, transportistas y operadores activos en esa zona.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">8. Mapa de Actores</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">8. Mapa de Actores</button>
 <div class="collapsible-body">
 <p><strong>Ruta:</strong> Reportes &gt; Mapa de Actores</p>
 <p>Mapa interactivo Leaflet de pantalla completa con los tres tipos de actores geolocalizados. Controles de capas permiten activar/desactivar cada tipo: generadores (marcadores violeta con icono de fabrica), transportistas (marcadores naranja con icono de camion), operadores (marcadores azul con icono de laboratorio). Para densidades superiores a 50 marcadores, se activa el agrupamiento automatico (clustering) con icono de grupo numerado. Cada marcador tiene un popup informativo con razon social, CUIT, domicilio y datos de contacto.</p>
@@ -1129,20 +1130,20 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <section id="mod-gps" data-role="transportista">
 <h3>3.5 Tracking GPS</h3>
 <div class="info-card role-card-transportista">
-<p><strong>Modulo principal para transportistas.</strong> El seguimiento GPS se activa automaticamente al confirmar el retiro del residuo.</p>
+<p><strong>Para transporte.</strong> Tras confirmar el retiro, abrí el viaje o GPS de mis viajes, permití la ubicación y revisá si SITREP confirmó el envío. La coordinación previa no inicia el viaje.</p>
 </div>
 <table>
 <thead><tr><th>Parametro</th><th>Valor</th><th>Detalle</th></tr></thead>
 <tbody>
 <tr><td>Metodo de captura</td><td><code>navigator.geolocation.watchPosition()</code></td><td>Monitoreo continuo de posicion</td></tr>
-<tr><td>Intervalo de transmision</td><td>30 segundos</td><td>Envio al endpoint <code>POST /api/manifiestos/:id/ubicacion</code></td></tr>
-<tr><td>Datos capturados</td><td>latitud, longitud, velocidad, rumbo</td><td>Precision en metros incluida</td></tr>
+<tr><td>Intervalo de intento</td><td>Aproximadamente 30 segundos</td><td>La recepción depende de la conexión y del estado del viaje.</td></tr>
+<tr><td>Datos del dispositivo</td><td>Ubicación y, si están disponibles, velocidad y rumbo</td><td>La precisión del teléfono no confirma el envío al servidor.</td></tr>
 <tr><td>Maquina de estados</td><td>checking &rarr; acquiring &rarr; active</td><td>Tambien: denied, unavailable, error</td></tr>
-<tr><td>Resiliencia offline</td><td>Cola de hasta 5 envios fallidos</td><td>Persistidos en <code>localStorage (gps_pending_{id})</code></td></tr>
-<tr><td>Recuperacion</td><td>Flush automatico al reconectar</td><td>Puntos GPS guardados se envian al backend al montar la app</td></tr>
+<tr><td>Sin conexión</td><td>Ubicaciones pendientes</td><td>Revisá si se guardaron y conservá el dispositivo; no se garantiza guardar todas las lecturas.</td></tr>
+<tr><td>Recuperación</td><td>Revisar y reintentar</td><td>Comprobá la recepción con la misma cuenta y actividad; algunas ubicaciones requieren soporte.</td></tr>
 <tr><td>Pausa/Reanudacion</td><td>Incidentes PAUSA/REANUDACION</td><td>Respaldado en localStorage</td></tr>
 <tr><td>Temporizador</td><td>Tiempo transcurrido desde fechaRetiro</td><td>Timestamp del servidor como referencia</td></tr>
-<tr><td>Cache backend</td><td>30s TTL por manifiestoId</td><td>~24ms cached vs ~250ms cold</td></tr>
+<tr><td>Hora en Monitor</td><td>Recepción en SITREP</td><td>La captura del teléfono puede ser anterior.</td></tr>
 </tbody>
 </table>
 </section>
@@ -2447,7 +2448,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <section id="pwa-transportista" data-role="transportista">
 <h3>4.6 Pantallas del Transportista</h3>
 <div class="info-card role-card-transportista">
-<p><strong>Rol TRANSPORTISTA:</strong> Responsable de retirar los residuos del generador, transportarlos con tracking GPS en tiempo real, y entregarlos al operador de tratamiento. La interfaz mobile esta especialmente optimizada para este rol, que opera exclusivamente desde el dispositivo movil durante los viajes.</p>
+<p><strong>Rol TRANSPORTISTA:</strong> coordina el retiro, comparte ubicación cuando corresponde y registra la entrega. Puede usar web o app; durante el viaje revisá el GPS y la confirmación de SITREP en el dispositivo utilizado.</p>
 </div>
 
 <div class="screenshot-grid screenshot-grid-mobile">
@@ -2550,7 +2551,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <li><strong>Seleccion:</strong> El transportista toca &quot;Tomar Viaje&quot; en la tarjeta del manifiesto.</li>
 <li><strong>Pantalla ViajeEnCurso:</strong> Se abre el panel de control del viaje con toda la informacion del manifiesto.</li>
 <li><strong>Confirmar Retiro:</strong> El transportista toca el boton &quot;Confirmar Retiro&quot; para cambiar el estado a EN_TRANSITO.</li>
-<li><strong>GPS Activo:</strong> Automaticamente se activa el tracking GPS y comienza la transmision de ubicacion cada 30 segundos.</li>
+<li><strong>GPS:</strong> abrí el seguimiento, permití ubicación y comprobá la recepción. La señal por sí sola no confirma el envío.</li>
 </ol>
 
 <h4>Guard de Viaje Activo</h4>
@@ -2666,7 +2667,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <section id="pwa-gps" data-role="transportista">
 <h3>4.8 Tracking GPS y Viaje en Curso</h3>
 <div class="info-card role-card-transportista">
-<p><strong>Exclusivo para TRANSPORTISTA:</strong> El sistema de tracking GPS permite el monitoreo en tiempo real de la posicion del vehiculo durante el transporte de residuos peligrosos. Soporta hasta 50 viajes simultaneos con transmision cada 30 segundos.</p>
+<p><strong>Para transporte:</strong> el seguimiento permite compartir ubicación durante viajes en tránsito. Comprobá la recepción para cada carga seleccionada. La capacidad simultánea del entorno debe medirse.</p>
 </div>
 
 <div class="cu-screenshot-mobile">
@@ -2693,7 +2694,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tbody>
 <tr><td><code>checking</code></td><td>Gris</td><td>Verificando permisos de geolocalizacion</td></tr>
 <tr><td><code>acquiring</code></td><td>Amarillo pulsante</td><td>Obteniendo primera posicion GPS</td></tr>
-<tr><td><code>active</code></td><td>Verde</td><td>GPS activo, transmitiendo cada 30 segundos</td></tr>
+<tr><td><code>active</code></td><td>Verde</td><td>El dispositivo obtuvo señal; comprobá por separado si SITREP recibió la ubicación.</td></tr>
 <tr><td><code>denied</code></td><td>Rojo</td><td>Permisos de GPS denegados por el usuario</td></tr>
 <tr><td><code>unavailable</code></td><td>Rojo</td><td>GPS no disponible en el dispositivo</td></tr>
 <tr><td><code>error</code></td><td>Rojo</td><td>Error en la obtencion de posicion</td></tr>
@@ -2701,7 +2702,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 </table>
 
 <h4>Transmision de Datos</h4>
-<p>Cada 30 segundos, el dispositivo envia la posicion actual al backend:</p>
+<p>Con seguimiento activo, el dispositivo intenta enviar ubicaciones periódicamente. La conexión y los permisos pueden impedir la recepción:</p>
 <table>
 <thead><tr><th>Dato</th><th>Tipo</th><th>Requerido</th></tr></thead>
 <tbody>
@@ -2725,18 +2726,18 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <p>Cada incidente se registra con timestamp y se muestra en la timeline del manifiesto.</p>
 
 <h4>Confirmar Entrega</h4>
-<p>Al llegar al operador de destino, el transportista toca &quot;Confirmar Entrega&quot; para cambiar el estado del manifiesto de EN_TRANSITO a ENTREGADO. Esto detiene el tracking GPS y limpia el cache de verificacion del manifiesto.</p>
+<p>Al llegar, el transporte revisa las ubicaciones pendientes de este dispositivo y confirma la entrega. Si no hay conexión, la entrega puede quedar guardada para sincronizar con la misma cuenta y actividad; comprobá la confirmación antes de darla por recibida.</p>
 
 <h4>Resiliencia y Modo Offline</h4>
-<p>El tracking GPS esta disenado para funcionar de manera robusta ante perdidas de conexion:</p>
+<p>Una desconexión puede dejar ubicaciones pendientes. Mantené abierta la pantalla si informa que no pudo guardarlas; al reconectar, revisá la confirmación:</p>
 <table>
 <thead><tr><th>Mecanismo</th><th>Descripcion</th></tr></thead>
 <tbody>
-<tr><td><strong>Cola de pendientes</strong></td><td>Hasta 5 puntos GPS no enviados se almacenan en <code>pendingUpdatesRef</code></td></tr>
-<tr><td><strong>Persistencia localStorage</strong></td><td>La cola se guarda en <code>gps_pending_{id}</code> al cerrar o enviar a background la app</td></tr>
-<tr><td><strong>IndexedDB backup</strong></td><td>Cola respaldada en <code>sync_queue</code> de IndexedDB como segunda capa de seguridad</td></tr>
-<tr><td><strong>Flush al montar</strong></td><td>Al reabrir la app, los puntos guardados se envian automaticamente al backend</td></tr>
-<tr><td><strong>Cleanup de watchPosition</strong></td><td>Callback <code>cleanupGps</code> + listener <code>beforeunload</code> previene watchers zombie</td></tr>
+<tr><td><strong>Pendientes</strong></td><td>La aplicación intenta conservar el envío no confirmado para su cuenta y actividad. No se garantiza guardar cada lectura sin conexión.</td></tr>
+<tr><td><strong>Copia local</strong></td><td>Si no puede guardarse, mantené esta pantalla abierta y revisá el almacenamiento.</td></tr>
+<tr><td><strong>Varias cargas</strong></td><td>Puede conservarse el primer envío sin confirmar por carga; las lecturas posteriores pueden no quedar guardadas.</td></tr>
+<tr><td><strong>Revisión al reconectar</strong></td><td>Revisá la confirmación con la cuenta y actividad originales. Una ubicación antigua sin confirmar puede requerir soporte.</td></tr>
+<tr><td><strong>Al cerrar</strong></td><td>No se garantiza seguimiento en segundo plano ni conservar una ubicación que sólo quedó en memoria.</td></tr>
 </tbody>
 </table>
 </section>
@@ -2807,9 +2808,9 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <thead><tr><th>Operacion</th><th>Disponible Offline</th><th>Comportamiento</th></tr></thead>
 <tbody>
 <tr><td>Ver pantallas cacheadas</td><td>Si</td><td>Se muestran desde el cache del Service Worker</td></tr>
-<tr><td>Enviar puntos GPS</td><td>Parcial</td><td>Se almacenan en localStorage + IndexedDB y se envian al reconectar</td></tr>
+<tr><td>Enviar puntos GPS</td><td>Parcial</td><td>Revisá los pendientes y la confirmación al reconectar; no todas las lecturas se conservan.</td></tr>
 <tr><td>Crear manifiestos</td><td>No</td><td>Requiere conexion al servidor</td></tr>
-<tr><td>Cambiar estados</td><td>No</td><td>Requiere conexion al servidor</td></tr>
+<tr><td>Cambiar estados</td><td>Parcial</td><td>Algunas entregas pueden quedar guardadas para sincronizar; revisá la confirmación del servidor.</td></tr>
 <tr><td>Ver reportes</td><td>No</td><td>Requiere datos actualizados del servidor</td></tr>
 <tr><td>Escanear QR</td><td>Parcial</td><td>Escaneo local funciona; detalle requiere conexion</td></tr>
 <tr><td>Ver notificaciones</td><td>No</td><td>Requiere polling al servidor</td></tr>
@@ -2826,19 +2827,10 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 </ul>
 
 <h4>Sincronizacion Automatica</h4>
-<p>El hook <code>useConnectivity</code> realiza un health ping al servidor cada 30 segundos. Al detectar reconexion, ejecuta automaticamente el flush de todos los datos pendientes (puntos GPS, estados de viaje) almacenados durante el periodo offline.</p>
+<p>Al recuperar la conexión, revisá la sincronización con la misma cuenta y actividad. La aplicación puede reintentar acciones guardadas, pero una ubicación anterior, un error de almacenamiento o de autorización pueden requerir una acción o consulta a soporte. No presupongas que todos los datos llegaron.</p>
 
 <h4>Persistencia de Estado del Viaje</h4>
-<p>Para transportistas, el estado del viaje se persiste localmente para sobrevivir reinicios:</p>
-<table>
-<thead><tr><th>Clave localStorage</th><th>Contenido</th><th>Uso</th></tr></thead>
-<tbody>
-<tr><td><code>sitrep_active_trip_id</code></td><td>ID del manifiesto activo</td><td>Redireccion automatica al viaje al abrir la app</td></tr>
-<tr><td><code>viaje_snapshot_{id}</code></td><td>Ultimo snapshot del viaje</td><td>Mostrar datos mientras se recarga del servidor</td></tr>
-<tr><td><code>viaje_status_{id}</code></td><td>Estado GPS (activo/pausa)</td><td>Reanudar tracking tras reinicio</td></tr>
-<tr><td><code>gps_pending_{id}</code></td><td>Cola de puntos GPS no enviados</td><td>Flush al servidor al montar el componente</td></tr>
-</tbody>
-</table>
+<p>La aplicación puede conservar una copia local del viaje y sus pendientes para la cuenta y actividad correspondientes. Al reabrir, comprobá el estado con el servidor. Algunas copias antiguas requieren revisión o soporte y no se trasladan automáticamente a otro dispositivo.</p>
 </section>
 
 <section id="pwa-tour" data-role="all">
@@ -2891,20 +2883,12 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><strong>Cambiar Contrasena</strong></td><td>Requiere ingresar la contrasena actual y la nueva (validacion de complejidad)</td></tr>
 <tr><td><strong>Notificaciones</strong></td><td>Toggle para activar/desactivar notificaciones por email</td></tr>
 <tr><td><strong>Ayuda</strong></td><td>Acceso a la documentacion y opcion de relanzar el Tour de Bienvenida</td></tr>
-<tr><td><strong>Cerrar Sesion</strong></td><td>Cierra la sesion activa y limpia todos los datos locales</td></tr>
+<tr><td><strong>Cerrar Sesion</strong></td><td>Cierra la sesión y limpia credenciales y copias de consulta; los pendientes guardados se conservan para su cuenta.</td></tr>
 </tbody>
 </table>
 
 <h4>Comportamiento del Logout</h4>
-<p>Al cerrar sesion, la aplicacion realiza una limpieza completa de datos locales para garantizar la seguridad:</p>
-<ul>
-<li>Tokens JWT (access y refresh).</li>
-<li><code>sitrep_active_trip_id</code> — ID del viaje activo.</li>
-<li><code>viaje_snapshot_*</code> — Snapshots de datos de viaje.</li>
-<li><code>viaje_status_*</code> — Estado del GPS.</li>
-<li><code>gps_pending_*</code> — Cola de puntos GPS pendientes.</li>
-</ul>
-<p>Esto asegura que al iniciar sesion con otro usuario, no se mezclen datos de sesiones anteriores.</p>
+<p>Al cerrar sesión se limpian las credenciales y algunas copias de consulta. Las ubicaciones y acciones pendientes que pudieron guardarse permanecen asociadas a su cuenta y actividad para revisarlas al volver. No se envían bajo otra cuenta. Si una ubicación quedó sólo en memoria, no cierres la pantalla hasta resolver el almacenamiento; borrar los datos del navegador puede eliminar las copias locales.</p>
 </section>
 
 <!-- ============================================================ -->
@@ -3307,7 +3291,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/entregar</td><td>EN_TRANSITO a ENTREGADO. Registra fechaEntrega. Invalida cache GPS. <code>$transaction()</code>.</td><td>TRANSPORTISTA, ADMIN</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/recibir</td><td>ENTREGADO a RECIBIDO. Body: <code>{ cantidadRecibida }</code>. Registra diferencia de peso.</td><td>OPERADOR, ADMIN</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/tratamiento</td><td>RECIBIDO a EN_TRATAMIENTO. Body: <code>{ metodo, observaciones }</code>. <code>$transaction()</code>.</td><td>OPERADOR, ADMIN</td></tr>
-<tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/cerrar</td><td>EN_TRATAMIENTO/RECIBIDO a TRATADO. Genera certificado.</td><td>OPERADOR, ADMIN</td></tr>
+<tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/cerrar</td><td>Registra el cierre. En el circuito nuevo, el operador firma y emite la certificación por separado.</td><td>OPERADOR, ADMIN</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/rechazar</td><td>ENTREGADO a RECHAZADO. Body: <code>{ motivo }</code>.</td><td>OPERADOR, ADMIN</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/incidente</td><td>Registra evento en EN_TRANSITO. Body: <code>{ tipo|tipoIncidente, descripcion }</code>. No cambia estado.</td><td>TRANSPORTISTA, ADMIN</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/cancelar</td><td>Cualquier estado (excepto CANCELADO/TRATADO) a CANCELADO. Body: <code>{ motivo }</code>.</td><td>GENERADOR, ADMIN</td></tr>
@@ -3365,7 +3349,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <thead><tr><th>Metodo</th><th>Endpoint</th><th>Descripcion</th></tr></thead>
 <tbody>
 <tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/pdf/manifiesto/:id</td><td>Generar y descargar PDF del manifiesto</td></tr>
-<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/pdf/certificado/:id</td><td>Generar y descargar Certificado de Disposicion (solo TRATADO)</td></tr>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/pdf/certificado/:id</td><td>Descarga histórica en casos compatibles; el circuito nuevo requiere emisión expresa del operador.</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/anomalias/detectar/:manifiestoId</td><td>Ejecutar deteccion de anomalias para un manifiesto</td></tr>
 <tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/anomalias/:manifiestoId</td><td>Listar anomalias detectadas para un manifiesto</td></tr>
 <tr><td><span class="method method-put">PUT</span></td><td class="endpoint">/api/anomalias/:id/resolver</td><td>Resolver una anomalia detectada</td></tr>
@@ -3410,7 +3394,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 </table>
 
 <h4>Protecciones de Concurrencia</h4>
-<p>Para soportar 50+ transportistas simultaneos, el sistema implementa las siguientes protecciones contra condiciones de carrera:</p>
+<p>Algunas operaciones tienen protecciones contra solicitudes simultáneas. Estas protecciones, por sí solas, no establecen una capacidad de usuarios o viajes; esa capacidad requiere una prueba representativa del entorno.</p>
 <table>
 <thead><tr><th>Proteccion</th><th>Ubicacion</th><th>Descripcion</th></tr></thead>
 <tbody>
@@ -3418,9 +3402,9 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><strong>Guard doble-tap</strong></td><td>ManifiestoDetallePage.tsx</td><td><code>actionInFlightRef</code> bloquea envios concurrentes de acciones antes de que React re-renderice el estado <code>isPending</code>.</td></tr>
 <tr><td><strong>Sync tokens cross-tab</strong></td><td>api.ts</td><td>Listener del evento <code>storage</code> sincroniza el refresh de tokens entre pestanas del navegador, previniendo agotamiento de la cola de renovacion.</td></tr>
 <tr><td><strong>switchUser async</strong></td><td>AuthContext.tsx</td><td>Funcion asincrona con <code>await</code> + <code>setIsLoading(true)</code> para prevenir navegacion con tokens inconsistentes.</td></tr>
-<tr><td><strong>Limpieza en logout</strong></td><td>AuthContext.tsx</td><td>Limpia <code>sitrep_active_trip_id</code>, <code>viaje_snapshot_*</code>, <code>viaje_status_*</code>, <code>gps_pending_*</code> de localStorage.</td></tr>
+<tr><td><strong>Cierre de sesión</strong></td><td>AuthContext.tsx</td><td>Limpia credenciales y copias de consulta; conserva pendientes guardados con su cuenta y actividad.</td></tr>
 <tr><td><strong>ActiveTripGuard</strong></td><td>AppMobile.tsx</td><td>Valida el estado del viaje contra estados terminales antes de redirigir, previniendo bucles de redireccion a viajes finalizados.</td></tr>
-<tr><td><strong>GPS localStorage persist</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Ref de actualizaciones pendientes persistido a localStorage al cerrar; flush al backend al montar la aplicacion.</td></tr>
+<tr><td><strong>Ubicaciones pendientes</strong></td><td>Seguimiento GPS</td><td>Se comprueban y reintentan según el contexto y el estado del viaje; la confirmación no se presume.</td></tr>
 <tr><td><strong>Limpieza watchPosition</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Callback de limpieza + listener <code>beforeunload</code> previene watchers GPS zombi en navegacion o desmontaje.</td></tr>
 </tbody>
 </table>
@@ -3438,134 +3422,15 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 </section>
 
 <section id="arq-capacidad" data-role="all">
-<h3>5.5 Capacidad Actual (50 Transportistas)</h3>
-<table>
-<thead><tr><th>Parametro</th><th>Valor</th><th>Notas</th></tr></thead>
-<tbody>
-<tr><td>Viajes concurrentes maximos</td><td>50+</td><td>Connection pool + indices + cache</td></tr>
-<tr><td>Intervalo GPS</td><td>30s</td><td>1 solicitud cada 30s por telefono</td></tr>
-<tr><td>Rate limit</td><td>600 req/min/IP</td><td>Soporta 50+ telefonos</td></tr>
-<tr><td>Connection pool DB</td><td>20/instancia (40 total)</td><td>PM2 cluster con 2 instancias</td></tr>
-<tr><td>PostgreSQL max_connections</td><td>100</td><td>~40 activas en pico</td></tr>
-<tr><td>Latencia por solicitud</td><td>~24ms cached / ~250ms cold</td><td>Cache TTL: 30s</td></tr>
-<tr><td>Crecimiento de datos</td><td>~6,000 filas/hora a 50 viajes</td><td>Indices optimizados</td></tr>
-</tbody>
-</table>
+<h3>5.5 Capacidad y concurrencia</h3>
+<p>La capacidad del entorno de destino todavía no está verificada. Un intervalo de envío GPS, el tamaño de un pool o un límite de solicitudes no demuestran por sí solos cuántos viajes y operaciones simultáneas puede sostener SITREP.</p>
+<p>Antes de fijar una cifra, medí en un entorno autorizado una carga representativa de viajes, mapa, manifiestos, adendas, inspecciones y documentos; registrá tiempos, errores, conexiones y recuperación. Las pruebas con datos artificiales no se extrapolan automáticamente a producción.</p>
 </section>
 
 <section id="arq-escalamiento" data-role="all">
-<h3>5.6 Escalamiento a 200 Usuarios</h3>
-<p>Plan de escalamiento para soportar 200 usuarios concurrentes:</p>
-<ul>
-<li><strong>Servidor:</strong> Upgrade de CPU y RAM.</li>
-<li><strong>PM2:</strong> Escalar de 2 a 4-6 instancias.</li>
-<li><strong>Connection pool:</strong> 50 por instancia con cap global.</li>
-<li><strong>Redis:</strong> Cache para dashboard, reportes, catalogos con TTL de 30s a 5min.</li>
-<li><strong>Nginx:</strong> Proxy cache para catalogos y reportes.</li>
-<li><strong>Rate limit:</strong> Escalar a 1200 req/min/IP.</li>
-<li><strong>PostgreSQL tuning:</strong> max_connections=200, shared_buffers=256MB, work_mem=4MB, effective_cache_size=1GB.</li>
-</ul>
-
-<h4>Estrategia de Cache con Redis</h4>
-<p>Para el escalamiento a 200 usuarios, se planifica la migracion del cache en memoria a Redis con las siguientes politicas de TTL:</p>
-<table>
-<thead><tr><th>Recurso</th><th>TTL</th><th>Justificacion</th></tr></thead>
-<tbody>
-<tr><td>GPS ubicacion (manifiestoId)</td><td>30 segundos</td><td>Coincide con el intervalo de envio GPS</td></tr>
-<tr><td>Dashboard estadisticas</td><td>30 segundos</td><td>Coincide con el refresco del Centro de Control</td></tr>
-<tr><td>Catalogos (residuos, actores)</td><td>5 minutos</td><td>Datos poco volatiles, alta frecuencia de lectura</td></tr>
-<tr><td>Reportes (periodo fijo)</td><td>2 minutos</td><td>Consultas costosas que se repiten frecuentemente</td></tr>
-<tr><td>Sesiones de usuario</td><td>24 horas</td><td>Coincide con la duracion del access token</td></tr>
-</tbody>
-</table>
-
-<h4>Comparativa de Capacidad</h4>
-<table>
-<thead><tr><th>Metrica</th><th>50 usuarios</th><th>200 usuarios</th></tr></thead>
-<tbody>
-<tr><td>Instancias PM2</td><td>2</td><td>4-6</td></tr>
-<tr><td>Connection pool total</td><td>40</td><td>200-300</td></tr>
-<tr><td>Rate limit</td><td>600/min/IP</td><td>1200/min/IP</td></tr>
-<tr><td>Escrituras GPS</td><td>~100/min</td><td>~400/min</td></tr>
-<tr><td>Cache</td><td>In-memory (30s TTL)</td><td>Redis</td></tr>
-<tr><td>Latencia esperada</td><td>24-250ms</td><td>20-100ms (con Redis)</td></tr>
-</tbody>
-</table>
-
-<h4>Fases de Escalamiento</h4>
-<p>El escalamiento a 200 usuarios se planifica en tres fases incrementales:</p>
-
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Fase 1: Optimizacion de infraestructura existente (50 a 100 usuarios)</div>
-<div class="collapsible-body">
-<ul>
-<li>Aumentar instancias PM2 de 2 a 4.</li>
-<li>Aumentar connection pool a 25 por instancia (100 total).</li>
-<li>Aumentar max_connections de PostgreSQL a 150.</li>
-<li>Ajustar shared_buffers a 128MB y work_mem a 2MB.</li>
-<li>Rate limit a 800 req/min/IP.</li>
-<li>Monitorear metricas con PM2 Plus o similar.</li>
-</ul>
-<p><strong>Costo estimado:</strong> Solo configuracion, sin cambio de hardware.</p>
-</div>
-
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Fase 2: Introduccion de Redis y upgrade de servidor (100 a 150 usuarios)</div>
-<div class="collapsible-body">
-<ul>
-<li>Instalar Redis en contenedor Docker.</li>
-<li>Migrar cache en memoria a Redis (GPS, dashboard, catalogos).</li>
-<li>Configurar Nginx proxy cache para endpoints de catalogos y reportes.</li>
-<li>Upgrade de CPU y RAM del servidor (al menos 4 cores, 8GB RAM).</li>
-<li>Aumentar instancias PM2 a 6.</li>
-<li>Connection pool 30 por instancia (180 total).</li>
-<li>Rate limit a 1000 req/min/IP.</li>
-</ul>
-<p><strong>Costo estimado:</strong> Upgrade de servidor + configuracion de Redis.</p>
-</div>
-
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Fase 3: Arquitectura de alta disponibilidad (150 a 200+ usuarios)</div>
-<div class="collapsible-body">
-<ul>
-<li>Separar PostgreSQL a servidor dedicado.</li>
-<li>Connection pool 50 por instancia (200-300 total).</li>
-<li>max_connections=200, shared_buffers=256MB, work_mem=4MB, effective_cache_size=1GB.</li>
-<li>Redis con politicas de TTL por tipo de dato (30s GPS, 5min catalogos).</li>
-<li>Rate limit a 1200 req/min/IP.</li>
-<li>Considerar read replicas de PostgreSQL para reportes pesados.</li>
-<li>Monitoreo avanzado con alertas de rendimiento.</li>
-</ul>
-<p><strong>Costo estimado:</strong> Servidor adicional para BD + configuracion avanzada.</p>
-</div>
-
-<h4>Metricas de Monitoreo Clave</h4>
-<table>
-<thead><tr><th>Metrica</th><th>Herramienta</th><th>Umbral de Alerta</th></tr></thead>
-<tbody>
-<tr><td>CPU del servidor</td><td>PM2 / top</td><td>Mayor a 80% sostenido por 5 minutos</td></tr>
-<tr><td>Memoria RAM</td><td>PM2 / free</td><td>Mayor a 85% de uso</td></tr>
-<tr><td>Connection pool activo</td><td>Prisma metrics</td><td>Mayor a 80% de capacidad</td></tr>
-<tr><td>Latencia de endpoint GPS</td><td>AnalyticsLog</td><td>Mayor a 100ms promedio</td></tr>
-<tr><td>Latencia de endpoints generales</td><td>AnalyticsLog</td><td>Mayor a 500ms promedio</td></tr>
-<tr><td>Tasa de error 5xx</td><td>Nginx access log</td><td>Mayor a 1% de solicitudes</td></tr>
-<tr><td>Tamano de la BD</td><td>PostgreSQL</td><td>Mas de 10GB (planificar archivado)</td></tr>
-<tr><td>Rate limit hits</td><td>Express middleware</td><td>Mas de 10 bloqueos por hora (indica posible abuso)</td></tr>
-</tbody>
-</table>
-
-<h4>Punto de Salud (Health Check)</h4>
-<p>El endpoint <code>GET /api/health</code> verifica el estado del sistema:</p>
-<pre><code>{
-  "status": "healthy",
-  "db": "connected",
-  "uptime": 345600,
-  "version": "2026.1",
-  "timestamp": "2026-02-10T14:30:00Z"
-}</code></pre>
-<p>Este endpoint es utilizado por:</p>
-<ul>
-<li>El hook <code>useConnectivity</code> para detectar reconexion (ping cada 30s).</li>
-<li>Sistemas de monitoreo externo para verificar disponibilidad.</li>
-<li>PM2 para health checks de las instancias del cluster.</li>
-</ul>
+<h3>5.6 Escalamiento y medición</h3>
+<p>El escalamiento depende de los resultados de carga del entorno autorizado. Antes de cambiar servidores, cantidad de procesos, conexión a base o límites de red, medí el cuello de botella y prepará una reversión. No hay una configuración de 200 usuarios ni latencias de producción validadas en este manual.</p>
+<p>Supervisá tiempos de respuesta y errores, uso de CPU y memoria, conexiones de base, sincronizaciones pendientes y antigüedad de las posiciones recibidas. Revisá también los límites compartidos por usuarios detrás de una misma red.</p>
 </section>
 
 <!-- ============================================================ -->
@@ -3636,7 +3501,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span> &rarr; <span class="workflow-state ws-tratado">TRATADO</span></td>
 <td>Operador</td>
 <td>Cerrar Manifiesto confirmando tratamiento completo</td>
-<td>Registra fechaCierre. Genera Certificado de Disposicion. Crea evento CIERRE. Notifica a todos los actores.</td>
+<td>Registra el cierre y el evento. La certificación del circuito nuevo requiere emisión expresa del operador.</td>
 </tr>
 </tbody>
 </table>
@@ -3726,21 +3591,21 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Flujo del seguimiento GPS durante el transporte de residuos peligrosos.</strong></p>
 </div>
 <ol>
-<li><strong>Activacion:</strong> El transportista confirma el retiro en el generador. El estado cambia a EN_TRANSITO y se activa <code>navigator.geolocation.watchPosition()</code>.</li>
+<li><strong>Activación:</strong> el transporte confirma el retiro físico y abre el seguimiento. Debe permitir el acceso a ubicación; comprobar GPS y recepción por separado.</li>
 <li><strong>Captura continua:</strong> El navegador reporta la posicion continuamente al obtener nuevas coordenadas.</li>
-<li><strong>Transmision periodica:</strong> Cada 30 segundos, la ultima posicion conocida se envia al servidor via <code>POST /api/manifiestos/:id/ubicacion</code>.</li>
-<li><strong>Datos transmitidos:</strong> latitud, longitud, velocidad (m/s), direccion (grados), precision (metros).</li>
-<li><strong>Resiliencia offline:</strong> Si falla el envio, el punto GPS se agrega a una cola (maximo 5 puntos pendientes). La cola se persiste en <code>localStorage</code> con clave <code>gps_pending_{manifiestoId}</code>.</li>
-<li><strong>Recuperacion:</strong> Al montar la aplicacion, los puntos GPS pendientes guardados en localStorage se envian automaticamente al backend.</li>
+<li><strong>Transmisión:</strong> con seguimiento activo se intenta enviar periódicamente. La señal del teléfono no confirma que SITREP haya recibido el punto.</li>
+<li><strong>Datos:</strong> ubicación y, cuando están disponibles, velocidad y dirección. La unidad de registros históricos no siempre se puede identificar.</li>
+<li><strong>Sin conexión:</strong> se intenta conservar el envío pendiente en este dispositivo y su contexto; no se garantiza guardar todas las lecturas.</li>
+<li><strong>Recuperación:</strong> al reconectar, revisá la confirmación con la misma cuenta y actividad. Si la pantalla indica que una ubicación anterior no puede confirmarse, conservá el dispositivo y consultá a soporte.</li>
 <li><strong>Pausa/Reanudacion:</strong> El transportista puede pausar el tracking, lo cual registra un incidente de tipo PAUSA. Al reanudar, se registra un incidente REANUDACION.</li>
-<li><strong>Desactivacion:</strong> Al confirmar la entrega en el operador, el estado cambia a ENTREGADO y el watcher GPS se limpia correctamente (incluye listener <code>beforeunload</code> para prevenir watchers zombi).</li>
+<li><strong>Entrega:</strong> revisá las ubicaciones pendientes de este dispositivo y la confirmación de la entrega antes de darla por completada.</li>
 </ol>
 
 <h4>Temporizador</h4>
 <p>El temporizador de viaje muestra el tiempo transcurrido desde la <code>fechaRetiro</code> (timestamp del servidor), no un contador local. Esto garantiza consistencia entre dispositivos y sesiones.</p>
 
 <h4>Cache Backend</h4>
-<p>El endpoint de ubicacion GPS utiliza un cache en memoria con TTL de 30 segundos por <code>manifiestoId</code>. Esto reduce la latencia de las escrituras GPS de ~250ms (consulta completa a BD) a ~24ms (cache hit). El cache se invalida cuando el manifiesto cambia de estado (por ejemplo, al confirmar entrega).</p>
+<p>La hora visible en Monitor corresponde a la recepción por SITREP; la captura del teléfono puede ser anterior. La latencia del entorno requiere medición y no se deduce de un valor histórico.</p>
 
 <h4>Maquina de Estados GPS</h4>
 <p>El componente de tracking GPS en el frontend implementa una maquina de estados para gestionar el ciclo de vida del GPS:</p>
@@ -3749,7 +3614,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tbody>
 <tr><td><strong>checking</strong></td><td>Verificando disponibilidad de la API de geolocalizacion</td><td>acquiring, unavailable, error</td></tr>
 <tr><td><strong>acquiring</strong></td><td>Solicitando permisos y primera posicion GPS</td><td>active, denied, error</td></tr>
-<tr><td><strong>active</strong></td><td>GPS activo, transmitiendo posiciones cada 30 segundos</td><td>(fin del viaje)</td></tr>
+<tr><td><strong>active</strong></td><td>El dispositivo obtuvo señal; revisá aparte la confirmación del envío</td><td>(fin del viaje)</td></tr>
 <tr><td><strong>denied</strong></td><td>El usuario denego los permisos de ubicacion</td><td>checking (al reintentar)</td></tr>
 <tr><td><strong>unavailable</strong></td><td>API de geolocalizacion no disponible en el dispositivo</td><td>checking (al reintentar)</td></tr>
 <tr><td><strong>error</strong></td><td>Error inesperado en la captura de posicion</td><td>checking (al reintentar)</td></tr>
@@ -3764,17 +3629,13 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
   "velocidad": 45.2,         // Velocidad en m/s (opcional)
   "direccion": 180.5         // Rumbo en grados (0-360, opcional)
 }</code></pre>
-<p>El servidor adiciona automaticamente: <code>precision</code> (metros), <code>timestamp</code> (ISO 8601), y el <code>manifiestoId</code> de la URL.</p>
+<p>El servidor vincula la ubicación al manifiesto y registra su hora de recepción. Esa hora no acredita cuándo la capturó el dispositivo; no se debe interpretar como la hora real de captura.</p>
 
-<h4>Resiliencia ante Perdida de Conexion</h4>
+<h4>Ubicaciones pendientes</h4>
 <ol>
-<li>El frontend intenta enviar la posicion GPS al servidor.</li>
-<li>Si falla (sin conexion, timeout, error 5xx), el punto se agrega a <code>pendingUpdatesRef</code>.</li>
-<li>La cola de pendientes tiene un limite maximo de 5 puntos (los mas antiguos se descartan para priorizar datos recientes).</li>
-<li>La cola se persiste en <code>localStorage</code> con clave <code>gps_pending_{manifiestoId}</code> para sobrevivir cierres de aplicacion.</li>
-<li>Al montar el componente de viaje, se verifica si hay puntos pendientes en localStorage.</li>
-<li>Si existen puntos pendientes, se envian al backend secuencialmente antes de iniciar el tracking normal.</li>
-<li>Adicionalmente, el hook <code>useConnectivity</code> realiza un health ping cada 30 segundos y, al detectar reconexion, ejecuta un flush de la cola de sincronizacion de IndexedDB.</li>
+<li>Mantené la pantalla abierta si informa que una ubicación no pudo guardarse.</li>
+<li>Al reconectar, revisá el envío y la confirmación con la misma cuenta y actividad. No se garantiza conservar cada lectura durante la desconexión.</li>
+<li>Si una ubicación anterior no puede confirmarse, conservá el dispositivo y consultá a soporte antes de entregar o relevar. La comprobación no revisa otros dispositivos.</li>
 </ol>
 </section>
 
@@ -3786,7 +3647,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <h2>7. Anexo: Casos de Uso</h2>
 <h3 class="cu-section-title"><span class="cu-section-badge role-admin">Administrador</span>7.1 Administrador DGFA <span class="cu-section-count">(22 casos)</span></h3>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A01: Gestionar Usuarios del Sistema</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A01: Gestionar Usuarios del Sistema</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Gestión de Usuarios — tabla con 7 roles e impersonación" loading="lazy"></a><div class="cu-screenshot-caption">Gestión de Usuarios — tabla con 7 roles e impersonación</div></div>
@@ -3809,7 +3670,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A02: Gestionar Generadores</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A02: Gestionar Generadores</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/64_generador_detalle.png" target="_blank"><img src="screenshots/desktop/64_generador_detalle.png" alt="Detalle de Generador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle de Generador — campos completos con actividad, rubro y domicilios</div></div>
 
@@ -3838,7 +3699,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A03: Gestionar Transportistas</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A03: Gestionar Transportistas</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Detalle Transportista — flota y conductores" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Transportista — flota y conductores</div></div>
 
@@ -3865,7 +3726,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A04: Gestionar Operadores</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A04: Gestionar Operadores</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/65_operador_detalle.png" target="_blank"><img src="screenshots/desktop/65_operador_detalle.png" alt="Detalle Operador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Operador — representantes legales y tecnicos, regulatorio completo</div></div>
 
@@ -3894,7 +3755,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A05: Configurar Catalogo de Residuos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A05: Configurar Catalogo de Residuos</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/32_admin_catalogo_residuos.png" target="_blank"><img src="screenshots/desktop/32_admin_catalogo_residuos.png" alt="Catálogo de Residuos" loading="lazy"></a><div class="cu-screenshot-caption">Catálogo de Residuos</div></div>
 
@@ -3907,7 +3768,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A06: Configurar Catalogo de Tratamientos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A06: Configurar Catalogo de Tratamientos</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/33_admin_tratamientos_grid.png" target="_blank"><img src="screenshots/desktop/33_admin_tratamientos_grid.png" alt="Catálogo de Tratamientos" loading="lazy"></a><div class="cu-screenshot-caption">Catálogo de Tratamientos</div></div>
 
@@ -3919,7 +3780,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A07: Visualizar Dashboard General</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A07: Visualizar Dashboard General</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/04_dashboard_admin.png" target="_blank"><img src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard Admin — KPIs y manifiestos recientes" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Admin — KPIs y manifiestos recientes</div></div>
@@ -3935,7 +3796,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A08: Operar Centro de Control</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A08: Operar Centro de Control</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Centro de Control — mapa y viajes activos" loading="lazy"></a><div class="cu-screenshot-caption">Centro de Control — mapa y viajes activos</div></div>
 
@@ -3957,7 +3818,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A09: Generar Reportes</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A09: Generar Reportes</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Centro de Reportes — 8 pestañas" loading="lazy"></a><div class="cu-screenshot-caption">Centro de Reportes — 8 pestañas</div></div>
@@ -3973,7 +3834,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A10: Consultar Auditoria</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A10: Consultar Auditoria</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/35_admin_auditoria.png" target="_blank"><img src="screenshots/desktop/35_admin_auditoria.png" alt="Auditoría del Sistema" loading="lazy"></a><div class="cu-screenshot-caption">Auditoría del Sistema</div></div>
 
@@ -3985,7 +3846,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A11: Gestionar Alertas</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A11: Gestionar Alertas</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/16_alertas_timeline.png" target="_blank"><img src="screenshots/desktop/16_alertas_timeline.png" alt="Alertas — Timeline por criticidad" loading="lazy"></a><div class="cu-screenshot-caption">Alertas — Timeline por criticidad</div></div>
@@ -4008,7 +3869,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A12: Carga Masiva de Datos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A12: Carga Masiva de Datos</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/36_carga_masiva.png" target="_blank"><img src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva CSV" loading="lazy"></a><div class="cu-screenshot-caption">Carga Masiva CSV</div></div>
 
@@ -4025,7 +3886,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A13: Gestionar Vehiculos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A13: Gestionar Vehiculos</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/34_admin_vehiculos.png" target="_blank"><img src="screenshots/desktop/34_admin_vehiculos.png" alt="Gestión de Vehículos" loading="lazy"></a><div class="cu-screenshot-caption">Gestión de Vehículos</div></div>
 
@@ -4037,7 +3898,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A14: Configurar Parametros del Sistema</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A14: Configurar Parametros del Sistema</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Configuración del Sistema" loading="lazy"></a><div class="cu-screenshot-caption">Configuración del Sistema</div></div>
 
@@ -4047,7 +3908,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A15: Supervisar Anomalias de Transporte</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A15: Supervisar Anomalias de Transporte</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/61_centro_control_viajes.png" target="_blank"><img src="screenshots/desktop/61_centro_control_viajes.png" alt="Anomalías — Centro de Control Viajes" loading="lazy"></a><div class="cu-screenshot-caption">Anomalías — Centro de Control Viajes</div></div>
 
@@ -4065,7 +3926,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-partial">Parcial</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A16: Impersonar Usuario (Acceso Comodin)</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A16: Impersonar Usuario (Acceso Comodin)</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Impersonación — ícono ojo naranja en tabla de usuarios" loading="lazy"></a><div class="cu-screenshot-caption">Impersonación — ícono ojo naranja en tabla de usuarios</div></div>
 
@@ -4090,7 +3951,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A17: Gestionar Roles Administrativos Delegados</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A17: Gestionar Roles Administrativos Delegados</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/24_admin_usuario_crear_modal.png" target="_blank"><img src="screenshots/desktop/24_admin_usuario_crear_modal.png" alt="Sub-roles — modal con 7 opciones de rol" loading="lazy"></a><div class="cu-screenshot-caption">Sub-roles — modal con 7 opciones de rol</div></div>
 
@@ -4119,7 +3980,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A18: Busqueda Global (Cmd+K)</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A18: Busqueda Global (Cmd+K)</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/25_busqueda_global_cmd_k.png" target="_blank"><img src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Búsqueda Global Cmd+K" loading="lazy"></a><div class="cu-screenshot-caption">Búsqueda Global Cmd+K</div></div>
 
@@ -4142,7 +4003,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A19: Configurar Preferencias de Notificaciones por Email</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A19: Configurar Preferencias de Notificaciones por Email</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/38_configuracion_notificaciones_email.png" target="_blank"><img src="screenshots/desktop/38_configuracion_notificaciones_email.png" alt="Preferencias de Email por usuario" loading="lazy"></a><div class="cu-screenshot-caption">Preferencias de Email por usuario</div></div>
 
@@ -4166,7 +4027,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A20: Certificacion Blockchain de Manifiestos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A20: Certificacion Blockchain de Manifiestos</button>
 <div class="collapsible-body">
 <p><strong>Descripcion:</strong> Registro inmutable de manifiestos en la blockchain de Ethereum Sepolia. El usuario certifica bajo demanda desde el detalle del manifiesto (boton &ldquo;Certificar en Blockchain&rdquo;). La pagina <code>/admin/blockchain</code> permite al administrador consultar todas las certificaciones con filtros por estado (Confirmados, Pendientes, Con Error), tabla paginada con TX Hash, numero de bloque y links a Etherscan.</p>
 <p><strong>Precondiciones:</strong> El manifiesto debe estar en estado APROBADO o posterior (no BORRADOR ni CANCELADO). Blockchain habilitado en configuracion del servidor.</p>
@@ -4184,7 +4045,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A21: Gestionar Solicitudes de Inscripcion</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A21: Gestionar Solicitudes de Inscripcion</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/76_admin_solicitudes_lista.png" target="_blank"><img src="screenshots/desktop/76_admin_solicitudes_lista.png" alt="Admin Solicitudes — lista con KPIs" loading="lazy"></a><div class="cu-screenshot-caption">Panel de solicitudes de inscripcion con KPIs y filtros</div></div>
 
@@ -4210,7 +4071,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A22: Alta de Transportista con Flota</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-A22: Alta de Transportista con Flota</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/78_nuevo_transportista_wizard.png" target="_blank"><img src="screenshots/desktop/78_nuevo_transportista_wizard.png" alt="Nuevo Transportista — Wizard paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Wizard de creacion de transportista — paso 1 datos basicos</div></div>
 
@@ -4235,7 +4096,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <section id="cu-generador" data-role="generador">
 <h3 class="cu-section-title"><span class="cu-section-badge role-generador">Generador</span>7.2 Generador <span class="cu-section-count">(12 casos)</span></h3>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G01: Crear Manifiesto</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G01: Crear Manifiesto</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/14_nuevo_manifiesto_paso1.png" target="_blank"><img src="screenshots/desktop/14_nuevo_manifiesto_paso1.png" alt="Nuevo Manifiesto — Paso 1: datos generales" loading="lazy"></a><div class="cu-screenshot-caption">Nuevo Manifiesto — Paso 1: datos generales</div></div>
@@ -4258,7 +4119,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G02: Firmar Manifiesto Electronicamente</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G02: Firmar Manifiesto Electronicamente</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firmar Manifiesto — botón Aprobar en estado BORRADOR" loading="lazy"></a><div class="cu-screenshot-caption">Firmar Manifiesto — botón Aprobar en estado BORRADOR</div></div>
 
@@ -4276,7 +4137,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G03: Consultar Manifiestos Propios</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G03: Consultar Manifiestos Propios</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/48_manifiestos_generador.png" target="_blank"><img src="screenshots/desktop/48_manifiestos_generador.png" alt="Mis Manifiestos — lista filtrada por generador" loading="lazy"></a><div class="cu-screenshot-caption">Mis Manifiestos — lista filtrada por generador</div></div>
@@ -4291,7 +4152,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G04: Ver Detalle de Manifiesto</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G04: Ver Detalle de Manifiesto</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Detalle de Manifiesto — acciones y timeline" loading="lazy"></a><div class="cu-screenshot-caption">Detalle de Manifiesto — acciones y timeline</div></div>
@@ -4314,18 +4175,18 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G05: Seguir Transporte en Tiempo Real</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G05: Seguir Transporte en Tiempo Real</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/10_manifiestos_en_transito.png" target="_blank"><img src="screenshots/desktop/10_manifiestos_en_transito.png" alt="Seguimiento — manifiestos EN_TRANSITO" loading="lazy"></a><div class="cu-screenshot-caption">Seguimiento — manifiestos EN_TRANSITO</div></div>
 
-<p><strong>Descripcion:</strong> Visualizar la ubicacion GPS del vehiculo transportador en tiempo real sobre un mapa interactivo. Disponible cuando el manifiesto esta en estado EN_TRANSITO.</p>
+<p><strong>Descripción:</strong> Consultar en el mapa la última ubicación recibida durante el viaje. La hora corresponde a recepción y el punto puede ser anterior; no garantiza la ubicación actual.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El transportista tiene GPS activo.</p>
 <p><strong>Datos mostrados:</strong> Posicion actual del vehiculo (marcador rojo pulsante), traza del recorrido (linea sobre el mapa), velocidad actual, tiempo transcurrido desde el retiro, generador (punto de origen), operador (punto de destino).</p>
 <p><strong>Ruta:</strong> <code>/manifiestos/:id</code> (seccion de mapa en el detalle)</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G06: Cancelar Manifiesto</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G06: Cancelar Manifiesto</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/48_manifiestos_generador.png" target="_blank"><img src="screenshots/desktop/48_manifiestos_generador.png" alt="Lista de Manifiestos — acción Cancelar disponible" loading="lazy"></a><div class="cu-screenshot-caption">Lista de Manifiestos — acción Cancelar disponible</div></div>
 
@@ -4337,7 +4198,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G07: Descargar PDF de Manifiesto</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G07: Descargar PDF de Manifiesto</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Descargar PDF — manifiesto TRATADO" loading="lazy"></a><div class="cu-screenshot-caption">Descargar PDF — manifiesto TRATADO</div></div>
 
@@ -4348,18 +4209,18 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G08: Descargar Certificado de Disposicion</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G08: Descargar Certificado de Disposicion</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Descargar Certificado de Disposición Final" loading="lazy"></a><div class="cu-screenshot-caption">Descargar Certificado de Disposición Final</div></div>
 
 <p><strong>Descripcion:</strong> Descargar el Certificado de Tratamiento y Disposicion Final en formato PDF. Este documento certifica que el residuo peligroso fue tratado conforme a la normativa vigente.</p>
-<p><strong>Precondiciones:</strong> El manifiesto esta en estado TRATADO.</p>
-<p><strong>Contenido del certificado:</strong> Referencia a Ley 24.051, datos completos del ciclo (generador, transportista, operador), tipo de residuo y cantidad, metodo de tratamiento aplicado, fechas completas, firma del operador responsable, numero de certificado.</p>
-<p><strong>Endpoint:</strong> <code>GET /api/pdf/certificado/:id</code></p>
+<p><strong>Precondiciones:</strong> En el circuito nuevo, el operador debe haber emitido el documento. El estado TRATADO por sí solo no lo publica.</p>
+<p><strong>Contenido:</strong> número, partes, fecha de emisión, método, corrientes y cantidades certificadas, firma manuscrita y referencias vinculadas cuando correspondan.</p>
+<p><strong>Descarga del circuito nuevo:</strong> <code>GET /api/manifiestos/:id/certificados/:documentId/archivo</code>. Los documentos históricos pueden usar su descarga anterior.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G09: Visualizar Dashboard de Generador</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G09: Visualizar Dashboard de Generador</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/47_dashboard_generador.png" target="_blank"><img src="screenshots/desktop/47_dashboard_generador.png" alt="Dashboard Generador — KPIs propios" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Generador — KPIs propios</div></div>
@@ -4372,7 +4233,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G10: Consultar Reportes Propios</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G10: Consultar Reportes Propios</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Reportes — filtrados por empresa" loading="lazy"></a><div class="cu-screenshot-caption">Reportes — filtrados por empresa</div></div>
 
@@ -4382,7 +4243,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G11: Recibir Notificaciones</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G11: Recibir Notificaciones</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones — configuración de alertas" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones — configuración de alertas</div></div>
 
@@ -4393,7 +4254,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G12: Gestionar Perfil</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G12: Gestionar Perfil</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/39_mi_perfil.png" target="_blank"><img src="screenshots/desktop/39_mi_perfil.png" alt="Mi Perfil — datos personales y contraseña" loading="lazy"></a><div class="cu-screenshot-caption">Mi Perfil — datos personales y contraseña</div></div>
 
@@ -4407,7 +4268,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <section id="cu-transportista" data-role="transportista">
 <h3 class="cu-section-title"><span class="cu-section-badge role-transportista">Transportista</span>7.3 Transportista <span class="cu-section-count">(12 casos)</span></h3>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T01: Ver Manifiestos Asignados</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T01: Ver Manifiestos Asignados</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/45_manifiestos_transportista.png" target="_blank"><img src="screenshots/desktop/45_manifiestos_transportista.png" alt="Manifiestos Asignados al Transportista" loading="lazy"></a><div class="cu-screenshot-caption">Manifiestos Asignados al Transportista</div></div>
@@ -4421,14 +4282,14 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T02: Confirmar Retiro de Residuos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T02: Confirmar Retiro de Residuos</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Retiro — estado APROBADO" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Retiro — estado APROBADO</div></div>
 <div class="cu-screenshot-mobile"><a href="screenshots/mobile/M21_tomar_viaje_mobile.png" target="_blank"><img src="screenshots/mobile/M21_tomar_viaje_mobile.png" alt="Tomar viaje — móvil" loading="lazy"></a><div class="cu-screenshot-mobile-caption">📱 Móvil</div></div>
 </div>
 
-<p><strong>Descripcion:</strong> El transportista confirma que ha retirado el residuo en la ubicacion del generador. Esta accion cambia el estado del manifiesto a EN_TRANSITO y activa automaticamente el tracking GPS.</p>
+<p><strong>Descripción:</strong> El transporte confirma el retiro físico y el manifiesto pasa a EN TRÁNSITO. Después revisá el permiso, la señal y la confirmación de ubicación.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado APROBADO. El usuario es el transportista asignado o ADMIN.</p>
 <p><strong>Flujo:</strong></p>
 <ol>
@@ -4438,28 +4299,28 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <li>El navegador solicita permisos de ubicacion (si no fueron concedidos previamente).</li>
 <li>El sistema registra la fechaRetiro y activa el watcher GPS.</li>
 </ol>
-<p><strong>Postcondiciones:</strong> Estado EN_TRANSITO. GPS activo. Evento RETIRO registrado. Notificacion al generador y operador.</p>
+<p><strong>Resultado:</strong> Estado EN_TRÁNSITO y evento de retiro registrado. El GPS requiere permiso, señal y confirmación del envío.</p>
 <p><strong>Endpoint:</strong> <code>POST /api/manifiestos/:id/confirmar-retiro</code> (envuelto en <code>prisma.$transaction()</code>)</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T03: Tracking GPS en Tiempo Real</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T03: Tracking GPS en Tiempo Real</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="GPS en Tiempo Real — PWA móvil" loading="lazy"></a><div class="cu-screenshot-caption">GPS en Tiempo Real — PWA móvil</div></div>
 <div class="cu-screenshot-mobile"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="GPS activo — móvil" loading="lazy"></a><div class="cu-screenshot-mobile-caption">📱 Móvil</div></div>
 </div>
 
-<p><strong>Descripcion:</strong> Seguimiento GPS continuo durante todo el transporte del residuo peligroso. La posicion se captura continuamente y se transmite al servidor cada 30 segundos.</p>
+<p><strong>Descripción:</strong> Seguimiento durante el viaje mientras el dispositivo y la aplicación pueden obtener y enviar ubicación. Revisá la confirmación de SITREP; el seguimiento no está garantizado al cerrar la app.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. Permisos de ubicacion concedidos.</p>
-<p><strong>Datos capturados:</strong> Latitud, longitud, velocidad (m/s), direccion (grados 0-360), precision (metros).</p>
+<p><strong>Datos:</strong> ubicación y, cuando están disponibles, velocidad y dirección. La precisión informada por el dispositivo no garantiza recepción por SITREP; no supongas la unidad de velocidad de registros históricos.</p>
 <p><strong>Panel de control:</strong> Temporizador de viaje (desde fechaRetiro del servidor), velocidad actual, coordenadas, estado del GPS (activo/pausa/error), boton de pausa/reanudacion.</p>
-<p><strong>Resiliencia:</strong> Cola de hasta 5 puntos pendientes persistidos en localStorage. Flush automatico al reconectar.</p>
+<p><strong>Sin conexión:</strong> revisá las ubicaciones pendientes y la confirmación al reconectar. No se garantiza conservar todas las lecturas; una ubicación antigua sin confirmar puede requerir soporte.</p>
 <p><strong>Endpoint:</strong> <code>POST /api/manifiestos/:id/ubicacion</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T04: Pausar y Reanudar Tracking</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T04: Pausar y Reanudar Tracking</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Pausar/Reanudar Tracking GPS" loading="lazy"></a><div class="cu-screenshot-caption">Pausar/Reanudar Tracking GPS</div></div>
 
@@ -4471,11 +4332,11 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T05: Registrar Incidente en Transito</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T05: Registrar Incidente en Transito</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Registrar Incidente durante el viaje" loading="lazy"></a><div class="cu-screenshot-caption">Registrar Incidente durante el viaje</div></div>
 
-<p><strong>Descripcion:</strong> Documentar incidentes ocurridos durante el transporte con descripcion detallada, tipo de incidente y ubicacion GPS automatica.</p>
+<p><strong>Descripción:</strong> Documentar incidentes durante el transporte con tipo y descripción. Una ubicación reciente puede adjuntarse si está disponible; el incidente puede continuar sin ella.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El usuario es el transportista asignado.</p>
 <p><strong>Tipos de incidente:</strong> Accidente vial, demora por trafico, desvio de ruta, problema mecanico, condicion climatica adversa, otro (texto libre).</p>
 <p><strong>Datos registrados:</strong> Tipo de incidente, descripcion textual, coordenadas GPS actuales, timestamp, usuario.</p>
@@ -4484,7 +4345,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T06: Confirmar Entrega al Operador</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T06: Confirmar Entrega al Operador</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Entrega — acciones en detalle" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Entrega — acciones en detalle</div></div>
 
@@ -4495,7 +4356,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T07: Escanear Codigo QR</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T07: Escanear Codigo QR</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/46_escaner_qr_desktop.png" target="_blank"><img src="screenshots/desktop/46_escaner_qr_desktop.png" alt="Escáner QR — verificación de manifiesto" loading="lazy"></a><div class="cu-screenshot-caption">Escáner QR — verificación de manifiesto</div></div>
@@ -4509,7 +4370,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T08: Visualizar Dashboard de Transportista</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T08: Visualizar Dashboard de Transportista</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/41_dashboard_transportista.png" target="_blank"><img src="screenshots/desktop/41_dashboard_transportista.png" alt="Dashboard Transportista — viajes y KPIs" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Transportista — viajes y KPIs</div></div>
@@ -4528,7 +4389,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T09: Consultar Historial de Viajes</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T09: Consultar Historial de Viajes</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/44_transporte_perfil_historial.png" target="_blank"><img src="screenshots/desktop/44_transporte_perfil_historial.png" alt="Historial de Viajes completados" loading="lazy"></a><div class="cu-screenshot-caption">Historial de Viajes completados</div></div>
 
@@ -4538,7 +4399,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T10: Recibir Notificaciones</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T10: Recibir Notificaciones</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Transportista" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Transportista</div></div>
 
@@ -4548,7 +4409,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T11: Gestionar Perfil</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T11: Gestionar Perfil</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/43_transporte_perfil_tab_info.png" target="_blank"><img src="screenshots/desktop/43_transporte_perfil_tab_info.png" alt="Perfil Transportista — datos de empresa" loading="lazy"></a><div class="cu-screenshot-caption">Perfil Transportista — datos de empresa</div></div>
@@ -4561,7 +4422,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T12: Gestion Autonoma de Flota Propia</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-T12: Gestion Autonoma de Flota Propia</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Gestión Autónoma de Flota — vehículos y conductores" loading="lazy"></a><div class="cu-screenshot-caption">Gestión Autónoma de Flota — vehículos y conductores</div></div>
 
@@ -4588,7 +4449,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <section id="cu-operador" data-role="operador">
 <h3 class="cu-section-title"><span class="cu-section-badge role-operador">Operador</span>7.4 Operador <span class="cu-section-count">(12 casos)</span></h3>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O01: Ver Manifiestos Entrantes</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O01: Ver Manifiestos Entrantes</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/51_manifiestos_operador.png" target="_blank"><img src="screenshots/desktop/51_manifiestos_operador.png" alt="Manifiestos Entrantes — lista ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Manifiestos Entrantes — lista ENTREGADO</div></div>
@@ -4602,7 +4463,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O02: Confirmar Recepcion</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O02: Confirmar Recepcion</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Confirmar Recepción — estado ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Recepción — estado ENTREGADO</div></div>
@@ -4624,7 +4485,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O03: Registrar Pesaje Real</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O03: Registrar Pesaje Real</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Pesaje — estado RECIBIDO" loading="lazy"></a><div class="cu-screenshot-caption">Registrar Pesaje — estado RECIBIDO</div></div>
@@ -4638,7 +4499,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O04: Aceptar Carga</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O04: Aceptar Carga</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Aceptar Carga — estado ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Aceptar Carga — estado ENTREGADO</div></div>
 
@@ -4648,7 +4509,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O05: Rechazar Carga</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O05: Rechazar Carga</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Rechazar Carga — motivo requerido" loading="lazy"></a><div class="cu-screenshot-caption">Rechazar Carga — motivo requerido</div></div>
 
@@ -4668,7 +4529,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O06: Registrar Tratamiento</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O06: Registrar Tratamiento</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Tratamiento — avance a EN_TRATAMIENTO" loading="lazy"></a><div class="cu-screenshot-caption">Registrar Tratamiento — avance a EN_TRATAMIENTO</div></div>
 
@@ -4687,41 +4548,35 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O07: Cerrar Manifiesto</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O07: Cerrar Manifiesto</button>
 <div class="collapsible-body">
-<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Cerrar Manifiesto — estado final TRATADO" loading="lazy"></a><div class="cu-screenshot-caption">Cerrar Manifiesto — estado final TRATADO</div></div>
+<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Captura histórica de un manifiesto tratado" loading="lazy"></a><div class="cu-screenshot-caption">Captura histórica: la interfaz actual puede ser distinta.</div></div>
 
-<p><strong>Descripcion:</strong> Finalizar el ciclo completo del manifiesto confirmando que el tratamiento fue completado exitosamente. El sistema genera automaticamente el Certificado de Disposicion Final.</p>
+<p><strong>Descripción:</strong> Registrar que terminó el tratamiento. En el circuito nuevo, el cierre no emite automáticamente una certificación.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRATAMIENTO o RECIBIDO. El usuario es el operador o ADMIN.</p>
-<p><strong>Postcondiciones:</strong> Estado TRATADO (estado final). Certificado de Disposicion generado. Evento CIERRE registrado. Notificacion a todos los actores. El manifiesto no puede ser modificado ni cancelado.</p>
+<p><strong>Resultado:</strong> Estado TRATADO y evento de cierre registrado. El operador puede emitir la certificación final cuando se cumplan sus condiciones.</p>
 <p><strong>Endpoint:</strong> <code>POST /api/manifiestos/:id/cerrar</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O08: Generar Certificado de Disposicion</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O08: Emitir certificación</button>
 <div class="collapsible-body">
-<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Generar Certificado de Disposición Final" loading="lazy"></a><div class="cu-screenshot-caption">Generar Certificado de Disposición Final</div></div>
+<div class="cu-screenshot-mobile"><a href="screenshots/mobile/certificate-recovery-compact-20261030.png" target="_blank"><img src="screenshots/mobile/certificate-recovery-compact-20261030.png" alt="Certificación parcial emitida y confirmación en la app" loading="lazy"></a><div class="cu-screenshot-mobile-caption">Preview con datos artificiales · app en navegador</div></div>
 
-<p><strong>Descripcion:</strong> Generacion automatica del Certificado de Tratamiento y Disposicion Final en formato PDF. El certificado se genera al cerrar el manifiesto y queda disponible para descarga por todos los actores.</p>
-<p><strong>Precondiciones:</strong> El manifiesto esta en estado TRATADO.</p>
+<p><strong>Descripción:</strong> En el circuito nuevo, el operador firma y emite expresamente la certificación; cerrar el manifiesto no la publica. Las partes autorizadas reciben un aviso y descargan el mismo PDF. Los documentos históricos conservan su acceso anterior.</p>
+<p><strong>Precondiciones:</strong> Para la final: estado TRATADO, adendas resueltas y tratamiento completo de las corrientes halladas. La emisión debe estar habilitada y realizarla el operador vinculado.</p>
 <p><strong>Contenido del certificado:</strong></p>
 <ul>
-<li>Referencia a Ley Nacional 24.051 y normativa aplicable.</li>
-<li>Datos completos del generador (razon social, CUIT, inscripcion).</li>
-<li>Datos del transportista (razon social, habilitacion, vehiculo, chofer).</li>
-<li>Datos del operador (razon social, habilitacion, certificado).</li>
-<li>Tipo de residuo, categoria Y, caracteristicas de peligrosidad.</li>
-<li>Cantidad declarada y cantidad recibida.</li>
-<li>Metodo de tratamiento aplicado.</li>
-<li>Fechas completas del ciclo (creacion, aprobacion, retiro, entrega, recepcion, tratamiento, cierre).</li>
-<li>Firma digital del operador responsable.</li>
-<li>Numero unico de certificado.</li>
+<li>Número de certificación y manifiesto, fecha de emisión y partes.</li>
+<li>Método, corrientes y cantidades certificadas; parciales y adendas vinculadas cuando correspondan.</li>
+<li>Firma manuscrita del operador y huella para verificar su integridad. No equivale a una firma digital criptográfica.</li>
 </ul>
-<p><strong>Endpoint:</strong> <code>GET /api/pdf/certificado/:id</code></p>
+<p><a href="tutorial.html?guide=certificados-operador-partes">Ver emisión, aviso y descarga de certificaciones</a>.</p>
+<p><strong>Descarga del circuito nuevo:</strong> <code>GET /api/manifiestos/:id/certificados/:documentId/archivo</code>. Los documentos históricos pueden usar su descarga anterior.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O09: Visualizar Dashboard de Operador</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O09: Visualizar Dashboard de Operador</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/50_dashboard_operador.png" target="_blank"><img src="screenshots/desktop/50_dashboard_operador.png" alt="Dashboard Operador — KPIs de planta" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Operador — KPIs de planta</div></div>
@@ -4734,7 +4589,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O10: Consultar Reportes de Operador</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O10: Consultar Reportes de Operador</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Reportes Operador — tratamientos y volúmenes" loading="lazy"></a><div class="cu-screenshot-caption">Reportes Operador — tratamientos y volúmenes</div></div>
 
@@ -4744,7 +4599,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O11: Recibir Notificaciones</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O11: Recibir Notificaciones</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Operador" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Operador</div></div>
 
@@ -4754,7 +4609,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O12: Gestionar Perfil</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O12: Gestionar Perfil</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/39_mi_perfil.png" target="_blank"><img src="screenshots/desktop/39_mi_perfil.png" alt="Mi Perfil Operador" loading="lazy"></a><div class="cu-screenshot-caption">Mi Perfil Operador</div></div>
 
@@ -4768,7 +4623,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <section id="cu-sistema" data-role="all">
 <h3 class="cu-section-title"><span class="cu-section-badge role-sistema">Sistema</span>7.5 Sistema <span class="cu-section-count">(12 casos)</span></h3>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S01: Generar Codigo QR</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S01: Generar Codigo QR</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/66_verificar_manifiesto_detalle.png" target="_blank"><img src="screenshots/desktop/66_verificar_manifiesto_detalle.png" alt="Verificación Pública QR — sin autenticación" loading="lazy"></a><div class="cu-screenshot-caption">Verificación Pública QR — sin autenticación</div></div>
 
@@ -4779,7 +4634,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S02: Enviar Notificaciones Automaticas</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S02: Enviar Notificaciones Automaticas</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones automáticas del sistema" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones automáticas del sistema</div></div>
 
@@ -4803,7 +4658,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S03: Registrar Auditoria</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S03: Registrar Auditoria</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/58_manifiesto_timeline.png" target="_blank"><img src="screenshots/desktop/58_manifiesto_timeline.png" alt="Timeline de Auditoría — eventos inmutables" loading="lazy"></a><div class="cu-screenshot-caption">Timeline de Auditoría — eventos inmutables</div></div>
 
@@ -4824,36 +4679,25 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S04: Almacenar Tracking GPS</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S04: Almacenar Tracking GPS</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Tracking GPS almacenado — ruta del viaje" loading="lazy"></a><div class="cu-screenshot-caption">Tracking GPS almacenado — ruta del viaje</div></div>
 
-<p><strong>Descripcion:</strong> Recepcion y almacenamiento de los puntos GPS enviados por el transportista durante el transporte. Utiliza cache en memoria para optimizar las escrituras frecuentes.</p>
-<p><strong>Disparador:</strong> Solicitud <code>POST /api/manifiestos/:id/ubicacion</code> cada 30 segundos durante EN_TRANSITO.</p>
-<p><strong>Proceso:</strong></p>
-<ol>
-<li>Recibir solicitud con latitud, longitud, velocidad y direccion.</li>
-<li>Verificar cache en memoria (TTL 30s) para validar que el manifiesto existe y esta EN_TRANSITO.</li>
-<li>Si hay cache hit (~24ms): escribir directamente en <code>tracking_gps</code>.</li>
-<li>Si hay cache miss (~250ms): consultar BD, validar estado, actualizar cache, escribir en <code>tracking_gps</code>.</li>
-</ol>
-<p><strong>Indices optimizados:</strong> <code>idx_tracking_manifiesto</code>, <code>idx_tracking_timestamp</code>, <code>idx_tracking_manif_ts</code> (compuesto).</p>
-<p><strong>Crecimiento de datos:</strong> ~6,000 filas por hora con 50 viajes simultaneos. Los indices compuestos mantienen el rendimiento constante.</p>
-<p><span class="badge badge-complete">Completo</span></p>
+<p><strong>Descripción:</strong> SITREP valida el acceso y el estado del viaje antes de registrar una ubicación recibida. Una referencia permite comprobar un reintento del mismo punto.</p>
+<p><strong>Tiempo:</strong> la hora almacenada indica recepción, no necesariamente la captura del dispositivo. La capacidad y las latencias requieren una medición del entorno.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S05: Detectar Anomalias de Transporte</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S05: Detectar Anomalias de Transporte</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/61_centro_control_viajes.png" target="_blank"><img src="screenshots/desktop/61_centro_control_viajes.png" alt="Detección de Anomalías en transporte" loading="lazy"></a><div class="cu-screenshot-caption">Detección de Anomalías en transporte</div></div>
 
-<p><strong>Descripcion:</strong> Deteccion de anomalias durante el transporte de residuos peligrosos. Incluye deteccion basica de desvios de ruta, paradas prolongadas y velocidad excesiva.</p>
-<p><strong>Disparador:</strong> Analisis de datos GPS durante y despues del transporte.</p>
-<p><strong>Tipos de anomalia detectados:</strong> Desvio de ruta (distancia excesiva del camino directo), parada prolongada (sin movimiento por periodo extenso sin registrar pausa), velocidad excesiva (superando limites de seguridad para transporte de peligrosos), perdida de senal GPS (ausencia prolongada de datos).</p>
+<p><strong>Descripción:</strong> algunas observaciones GPS señalan situaciones para revisar; la regla histórica de Desvío de ruta no compara una ruta autorizada ni garantiza una alerta.</p>
+<p><strong>Análisis:</strong> utiliza puntos recibidos y puede quedar sin ejecutarse tras una interrupción. Una posición recibida puede haber sido capturada antes.</p>
+<p><strong>Interpretación:</strong> el corredor geográfico es una estimación entre origen y destino, no una ruta vial autorizada. Velocidad, parada o falta de posiciones son observaciones que deben verificarse con transporte.</p>
 <p><strong>Endpoints:</strong> <code>POST /api/anomalias/detectar/:manifiestoId</code>, <code>GET /api/anomalias/:manifiestoId</code>, <code>PUT /api/anomalias/:id/resolver</code>.</p>
-<p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S06: Generar Alertas por Reglas</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S06: Generar Alertas por Reglas</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/60_alertas_reglas.png" target="_blank"><img src="screenshots/desktop/60_alertas_reglas.png" alt="Reglas de Alertas — configuración" loading="lazy"></a><div class="cu-screenshot-caption">Reglas de Alertas — configuración</div></div>
 
@@ -4863,7 +4707,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S07: Calcular Estadisticas en Tiempo Real</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S07: Calcular Estadisticas en Tiempo Real</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/67_centro_control_kpis.png" target="_blank"><img src="screenshots/desktop/67_centro_control_kpis.png" alt="KPIs en Tiempo Real — Centro de Control" loading="lazy"></a><div class="cu-screenshot-caption">KPIs en Tiempo Real — Centro de Control</div></div>
 
@@ -4878,31 +4722,19 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S08: Sincronizar Datos Offline</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S08: Sincronizar Datos Offline</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/mobile/M16_configuracion_mobile.png" target="_blank"><img src="screenshots/mobile/M16_configuracion_mobile.png" alt="Sincronización Offline — PWA móvil" loading="lazy"></a><div class="cu-screenshot-caption">Sincronización Offline — PWA móvil</div></div>
 <div class="cu-screenshot-mobile"><a href="screenshots/mobile/M16_configuracion_mobile.png" target="_blank"><img src="screenshots/mobile/M16_configuracion_mobile.png" alt="Configuración offline — móvil" loading="lazy"></a><div class="cu-screenshot-mobile-caption">📱 Móvil</div></div>
 </div>
 
-<p><strong>Descripcion:</strong> Sincronizacion automatica de datos pendientes almacenados localmente cuando el dispositivo recupera la conectividad a internet.</p>
-<p><strong>Disparador:</strong> Cambio de estado de offline a online (detectado por hook <code>useConnectivity</code>).</p>
-<p><strong>Almacenamiento local:</strong></p>
-<ul>
-<li><code>localStorage</code>: Puntos GPS pendientes (<code>gps_pending_{id}</code>), estado del viaje (<code>viaje_status_*</code>), snapshot del viaje (<code>viaje_snapshot_*</code>).</li>
-<li><code>IndexedDB</code>: Cola de sincronizacion (<code>sync_queue</code>) para operaciones generales.</li>
-</ul>
-<p><strong>Proceso de sincronizacion:</strong></p>
-<ol>
-<li>El hook <code>useConnectivity</code> detecta reconexion via health ping (<code>/api/health</code>).</li>
-<li>Se ejecuta flush de puntos GPS pendientes de localStorage.</li>
-<li>Se ejecuta flush de operaciones pendientes de IndexedDB.</li>
-<li>Se limpian las colas locales tras confirmacion del servidor.</li>
-</ol>
-<p><span class="badge badge-complete">Completo</span></p>
+<p><strong>Descripción:</strong> algunas acciones y ubicaciones pendientes pueden conservarse en este navegador para su cuenta y actividad. Al recuperar la conexión, revisá el estado y la confirmación del servidor.</p>
+<p>Una ubicación anterior sin confirmar, un error de almacenamiento o una autorización vencida pueden requerir reintento o soporte. No se garantiza guardar todas las lecturas sin conexión ni revisar pendientes de otros dispositivos.</p>
+<p><a href="tutorial.html?guide=resolver-gps">Consultar cómo resolver y conservar ubicaciones pendientes</a>.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S09: Enviar Notificaciones Push</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S09: Enviar Notificaciones Push</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Push" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Push</div></div>
 
@@ -4912,7 +4744,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-pending">Pendiente</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S10: Firma Digital Avanzada</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S10: Firma Digital Avanzada</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firma Digital — aprobación de manifiesto" loading="lazy"></a><div class="cu-screenshot-caption">Firma Digital — aprobación de manifiesto</div></div>
 
@@ -4922,7 +4754,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-pending">Pendiente</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S11: Integracion con Sistemas Externos</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S11: Integracion con Sistemas Externos</button>
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Integración API REST — datos en tiempo real" loading="lazy"></a><div class="cu-screenshot-caption">Integración API REST — datos en tiempo real</div></div>
 
@@ -4938,7 +4770,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-pending">Pendiente</span></p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S12: Reintentar Certificaciones Blockchain</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S12: Reintentar Certificaciones Blockchain</button>
 <div class="collapsible-body">
 <p><strong>Descripcion:</strong> Cron job automatico que se ejecuta cada 60 segundos y procesa registros blockchain en estado PENDIENTE o ERROR. Garantiza que las certificaciones se completen incluso ante fallos transitorios de red.</p>
 <p><strong>Disparador:</strong> Cron <code>node-cron</code> cada 60 segundos (<code>*/1 * * * *</code>).</p>
@@ -4997,12 +4829,12 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <section id="faq" data-role="all">
 <h2>8. Preguntas Frecuentes</h2>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como accedo al sistema por primera vez?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como accedo al sistema por primera vez?</button>
 <div class="collapsible-body">
 <p>El administrador del sistema (DGFA) debe crear su cuenta de usuario y asignarle el rol correspondiente (Generador, Transportista u Operador). Una vez creada la cuenta, acceda a <a href="/" data-installation-url="/">/ (esta instalación)</a> con el email y contrasena proporcionados. Para la version mobile, acceda a <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a> desde el navegador de su telefono.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Que navegadores son compatibles?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Que navegadores son compatibles?</button>
 <div class="collapsible-body">
 <p>SITREP es compatible con las versiones actualizadas de los principales navegadores:</p>
 <ul>
@@ -5014,31 +4846,31 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>Para el tracking GPS y la instalacion PWA, se recomienda Google Chrome en Android y Safari en iOS.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Que hago si el GPS no funciona en mi telefono?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Que hago si el GPS no funciona en mi telefono?</button>
 <div class="collapsible-body">
 <p>El tracking GPS requiere que se concedan permisos de ubicacion al navegador. Si el GPS no funciona:</p>
 <ol>
 <li><strong>Verificar permisos:</strong> En la configuracion del navegador, asegurarse de que <a href="/" data-installation-url="/">/ (esta instalación)</a> tenga permiso de ubicacion &quot;Permitir&quot;.</li>
 <li><strong>Verificar GPS del dispositivo:</strong> Asegurarse de que el GPS del telefono este activado (Configuracion &gt; Ubicacion).</li>
 <li><strong>Modo de alta precision:</strong> Activar el modo de ubicacion de alta precision que combina GPS, WiFi y datos moviles.</li>
-<li><strong>Reiniciar el navegador:</strong> Cerrar completamente el navegador y volver a abrir la aplicacion.</li>
+<li><strong>Antes de cerrar:</strong> si una ubicación no pudo guardarse, mantené la pantalla abierta, revisá el almacenamiento y seguí la indicación de la aplicación.</li>
 <li><strong>Verificar HTTPS:</strong> El GPS solo funciona en conexiones seguras (HTTPS). No funciona en HTTP ni en <code>file://</code>.</li>
 </ol>
-<p>Si el problema persiste, el sistema almacena los puntos GPS en una cola local y los enviara automaticamente cuando se restablezca la conexion.</p>
+<p>Al reconectar, revisá si SITREP confirmó cada envío pendiente con la cuenta y actividad originales. Si una ubicación anterior no puede confirmarse, conservá el dispositivo y consultá a soporte. No se garantiza conservar todas las lecturas sin conexión. <a href="tutorial.html?guide=resolver-gps">Ver guía de GPS</a>.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Puedo usar el sistema sin conexion a internet?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Puedo usar el sistema sin conexion a internet?</button>
 <div class="collapsible-body">
 <p>SITREP tiene soporte parcial para modo offline gracias a la tecnologia PWA:</p>
 <ul>
 <li><strong>Recursos estaticos:</strong> La aplicacion se cachea localmente y puede cargarse sin conexion.</li>
-<li><strong>Datos GPS:</strong> Los puntos GPS capturados sin conexion se almacenan en localStorage y se envian automaticamente al recuperar la conectividad.</li>
+<li><strong>Datos GPS:</strong> pueden quedar ubicaciones pendientes en el dispositivo. Al reconectar, revisá la confirmación; no se garantiza conservar todas las lecturas.</li>
 <li><strong>Limitaciones:</strong> Las operaciones que requieren consulta al servidor (crear manifiestos, cambiar estados, ver reportes) no estan disponibles sin conexion. Se muestra una pagina de fallback offline.</li>
 <li><strong>Indicador:</strong> El componente <code>ConnectivityIndicator</code> muestra una barra de estado cuando se pierde la conexion.</li>
 </ul>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como instalo la aplicacion en mi telefono?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como instalo la aplicacion en mi telefono?</button>
 <div class="collapsible-body">
 <p><strong>Android (Chrome):</strong></p>
 <ol>
@@ -5055,7 +4887,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </ol>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Que es el codigo QR del manifiesto?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Que es el codigo QR del manifiesto?</button>
 <div class="collapsible-body">
 <p>El codigo QR se genera automaticamente cuando un manifiesto es aprobado (firmado electronicamente). Contiene el identificador unico del manifiesto y permite:</p>
 <ul>
@@ -5066,7 +4898,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>Para escanear, acceder a la herramienta Escaner QR desde el menu de la aplicacion mobile, o usar cualquier lector de QR estandar.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como exporto datos del sistema?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como exporto datos del sistema?</button>
 <div class="collapsible-body">
 <p>SITREP ofrece dos formatos de exportacion:</p>
 <ul>
@@ -5076,7 +4908,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>Ademas, cada manifiesto individual puede descargarse como PDF desde su pagina de detalle, y los manifiestos en estado TRATADO incluyen el Certificado de Disposicion Final como PDF separado.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Que sucede si hay diferencia de peso entre lo declarado y lo recibido?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Que sucede si hay diferencia de peso entre lo declarado y lo recibido?</button>
 <div class="collapsible-body">
 <p>Cuando el operador registra el peso real (cantidadRecibida) al recibir la carga, el sistema calcula automaticamente la diferencia con el peso declarado por el generador. Los escenarios posibles son:</p>
 <ul>
@@ -5087,13 +4919,13 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>En todos los casos, la diferencia queda registrada en el campo <code>tipoDiferencia</code> del manifiesto y en el log de auditoria, proporcionando trazabilidad completa para fiscalizacion.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Puedo cancelar un manifiesto despues de firmarlo?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Puedo cancelar un manifiesto despues de firmarlo?</button>
 <div class="collapsible-body">
 <p>Si, un manifiesto puede cancelarse en cualquier momento del ciclo, excepto cuando ya se encuentra en estado TRATADO o CANCELADO. La cancelacion la puede realizar el generador propietario del manifiesto o un administrador DGFA. Al cancelar, se requiere indicar un motivo y todos los actores involucrados son notificados.</p>
 <p><strong>Nota importante:</strong> Si el manifiesto esta EN_TRANSITO, la cancelacion desactiva el tracking GPS y el transportista es notificado inmediatamente.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como funciona la auditoria del sistema?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como funciona la auditoria del sistema?</button>
 <div class="collapsible-body">
 <p>Cada operacion realizada en SITREP genera un registro inmutable en la tabla de auditoria. El registro incluye:</p>
 <ul>
@@ -5109,20 +4941,10 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>Los registros de auditoria <strong>no pueden ser modificados ni eliminados</strong> por ningun usuario del sistema, incluido el administrador. Esto garantiza la integridad del historial para fines de fiscalizacion y cumplimiento normativo.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Cuantos transportistas puede soportar el sistema simultaneamente?</div>
-<div class="collapsible-body">
-<p>La configuracion actual esta optimizada para <strong>50 transportistas simultaneos</strong>, cada uno enviando posiciones GPS cada 30 segundos. Esto representa aproximadamente 100 solicitudes GPS por minuto en total, bien dentro del limite de rate limiting (600 req/min/IP) y de la capacidad del connection pool de PostgreSQL (40 conexiones activas).</p>
-<p>El sistema esta disenado para escalar a <strong>200 usuarios concurrentes</strong> mediante:</p>
-<ul>
-<li>Aumento de instancias PM2 (de 2 a 4-6).</li>
-<li>Migracion de cache en memoria a Redis.</li>
-<li>Aumento del connection pool y max_connections de PostgreSQL.</li>
-<li>Ajuste de rate limiting.</li>
-</ul>
-<p>Ver la seccion 5.6 (Escalamiento a 200 Usuarios) para el plan detallado.</p>
-</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">¿Cuántos viajes simultáneos soporta SITREP?</button>
+<div class="collapsible-body"><p>La capacidad del entorno de destino está pendiente de medición con una carga representativa. Los límites de red y los intervalos GPS no alcanzan para garantizar una cantidad de viajes o usuarios.</p><p>Ver <a href="#arq-capacidad">Capacidad y concurrencia</a>.</p></div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Que categorias de residuos maneja el sistema?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Que categorias de residuos maneja el sistema?</button>
 <div class="collapsible-body">
 <p>El sistema implementa el catalogo completo de categorias de residuos sometidos a control conforme al Anexo I de la Ley Nacional 24.051, con codigos desde Y1 hasta Y48. Cada categoria incluye:</p>
 <ul>
@@ -5135,7 +4957,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>El administrador puede activar/desactivar categorias segun las necesidades de la provincia, pero no puede crear codigos fuera del rango normativo establecido por la ley.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Donde se almacenan los datos del sistema?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Donde se almacenan los datos del sistema?</button>
 <div class="collapsible-body">
 <p>Los datos del sistema se almacenan en una base de datos PostgreSQL alojada en un contenedor Docker en el servidor de produccion (IP: 23.105.176.45). La base de datos se denomina <code>trazabilidad_rrpp</code>.</p>
 <p><strong>Componentes de almacenamiento:</strong></p>
@@ -5148,7 +4970,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </ul>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como funciona el auto-refresco de datos?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como funciona el auto-refresco de datos?</button>
 <div class="collapsible-body">
 <p>SITREP utiliza un mecanismo de polling para mantener los datos actualizados sin necesidad de recargar la pagina:</p>
 <ul>
@@ -5160,7 +4982,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Nota tecnica:</strong> El polling se implementa con TanStack Query v5, que maneja automaticamente el cache, la deduplicacion de solicitudes simultaneas, y la pausacion del polling cuando la pestana esta inactiva.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Cual es la diferencia entre la version web y la version mobile?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Cual es la diferencia entre la version web y la version mobile?</button>
 <div class="collapsible-body">
 <p>SITREP tiene dos puntos de acceso:</p>
 <table>
@@ -5180,7 +5002,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>Ambas versiones comparten el mismo backend y los mismos datos. Las funcionalidades principales estan disponibles en ambas versiones, pero la version mobile esta optimizada para el uso en campo por transportistas y operadores.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Que tipo de graficos muestra el sistema?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Que tipo de graficos muestra el sistema?</button>
 <div class="collapsible-body">
 <p>SITREP utiliza la biblioteca Recharts para generar graficos interactivos:</p>
 <ul>
@@ -5192,7 +5014,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p>Todos los graficos son interactivos: al pasar el cursor se muestra un tooltip con datos detallados. Los graficos se renderizan del lado del cliente y se adaptan al tamano de la pantalla.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como se generan los PDF del sistema?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como se generan los PDF del sistema?</button>
 <div class="collapsible-body">
 <p>SITREP genera dos tipos de documentos PDF:</p>
 <h4>1. PDF de Manifiesto</h4>
@@ -5210,7 +5032,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </ul>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como se manejan las sesiones expiradas?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como se manejan las sesiones expiradas?</button>
 <div class="collapsible-body">
 <p>El sistema utiliza un mecanismo automatico de renovacion de sesion:</p>
 <ol>
@@ -5224,7 +5046,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Sincronizacion cross-tab:</strong> Si el usuario tiene multiples pestanas abiertas, la renovacion de tokens se sincroniza via el evento <code>storage</code> de localStorage para evitar solicitudes de refresh concurrentes que podrian agotar la cola de renovacion.</p>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">Como se protege el sistema contra ataques de fuerza bruta?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">Como se protege el sistema contra ataques de fuerza bruta?</button>
 <div class="collapsible-body">
 <p>El sistema implementa multiples capas de proteccion:</p>
 <ul>
@@ -5237,7 +5059,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </ul>
 </div>
 
-<div class="collapsible-header" onclick="toggleCollapsible(this)">El sistema cumple con la normativa de proteccion de datos?</div>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">El sistema cumple con la normativa de proteccion de datos?</button>
 <div class="collapsible-body">
 <p>SITREP implementa multiples capas de proteccion de datos:</p>
 <ul>
@@ -5276,7 +5098,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td><strong>KPI</strong></td><td>Key Performance Indicator. Indicador clave de rendimiento visualizado en dashboards y reportes.</td></tr>
 <tr><td><strong>TTL</strong></td><td>Time To Live. Tiempo de vida de un dato en cache antes de ser invalidado.</td></tr>
 <tr><td><strong>Tracking</strong></td><td>Seguimiento en tiempo real de la posicion geografica del vehiculo durante el transporte de residuos.</td></tr>
-<tr><td><strong>Certificado de Disposicion</strong></td><td>Documento PDF generado al completar el tratamiento de un residuo. Certifica el cumplimiento normativo del ciclo completo.</td></tr>
+<tr><td><strong>Certificación</strong></td><td>Documento emitido y firmado por el operador que registra el tratamiento certificado; su emisión no declara automáticamente el cumplimiento normativo completo.</td></tr>
 <tr><td><strong>Pipeline</strong></td><td>Visualizacion del flujo de estados de los manifiestos como embudo progresivo.</td></tr>
 <tr><td><strong>Clustering</strong></td><td>Agrupacion automatica de marcadores de mapa cuando hay muchos elementos cercanos, mostrando un numero en lugar de marcadores individuales.</td></tr>
 <tr><td><strong>Coropletico</strong></td><td>Tipo de mapa tematico que colorea areas geograficas segun la intensidad de un valor (usado en el reporte de departamentos).</td></tr>
@@ -5352,14 +5174,14 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td>10</td><td>El transportista se presenta en la ubicacion del generador</td><td>Transportista</td><td>APROBADO</td></tr>
 <tr><td>11</td><td>Verifica los datos del manifiesto (opcionalmente escaneando QR)</td><td>Transportista</td><td>APROBADO</td></tr>
 <tr><td>12</td><td>Confirma Retiro en el sistema</td><td>Transportista</td><td>EN_TRANSITO</td></tr>
-<tr><td>13</td><td>GPS se activa automaticamente y comienza tracking cada 30s</td><td>Sistema</td><td>EN_TRANSITO</td></tr>
+<tr><td>13</td><td>El transporte abre el seguimiento y comprueba el permiso y la recepción GPS</td><td>Transportista</td><td>EN_TRANSITO</td></tr>
 <tr><td>14</td><td>Transporta el residuo hacia la planta del operador</td><td>Transportista</td><td>EN_TRANSITO</td></tr>
 <tr><td>15</td><td>(Opcional) Pausa tracking durante parada intermedia</td><td>Transportista</td><td>EN_TRANSITO</td></tr>
 <tr><td>16</td><td>(Opcional) Registra incidentes si ocurren</td><td>Transportista</td><td>EN_TRANSITO</td></tr>
 <tr><td>17</td><td>Llega a la planta del operador y Confirma Entrega</td><td>Transportista</td><td>ENTREGADO</td></tr>
 </tbody>
 </table>
-<p><strong>Acciones automaticas del sistema:</strong> Registra fechas, activa/desactiva GPS, almacena puntos de tracking, crea eventos, notifica actores.</p>
+<p><strong>Registro:</strong> SITREP guarda eventos y las ubicaciones que logra recibir. El dispositivo debe tener permiso y conexión; revisá la confirmación antes de asumir que el punto llegó.</p>
 
 <h4>Fase 3: Recepcion y Tratamiento (Operador)</h4>
 <table>
@@ -5375,14 +5197,14 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td>24</td><td>Cierra el Manifiesto confirmando tratamiento completo</td><td>Operador</td><td>TRATADO</td></tr>
 </tbody>
 </table>
-<p><strong>Acciones automaticas del sistema:</strong> Calcula diferencias de peso, genera Certificado de Disposicion, crea eventos, notifica a todos los actores, cierra el ciclo del manifiesto.</p>
+<p><strong>Al cerrar:</strong> se registra el cierre y sus eventos. La certificación del circuito nuevo se firma y emite por separado cuando se cumplen sus condiciones.</p>
 
 <h4>Fase 4: Finalizacion</h4>
 <table>
 <thead><tr><th>Paso</th><th>Accion</th><th>Actor</th><th>Resultado</th></tr></thead>
 <tbody>
 <tr><td>25</td><td>Todos los actores descargan el PDF del manifiesto</td><td>Todos</td><td>Archivo PDF</td></tr>
-<tr><td>26</td><td>Todos los actores descargan el Certificado de Disposicion</td><td>Todos</td><td>Archivo PDF</td></tr>
+<tr><td>26</td><td>Las partes autorizadas descargan la certificación después de que el operador la emite</td><td>Partes vinculadas</td><td>Archivo PDF firmado</td></tr>
 <tr><td>27</td><td>El administrador revisa el ciclo en Reportes y Auditoria</td><td>Admin</td><td>Cumplimiento verificado</td></tr>
 </tbody>
 </table>
@@ -5393,7 +5215,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tbody>
 <tr><td>GPS no se activa al confirmar retiro</td><td>Permisos de ubicacion denegados</td><td>Ir a Configuracion del navegador &gt; Permisos &gt; Ubicacion &gt; Permitir para el dominio de esta instalación</td></tr>
 <tr><td>Estado &quot;acquiring&quot; indefinido</td><td>GPS del dispositivo desactivado</td><td>Activar GPS en Configuracion &gt; Ubicacion del telefono. Usar modo alta precision.</td></tr>
-<tr><td>Puntos GPS no se envian</td><td>Sin conexion a internet</td><td>Los puntos se almacenan localmente (max 5). Se enviaran automaticamente al reconectar.</td></tr>
+<tr><td>Puntos GPS no se envían</td><td>Sin conexión, autorización o almacenamiento disponible</td><td>Revisá el mensaje y la confirmación. Si una ubicación anterior no puede confirmarse, conservá el dispositivo y consultá a soporte.</td></tr>
 <tr><td>GPS muestra ubicacion incorrecta</td><td>Baja precision de senial</td><td>Moverse a un area abierta. Verificar que el modo de alta precision este activado.</td></tr>
 <tr><td>Watcher GPS no se detiene</td><td>Error en limpieza</td><td>Cerrar completamente el navegador. El listener beforeunload deberia limpiar automaticamente.</td></tr>
 <tr><td>Error &quot;denied&quot;</td><td>Usuario denego el permiso</td><td>En Chrome: candado en barra de direccion &gt; Permisos del sitio &gt; Ubicacion &gt; Permitir. Recargar pagina.</td></tr>
@@ -5536,8 +5358,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td><strong>Modulos del sistema</strong></td><td>9 modulos principales + PWA mobile</td></tr>
 <tr><td><strong>Endpoints API</strong></td><td>110+ endpoints documentados</td></tr>
 <tr><td><strong>Pestanas de reportes</strong></td><td>8 pestanas con graficos interactivos</td></tr>
-<tr><td><strong>Capacidad actual</strong></td><td>50 transportistas simultaneos</td></tr>
-<tr><td><strong>Capacidad planificada</strong></td><td>200 usuarios concurrentes</td></tr>
+<tr><td><strong>Capacidad del entorno</strong></td><td>Pendiente de medición representativa</td></tr>
+<tr><td><strong>Escalamiento</strong></td><td>Sujeto a medición y planificación del entorno</td></tr>
 </tbody>
 </table>
 
@@ -5665,7 +5487,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <li>Modulos implementados: Dashboard, Manifiestos, Centro de Control, Reportes (8 pestanas), Tracking GPS, Gestion de Actores, Catalogos, Usuarios, Seguridad, Herramientas.</li>
 <li>PWA mobile con soporte offline y tracking GPS continuo.</li>
 <li>API REST completa con 110+ endpoints documentados.</li>
-<li>Escalado para 50 transportistas simultaneos con cache GPS.</li>
+<li>Se documentó una estimación histórica de capacidad; no constituye una medición del entorno actual.</li>
 <li>16 indices de base de datos optimizados.</li>
 <li>Protecciones de concurrencia para operaciones criticas.</li>
 <li>Despliegue en produccion: PM2 cluster, Nginx reverse proxy, SSL Let's Encrypt.</li>
@@ -5682,7 +5504,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td><strong>Firma Digital Certificada</strong></td><td>Integracion con PKI y certificados X.509 para firma digital legalmente valida conforme Ley 25.506.</td><td>Alta</td></tr>
 <tr><td><strong>Integracion COFEMA/SAyDS</strong></td><td>Reportes automaticos a organismos nacionales via API de integracion bidireccional.</td><td>Media</td></tr>
 <tr><td><strong>Deteccion de Anomalias Avanzada</strong></td><td>Algoritmos automaticos para deteccion de desvios, paradas prolongadas y patrones sospechosos en trazas GPS.</td><td>Media</td></tr>
-<tr><td><strong>Escalamiento a 200 usuarios</strong></td><td>Redis, mas instancias PM2, PostgreSQL tuning, proxy cache para catalogos y reportes.</td><td>Media</td></tr>
+<tr><td><strong>Escalamiento</strong></td><td>Evaluar infraestructura y configuración después de medir una carga representativa.</td><td>Por evaluar</td></tr>
 <tr><td><strong>Dashboard Analytics avanzado</strong></td><td>Tendencias historicas, predicciones, comparativas mensuales y anuales.</td><td>Baja</td></tr>
 <tr><td><strong>API publica documentada</strong></td><td>OpenAPI/Swagger para integracion de terceros con autenticacion por API key.</td><td>Baja</td></tr>
 <tr><td><strong>Soporte multi-provincia</strong></td><td>Configuracion multi-tenant para despliegue en otras provincias con sus propias normativas.</td><td>Baja</td></tr>
@@ -6149,7 +5971,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
   <div class="wf-step-num">7</div>
   <div class="wf-step-body">
     <h4 id="fg-7">Seguimiento del Transporte</h4>
-    <p>Ver posición GPS del vehículo en tiempo real desde la página del manifiesto. Timeline con cada evento del ciclo: retiro, incidentes, entrega, tratamiento.</p>
+    <p>Consultar desde el manifiesto la última ubicación recibida y su hora, que puede ser anterior. La línea de tiempo reúne los eventos del ciclo.</p>
     <a href="screenshots/desktop/10_manifiestos_en_transito.png" target="_blank"><img src="screenshots/desktop/10_manifiestos_en_transito.png" alt="Seguimiento del Transporte" loading="lazy" class="wf-step-img"></a>
   </div>
 </div>
@@ -6221,7 +6043,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
     <h4 id="ft-6">GPS Activo durante el Viaje</h4>
     <p>La pantalla de viaje en curso muestra el mapa con la ruta, velocidad actual, tiempo transcurrido y controles: Pausar, Registrar Incidente, Confirmar Entrega.</p>
     <a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="GPS Activo durante el Viaje" loading="lazy" class="wf-step-img-mobile"></a>
-<div class="wf-tip">El sistema envía la posición GPS cada 30 segundos. Los puntos se guardan aunque no haya conexión (hasta 5 puntos en cola offline).</div>
+<div class="wf-tip">Revisá si SITREP recibió la ubicación. Sin conexión pueden quedar envíos pendientes; no se garantiza conservar todas las lecturas. Si una ubicación anterior no se confirma, conservá el dispositivo y consultá a soporte.</div>
   </div>
 </div>
 <div class="wf-step">
@@ -6330,9 +6152,9 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
   <div class="wf-step-num">9</div>
   <div class="wf-step-body">
     <h4 id="fo-9">Certificado de Disposición</h4>
-    <p>PDF oficial con membrete SITREP, datos completos del tratamiento, firma del operador responsable, conforme Ley 24.051 y Decreto 831/93. Descargable por todos los actores.</p>
+    <p>El operador revisa, firma y publica la certificación. Una vez emitida, las partes autorizadas pueden descargar el PDF desde el manifiesto.</p>
     <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Certificado de Disposición" loading="lazy" class="wf-step-img"></a>
-<div class="wf-tip">El Certificado de Disposición Final es el documento legal que acredita el tratamiento correcto de los residuos peligrosos ante organismos de control.</div>
+<div class="wf-tip">La certificación registra lo emitido por el operador; su publicación no sustituye la revisión de la autoridad.</div>
   </div>
 </div>
 </div>
@@ -6564,7 +6386,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <tr><td>2</td><td><code>compression()</code></td><td>Default gzip/deflate</td><td>~5-10x reduccion de payload JSON. Actua en todas las respuestas.</td></tr>
 <tr><td>3</td><td><code>cors()</code></td><td>Origins via <code>CORS_ORIGIN</code> env (comma-split)</td><td>Multi-dominio: produccion + localhost dev</td></tr>
 <tr><td>4</td><td><code>express.json()</code></td><td><code>{ limit: '10mb' }</code></td><td>JSON body parser. 10MB para carga masiva CSV.</td></tr>
-<tr><td>5</td><td>Rate Limiter (general)</td><td>600 req/min/IP</td><td>Soporta 50+ telefonos detras de NAT/CGNAT</td></tr>
+<tr><td>5</td><td>Rate Limiter (general)</td><td>Según configuración</td><td>El límite por sí solo no demuestra capacidad simultánea detrás de una red compartida.</td></tr>
 <tr><td>6</td><td>Rate Limiter (auth)</td><td>5 req/min/IP</td><td>Solo en <code>/api/auth/login</code> y <code>/api/auth/register</code></td></tr>
 <tr><td>7</td><td>Analytics middleware</td><td>Batch: 30s o 10 items</td><td>Registra endpoint, method, status, responseTime. <strong>Excluye</strong> rutas GPS (<code>/ubicacion</code>, <code>/gps</code>)</td></tr>
 <tr><td>8</td><td>Request timeout</td><td>30 segundos</td><td>Protege contra consultas largas o conexiones colgadas</td></tr>
@@ -6641,7 +6463,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <table>
 <thead><tr><th>Endpoint</th><th>Limite</th><th>Ventana</th><th>Razon</th></tr></thead>
 <tbody>
-<tr><td>General (todas las rutas)</td><td>600 solicitudes</td><td>1 minuto</td><td>Soporta 50+ telefonos con GPS cada 30s detras de NAT</td></tr>
+<tr><td>General (todas las rutas)</td><td>Según configuración</td><td>Según configuración</td><td>Revisar el entorno y medir la carga compartida.</td></tr>
 <tr><td><code>/api/auth/login</code></td><td>5 intentos</td><td>1 minuto</td><td>Brute-force protection</td></tr>
 <tr><td><code>/api/auth/register</code></td><td>5 intentos</td><td>1 minuto</td><td>Spam protection</td></tr>
 </tbody>
@@ -6649,70 +6471,11 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 </section>
 
 <section id="devops-gps" data-role="all">
-<h3>15.6 GPS Tracking — Arquitectura Tecnica</h3>
-
-<h4>Flujo de Datos GPS</h4>
-<pre>
-Telefono (watchPosition)
-    │  cada 30 segundos
-    ▼
-POST /api/manifiestos/:id/ubicacion
-    │  { latitud, longitud, velocidad?, direccion? }
-    ▼
-┌───────────────────────────┐
-│  In-memory cache check    │  TTL: 30s per manifiestoId
-│  (skip findUnique si hit) │  ~10x mas rapido en cache hit
-└───────────┬───────────────┘
-            ▼
-┌───────────────────────────┐
-│  Validar: manifiesto      │  Estado debe ser EN_TRANSITO
-│  existe y EN_TRANSITO     │  Auth: TRANSPORTISTA o ADMIN
-└───────────┬───────────────┘
-            ▼
-┌───────────────────────────┐
-│  INSERT tracking_gps      │  Indice: manifiestoId+timestamp
-│  (latitud, longitud, etc.)│  ~6,000 filas/hora a 50 viajes
-└───────────────────────────┘
-            ▼
-Centro de Control polling cada 30s
-GET /api/centro-control/actividad
-    → ultimos 50 puntos GPS por viaje EN_TRANSITO
-</pre>
-
-<h4>Resiliencia Offline (Frontend)</h4>
-<table>
-<thead><tr><th>Mecanismo</th><th>Archivo</th><th>Detalle</th></tr></thead>
-<tbody>
-<tr><td><strong>pendingUpdatesRef</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Cola de max 5 puntos GPS pendientes en memoria</td></tr>
-<tr><td><strong>localStorage persist</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Key: <code>gps_pending_{manifiestoId}</code>. Persiste al cerrar app/tab. Flush al mount.</td></tr>
-<tr><td><strong>IndexedDB sync_queue</strong></td><td>useOfflineSync.ts</td><td>Cola durable para sincronizacion offline-first</td></tr>
-<tr><td><strong>watchPosition cleanup</strong></td><td>ViajeEnCursoTransportista.tsx</td><td><code>cleanupGps</code> callback + <code>beforeunload</code> listener previene watchers zombi</td></tr>
-<tr><td><strong>Pausa/Reanudacion</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Registra incidentes PAUSA/REANUDACION via backend + localStorage backup</td></tr>
-</tbody>
-</table>
-
-<h4>GPS Status State Machine</h4>
-<pre>
-checking → acquiring → active
-                    → denied
-                    → unavailable
-                    → error
-</pre>
-
-<h4>Metricas de Capacidad GPS</h4>
-<table>
-<thead><tr><th>Parametro</th><th>Valor</th><th>Calculo</th></tr></thead>
-<tbody>
-<tr><td>Viajes concurrentes max</td><td>50+</td><td>Connection pool + indices + cache optimizados</td></tr>
-<tr><td>Intervalo de envio</td><td>30 segundos</td><td>1 request/30s por telefono</td></tr>
-<tr><td>Throughput peak</td><td>~100 req/min</td><td>50 telefonos x 2 req/min</td></tr>
-<tr><td>Latencia (cache hit)</td><td>~24ms</td><td>Skip findUnique, solo INSERT</td></tr>
-<tr><td>Latencia (cache miss)</td><td>~250ms</td><td>findUnique + validacion + INSERT</td></tr>
-<tr><td>Cache TTL</td><td>30 segundos</td><td>Coincide con intervalo GPS</td></tr>
-<tr><td>Crecimiento de datos</td><td>~6,000 filas/hora</td><td>50 viajes x 2 puntos/min x 60 min</td></tr>
-<tr><td>Cache invalidation</td><td>En <code>confirmarEntrega</code></td><td>Limpia cache al cambiar estado del viaje</td></tr>
-</tbody>
-</table>
+<h3>15.6 Seguimiento GPS y límites</h3>
+<p>El transporte puede compartir ubicación en un viaje en tránsito. La señal del dispositivo y la confirmación de recepción son estados distintos. Monitor muestra la hora de recepción de SITREP, que puede ser posterior a la captura del teléfono.</p>
+<p>Las ubicaciones pendientes se separan por cuenta y actividad cuando corresponde. Si la aplicación no puede conservarlas o verificar su recepción, informa el problema. Una ubicación antigua sin confirmar en GPS de mis viajes no se presenta como actual; conservá el dispositivo y consultá a soporte si la pantalla lo indica.</p>
+<p>El navegador puede dejar de capturar al cerrar la aplicación y no se garantiza conservar cada lectura durante una desconexión. Antes de entregar o relevar, revisá los pendientes en este dispositivo; no se comprueban automáticamente los de otros dispositivos o perfiles.</p>
+<p>El análisis de observaciones usa puntos recibidos y puede quedar sin ejecutarse tras una interrupción. La capacidad y las latencias del entorno de destino requieren medición; no se infieren de cifras históricas. <a href="tutorial.html?guide=resolver-gps">Abrir la guía vigente de GPS</a>.</p>
 </section>
 
 <section id="devops-cicd" data-role="all">
@@ -6905,7 +6668,8 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 </tbody>
 </table>
 
-<h4>Test Coverage</h4>
+<h4>Registro histórico de pruebas</h4>
+<p>Estos resultados corresponden a una versión anterior. No representan cobertura total ni validan el estado actual o la capacidad del entorno de destino.</p>
 <table>
 <thead><tr><th>Suite</th><th>Tests</th><th>Resultado</th><th>Script</th></tr></thead>
 <tbody>
@@ -6915,19 +6679,8 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 </table>
 <p>El cross-platform test cubre: autenticacion de 4 roles, ciclo completo del manifiesto (7 estados), GPS tracking (3 updates + verificacion de ruta), incidentes (averia + pausa + reanudacion), timeline (10 eventos), workflow dates, PDF, certificado, QR verificacion publica, y enforcement negativo de roles.</p>
 
-<h4>Latencias por Endpoint (tipicas)</h4>
-<table>
-<thead><tr><th>Operacion</th><th>Latencia</th><th>Notas</th></tr></thead>
-<tbody>
-<tr><td>GPS update (cache hit)</td><td>~24ms</td><td>In-memory cache, solo INSERT</td></tr>
-<tr><td>GPS update (cache miss)</td><td>~250ms</td><td>findUnique + validacion + INSERT</td></tr>
-<tr><td>Dashboard stats</td><td>~150ms</td><td>Multiples count queries paralelas</td></tr>
-<tr><td>Lista manifiestos (paginada)</td><td>~100ms</td><td>Con indices, limit 20</td></tr>
-<tr><td>Detalle manifiesto</td><td>~80ms</td><td>Include eventos + residuos + actores</td></tr>
-<tr><td>Reportes (periodo fijo)</td><td>~300-500ms</td><td>GroupBy + aggregation queries</td></tr>
-<tr><td>Health check</td><td>~10ms</td><td>Simple DB ping</td></tr>
-</tbody>
-</table>
+<h4>Latencia y capacidad</h4>
+<p>Las cifras históricas no acreditan la latencia ni la capacidad del entorno actual. Medí tiempos y errores con una carga representativa antes de establecer objetivos operativos.</p>
 </section>
 
 <section id="devops-mejoras" data-role="all">
@@ -7511,6 +7264,6 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 
 <button class="back-to-top" id="backToTop" aria-label="Volver arriba">&uarr;</button>
 
-<script src="directorio.js?v=2026.15.2"></script>
+<script src="directorio.js?v=07f7c85c59af"></script>
 </body>
 </html>
