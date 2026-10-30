@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import BajaIntensidadPage from '../../pages/manifiestos/BajaIntensidadPage';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), user: { id: 'qa-operator', rol: 'OPERADOR' } }));
 vi.mock('../../services/api', () => ({ api: mock }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mock.user }) }));
@@ -26,6 +27,14 @@ it('disabled feature never fetches or shows write controls', () => {
   vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED', 'false'); view();
   expect(screen.getByText('Circuito no habilitado.')).toBeVisible();
   expect(mock.get).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+});
+it('explains site-limited company access before showing eventual records or a form', () => {
+  mock.user = { id:'qa-generator', rol:'GENERADOR', empresaContexto:{ todasSedes:false, establecimientoId:'site-north' } } as typeof mock.user;
+  view();
+  expect(screen.getByRole('alert')).toHaveTextContent(/todos los establecimientos/i);
+  expect(screen.getByRole('link',{name:'Volver a Manifiestos'})).toHaveAttribute('href','/manifiestos');
+  expect(screen.queryByRole('button',{name:'Registrar operación'})).toBeNull();
+  expect(mock.get).not.toHaveBeenCalled();
 });
 it('pending conformity does not disable recording treatment, nor grant reviewer buttons', async () => {
   view(true); await screen.findByText('Operación: Recibido');
@@ -52,7 +61,8 @@ it('an HTTP error is not presented as zero records', async () => {
 });
 it('invalidates a fresh list after a write without discarding the returned detail', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } });
-  const listKey = ['baja-intensidad', mock.user.id, null, 1];
+  const owner = inspectionWorkspaceOwner(mock.user as never);
+  const listKey = ['baja-intensidad', mock.user.id, owner, null, 1];
   client.setQueryData(listKey, { registros: [entry], total: 1 });
   const updated = { ...entry, version: 1, etapa: 'TRATADO' };
   mock.post.mockResolvedValue({ data: { data: { registro: updated } } });
@@ -60,7 +70,28 @@ it('invalidates a fresh list after a write without discarding the returned detai
   fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' }));
   await screen.findByText('Operación: Tratado');
   expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
-  expect(client.getQueryData(['baja-intensidad', mock.user.id, id])).toEqual({ registro: updated });
+  expect(client.getQueryData(['baja-intensidad', mock.user.id, owner, id])).toEqual({ registro: updated });
+});
+it('hides a previously loaded eventual when the server revokes access', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  view(true, client); await screen.findByText('Operación: Recibido');
+  mock.get.mockRejectedValue({ response: { status: 403 } });
+  await client.invalidateQueries({ queryKey: ['baja-intensidad'] });
+  expect(await screen.findByRole('alert')).toHaveTextContent(/Revisá tus permisos/);
+  expect(screen.queryByText('Operación: Recibido')).toBeNull();
+  expect(screen.queryByText('QA externo')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Registrar tratado' })).toBeNull();
+});
+it('does not show an earlier company record while a new context is loading', async () => {
+  mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'actor-a', empresaContexto:{ empresaId:'company-a', actividadId:'activity-a', todasSedes:true } } as typeof mock.user;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const element = () => <QueryClientProvider client={client}><MemoryRouter initialEntries={['/manifiestos/baja-intensidad?registro='+id]}><BajaIntensidadPage /></MemoryRouter></QueryClientProvider>;
+  const rendered = render(element()); await screen.findByText('Operación: Recibido');
+  mock.get.mockImplementation(() => new Promise(() => {}));
+  mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'actor-b', empresaContexto:{ empresaId:'company-b', actividadId:'activity-b', todasSedes:true } } as typeof mock.user;
+  rendered.rerender(element());
+  expect(screen.queryByText('Operación: Recibido')).toBeNull();
+  expect(screen.queryByText('QA externo')).toBeNull();
 });
 
 // Especificación aprobada 17/10/2026 (docs/ESPEC-EVENTUALES-20261017.md v2).

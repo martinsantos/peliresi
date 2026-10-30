@@ -1,4 +1,5 @@
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -44,7 +45,7 @@ function ParticipantFields({ title, value, onChange }: { title: string; value: P
   const [search, setSearch] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
   const externalDraft = useRef(value);
-  const query = useQuery({ queryKey: ['baja-intensidad-participantes', currentUser?.id, title, submittedSearch], enabled: lookup,
+  const query = useQuery({ queryKey: ['baja-intensidad-participantes', currentUser?.id, inspectionWorkspaceOwner(currentUser), title, submittedSearch], enabled: lookup,
     queryFn: async () => (await api.get(endpoint + '/participantes', { params: { tipo: title.toLowerCase(), q: submittedSearch } })).data.data.participantes as Participant[],
     retry: false, staleTime: 60000 });
   const participants = query.data || [];
@@ -94,9 +95,11 @@ export default function BajaIntensidadPage() {
   }
   const listPage = Math.max(1, Math.floor(Number(params.get('pagina')) || 1));
   const enabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED, currentUser);
+  const owner = inspectionWorkspaceOwner(currentUser);
+  const siteLimited = !!currentUser?.empresaContexto && !currentUser.empresaContexto.todasSedes;
   const qc = useQueryClient();
-  const queryKey = id ? ['baja-intensidad', currentUser?.id, id] : ['baja-intensidad', currentUser?.id, null, listPage, search, stage];
-  const query = useQuery({ queryKey, enabled: enabled && !!currentUser && !tracking,
+  const queryKey = id ? ['baja-intensidad', currentUser?.id, owner, id] : ['baja-intensidad', currentUser?.id, owner, null, listPage, search, stage];
+  const query = useQuery({ queryKey, enabled: enabled && !!currentUser && !tracking && !siteLimited,
     queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint, id ? undefined : { params: { page: listPage, search, etapa: stage } })).data.data as { registro?: Entry; registros?: Entry[]; total?: number; page?: number; pageSize?: number },
     retry: false, staleTime: 0, refetchInterval: 5000, refetchIntervalInBackground: false });
   const [creating, setCreating] = useState(false);
@@ -122,10 +125,10 @@ export default function BajaIntensidadPage() {
     if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
     try {
       const result: Entry = (await api.post(path, { ...body, id: created ? creationId.current : request.current.id })).data.data.registro;
-      await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id] });
+      await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner] });
       // Lists must not retain the shared 60-second cache after an operation or resolution.
-      void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id], refetchType: 'none' });
-      qc.setQueryData(['baja-intensidad', currentUser?.id, result.id], { registro: result });
+      void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner], refetchType: 'none' });
+      qc.setQueryData(['baja-intensidad', currentUser?.id, owner, result.id], { registro: result });
       changeParams({ registro: result.id }); setCreating(false); setDifference(false); setNota(''); setDraftVersion(undefined);
       if (created) creationId.current = crypto.randomUUID();
       request.current = undefined;
@@ -134,7 +137,7 @@ export default function BajaIntensidadPage() {
       setError(failure.response?.data?.message || 'No se pudo confirmar. Tus datos siguen aquí; podés reintentar.');
     } finally { lock.current = false; setBusy(false); }
   }
-  const entry = query.data?.registro;
+  const entry = query.isError ? undefined : query.data?.registro;
   useEffect(() => {
     const sent = request.current;
     if (busy || !sent || !entry?.eventos.some(item => item.id === sent.id)) return;
@@ -166,6 +169,14 @@ export default function BajaIntensidadPage() {
     <Button type="button" variant="outline" disabled={wastes.length >= 50} onClick={() => setWastes(rows => [...rows, { corriente: '', cantidad: 0, unidad: 'kg' }])}>Agregar residuo</Button>
   </div>;
   if (!enabled) return <p className="p-6">Circuito no habilitado.</p>;
+  if (siteLimited) return <div className="mx-auto max-w-4xl space-y-4 p-4">
+    <Link className="inline-flex min-h-11 items-center text-primary-700 underline" to={mp('/manifiestos')}>Volver a Manifiestos</Link>
+    <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-neutral-900">Los eventuales no identifican un establecimiento. Para consultarlos necesitás autorización para todos los establecimientos de la empresa. Pedí a una persona responsable que revise tu acceso.</div>
+  </div>;
+  if (query.isError && (query.error as { response?: { status?: number } } | null)?.response?.status === 403) return <div className="mx-auto max-w-4xl space-y-4 p-4">
+    <Link className="inline-flex min-h-11 items-center text-primary-700 underline" to={mp('/manifiestos')}>Volver a Manifiestos</Link>
+    <div role="alert" className="space-y-3 rounded-lg border border-warning-200 bg-warning-50 p-4 text-neutral-900"><p>No podés consultar los eventuales con el contexto actual. Revisá tus permisos o cambiá de empresa.</p><Button variant="outline" onClick={() => void query.refetch()}>Reintentar</Button></div>
+  </div>;
   return <div className="max-w-4xl mx-auto py-5 space-y-4 pb-24">
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -199,7 +210,7 @@ export default function BajaIntensidadPage() {
         <div className="flex flex-wrap items-center justify-between gap-2"><span role="status" className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · Página {actualPage}</span>
           <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={16} aria-hidden="true" />} disabled={query.isFetching} onClick={() => void query.refetch()}>Actualizar</Button></div>
       </div>
-      <ul className="divide-y divide-neutral-200">{query.data?.registros?.map(row => {
+      <ul className="divide-y divide-neutral-200">{!query.isError && query.data?.registros?.map(row => {
         const pending = row.revisiones.filter(r => r.estado !== 'APROBADA').length;
         const task = row.aprobacion?.estado === 'RECHAZADO' ? 'Operación detenida' : row.puedeAprobar?.length ? 'Te toca aprobar'
           : row.aprobacion?.estado === 'PENDIENTE' ? 'En espera de las partes'

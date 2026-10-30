@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock('../../services/api', () => ({ api: { get, post } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-reviewer', rol: 'ADMIN' } }) }));
 import ConciliacionExterna from '../../pages/manifiestos/ConciliacionExterna';
 const base = { revision: 0, vinculo: null, historial: [], puedeRevisar: true, pendiente: null,
   candidato: { id: 'qa-actor', razonSocial: 'QA Registrado', cuit: '30712345671', domicilio: 'QA' } };

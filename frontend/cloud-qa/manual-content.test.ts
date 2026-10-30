@@ -28,6 +28,12 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('eventual records without a site require full company authorization', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'eventuales-aprobaciones-avisos'));
+  assert.match(text, /eventuales no identifican una sede/);
+  assert.match(text, /autorización limitada a una sede no alcanza/);
+  assert.match(text, /todavía no garantizan avisar a cada actividad de una cuenta multirrol ni a todas las personas representantes/);
+});
 test('an authenticated link opens the requested task without covering it with the welcome', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'bienvenida-preferencia-ayuda'));
   assert.match(text, /primero se abre la tarea sin cubrirla con la bienvenida/);

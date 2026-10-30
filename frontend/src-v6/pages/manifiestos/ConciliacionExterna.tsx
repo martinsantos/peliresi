@@ -3,16 +3,19 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { useAuth } from '../../contexts/AuthContext';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 type Entry = { id: string; accion: string; revision: number; motivo: string; autorId: string; createdAt: string;
   ficha: { razonSocial: string; cuit: string } | null };
 type Result = { revision: number; vinculo: Entry | null; historial: Entry[]; puedeRevisar: boolean; pendiente: string | null;
   candidato: { id: string; razonSocial: string; cuit: string; domicilio: string | null } | null };
 
 export default function ConciliacionExterna({ id, rol, userId }: { id: string; rol: string; userId: string | number }) {
+  const { currentUser } = useAuth();
   const endpoint = '/manifiestos/baja-intensidad/' + encodeURIComponent(id) + '/conciliacion';
   const [motivo, setMotivo] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
-  const query = useQuery({ queryKey: ['conciliacion-externa', userId, id, rol], retry: false,
+  const query = useQuery({ queryKey: ['conciliacion-externa', userId, inspectionWorkspaceOwner(currentUser), id, rol], retry: false,
     queryFn: async () => (await api.get(endpoint, { params: { rol } })).data.data as Result });
   const data = query.data;
   async function confirm() {

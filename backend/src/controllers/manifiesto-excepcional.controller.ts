@@ -15,8 +15,13 @@ import { advanceExceptional, exceptionalApproval, exceptionalApprovers, exceptio
   EXCEPTIONAL_SLOTS, ExceptionalApprover, ExceptionalEvent, ExceptionalSlot, ExceptionalStage } from '../domain/manifiestoExcepcional';
 
 // Operational sessions stay fail-closed; school sessions use their isolated store.
-export function exceptionalEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
+export function exceptionalEnabled(req: AuthRequest, _res: Response, next: NextFunction) {
   if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED')) return next(new AppError('Circuito no habilitado', 404));
+  // Eventual records do not identify a site. An actor-wide match cannot prove
+  // that a delegated single-site grant covers this particular record.
+  if (req.user?.empresaContexto && req.user.empresaContexto.todasSedes !== true) {
+    return next(new AppError('Los eventuales no identifican un establecimiento. Para consultarlos necesitás autorización para todos los establecimientos de la empresa.', 403));
+  }
   next();
 }
 /** Sector administrators never gain eventual authority from the addendum policy. */

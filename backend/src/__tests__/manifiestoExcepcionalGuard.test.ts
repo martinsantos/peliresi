@@ -22,6 +22,18 @@ it('passes the feature gate only for an explicit true value', () => {
   const next = vi.fn(); exceptionalEnabled({} as never, {} as never, next);
   expect(next).toHaveBeenCalledWith();
 });
+it('blocks a site-limited company context before any eventual endpoint is reached', () => {
+  vi.stubEnv('MANIFEST_EXCEPTIONAL_ENABLED', 'true');
+  const next = vi.fn();
+  exceptionalEnabled({ user: { rol: 'GENERADOR', empresaContexto: { todasSedes: false, establecimientoId: 'site-north' } } } as never, {} as never, next);
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, message: expect.stringMatching(/todos los establecimientos/i) }));
+});
+it.each([undefined, { todasSedes: true }])('keeps an authorized personal or whole-company context available: %j', empresaContexto => {
+  vi.stubEnv('MANIFEST_EXCEPTIONAL_ENABLED', 'true');
+  const next = vi.fn();
+  exceptionalEnabled({ user: { rol: 'GENERADOR', empresaContexto } } as never, {} as never, next);
+  expect(next).toHaveBeenCalledWith();
+});
 it('lectura: el revisor ve todo; quien creó, lo suyo; cada parte, sólo donde figura con alta', () => {
   vi.stubEnv('MANIFEST_EXCEPTIONAL_REVIEWERS', 'qa-reviewer');
   expect(exceptionalReadWhere({ id: 'qa-reviewer', rol: 'ADMIN' } as never)).toEqual({});
