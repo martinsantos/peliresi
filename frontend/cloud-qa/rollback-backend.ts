@@ -1,0 +1,17 @@
+import path from 'node:path';
+import { root } from './safety.ts';
+
+/** Only the dedicated, isolated rollback rehearsal may load the old build. */
+export function qaBackendEntry(env = process.env): string {
+  const version = env.QA_COMPAT_BACKEND || 'current';
+  if (version === 'current') return path.join(root, 'backend/dist/index.js');
+  if (version === '17152d81'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
+    return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');
+  }
+  if (version === '8fb6277e'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
+    return path.join(root, '.qa-rollback-partial-20261030/snapshot-8fb/backend/dist/index.js');
+  }
+  throw new Error('Destino de backend no autorizado para el ensayo aislado');
+}

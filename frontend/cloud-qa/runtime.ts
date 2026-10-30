@@ -1,6 +1,6 @@
 import { Server } from 'node:net';
-import { assertCloudDatabase, backendRequire, root } from './safety.ts';
-import path from 'node:path';
+import { assertCloudDatabase, backendRequire } from './safety.ts';
+import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 // Production entrypoint is unchanged; only its QA listener is bound to loopback.
@@ -15,4 +15,4 @@ Server.prototype.listen = function (...args: unknown[]) {
   return Reflect.apply(listen,this,args);
 } as typeof Server.prototype.listen;
 console.log('Cloud QA safety PASS: isolated DB, loopback and external delivery disabled');
-backendRequire(path.join(root,'backend/dist/index.js'));
+backendRequire(qaBackendEntry());
