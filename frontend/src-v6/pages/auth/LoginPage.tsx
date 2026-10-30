@@ -12,7 +12,7 @@ import { getApiErrorMessage } from '../../utils/api-error';
 import { MendozaBrand } from '../../components/MendozaBrand';
 import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
 import { BrandSpinner } from '../../components/ui/LoadingState';
-import { postLoginDestination } from '../../utils/authRedirect';
+import { postLoginDestination, safeLocalRedirect } from '../../utils/authRedirect';
 import './institutional.css';
 
 const LoginPage: React.FC = () => {
@@ -41,8 +41,10 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const authenticatedUser = await login(email, password);
       const requestedPath = (location.state as { from?: unknown } | null)?.from;
+      const safeRequestedPath = safeLocalRedirect(requestedPath, '');
+      const deferWelcome = !!safeRequestedPath && !/^(?:\/|\/(?:mobile\/)?dashboard)\/?(?:[?#].*)?$/.test(safeRequestedPath);
+      const authenticatedUser = await login(email, password, { deferWelcome });
       navigate(postLoginDestination(requestedPath, authenticatedUser?.rol, authenticatedUser?.esInspector), { replace: true });
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error al iniciar sesión. Verificá tus credenciales.'));

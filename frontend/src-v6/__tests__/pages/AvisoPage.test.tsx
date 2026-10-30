@@ -70,6 +70,37 @@ it.each(['', '/app'])('opens the exact certificate when the authorized activity 
  show(prefix);
  expect(screen.getByRole('link', { name: 'Ver certificado ambiental →' })).toHaveAttribute('href', prefix + '/mi-perfil?certificadoAmbiental=doc-1#certificado-ambiental');
 });
+it.each(['', '/app'])('requires the exact actor activity for a repeated receipt in %s', async prefix => {
+ state.query.data = { ...state.query.data, tipo:'ALERTA_SISTEMA', titulo:'Comprobante repetido', datos: JSON.stringify({ tipo:'comprobante_repetido', actorTipo:'operador', actorId:'operator-1', documentoId:'doc-1', ruta:'/mi-perfil' }) };
+ state.user = { ...state.user, rol:'GENERADOR', actorId:'g-1' }; state.activate.mockRejectedValue(new Error('Revoked'));
+ show(prefix);
+ expect(screen.getByText('Usá tu actividad Operador para consultar este comprobante.')).toBeVisible();
+ expect(screen.queryByRole('link', { name:'Revisar comprobante →' })).toBeNull();
+ fireEvent.click(screen.getByRole('button', { name:'Usar Operador y ver comprobante' }));
+ await waitFor(() => expect(state.activate).toHaveBeenCalledWith('qa-owner','OPERADOR','operator-1'));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Tu actividad actual no cambió');
+});
+it.each(['', '/app'])('offers the matching actor receipt only in its exact activity on %s', prefix => {
+ state.query.data = { ...state.query.data, tipo:'ALERTA_SISTEMA', titulo:'Comprobante repetido', datos: JSON.stringify({ tipo:'comprobante_repetido', actorTipo:'operador', actorId:'operator-1', documentoId:'doc-1' }) };
+ state.user = { ...state.user, rol:'OPERADOR', actorId:'operator-1' };
+ show(prefix);
+ const link=screen.getByRole('link',{name:'Revisar comprobante →'});
+ expect(link).toHaveAttribute('href',prefix+'/mi-perfil?comprobante=doc-1&aviso=n1#comprobante-aviso');
+ fireEvent.click(link);expect(state.invalidate).toHaveBeenCalledWith({queryKey:['operador-documentos','operator-1']});
+});
+it('does not open a receipt for another actor of the same role or a restricted company context', async () => {
+ state.query.data = { ...state.query.data, tipo:'ALERTA_SISTEMA', titulo:'Comprobante repetido', datos: JSON.stringify({ tipo:'comprobante_repetido', actorTipo:'operador', actorId:'operator-1', documentoId:'doc-1' }) };
+ state.user = { ...state.user, rol:'OPERADOR', actorId:'other', empresaContexto:{todasSedes:false} };state.activate.mockRejectedValue(new Error('Revoked'));
+ show();expect(screen.queryByRole('link',{name:'Revisar comprobante →'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Usar Operador y ver comprobante'}));
+ await waitFor(()=>expect(state.activate).toHaveBeenCalledWith('qa-owner','OPERADOR','operator-1'));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Tu actividad actual no cambió');
+});
+it('explains an older receipt notice whose actor or document cannot be identified', () => {
+ state.query.data = { ...state.query.data, tipo:'ALERTA_SISTEMA', titulo:'Comprobante repetido', datos: JSON.stringify({ tipo:'comprobante_repetido', actorTipo:'operador', ruta:'/mi-perfil' }) };
+ show();expect(screen.getByText(/No pudimos identificar la actividad o el documento de este aviso/)).toBeVisible();
+ expect(screen.queryByRole('link',{name:'Revisar comprobante →'})).toBeNull();
+});
 it('does not offer the company certificate when site access is restricted', () => {
  state.query.data = { ...state.query.data, titulo: 'Certificado ambiental disponible', datos: JSON.stringify({ tipo: 'certificado_ambiental', actorTipo: 'operador', actorId: 'operator-1', documentoId: 'doc-1' }) };
  state.user = { ...state.user, rol: 'OPERADOR', actorId: 'operator-1', empresaContexto: { todasSedes: false } };

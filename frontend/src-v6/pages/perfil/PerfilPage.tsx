@@ -7,7 +7,7 @@ import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User,
   Mail,
@@ -31,15 +31,21 @@ import { getApiErrorMessage } from '../../utils/api-error';
 import { useGenerador, useOperador } from '../../hooks/useActores';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorReceiptNotice } from '../../components/ActorReceiptNotice';
 import ActorActivities from '../../components/ActorActivities';
 import { CompanyAccessLink } from '../../components/CompanyAccessLink';
 
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const certificateId = searchParams.get('certificadoAmbiental');
   const highlightedCertificate = certificateId && /^[a-zA-Z0-9_-]{1,100}$/.test(certificateId) ? certificateId : undefined;
+  const receiptId = searchParams.get('comprobante');
+  const highlightedReceipt = receiptId && /^[a-zA-Z0-9_-]{1,100}$/.test(receiptId) ? receiptId : undefined;
+  const noticeId = searchParams.get('aviso');
+  const receiptReturn = noticeId && /^[a-zA-Z0-9_-]{1,100}$/.test(noticeId) ? '/notificaciones/' + encodeURIComponent(noticeId) : '/notificaciones';
   const mp = useMobilePrefix();
   const { currentUser, isGenerador:personalGenerador, isOperador:personalOperador } = useAuth();
   const isGenerador=personalGenerador&&!currentUser?.empresaContexto;
@@ -94,6 +100,10 @@ const PerfilPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
+      {receiptId !== null && !highlightedReceipt && <p role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-4">El enlace del comprobante no es válido. Volvé al aviso para revisarlo.</p>}
+      {highlightedReceipt && currentUser?.empresaContexto && !currentUser.empresaContexto.todasSedes && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4">Para consultar el comprobante necesitás autorización para todos los establecimientos de la empresa.</p>}
+      {highlightedReceipt && currentUser && (!currentUser.actorId || !['GENERADOR', 'OPERADOR', 'TRANSPORTISTA'].includes(currentUser.rol)) && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4">No pudimos identificar una actividad autorizada para este comprobante. Volvé al aviso o revisá los roles de tu cuenta.</p>}
+      {highlightedReceipt && (!currentUser?.empresaContexto || currentUser.empresaContexto.todasSedes) && currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorReceiptNotice type={currentUser.rol} actorId={currentUser.actorId} documentId={highlightedReceipt} visitKey={location.key} returnPath={mp(receiptReturn)} />}
       <ActorActivities />
       <CompanyAccessLink />
       {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y establecimiento en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}

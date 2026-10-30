@@ -17,6 +17,8 @@ function setup(path='/mi-perfil') {
 beforeEach(() => {
   m.user = { id: 'user', actorId: 'op-1', rol: 'OPERADOR', nombre: 'QA usuario', email: 'qa@example.invalid' };
   m.get.mockReset().mockImplementation(async (url: string) => {
+    if (url === '/solicitudes/mis-solicitudes') return { data: { success: true, data: { solicitudes: [] } } };
+    if (url === '/empresas') return { data: { success: true, data: { puedeValidar: false, pagination: { total: 0 } } } };
     if (url.endsWith('/documentos')) return { data: { success: true, data: { documentos: [] } } };
     const key = url.includes('/generadores/') ? 'generador' : 'operador';
     return { data: { success: true, data: { [key]: actor(url.split('/').at(-1)!) } } };
@@ -64,7 +66,7 @@ it('does not retain the former actor after an identity change', async () => {
 it('does not request an actor for an unbound administrative identity', async () => {
   m.user = { ...m.user, actorId: '', rol: 'ADMIN' }; setup();
   expect(screen.queryByText('Mi establecimiento')).toBeNull();
-  expect(m.get).not.toHaveBeenCalled();
+  expect(m.get.mock.calls.some(([url]) => url.startsWith('/actores/'))).toBe(false);
 });
 it('shows the company certificate only with authorization for every site', async () => {
   m.user = { ...m.user, empresaContexto: { todasSedes: true, razonSocial: 'QA empresa', domicilioLegal: { calle: 'QA' } } } as typeof m.user;
@@ -77,6 +79,31 @@ it('explains restricted company access without requesting company-wide certifica
   setup();
   expect(screen.getByText(/necesitás autorización para todos sus establecimientos/i)).toBeVisible();
   expect(m.get).not.toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
+it('opens only the receipt selected by a notice for the active actor', async () => {
+  const original=m.get.getMockImplementation()!;
+  m.get.mockImplementation(async (url:string)=>url.endsWith('/documentos')
+    ? {data:{success:true,data:{documentos:[{id:'doc-1',tipo:'COMPROBANTE_PAGO',nombre:'Pago QA.pdf',estado:'PENDIENTE',analisis:{duplicado:true}}]}}} : original(url));
+  setup('/mi-perfil?comprobante=doc-1#comprobante-aviso');
+  const panel=await screen.findByRole('region',{name:'Comprobante del aviso'});
+  await screen.findByText('Pago QA.pdf');expect(panel).toHaveTextContent('Actividad: Operador');
+});
+it('does not request the receipt in a site-restricted company context', () => {
+  m.user = { ...m.user, empresaContexto:{todasSedes:false,razonSocial:'QA empresa',domicilioLegal:{calle:'QA'}} } as typeof m.user;
+  setup('/mi-perfil?comprobante=doc-1#comprobante-aviso');
+  expect(screen.getByText(/Para consultar el comprobante necesitás autorización/)).toBeVisible();
+  expect(m.get).not.toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
+it('rejects a malformed receipt link without fetching a targeted document', () => {
+  setup('/mi-perfil?comprobante=..%2Fotro#comprobante-aviso');
+  expect(screen.getByRole('alert')).toHaveTextContent('El enlace del comprobante no es válido');
+  expect(screen.queryByRole('region',{name:'Comprobante del aviso'})).toBeNull();
+});
+it('explains a receipt link when the account no longer has a bound activity', () => {
+  m.user = { ...m.user, actorId: '', rol: 'ADMIN' };
+  setup('/mi-perfil?comprobante=doc-1#comprobante-aviso');
+  expect(screen.getByText(/No pudimos identificar una actividad autorizada para este comprobante/)).toBeVisible();
+  expect(screen.queryByRole('region',{name:'Comprobante del aviso'})).toBeNull();
 });
 it('identifies loading rather than showing placeholder establishment fields', async () => {
   m.get.mockImplementation(() => new Promise(() => {})); setup();

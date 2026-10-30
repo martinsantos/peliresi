@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses, notificationEnvironmentalCertificate, notificationFiscalReminder, notificationInboxReturnPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses, notificationEnvironmentalCertificate, notificationFiscalReminder, notificationActorReceipt, isActorReceiptNotice, notificationInboxReturnPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
 import { activateActorActivity } from '../../services/activateActorActivity';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import type { Notificacion } from '../../types/models';
@@ -33,7 +33,8 @@ export default function AvisoPage() {
   const companyAccesses = notice ? notificationCompanyAccesses(notice) : [];
   const certificate = notice ? notificationEnvironmentalCertificate(notice) : null;
   const fiscal = notice ? notificationFiscalReminder(notice) : null;
-  const actorTarget = certificate || fiscal;
+  const receipt = notice ? notificationActorReceipt(notice) : null;
+  const actorTarget = certificate || fiscal || receipt;
   const actorRole = notice ? notificationActorRole(notice) : null;
   const actorContextMatches = !!(actorTarget && currentUser?.rol === actorTarget.role && currentUser.actorId === actorTarget.actorId
     && (!currentUser.empresaContexto || currentUser.empresaContexto.todasSedes));
@@ -46,7 +47,7 @@ export default function AvisoPage() {
     try {
       if (actorTarget) await activateActorActivity(currentUser.id, actorRole, actorTarget.actorId);
       else await activateActorActivity(currentUser.id, actorRole);
-      const path = mp(fiscal ? '/notificaciones/' + encodeURIComponent(notice.id) : resolveNotificationPath(notice, '', actorRole, !!certificate));
+      const path = mp(fiscal ? '/notificaciones/' + encodeURIComponent(notice.id) : resolveNotificationPath(notice, '', actorRole, !!certificate || !!receipt));
       window.location.replace((window.location.pathname.startsWith('/app/') ? '/app' : '') + path);
     } catch { setContextError('No pudimos confirmar ese rol. Tu actividad actual no cambió. Reintentá o revisá los roles de tu cuenta.'); }
     finally { lock.current = false; setChanging(false); }
@@ -60,16 +61,17 @@ export default function AvisoPage() {
     </div>}
     {notice && <article className="rounded-xl border border-primary-200 bg-white p-5 space-y-4">
       <h2 className="text-lg font-semibold">{gpsNoticeTitle(notice) || notice.titulo}</h2>{manifestReference && <p className="text-sm font-semibold text-neutral-700">{manifestReference}</p>}{gpsContext && <p className="text-sm font-medium text-neutral-700">{gpsContext}</p>}<p className="whitespace-pre-wrap break-words">{notice.mensaje}</p>
+      {isActorReceiptNotice(notice) && !receipt && <p role="status" className="text-sm text-neutral-700">No pudimos identificar la actividad o el documento de este aviso. Consultá a Administración.</p>}
       {!companyAccesses.length && actorRole && !otherRole && <p className="text-sm font-semibold text-primary-800">Actividad: {roleLabel}</p>}
       {!companyAccesses.length && otherRole && <div className="space-y-3 rounded-lg bg-primary-50 p-3">
-        <p>Usá tu actividad {roleLabel} para consultar {certificate ? 'este certificado ambiental' : fiscal ? 'este recordatorio fiscal' : 'este requerimiento'}.</p>
-        {canChange ? <Button onClick={() => void changeActivity()} isLoading={changing}>Usar {roleLabel}{fiscal ? '' : certificate ? ' y ver certificado' : ' y abrir requerimiento'}</Button>
+        <p>Usá tu actividad {roleLabel} para consultar {certificate ? 'este certificado ambiental' : fiscal ? 'este recordatorio fiscal' : receipt ? 'este comprobante' : 'este requerimiento'}.</p>
+        {canChange ? <Button onClick={() => void changeActivity()} isLoading={changing}>Usar {roleLabel}{fiscal ? '' : certificate ? ' y ver certificado' : receipt ? ' y ver comprobante' : ' y abrir requerimiento'}</Button>
           : <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Revisar los roles de mi cuenta</Link>}
         {contextError && <p role="alert" className="text-sm text-error-700">{contextError}</p>}
       </div>}
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
       {companyAccesses.length > 0 && currentUser && <CompanyNoticeAction key={inspectionWorkspaceOwner(currentUser)} notice={notice} target={target} userId={String(currentUser.id)} context={currentUser.empresaContexto} returnState={inboxState} onOpenFiscal={() => refreshInspectionNotification(notice, queryClient)} />}
-      {!companyAccesses.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
+      {!companyAccesses.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal || receipt) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
     </article>}
   </section>;
 }

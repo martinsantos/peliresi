@@ -57,7 +57,7 @@ export interface AuthContextType {
   isAdminOperador: boolean;
   isAnyAdmin: boolean;
   canAccess: (permission: string) => boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string, options?: { deferWelcome?: boolean }) => Promise<User>;
   logout: (options?: { reason: 'expired' }) => Promise<void>;
   signOutRedirectPending: boolean;
   finishSignOutRedirect: () => void;
@@ -327,7 +327,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [offlineExpiresAt, qc]);
 
   // Real login via API — accepts email or CUIT
-  const login = useCallback(async (identifier: string, password: string) => {
+  const login = useCallback(async (identifier: string, password: string, options?: { deferWelcome?: boolean }) => {
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
@@ -359,7 +359,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
       // A verified applicant may edit drafts, but has no approved operational role.
       // Do not consume their first operational welcome before approval.
-      setShowOnboarding(!response.restricted && response.user.activo && (isFirstSession || isPostReset));
+      // A deep link is an explicit task; do not cover it with a welcome dialog.
+      // Deferring does not mark the introduction as completed.
+      setShowOnboarding(!options?.deferWelcome && !response.restricted && response.user.activo && (isFirstSession || isPostReset));
       return user;
     } catch (err: any) {
       validatedToken.current = null;

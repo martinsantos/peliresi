@@ -28,12 +28,18 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('an authenticated link opens the requested task without covering it with the welcome', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'bienvenida-preferencia-ayuda'));
+  assert.match(text, /primero se abre la tarea sin cubrirla con la bienvenida/);
+  assert.match(text, /repasar la introducción desde Ayuda/);
+});
 test('repeated receipt guidance distinguishes the specific application from an actor profile', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'correos-decisiones-documentos'));
   assert.match(text, /se abre esa solicitud y se señala el documento indicado, incluso si tu cuenta tiene varias actividades/);
   assert.match(text, /El archivo no se descarga automáticamente/);
   assert.match(text, /avisos anteriores sin referencia al documento abren la solicitud/i);
-  assert.match(text, /Si pertenece a una ficha, se abre Mi perfil/);
+  assert.match(text, /el aviso identifica la actividad; si usás otra, confirmá el cambio de actividad/);
+  assert.match(text, /un aviso antiguo sin datos suficientes conserva el mensaje/i);
 });
 test('inspection guidance distinguishes the saved act and its continued fields', () => {
   const text = JSON.stringify(guides);

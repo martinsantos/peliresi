@@ -61,6 +61,22 @@ export function notificationEnvironmentalCertificate(notice: Pick<Notificacion, 
     ? { role, actorId: data.actorId, documentoId: data.documentoId } : null;
 }
 
+/** Actor receipt metadata orients the user; the server still checks actor and document access. */
+export function notificationActorReceipt(notice: Pick<Notificacion, 'datos'>) {
+  const data = parseNotificationData(notice.datos);
+  const validId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
+  const roles = { generador: 'GENERADOR', transportista: 'TRANSPORTISTA', operador: 'OPERADOR' } as const;
+  const role = typeof data.actorTipo === 'string' && Object.prototype.hasOwnProperty.call(roles, data.actorTipo)
+    ? roles[data.actorTipo as keyof typeof roles] : null;
+  return data.tipo === 'comprobante_repetido' && !Object.prototype.hasOwnProperty.call(data, 'solicitudId')
+    && role && validId(data.actorId) && validId(data.documentoId) ? { role, actorId: data.actorId, documentoId: data.documentoId } : null;
+}
+
+export function isActorReceiptNotice(notice: Pick<Notificacion, 'datos'>): boolean {
+  const data = parseNotificationData(notice.datos);
+  return data.tipo === 'comprobante_repetido' && !Object.prototype.hasOwnProperty.call(data, 'solicitudId');
+}
+
 /** A fiscal reminder names the generator and year; it does not grant access. */
 export function notificationFiscalReminder(notice: Pick<Notificacion, 'datos'>) {
   const data = parseNotificationData(notice.datos);
@@ -74,6 +90,8 @@ export function notificationActorRole(notice: Notificacion): 'GENERADOR' | 'TRAN
   const data = parseNotificationData(notice.datos);
   const certificate = notificationEnvironmentalCertificate(notice);
   if (certificate) return certificate.role;
+  const receipt = notificationActorReceipt(notice);
+  if (receipt) return receipt.role;
   if (notificationFiscalReminder(notice)) return 'GENERADOR';
   return ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1
     && data.destino === 'participacion' && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))
@@ -93,6 +111,8 @@ function withBasePath(path: string, basePath: string): string {
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
   const fiscal = notificationFiscalReminder(notificacion);
+  const receipt = notificationActorReceipt(notificacion);
+  if (receipt) void queryClient.invalidateQueries({ queryKey: [`${receipt.role.toLowerCase()}-documentos`, receipt.actorId] });
   if (fiscal) {
     for (const key of ['generador-pagos', 'generador-ddjj', 'generador-documentos']) {
       void queryClient.invalidateQueries({ queryKey: [key, fiscal.actorId] });
@@ -139,12 +159,14 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
   if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';
   if (pathname === '/empresas') return 'Ver entidad y acceso →';
+  if (pathname === '/mi-perfil' && new URLSearchParams(query).has('comprobante')) return 'Revisar comprobante →';
   if (pathname === '/mi-perfil' && new URLSearchParams(query).has('certificadoAmbiental')) return 'Ver certificado ambiental →';
   if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
   if (/^\/admin\/actores\/generadores\/[^/]+$/.test(pathname) && new URLSearchParams(query).get('tab') === 'fiscal') return 'Ver situación fiscal →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar renovación →';
   if (/^\/notificaciones\/[^/]+$/.test(pathname) && data.tipo === 'recordatorio_fiscal') return 'Ver aviso fiscal →';
+  if (/^\/notificaciones\/[^/]+$/.test(pathname) && data.tipo === 'comprobante_repetido') return 'Ver aviso del comprobante →';
   if (/^\/notificaciones\/[^/]+$/.test(pathname)) return 'Ver aviso y resultado →';
   if (pathname === '/alertas') return 'Revisar alerta →';
   if (/^\/manifiestos\/[^/]+\/adendas$/.test(pathname)) return 'Abrir adenda y revisiones →';
@@ -166,6 +188,12 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
     const destination = admin ? `/admin/solicitudes/${id}` : `/mi-solicitud?solicitud=${id}`;
     const document = safeId(data.documentoId) ? `${admin ? '?' : '&'}documento=${encodeURIComponent(data.documentoId)}` : '';
     return withBasePath(destination + document, basePath);
+  }
+  if (isActorReceiptNotice(notificacion)) {
+    const receipt = notificationActorReceipt(notificacion);
+    if (!safeId(notificacion.id)) return withBasePath('/notificaciones', basePath);
+    return withBasePath(companyTarget ? receipt ? '/mi-perfil?comprobante=' + encodeURIComponent(receipt.documentoId) + '&aviso=' + encodeURIComponent(notificacion.id) + '#comprobante-aviso' : '/notificaciones'
+      : '/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   }
   if (companyTarget && representativeManifestAlert(notificacion.tipo, data)) {
     return withBasePath(safeId(notificacion.manifiestoId) ? '/manifiestos/' + notificacion.manifiestoId : '/notificaciones', basePath);

@@ -120,6 +120,7 @@ function AuthConsumer() {
       <span data-testid="restricted">{String(auth.isRestricted)}</span>
       <span data-testid="draft">{auth.solicitudId ?? 'none'}</span>
       <button data-testid="login-btn" onClick={() => auth.login('admin@test.com', 'pass123')}>Login</button>
+      <button data-testid="login-deferred-btn" onClick={() => auth.login('admin@test.com', 'pass123', { deferWelcome: true })}>Login to task</button>
       <button data-testid="logout-btn" onClick={() => auth.logout()}>Logout</button>
       <button data-testid="switch-btn" onClick={() => auth.switchUser(-1)}>Switch</button>
     </div>
@@ -186,6 +187,12 @@ describe('AuthContext', () => {
     const expected = reason === 'expired' ? requested : reason === 'new-link-after-exit' ? '/manifiestos/new-target?origen=aviso#certificaciones' : '/dashboard';
     await waitFor(() => expect(screen.getByTestId('session-location').textContent).toBe(expected));
     expect(screen.getByTestId('private-role')).toHaveTextContent(nextUser.rol);
+    if (reason === 'exit') {
+      expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+      expect(localStorage.getItem(`sitrep_onboarding_${nextUser.id}`)).toBeNull();
+    }
   });
 
   it('restores a draft-only registration via its protected draft, without asking for a forbidden full profile', async () => {
@@ -359,6 +366,20 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('isAnyAdmin').textContent).toBe('true');
     expect(screen.getByTestId('isGenerador').textContent).toBe('false');
     expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument();
+  });
+
+  it('preserves the welcome for a later ordinary login after opening a task', async () => {
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('login-deferred-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Admin User'));
+    expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+    expect(localStorage.getItem('sitrep_onboarding_42')).toBeNull();
+    await user.click(screen.getByTestId('logout-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    await user.click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument());
   });
 
   it.each([false, true])('does not introduce pending applicants as approved actors (post-reset: %s)', async (postReset) => {

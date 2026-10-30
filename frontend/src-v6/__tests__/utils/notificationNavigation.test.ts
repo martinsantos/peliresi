@@ -143,11 +143,27 @@ describe('resolveNotificationPath', () => {
       expect(resolveNotificationPath(notice, '/app', 'GENERADOR')).toBe('/app/notificaciones');
     }
     const actorReceipt = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', actorTipo: 'operador', actorId: 'o-1', ruta: '/mi-perfil' }) };
-    expect(resolveNotificationPath(actorReceipt, '/app', 'OPERADOR')).toBe('/app/mi-perfil');
+    expect(resolveNotificationPath(actorReceipt, '/app', 'OPERADOR')).toBe('/app/notificaciones/n-1');
     const historical = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', solicitudId: 'own-1', ruta: '/mi-solicitud' }) };
     expect(resolveNotificationPath(historical, '/app', 'GENERADOR')).toBe('/app/mi-solicitud?solicitud=own-1');
     const invalidDocument = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', solicitudId: 'own-1', documentoId: '../otro', ruta: '/mi-solicitud' }) };
     expect(resolveNotificationPath(invalidDocument, '/app', 'GENERADOR')).toBe('/app/notificaciones');
+  });
+  it.each(['', '/app', '/mobile'])('routes an actor receipt through the owned notice and its exact document on %s', prefix => {
+    for (const [actorTipo, role] of [['generador','GENERADOR'],['transportista','TRANSPORTISTA'],['operador','OPERADOR']]) {
+      const notice = { ...base, tipo: 'ALERTA_SISTEMA' as Notificacion['tipo'], datos: JSON.stringify({ tipo:'comprobante_repetido', actorTipo, actorId:'actor-1', documentoId:'doc-1', ruta:'/mi-perfil' }) };
+      expect(resolveNotificationPath(notice, prefix, 'GENERADOR')).toBe(prefix + '/notificaciones/n-1');
+      const target = resolveNotificationPath(notice, prefix, role, true);
+      expect(target).toBe(prefix + '/mi-perfil?comprobante=doc-1&aviso=n-1#comprobante-aviso');
+      expect(notificationActionLabel(target, notice)).toBe('Revisar comprobante →');
+      const invalidateQueries = vi.fn(); refreshInspectionNotification(notice, { invalidateQueries } as any);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: [`${actorTipo}-documentos`, 'actor-1'] });
+    }
+  });
+  it.each([{ actorTipo:'otro' }, { actorId:'../otro' }, { documentoId:'../otro' }, { documentoId:null }])('never follows an incomplete actor receipt target: %j', fields => {
+    const notice = { ...base, datos: JSON.stringify({ tipo:'comprobante_repetido', actorTipo:'operador', actorId:'actor-1', documentoId:'doc-1', ruta:'/mi-perfil', ...fields }) };
+    expect(resolveNotificationPath(notice, '/app', 'GENERADOR')).toBe('/app/notificaciones/n-1');
+    expect(resolveNotificationPath(notice, '/app', 'OPERADOR', true)).toBe('/app/notificaciones');
   });
   it('refreshes owned application data when opening a notice on an already open result', () => {
     const invalidateQueries = vi.fn(); refreshInspectionNotification({ ...base, datos: '{"tipo":"solicitud_observada","solicitudId":"own-1"}' }, { invalidateQueries } as any);

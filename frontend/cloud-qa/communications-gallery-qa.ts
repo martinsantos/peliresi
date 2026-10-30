@@ -112,6 +112,16 @@ try{
    await select('atm-repetido');await channel('email');
    await expect(page.locator('#review')).toContainText('señala el documento');
  });
+ await check('actor receipt sample reaches the owned notice in inbox and email',async()=>{
+   const item=data.cases.find((entry:any)=>entry.id==='atm-repetido-perfil');assert.ok(item);
+   for(const role of ['GENERADOR','TRANSPORTISTA','OPERADOR']){
+     assert.equal(item.paths[role],'/notificaciones/atm-repetido-perfil');
+     const html=data.blobs[item.mailRefs[role].ref];const web=html.match(/data-mail-action="web" href="([^"]+)"/);assert.ok(web);
+     assert.equal(new URL(web[1].replace(/&amp;/g,'&')).pathname,'/notificaciones/atm-repetido-perfil');
+   }
+   await select('atm-repetido-perfil');await channel('email');
+   await expect(page.locator('#review')).toContainText('confirmar la actividad');
+ });
  await check('current delivery and operational producers include their scoped representative notices',async()=>{
    for(const [id,role] of [
      ['entrega-representante-GENERADOR','GENERADOR'],['entrega-representante-TRANSPORTISTA','TRANSPORTISTA'],
