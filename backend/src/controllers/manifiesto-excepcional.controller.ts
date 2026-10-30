@@ -1,5 +1,6 @@
 import { manifestFeatureEnabled, manifestPracticeIdentity } from '../lib/manifestTraining';
 import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
+import { isActorActivity } from '../domain/actorActivities';
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
@@ -191,14 +192,17 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
     const parsed = exceptionalEventSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const command = parsed.data;
+    const authorRole = req.user.rol;
+    const authorActorId = isActorActivity(authorRole) ? req.user[authorRole.toLowerCase() as 'generador' | 'transportista' | 'operador']?.id : undefined;
     const record = await prisma.$transaction(async tx => {
       const current = await tx.registroManifiestoExcepcional.findFirst({ where });
       if (!current) throw new AppError('Registro no encontrado', 404);
       const events = current.eventos as unknown as ExceptionalEvent[];
       const repeated = events.find(e => e.id === command.id);
       if (repeated) {
-        const { autorId, impersonadoPorId, fecha: _date, ...previous } = repeated;
-        if (autorId !== req.user.id || impersonadoPorId !== req.user.impersonatedBy?.id || !same(previous, command)) throw new AppError('La acción ya tiene otro contenido', 409);
+        const { autorId, autorRol, autorActorId, impersonadoPorId, fecha: _date, ...previous } = repeated;
+        if (autorId !== req.user.id || impersonadoPorId !== req.user.impersonatedBy?.id || (autorRol !== undefined && autorRol !== authorRole)
+          || (autorActorId !== undefined && autorActorId !== authorActorId) || !same(previous, command)) throw new AppError('La acción ya tiene otro contenido o pertenece a otra actividad', 409);
         return current;
       }
       if (command.version !== current.version) throw new AppError('Otro usuario actualizó el registro; recargá antes de continuar', 409);
@@ -211,7 +215,8 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
       const updated = await tx.registroManifiestoExcepcional.updateMany({
         where: { id: current.id, version: current.version },
         data: { etapa, version: { increment: 1 }, eventos: [...events,
-          { ...command, autorId: req.user.id, ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}),
+          { ...command, autorId: req.user.id, autorRol: authorRole, ...(authorActorId ? { autorActorId: authorActorId } : {}),
+            ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}),
             fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue },
       });
       if (updated.count !== 1) throw new AppError('El registro cambió; recargá antes de continuar', 409);

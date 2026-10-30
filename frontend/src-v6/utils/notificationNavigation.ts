@@ -40,14 +40,24 @@ function representativeManifestAlert(tipo: string, data: Record<string, unknown>
  return data.tipo === 'alerta_evento_manifiesto' && eventTypes[String(data.evento)] === tipo;
 }
 
-export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos' | 'tipo'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;establecimientoId?:string;establecimiento?:string}> {
+export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos' | 'tipo'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;actorId?:string;establecimientoId?:string;establecimiento?:string}> {
  const data = parseNotificationData(notice.datos), id = (v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
  const fiscal = data.tipo === 'recordatorio_fiscal' && data.destino === 'representante' && !!notificationFiscalReminder(notice);
  const alertRule = representativeManifestAlert(notice.tipo, data);
- if ((!fiscal && !alertRule && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
+ const eventual = notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && data.accesoVersion === 1;
+ if ((!fiscal && !alertRule && !eventual && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
  return data.accesosEmpresa.filter(a => a && id(a.empresaId) && id(a.actividadId) && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
   && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string')
-  && (!fiscal || (a.rol === 'GENERADOR' && !a.establecimientoId && !a.establecimiento)));
+  && (!fiscal || (a.rol === 'GENERADOR' && !a.establecimientoId && !a.establecimiento))
+  && (!eventual || (id(a.actorId) && !a.establecimientoId && !a.establecimiento)));
+}
+
+/** Only orientation; activity and actor are checked again on the server. */
+export function notificationEventualActors(notice: Pick<Notificacion, 'datos' | 'tipo'>): Array<{rol:'GENERADOR'|'TRANSPORTISTA'|'OPERADOR';actorId:string}> {
+ const data = parseNotificationData(notice.datos);
+ if (notice.tipo !== 'INFO_GENERAL' || data.tipo !== 'manifiesto_eventual' || data.version !== 1 || data.accesoVersion !== 1 || !Array.isArray(data.actividadesPropias)) return [];
+ return data.actividadesPropias.filter(a => a && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
+  && typeof a.actorId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(a.actorId));
 }
 
 /** Metadata provides orientation only; the selected actor is confirmed by the API. */
@@ -223,8 +233,9 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
       ? '/empresas?empresa=' + encodeURIComponent(data.empresaId) + '&origen=avisos' : '/notificaciones', basePath);
   }
   if (data.tipo === 'manifiesto_eventual') {
-    return withBasePath(data.version === 1 && typeof data.registroId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.registroId)
-      ? '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(data.registroId) : '/notificaciones', basePath);
+    const valid = data.version === 1 && safeId(data.registroId) && safeId(notificacion.id);
+    return withBasePath(valid ? companyTarget ? '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(data.registroId as string)
+      : '/notificaciones/' + encodeURIComponent(notificacion.id) : '/notificaciones', basePath);
   }
   if (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))) {
     if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)

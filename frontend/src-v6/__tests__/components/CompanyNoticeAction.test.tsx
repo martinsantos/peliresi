@@ -103,6 +103,33 @@ it.each([
 const fiscalNotice:any = { id:'fiscal-n', datos:JSON.stringify({ tipo:'recordatorio_fiscal', version:1, destino:'representante',
  generadorId:'g-1', fiscalYear:2026, accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'QA Entidad'}] }) };
 const fiscalTarget='/admin/actores/generadores/g-1?tab=fiscal&ejercicio=2026';
+it.each(['', '/app'])('routes an eventual through the owned notice and its company activity in %s', prefix => {
+ const n:any = { ...notice, tipo:'INFO_GENERAL', datos:JSON.stringify({ tipo:'manifiesto_eventual',version:1,accesoVersion:1,registroId:'e-1',
+  accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',actorId:'g-1',razonSocial:'QA Entidad'}] }) };
+ expect(resolveNotificationPath(n,prefix)).toBe(prefix+'/notificaciones/n');
+ expect(resolveNotificationPath(n,prefix,undefined,true)).toBe(prefix+'/manifiestos/baja-intensidad?registro=e-1');
+ render(<MemoryRouter><CompanyNoticeAction notice={n} target="/manifiestos/baja-intensidad?registro=e-1" userId="rep" /></MemoryRouter>);
+ expect(screen.getByRole('button',{name:'Abrir eventual como Generador de QA Entidad'})).toBeVisible();
+});
+it.each(['wrong-actor', 'site-only', 'revoked'])('does not save a company eventual context with %s', async reason => {
+ const n:any = { ...notice, tipo:'INFO_GENERAL', datos:JSON.stringify({ tipo:'manifiesto_eventual',version:1,accesoVersion:1,registroId:'e-1',
+  accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',actorId:'g-1',razonSocial:'QA Entidad'}] }) };
+ const context = { empresaId:'co', actividadId:'a', rol:'GENERADOR', actorId:'g-1', todasSedes:true };
+ if(reason==='wrong-actor') context.actorId='g-other'; if(reason==='site-only') context.todasSedes=false;
+ if(reason==='revoked') mocks.get.mockRejectedValue(new Error('403')); else mocks.get.mockResolvedValue({data:{data:{user:{id:'rep',empresaContexto:context}}}});
+ render(<MemoryRouter><CompanyNoticeAction notice={n} target="/manifiestos/baja-intensidad?registro=e-1" userId="rep" /></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Abrir eventual como Generador de QA Entidad'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Tu contexto no cambió'); expect(mocks.save).not.toHaveBeenCalled();
+});
+it('groups the activities of one company without repeating its name', () => {
+ const n:any = { ...notice, tipo:'INFO_GENERAL', datos:JSON.stringify({ tipo:'manifiesto_eventual',version:1,accesoVersion:1,registroId:'e-1',
+  accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',actorId:'g-1',razonSocial:'QA Entidad'},
+   {empresaId:'co',actividadId:'b',rol:'OPERADOR',actorId:'o-1',razonSocial:'QA Entidad'}] }) };
+ render(<MemoryRouter><CompanyNoticeAction notice={n} target="/manifiestos/baja-intensidad?registro=e-1" userId="rep" /></MemoryRouter>);
+ expect(screen.getAllByText('QA Entidad')).toHaveLength(1);
+ expect(screen.getByRole('button',{name:'Abrir eventual como Generador de QA Entidad'})).toBeVisible();
+ expect(screen.getByRole('button',{name:'Abrir eventual como Operador de QA Entidad'})).toBeVisible();
+});
 it.each(['','/app'])('offers the exact company fiscal record in %s without a personal-role detour', prefix => {
  expect(resolveNotificationPath(fiscalNotice,prefix)).toBe(prefix+'/notificaciones/fiscal-n');
  expect(resolveNotificationPath(fiscalNotice,prefix,undefined,true)).toBe(prefix+fiscalTarget);

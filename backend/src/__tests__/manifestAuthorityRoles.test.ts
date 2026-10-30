@@ -42,11 +42,12 @@ it('uses the same authority scope for new-current notices, without selecting use
   tx.usuario.findMany.mockResolvedValue([]);
   await expect(noticeNewCurrents(tx as never, [], [{ corriente: 'Y21' }], '/eventual', 'review')).rejects.toMatchObject({ statusCode: 409 });
 });
-it('requested eventual reviews notify administrators except the creator and impersonator', async () => {
+it('requested eventual reviews reach the creator and independent administrators, not the impersonator or author', async () => {
   roles();
-  const tx = { usuario: { findMany: vi.fn().mockResolvedValue([]) } };
-  await eventualNoticeAudience(tx as never, { creadoPorId: 'creator', impersonadoPorId: 'impersonator', datos: {}, operadorId: null } as never, 'SOLICITAR_REVISION', 'requester');
-  expect(tx.usuario.findMany.mock.calls[0][0].where.OR.at(-1)).toEqual({ rol: 'ADMIN', id: { notIn: ['creator', 'impersonator'] } });
+  const tx = { usuario: { findMany: vi.fn().mockResolvedValue(['creator', 'impersonator', 'authority', 'requester'].map(id => ({ id, rol: 'ADMIN' }))) } };
+  vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'false'); vi.stubEnv('ENTERPRISE_ENABLED', 'false');
+  const recipients = await eventualNoticeAudience(tx as never, { creadoPorId: 'creator', impersonadoPorId: 'impersonator', datos: {}, operadorId: null } as never, 'SOLICITAR_REVISION', 'requester');
+  expect(recipients.map(r => r.id)).toEqual(['creator', 'authority']);
 });
 it('role configuration never opens classroom authority scope', async () => {
   roles();

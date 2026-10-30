@@ -13,6 +13,30 @@ afterEach(cleanup);
 function show(prefix = '', entryState?: unknown) {
  return render(<MemoryRouter basename={prefix || '/'} initialEntries={[{ pathname: prefix + '/notificaciones/n1', state: entryState }]}><Routes><Route path="/notificaciones/:id" element={<AvisoPage />} /></Routes></MemoryRouter>);
 }
+it.each(['', '/app'])('opens an eventual only under the exact personal activity in %s', async prefix => {
+ state.query.data = { ...state.query.data, tipo: 'INFO_GENERAL', titulo: 'Nuevo eventual', datos: JSON.stringify({ tipo:'manifiesto_eventual', version:1,
+  accesoVersion:1, registroId:'eventual-1', actividadesPropias:[{ rol:'OPERADOR', actorId:'operator-1' }], accesosEmpresa:[], autoridad:false }) };
+ state.user = { ...state.user, rol:'GENERADOR', actorId:'gen-1' }; state.activate.mockRejectedValue(new Error('Revoked'));
+ show(prefix);
+ expect(screen.queryByRole('link', { name:'Abrir eventual con mi actividad Operador' })).toBeNull();
+ fireEvent.click(screen.getByRole('button', { name:'Abrir eventual con mi actividad Operador' }));
+ await waitFor(() => expect(state.activate).toHaveBeenCalledWith('qa-owner', 'OPERADOR', 'operator-1', expect.any(Function)));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Tu contexto no cambió');
+});
+it.each(['', '/app'])('offers the eventual in the matching activity on %s', prefix => {
+ state.query.data = { ...state.query.data, tipo:'INFO_GENERAL', titulo:'Nuevo eventual', datos:JSON.stringify({ tipo:'manifiesto_eventual', version:1,
+  accesoVersion:1, registroId:'eventual-1', actividadesPropias:[{ rol:'OPERADOR', actorId:'operator-1' }], accesosEmpresa:[], autoridad:false }) };
+ state.user = { ...state.user, rol:'OPERADOR', actorId:'operator-1' }; show(prefix);
+ expect(screen.getByRole('link', { name:'Abrir eventual con mi actividad Operador' })).toHaveAttribute('href', prefix + '/manifiestos/baja-intensidad?registro=eventual-1');
+});
+it('cancels a pending eventual role switch when the notice screen closes', async () => {
+ state.query.data = { ...state.query.data, tipo:'INFO_GENERAL', datos:JSON.stringify({ tipo:'manifiesto_eventual', version:1,
+  accesoVersion:1, registroId:'eventual-1', actividadesPropias:[{ rol:'OPERADOR', actorId:'operator-1' }], accesosEmpresa:[], autoridad:false }) };
+ let finish: () => void = () => {}; state.activate.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+ const view = show(); fireEvent.click(screen.getByRole('button', { name:'Abrir eventual con mi actividad Operador' }));
+ const stillRelevant = state.activate.mock.calls[0][3]; expect(stillRelevant()).toBe(true);
+ view.unmount(); expect(stillRelevant()).toBe(false); finish(); await Promise.resolve();
+});
 it.each(['', '/app'])('keeps the original GPS notice and explains its temporal uncertainty on %s', prefix => {
  state.query.data = { ...state.query.data, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS', mensaje: 'Parada prolongada de 120 minutos', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } };
  show(prefix);

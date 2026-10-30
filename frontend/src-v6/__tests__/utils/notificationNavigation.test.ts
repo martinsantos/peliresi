@@ -100,8 +100,9 @@ describe('resolveNotificationPath', () => {
   });
   it('opens and refreshes the exact eventual on web and app, ignoring an untrusted URL', () => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'manifiesto_eventual', version: 1, registroId: 'eventual-1', url: '/wrong' }) };
-    expect(resolveNotificationPath(notice)).toBe('/manifiestos/baja-intensidad?registro=eventual-1');
-    expect(resolveNotificationPath(notice, '/app')).toBe('/app/manifiestos/baja-intensidad?registro=eventual-1');
+    expect(resolveNotificationPath(notice)).toBe('/notificaciones/' + notice.id);
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app/notificaciones/' + notice.id);
+    expect(resolveNotificationPath(notice, '/app', undefined, true)).toBe('/app/manifiestos/baja-intensidad?registro=eventual-1');
     const invalidateQueries = vi.fn(); refreshInspectionNotification(notice, { invalidateQueries } as any);
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['baja-intensidad'] });
     expect(resolveNotificationPath({ ...notice, datos: JSON.stringify({ tipo: 'manifiesto_eventual', version: 1, registroId: '../other', url: '/wrong' }) }, '/app')).toBe('/app/notificaciones');

@@ -30,3 +30,13 @@ it('checks the exact actor behind an environmental certificate before changing c
   await activateActorActivity('owner', 'OPERADOR', 'actor-1');
   expect(mocks.save).toHaveBeenCalledWith('owner', 'OPERADOR');
 });
+it('does not change activity if the requesting screen closes before validation finishes', async () => {
+  let finish: (value: unknown) => void = () => {};
+  mocks.get.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  let relevant = true;
+  const pending = activateActorActivity('owner', 'OPERADOR', 'actor-1', () => relevant);
+  relevant = false;
+  finish({ data: { data: { user: { id: 'owner', rol: 'OPERADOR', operador: { id: 'actor-1' } } } } });
+  await pending;
+  expect(mocks.save).not.toHaveBeenCalled(); expect(mocks.clear).not.toHaveBeenCalled();
+});

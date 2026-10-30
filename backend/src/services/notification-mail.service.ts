@@ -18,6 +18,7 @@ import { PARTICIPANT_VISIBLE_STATES } from './inspectionExchange.service';
 import { INSPECTION_AGENDA_LABELS } from './inspectionAgendaNotice.service';
 import { requirementSituation } from './alertCataloguePolicy.service';
 import { EVENTUAL_NOTICE_LABELS, eventualNoticeAudience, eventualNoticeEvent } from './eventualNotice.service';
+import { matchingEventualRecipient } from './eventualNoticeContext.service';
 import { manifestFeatureEnabled } from '../lib/manifestTraining';
 import { RENEWAL_NOTICE_LABELS, renewalNoticeReference, validRenewalNotice } from '../domain/renewalNotice';
 
@@ -53,7 +54,8 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
     if (!record) return false;
     const event = eventualNoticeEvent(record, data.eventoId as string);
     if (!event || event.kind !== data.evento) return false;
-    return (await eventualNoticeAudience(prisma, record, event.kind, event.authorId)).some(user => user.id === notice.usuarioId);
+    const current = (await eventualNoticeAudience(prisma, record, event.kind, event.authorId, event.authorActivity)).find(user => user.id === notice.usuarioId);
+    return !!matchingEventualRecipient(data, current);
   }
   if (family === 'padron') {
     const renewal = await prisma.renovacion.findUnique({ where: { id: data.renovacionId }, include: {
@@ -262,7 +264,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     family = 'padron'; title = 'Novedad en una solicitud de padrón';
     path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones?anio=&revision=' + encodeURIComponent(data.renovacionId) : '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && validEventualMail(data)) {
-    family = 'manifiestos'; title = 'Novedad en un eventual'; path = '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(String(data.registroId));
+    family = 'manifiestos'; title = 'Novedad en un eventual'; path = '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'certificado_manifiesto' && data.version === 1 && typeof data.documentoId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.documentoId) && ['PARCIAL','FINAL'].includes(String(data.tipoCertificado))) {
     family='manifiestos'; title='Certificación disponible'; path='/manifiestos/'+encodeURIComponent(notice.manifiestoId)+'?certificado='+encodeURIComponent(data.documentoId)+'#certificaciones';
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {

@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { manifestCompanyRecipientsBatch, type ManifestCompanyAccess } from './manifestCompanyRecipients.service';
+import { maskEventualNotice, withEventualNoticeContext } from './eventualNoticeContext.service';
 
 type Notice = { usuarioId: string; manifiestoId: string | null; tipo: string; titulo: string; mensaje: string; datos: string | null };
 type Data = Record<string, unknown>;
@@ -38,6 +39,7 @@ export function matchingManifestRuleAccesses(data: Data, current: ManifestCompan
 
 /** Mutation responses do not repeat the private content. */
 export function maskManifestRuleCompanyNotice<T extends Notice>(notice: T): T {
+ notice = maskEventualNotice(notice);
  if (!isManifestRuleCompanyNotice(notice, parse(notice.datos))) return notice;
  return { ...notice, manifiestoId: null, manifiesto: null, titulo: 'Aviso para tu empresa',
   mensaje: 'Consultá tus avisos para conocer el estado actual.',
@@ -46,6 +48,7 @@ export function maskManifestRuleCompanyNotice<T extends Notice>(notice: T): T {
 
 /** Revalidate on every read, in a fixed number of queries per page. */
 export async function withManifestRuleCompanyNoticeContext<T extends Notice>(db: Prisma.TransactionClient, notices: T[]): Promise<T[]> {
+ notices = await withEventualNoticeContext(db, notices);
  const data = notices.map(n => parse(n.datos));
  const targets = notices.filter((n, i) => isManifestRuleCompanyNotice(n, data[i]));
  if (!targets.length) return notices;

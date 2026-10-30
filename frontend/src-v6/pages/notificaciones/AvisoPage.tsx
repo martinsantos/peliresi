@@ -1,4 +1,5 @@
 import CompanyNoticeAction from '../../components/CompanyNoticeAction';
+import EventualNoticeAction from '../../components/EventualNoticeAction';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
@@ -6,7 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses, notificationEnvironmentalCertificate, notificationFiscalReminder, notificationActorReceipt, isActorReceiptNotice, notificationInboxReturnPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses, notificationEventualActors, notificationEnvironmentalCertificate, notificationFiscalReminder, notificationActorReceipt, isActorReceiptNotice, notificationInboxReturnPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
 import { activateActorActivity } from '../../services/activateActorActivity';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import type { Notificacion } from '../../types/models';
@@ -31,6 +32,7 @@ export default function AvisoPage() {
     ? (location.state as { notificationInboxReturn?: unknown }).notificationInboxReturn : undefined;
   const target = notice ? resolveNotificationPath(notice, '', currentUser?.rol, true) : '/notificaciones';
   const companyAccesses = notice ? notificationCompanyAccesses(notice) : [];
+  const eventualActors = notice ? notificationEventualActors(notice) : [];
   const certificate = notice ? notificationEnvironmentalCertificate(notice) : null;
   const fiscal = notice ? notificationFiscalReminder(notice) : null;
   const receipt = notice ? notificationActorReceipt(notice) : null;
@@ -70,8 +72,9 @@ export default function AvisoPage() {
         {contextError && <p role="alert" className="text-sm text-error-700">{contextError}</p>}
       </div>}
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
+      {eventualActors.length > 0 && currentUser && <EventualNoticeAction key={inspectionWorkspaceOwner(currentUser) + ':' + notice.id} notice={notice} target={target} user={currentUser} />}
       {companyAccesses.length > 0 && currentUser && <CompanyNoticeAction key={inspectionWorkspaceOwner(currentUser)} notice={notice} target={target} userId={String(currentUser.id)} context={currentUser.empresaContexto} returnState={inboxState} onOpenFiscal={() => refreshInspectionNotification(notice, queryClient)} />}
-      {!companyAccesses.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal || receipt) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
+      {!companyAccesses.length && !eventualActors.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal || receipt) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
     </article>}
   </section>;
 }

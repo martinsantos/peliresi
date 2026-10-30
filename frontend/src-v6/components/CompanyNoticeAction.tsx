@@ -15,12 +15,14 @@ export default function CompanyNoticeAction({ notice, target, userId, context, r
 }) {
  const accesses = notificationCompanyAccesses(notice), mp = useMobilePrefix();
  const fiscal = notificationFiscalReminder(notice);
- const subject = fiscal ? 'situación fiscal' : target.includes('/adendas') ? 'adenda' : target.includes('certificado=') ? 'certificado' : 'manifiesto';
+ const eventual = target.includes('/manifiestos/baja-intensidad?registro=');
+ const subject = fiscal ? 'situación fiscal' : eventual ? 'eventual' : target.includes('/adendas') ? 'adenda' : target.includes('certificado=') ? 'certificado' : 'manifiesto';
  const article = subject === 'adenda' || fiscal ? 'la' : 'el';
  const [busy, setBusy] = useState(false), [error, setError] = useState('');
  const locked = useRef(false), alive = useRef(true);
  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
  const labels: Record<string,string> = { GENERADOR:'Generador', TRANSPORTISTA:'Transporte', OPERADOR:'Operador' };
+ const eventualCompanies = [...new Map(accesses.map(a => [a.empresaId, a.razonSocial])).entries()];
  async function open(access: typeof accesses[number]) {
   if (locked.current) return;
   locked.current = true; setBusy(true); setError('');
@@ -31,7 +33,8 @@ export default function CompanyNoticeAction({ notice, target, userId, context, r
    if (!alive.current) return;
    if (String(user.id) !== userId || verified?.empresaId !== selection.empresaId || verified?.actividadId !== selection.actividadId
     || (verified?.establecimientoId || '') !== (selection.establecimientoId || '') || verified?.rol !== access.rol
-    || (fiscal && (!verified?.todasSedes || verified?.actorId !== fiscal.actorId))) throw new Error('Contexto incompatible');
+    || (fiscal && (!verified?.todasSedes || verified?.actorId !== fiscal.actorId))
+    || (eventual && (!verified?.todasSedes || !access.actorId || verified?.actorId !== access.actorId))) throw new Error('Contexto incompatible');
    saveCompanyContext(userId, selection); clearOfflineSession();
    const destination = fiscal ? '/notificaciones/' + encodeURIComponent(notice.id) : target;
    window.location.replace((window.location.pathname.startsWith('/app/') ? '/app' : '') + mp(destination));
@@ -40,7 +43,13 @@ export default function CompanyNoticeAction({ notice, target, userId, context, r
  }
  return <div className="space-y-3" aria-label={`Acceso ${article === 'el' ? 'al' : 'a la'} ${subject} por empresa`}>
   <p className="text-sm text-neutral-700">Abrí {article} {subject} con la actividad que representa a la empresa.</p>
-  {accesses.map(a => <div key={a.actividadId} className="rounded-lg border border-primary-100 bg-primary-50 p-3 space-y-2">
+  {eventual ? eventualCompanies.map(([companyId, name]) => <div key={companyId} className="rounded-lg border border-primary-100 bg-primary-50 p-3 space-y-2">
+   <p className="font-semibold break-words">{name}</p>
+   <div className="flex flex-wrap gap-2">
+    {accesses.filter(a => a.empresaId === companyId).map(a => <Button key={a.actividadId} className="scroll-mb-28 scroll-mt-20"
+     aria-label={'Abrir eventual como ' + labels[a.rol] + ' de ' + a.razonSocial} disabled={busy} onClick={() => void open(a)}>Abrir como {labels[a.rol]}</Button>)}
+   </div>
+  </div>) : accesses.map(a => <div key={a.actividadId} className="rounded-lg border border-primary-100 bg-primary-50 p-3 space-y-2">
    <p className="font-semibold break-words">{a.razonSocial}</p>
    <p className="text-sm">{labels[a.rol]}{a.establecimiento ? ' · ' + a.establecimiento : ''}</p>
    {fiscal && context?.empresaId === a.empresaId && context.actividadId === a.actividadId && context.rol === 'GENERADOR'
