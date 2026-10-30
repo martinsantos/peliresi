@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 import { login, prefix } from './helpers';
 
 // Real synthetic login and APIs; no intercepted business data or actor mutations.
-for (const user of ['admin', 'inspector', 'lector-generadores', 'generador', 'operador']) {
+for (const user of ['admin', 'inspector', 'lector-generadores', 'generador', 'transportista', 'operador']) {
   test(`${user}: manifest actor links open permitted fichas and return to the exact record`, async ({ page }, info) => {
     const fixture = JSON.parse(await readFile(path.join(process.env.QA_ARTIFACTS!, 'fixture.json'), 'utf8'));
     expect(fixture.database).toBe('sitrep_night_qa_20260926');
@@ -64,8 +64,8 @@ for (const user of ['admin', 'inspector', 'lector-generadores', 'generador', 'op
           await expect(page.getByRole('button', { name: 'Registrar DDJJ', exact: true })).toHaveCount(0);
         }
         if (!staff) {
-          await page.getByRole('tab', { name: 'Inspecciones', exact: true }).click();
-          await expect(page.getByRole('link', { name: 'Ver mis inspecciones', exact: true })).toBeVisible();
+          await expect(page.getByRole('tab', { name: 'Inspecciones', exact: true })).toHaveCount(0);
+          await expect(page.getByRole('link', { name: 'Ver mis inspecciones', exact: true })).toHaveCount(0);
           await expect(page.getByRole('link', { name: /^Abrir expediente/ })).toHaveCount(0);
         }
       }

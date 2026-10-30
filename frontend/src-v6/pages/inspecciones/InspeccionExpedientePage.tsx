@@ -158,7 +158,7 @@ const InspeccionExpedientePage: React.FC = () => {
 const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const { id = '' } = useParams(); const navigate = useNavigate(); const location = useLocation(); const mobile = location.pathname.startsWith('/mobile'); const { currentUser } = useAuth();
   const workspaceReturn = inspectionReturnTarget(location.state, inspectionWorkspaceOwner(currentUser), mobile);
-  const returnToWorkspace = () => navigate(workspaceReturn.to);
+  const returnToWorkspace = () => navigate(workspaceReturn.to, workspaceReturn.state ? { state: workspaceReturn.state } : undefined);
   const query = useInspection(id); const inspection = query.data;
   const [items, setItems] = useState<InspectionItem[]>([]); const [comparisons, setComparisons] = useState<InspectionComparison[]>([]);
   const [observaciones, setObservaciones] = useState(''); const [numeroActa, setNumeroActa] = useState(''); const [ubicacion, setUbicacion] = useState(''); const [plazoRespuestaAt, setPlazoRespuestaAt] = useState('');
@@ -360,7 +360,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       if (evidenceScopeRef.current === evidenceScope) setPendingEvidenceReadFailed(true);
       throw error;
     }
-  }, [currentUser?.id, evidenceScope, id]);
+  }, [currentUser?.id, evidenceScope, id, owner]);
   useEffect(() => { setPendingEvidence([]); setPendingEvidenceReadFailed(true); void refreshPendingEvidence().catch(() => toast.error('No se pudo leer la cola local', 'No se confirmó el estado de las capturas pendientes. Volvé a abrir el expediente antes de cambiar de etapa.')); }, [refreshPendingEvidence]);
 
   const persistDraft = useCallback(async () => {
@@ -442,7 +442,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     } finally {
       syncingRef.current = false; setSyncingEvidence(false);
     }
-  }, [canEdit, canWriteDraft, currentUser?.id, evidenceScope, id, refreshAfterEvidence, refreshPendingEvidence, staleDraft]);
+  }, [canEdit, canWriteDraft, currentUser?.id, evidenceScope, id, owner, refreshAfterEvidence, refreshPendingEvidence, staleDraft]);
   useEffect(() => { syncEvidenceRef.current = syncEvidence; }, [syncEvidence]);
   useEffect(() => {
     const reconnected = isOnline && !previousOnlineRef.current;

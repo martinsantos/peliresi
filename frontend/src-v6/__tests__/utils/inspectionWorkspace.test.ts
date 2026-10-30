@@ -17,6 +17,21 @@ describe('inspection workspace continuity', () => {
     expect(inspectionReturnTarget(state, 'owner').label).toBe('Agenda de inspecciones');
     expect(inspectionReturnTarget(state, 'owner', true).to).toBe('/mobile/inspecciones');
   });
+  it.each(['', '/mobile'])('returns to the same actor tab and page on %s', prefix => {
+    const path = `${prefix}/admin/actores/generadores/g-1?tab=inspecciones&inspeccionesPagina=3`;
+    const prior = { actorReturn: `${prefix}/manifiestos/m-1?pagina=2#registro` };
+    const state = inspectionReturnState(path, 'owner', prior);
+    expect(inspectionReturnTarget(state, 'owner', Boolean(prefix))).toEqual({ to: path, label: 'Ficha del actor', state: prior });
+    expect(inspectionReturnTarget(state, 'another-owner', Boolean(prefix)).to).toBe(`${prefix}/inspecciones`);
+    expect(inspectionReturnTarget(state, 'owner', !prefix).to).toBe(`${prefix ? '' : '/mobile'}/inspecciones`);
+  });
+  it.each(['/admin/actores/generadores/..', '/admin/actores/generadores/g%2fedit', '/admin/actores/generadores/g-1#x', '//other.invalid/admin/actores/generadores/g-1'])('does not accept a malformed actor return: %s', path => {
+    expect(inspectionReturnTarget(inspectionReturnState(path, 'owner'), 'owner').to).toBe('/inspecciones');
+  });
+  it('does not carry an external origin into the actor ficha', () => {
+    const state = inspectionReturnState('/admin/actores/generadores/g-1?tab=inspecciones', 'owner', { actorReturn: 'https://other.invalid', inspectionReturn: '/\\other.invalid' });
+    expect(inspectionReturnTarget(state, 'owner')).toEqual({ to: '/admin/actores/generadores/g-1?tab=inspecciones', label: 'Ficha del actor' });
+  });
   it('rejects invalid dates and pages without passing them to the API', () => {
     expect(inspectionDateFilter('2026-02-30')).toBe('');
     expect(inspectionDateFilter('2026-10-25')).toBe('2026-10-25');

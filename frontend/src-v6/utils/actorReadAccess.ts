@@ -42,7 +42,7 @@ export function canReadActorInspectionHistory(user: Reader, type: ActorReadType)
   return user.esInspector === true;
 }
 
-export function actorInspectionAccess(user: Reader, type: ActorReadType, id?: string): 'staff' | 'participation' | null {
+export function actorInspectionAccess(user: Reader, type: ActorReadType, id?: string): 'staff' | null {
   if (!canReadActorDetail(user, type, id)) return null;
   if (canReadActorInspectionHistory(user, type)) return 'staff';
   return null;
