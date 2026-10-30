@@ -35,6 +35,9 @@ test('eventual records without a site require full company authorization', () =>
   assert.match(text, /actividades propias aprobadas y representaciones con acceso a todos los establecimientos/);
   assert.match(text, /Si una autorización se revoca, el aviso deja de mostrar el registro/);
   assert.match(text, /avisos anteriores pueden no incluir representaciones/i);
+  assert.match(text, /borrador se guarda en este dispositivo para la cuenta, actividad y contexto actuales/);
+  assert.match(text, /Comprobar envío: se reutilizan la referencia y los datos originales/);
+  assert.match(text, /borrar los datos del navegador o de la app también elimina esa copia local/);
   assert.match(text, /sólo ves los eventuales en los que participa esa actividad/);
   assert.match(text, /un reintento usa la actividad original/);
 });

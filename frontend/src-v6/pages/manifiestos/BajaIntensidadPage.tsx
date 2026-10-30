@@ -3,9 +3,14 @@ import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { api } from '../../services/api';
+import { api, getAccessToken } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useRecoverableForm } from '../../hooks/useRecoverableForm';
+import { DraftConflictNotice } from '../../components/DraftConflictNotice';
+import { clearEventualSubmission, emptyEventualDraft, emptyEventualWaste, eventualDraftScope, eventualSubmissionKey, mayReplaceEventualDraft,
+  readEventualSubmission, retainEventualDraft, validEventualDraft, writeEventualSubmission,
+  type EventualParticipant as Participant, type EventualSlot as Slot, type EventualWaste as Waste, type EventualPayload, type PendingEventualCreate } from '../../services/eventualDraft';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
@@ -13,9 +18,6 @@ import { Select } from '../../components/ui/Select';
 import SeguimientoExterno from './SeguimientoExterno';
 import { Factory, Truck, FlaskConical, Shield, ClipboardList, ClipboardCheck, ChevronRight, RefreshCw } from 'lucide-react';
 
-type Waste = { corriente: string; cantidad: number; unidad: string };
-type Participant = { nombre: string; identificacion: string; domicilio: string; nombreFantasia?: string; telefono?: string; padronId?: string };
-type Slot = 'generador' | 'transportista' | 'operador';
 type Approval = { estado: 'NO_REQUIERE' | 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'; partes: { parte: string; rol: string; estado: string }[] };
 type Entry = {
   id: string; referencia: string; version: number; etapa: string; puedeRegistrar: boolean; puedeResolver: boolean;
@@ -25,7 +27,6 @@ type Entry = {
   eventos: { id: string; tipo: string; nota: string; fecha: string; autorId: string; etapa?: string; parte?: string; residuos?: Waste[]; decision?: string }[];
 };
 const endpoint = '/manifiestos/baja-intensidad';
-const emptyActor = (): Participant => ({ nombre: '', identificacion: '', domicilio: '' });
 const stageLabels: Record<string, string> = { REGISTRADO: 'Registrado', RETIRADO: 'Retirado', RECIBIDO: 'Recibido', TRATADO: 'Tratado' };
 const nextStages: Record<string, string> = { REGISTRADO: 'RETIRADO', RETIRADO: 'RECIBIDO', RECIBIDO: 'TRATADO' };
 const labels: Record<string, string> = { AVANCE: 'Movimiento registrado', DIFERENCIA: 'Diferencia registrada', SOLICITAR_REVISION: 'Revisión solicitada', RESOLVER: 'Resolución posterior',
@@ -39,12 +40,11 @@ const partLabels: Record<string, string> = { creador: 'Quien lo creó', generado
 const approvalRoles: Record<string, { title: string; Icon: typeof Factory }> = { GENERADOR: { title: 'Generador', Icon: Factory }, TRANSPORTISTA: { title: 'Transporte', Icon: Truck }, OPERADOR: { title: 'Operador', Icon: FlaskConical }, ADMIN: { title: 'Administración', Icon: Shield } };
 const decisionLabels: Record<string, string> = { PENDIENTE: 'Pendiente', APROBADA: 'Aprobada', RECHAZADA: 'Rechazada' };
 
-function ParticipantFields({ title, value, onChange }: { title: string; value: Participant; onChange: (v: Participant) => void }) {
+function ParticipantFields({ title, value, external, onChange, onExternalChange }: { title: string; value: Participant; external: Participant; onChange: (v: Participant) => void; onExternalChange: (v: Participant) => void }) {
   const { currentUser } = useAuth();
-  const [lookup, setLookup] = useState(false);
+  const [lookup, setLookup] = useState(!!value.padronId);
   const [search, setSearch] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
-  const externalDraft = useRef(value);
   const query = useQuery({ queryKey: ['baja-intensidad-participantes', currentUser?.id, inspectionWorkspaceOwner(currentUser), title, submittedSearch], enabled: lookup,
     queryFn: async () => (await api.get(endpoint + '/participantes', { params: { tipo: title.toLowerCase(), q: submittedSearch } })).data.data.participantes as Participant[],
     retry: false, staleTime: 60000 });
@@ -52,8 +52,8 @@ function ParticipantFields({ title, value, onChange }: { title: string; value: P
   const choices = participants.some(p => p.padronId === value.padronId) || !value.padronId ? participants : [value, ...participants];
   return <fieldset className="space-y-3 min-w-0"><legend className="font-semibold mb-2">{title} · {value.padronId ? 'Del padrón' : 'Sin alta'}</legend>
     <Button type="button" variant="outline" size="sm" onClick={() => {
-      if (!lookup) { if (!value.padronId) externalDraft.current = value; setLookup(true); }
-      else { onChange(externalDraft.current); setLookup(false); }
+      if (!lookup) { if (!value.padronId) onExternalChange(value); setLookup(true); }
+      else { onChange(external); setLookup(false); }
     }}>{lookup ? title + ' · Usar datos declarados' : title + ' · Buscar en padrón'}</Button>
     {lookup && <div className="space-y-2">
       <Input label={title + ' · Buscar por nombre o CUIT'} value={search} onChange={e => setSearch(e.target.value)} />
@@ -83,6 +83,12 @@ function WasteFields({ value, onChange }: { value: Waste; onChange: (v: Waste) =
 }
 export default function BajaIntensidadPage() {
   const { currentUser } = useAuth();
+  const owner = currentUser ? eventualDraftScope(inspectionWorkspaceOwner(currentUser), currentUser.id, getAccessToken()) : '';
+  if (!owner) return <p role="status" className="p-4">Ingresá nuevamente para recuperar tu actividad y sus borradores.</p>;
+  return <BajaIntensidadWorkspace key={owner} />;
+}
+function BajaIntensidadWorkspace() {
+  const { currentUser } = useAuth();
   const mp = useMobilePrefix();
   const [params, setParams] = useSearchParams();
   const id = params.get('registro');
@@ -103,10 +109,20 @@ export default function BajaIntensidadPage() {
     queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint, id ? undefined : { params: { page: listPage, search, etapa: stage } })).data.data as { registro?: Entry; registros?: Entry[]; total?: number; page?: number; pageSize?: number },
     retry: false, staleTime: 0, refetchInterval: 5000, refetchIntervalInBackground: false });
   const [creating, setCreating] = useState(false);
-  const [declared, setDeclared] = useState<Record<Slot, Participant>>(() => ({ generador: emptyActor(), transportista: emptyActor(), operador: emptyActor() }));
-  const [patente, setPatente] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [wastes, setWastes] = useState<Waste[]>([{ corriente: '', cantidad: 0, unidad: 'kg' }]);
+  const draftKey = 'sitrep:eventual-form:v1:' + eventualDraftScope(owner, currentUser!.id, getAccessToken());
+  const draft = useRecoverableForm(draftKey, emptyEventualDraft(), validEventualDraft,
+    { retainExpired: retainEventualDraft, rejectUnreadable: true });
+  const readSubmission = () => { try { return { pending: readEventualSubmission(draftKey), error: false }; } catch { return { pending: null, error: true }; } };
+  const [submission, setSubmission] = useState(readSubmission);
+  useEffect(() => {
+    const refresh = () => setSubmission(readSubmission());
+    const receive = (event: StorageEvent) => { if (event.key === eventualSubmissionKey(draftKey)) refresh(); };
+    window.addEventListener('storage', receive); window.addEventListener('focus', refresh);
+    return () => { window.removeEventListener('storage', receive); window.removeEventListener('focus', refresh); };
+  }, [draftKey]);
+  const [discardDraft, setDiscardDraft] = useState(false);
+  const [confirmedCreate, setConfirmedCreate] = useState<string | null>(null);
+  const [wastes, setWastes] = useState<Waste[]>([emptyEventualWaste()]);
   const [nota, setNota] = useState('');
   const [draftVersion, setDraftVersion] = useState<number | undefined>();
   const [difference, setDifference] = useState(false);
@@ -114,28 +130,98 @@ export default function BajaIntensidadPage() {
   const [recovered, setRecovered] = useState('');
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  useEffect(() => { setNota(''); setDraftVersion(undefined); setDifference(false); setError(''); setRecovered(''); }, [id]);
+  const cleanupWarning = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => { setNota(''); setDraftVersion(undefined); setDifference(false); setWastes([emptyEventualWaste()]); setError('');
+    setRecovered(cleanupWarning.current ? 'La operación se guardó. Conservamos las copias locales que no pudimos limpiar; revisalas antes de enviar otra operación.' : ''); cleanupWarning.current = false; }, [id]);
   // Retained on failed requests. Repeating the same command cannot duplicate facts.
   const request = useRef<{ signature: string; id: string } | undefined>(undefined);
-  const creationId = useRef(crypto.randomUUID());
-  async function send(path: string, body: Record<string, unknown>, created = false) {
-    if (lock.current) return;
+  async function send(path: string, body: Record<string, unknown>, created = false, checking = false) {
+    if (lock.current || (created && (draft.error || submission.error || (draft.conflict && !submission.pending)))) return;
     lock.current = true; setBusy(true); setError(''); setRecovered('');
-    const signature = JSON.stringify({ path, body });
-    if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
+    const perform = async () => {
+      let pending: PendingEventualCreate | undefined, fresh = false, ownsDraft = false;
+      if (created) {
+        let stored: PendingEventualCreate | null;
+        try { stored = readEventualSubmission(draftKey); }
+        catch { setSubmission({ pending: null, error: true }); setError('No pudimos leer la referencia del envío. No se envió otra operación.'); return; }
+        if (stored && !checking) {
+          setSubmission({ pending: stored, error: false });
+          setError('Hay un envío sin confirmar. Comprobalo antes de registrar otra operación.'); return;
+        }
+        if (stored) { pending = stored; ownsDraft = draft.value.pendingCreate?.id === stored.id; }
+        else {
+        // Build the immutable payload from the latest in-memory draft while
+        // holding the cross-tab lock, not from an earlier rendered closure.
+        const saved = draft.update(current => {
+          pending = current.pendingCreate;
+          if (!pending) {
+            fresh = true;
+            const slots = (['generador', 'transportista', 'operador'] as Slot[]).filter(slot => slot !== ownSlot[currentUser?.rol || '']);
+            pending = { id: crypto.randomUUID(), body: structuredClone({ ...Object.fromEntries(slots.map(slot => [slot, current.declared[slot]])),
+              patente: current.patente, motivo: current.motivo, residuos: current.residuos }) as EventualPayload };
+          }
+          return { ...current, pendingCreate: pending };
+        });
+        if (!saved.saved || saved.conflict || !pending) {
+          // An unsent candidate must not be mistaken for a pending request.
+          if (fresh) draft.update(current => { const next = { ...current }; if (next.pendingCreate?.id === pending?.id) delete next.pendingCreate; return next; });
+          setError('Todavía no se envió. Revisá el borrador y su almacenamiento antes de reintentar.'); return;
+        }
+        ownsDraft = true;
+        try {
+          writeEventualSubmission(draftKey, pending);
+          setSubmission({ pending, error: false });
+        } catch {
+          setSubmission(readSubmission());
+          setError('No pudimos guardar la referencia del envío. No se envió otra operación.'); return;
+        }
+        }
+      }
+      const signature = JSON.stringify({ path, body });
+      if (!created && request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
+      try {
+        const result: Entry = (await api.post(path, created ? { ...pending!.body, id: pending!.id } : { ...body, id: request.current!.id })).data.data.registro;
+        if (!alive.current) return;
+        await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner] });
+        if (!alive.current) return;
+        // Lists must not retain the shared 60-second cache after an operation or resolution.
+        void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner], refetchType: 'none' });
+        qc.setQueryData(['baja-intensidad', currentUser?.id, owner, result.id], { registro: result });
+        if (created) {
+          setConfirmedCreate(pending!.id);
+          if (!ownsDraft || !draft.clear()) cleanupWarning.current = true;
+          try { clearEventualSubmission(draftKey, pending!.id); setSubmission({ pending: null, error: false }); }
+          catch { cleanupWarning.current = true; setSubmission(readSubmission()); }
+        }
+        changeParams({ registro: result.id }); setCreating(false); setDifference(false); setNota(''); setDraftVersion(undefined);
+        request.current = undefined;
+      } catch (caught) {
+        if (!alive.current) return;
+        const failure = caught as { response?: { status?: number; data?: { message?: string } } };
+        // A later rejection cannot establish whether an earlier attempt committed.
+        // Only a validation rejection on the very first attempt permits editing.
+        if (created && fresh && [400, 422].includes(failure.response?.status || 0)) {
+          try {
+            clearEventualSubmission(draftKey, pending!.id); setSubmission({ pending: null, error: false });
+            draft.update(current => { const next = { ...current }; delete next.pendingCreate; return next; });
+          } catch { setSubmission(readSubmission()); }
+        }
+        setError(failure.response?.data?.message || 'No se pudo confirmar. Tus datos siguen aquí; podés reintentar.');
+      }
+    };
     try {
-      const result: Entry = (await api.post(path, { ...body, id: created ? creationId.current : request.current.id })).data.data.registro;
-      await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner] });
-      // Lists must not retain the shared 60-second cache after an operation or resolution.
-      void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id, owner], refetchType: 'none' });
-      qc.setQueryData(['baja-intensidad', currentUser?.id, owner, result.id], { registro: result });
-      changeParams({ registro: result.id }); setCreating(false); setDifference(false); setNota(''); setDraftVersion(undefined);
-      if (created) creationId.current = crypto.randomUUID();
-      request.current = undefined;
-    } catch (caught) {
-      const failure = caught as { response?: { data?: { message?: string } } };
-      setError(failure.response?.data?.message || 'No se pudo confirmar. Tus datos siguen aquí; podés reintentar.');
-    } finally { lock.current = false; setBusy(false); }
+      if (!created) await perform();
+      else if (!navigator.locks?.request) setError('Este navegador no puede proteger el envío entre pestañas. Usá un navegador compatible para continuar; el borrador queda guardado aquí.');
+      else await navigator.locks.request('sitrep:eventual-submit:' + draftKey, { mode: 'exclusive', ifAvailable: true }, async grant => {
+        if (!alive.current) return;
+        if (!grant) { setError('Otra pestaña está enviando este borrador. Esperá a que termine y volvé a comprobarlo.'); return; }
+        await perform();
+      });
+    } catch {
+      if (alive.current) setError('No pudimos proteger el envío en este navegador. El borrador sigue guardado; reintentá.');
+    } finally { lock.current = false; if (alive.current) setBusy(false); }
   }
   const entry = query.isError ? undefined : query.data?.registro;
   useEffect(() => {
@@ -155,18 +241,24 @@ export default function BajaIntensidadPage() {
   const beginEdit = () => setDraftVersion(previous => previous ?? entry?.version);
   const actualPage = query.data?.page ?? listPage;
   const formSlots = (['generador', 'transportista', 'operador'] as Slot[]).filter(slot => slot !== ownSlot[currentUser?.rol || '']);
+  const creationWastes: React.Dispatch<React.SetStateAction<Waste[]>> = change => draft.update(current => {
+    if (current.pendingCreate) return current;
+    return { ...current, residuos: typeof change === 'function' ? change(current.residuos) : change };
+  });
+  const pendingCreate = submission.pending || draft.value.pendingCreate;
+  const hasDraft = draft.saved || draft.restored || draft.conflict || !!pendingCreate || submission.error;
   const approval = entry?.aprobacion && entry.aprobacion.estado !== 'NO_REQUIERE' ? entry.aprobacion : undefined;
   const factsBlocked = approval?.estado === 'PENDIENTE' || approval?.estado === 'RECHAZADO';
   const event = (body: Record<string, unknown>) => {
     if (!entry || staleDraft) return;
     return send(endpoint + '/' + entry.id + '/eventos', { ...body, version: draftVersion ?? entry.version });
   };
-  const wasteInputs = <div className="space-y-3">{wastes.map((waste, index) => <fieldset key={index} className="space-y-2">
+  const wasteInputs = (rows: Waste[], update: React.Dispatch<React.SetStateAction<Waste[]>>) => <div className="space-y-3">{rows.map((waste, index) => <fieldset key={index} className="space-y-2">
     <legend className="text-sm font-semibold mb-2">Residuo {index + 1}</legend>
-    <WasteFields value={waste} onChange={value => setWastes(rows => rows.map((row, i) => i === index ? value : row))} />
-    {wastes.length > 1 && <Button type="button" variant="outline" size="sm" onClick={() => setWastes(rows => rows.filter((_, i) => i !== index))}>Quitar residuo {index + 1}</Button>}
+    <WasteFields value={waste} onChange={value => update(previous => previous.map((row, i) => i === index ? value : row))} />
+    {rows.length > 1 && <Button type="button" variant="outline" size="sm" onClick={() => update(previous => previous.filter((_, i) => i !== index))}>Quitar residuo {index + 1}</Button>}
   </fieldset>)}
-    <Button type="button" variant="outline" disabled={wastes.length >= 50} onClick={() => setWastes(rows => [...rows, { corriente: '', cantidad: 0, unidad: 'kg' }])}>Agregar residuo</Button>
+    <Button type="button" variant="outline" disabled={rows.length >= 50} onClick={() => update(previous => [...previous, emptyEventualWaste()])}>Agregar residuo</Button>
   </div>;
   if (!enabled) return <p className="p-6">Circuito no habilitado.</p>;
   if (siteLimited) return <div className="mx-auto max-w-4xl space-y-4 p-4">
@@ -185,7 +277,7 @@ export default function BajaIntensidadPage() {
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-bold text-neutral-900">Manifiestos eventuales</h1>
-      {!id && !tracking && creators.includes(currentUser?.rol || '') && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
+      {!id && !tracking && creators.includes(currentUser?.rol || '') && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : hasDraft ? 'Continuar borrador' : 'Registrar operación'}</Button>}
       {id && <Button variant="outline" onClick={() => changeParams({ registro: null })}>Ver registros</Button>}
     </div>
     {!id && !creating && creators.includes(currentUser?.rol || '') && <Button variant="outline" onClick={() => changeParams({ vista: tracking ? null : 'seguimiento' })}>{tracking ? 'Volver a registros' : 'Seguimiento de participantes'}</Button>}
@@ -195,13 +287,38 @@ export default function BajaIntensidadPage() {
     {error && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
     {!tracking && query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {!tracking && query.isLoading && <p role="status">Cargando registros…</p>}
-    {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { ...Object.fromEntries(formSlots.map(slot => [slot, declared[slot]])), patente, motivo, residuos: wastes }, true); }}>
-      <div className="grid sm:grid-cols-2 gap-5">{formSlots.map(slot => <ParticipantFields key={slot} title={slotTitles[slot]} value={declared[slot]}
-        onChange={value => setDeclared(current => ({ ...current, [slot]: value }))} />)}</div>
-      <Input label="Patente declarada" maxLength={20} value={patente} onChange={e => setPatente(e.target.value)} />
-      {wasteInputs}
-      <Input label="Motivo del registro excepcional" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
-      <Button type="submit" disabled={busy}>Guardar operación</Button>
+    {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, {}, true); }}>
+      {draft.conflict && <DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload}
+        canReload={!draft.value.pendingCreate || draft.value.pendingCreate.id === confirmedCreate}
+        canKeep={!submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)} onKeep={() => {
+          if (!submission.pending && mayReplaceEventualDraft(draftKey, draft.value.pendingCreate?.id)) draft.overwrite();
+          else setError('Hay un envío sin confirmar en otra versión. Cargá esa versión antes de continuar.');
+        }} />}
+      {(draft.error || submission.error) && <div role="alert" className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900 space-y-2"><p>No pudimos leer o guardar el borrador o la referencia del envío en este dispositivo. Conservá esta pantalla abierta y reintentá antes de enviar.</p>
+        <Button type="button" variant="outline" onClick={() => { draft.update(draft.value); setSubmission(readSubmission()); }}>Reintentar guardado</Button></div>}
+      {pendingCreate && <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 space-y-2">
+        <p>{pendingCreate.id === confirmedCreate
+          ? 'La operación ya fue confirmada. Revisá las copias locales antes de continuar.'
+          : 'La operación podría haberse guardado. Comprobá el mismo envío antes de modificar los datos; no se creará otra.'}</p>
+        {submission.pending && submission.pending.id !== draft.value.pendingCreate?.id && <p className="break-words">Motivo del envío a comprobar: {submission.pending.body.motivo}</p>}
+        <Button type="button" disabled={busy || (draft.conflict && !submission.pending) || draft.error || submission.error} onClick={() => void send(endpoint, {}, true, true)}>Comprobar envío</Button>
+      </div>}
+      {!pendingCreate && (draft.saved || draft.restored) && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary-50 px-3 text-sm text-primary-900">
+        <p role="status" className="py-2">{draft.restored ? 'Borrador recuperado' : 'Borrador guardado'} · En este dispositivo; todavía no se envió.</p>
+        {!discardDraft ? <button type="button" className="min-h-11 font-semibold underline" onClick={() => setDiscardDraft(true)}>Descartar</button>
+          : <div className="flex flex-wrap items-center gap-2 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span>
+            <Button type="button" size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => { if (draft.clear()) setDiscardDraft(false); }}>Sí, descartar</Button></div>}
+      </div>}
+      {(!submission.pending || submission.pending.id === draft.value.pendingCreate?.id) && <fieldset className="space-y-5 min-w-0" disabled={busy || !!pendingCreate || draft.conflict}>
+        <div className="grid sm:grid-cols-2 gap-5">{formSlots.map(slot => <ParticipantFields key={slot} title={slotTitles[slot]} value={draft.value.declared[slot]} external={draft.value.external[slot]}
+          onChange={value => draft.update(current => ({ ...current, declared: { ...current.declared, [slot]: value } }))}
+          onExternalChange={value => draft.update(current => ({ ...current, external: { ...current.external, [slot]: value } }))} />)}</div>
+        <Input label="Patente declarada" maxLength={20} value={draft.value.patente} onChange={e => draft.update(current => ({ ...current, patente: e.target.value }))} />
+        {wasteInputs(draft.value.residuos, creationWastes)}
+        <Input label="Motivo del registro excepcional" required maxLength={500} value={draft.value.motivo} onChange={e => draft.update(current => ({ ...current, motivo: e.target.value }))} />
+        <Button type="submit" disabled={busy || draft.error || submission.error}>Guardar operación</Button>
+      </fieldset>}
     </form></Card>}
     {!id && !creating && !tracking && <Card padding="none" className="overflow-hidden">
       <div className="space-y-3 p-4 border-b border-neutral-200">
@@ -274,7 +391,7 @@ export default function BajaIntensidadPage() {
       </div>
       {difference && <form className="space-y-3 mt-4" onSubmit={e => { e.preventDefault(); void event({ tipo: 'DIFERENCIA', nota, residuos: wastes }); }}>
         <p className="text-sm">Carga observada completa; no se suma automáticamente al original.</p>
-        {wasteInputs}<Button type="submit" disabled={busy || staleDraft || !nota.trim()}>Guardar diferencia</Button>
+        {wasteInputs(wastes, setWastes)}<Button type="submit" disabled={busy || staleDraft || !nota.trim()}>Guardar diferencia</Button>
       </form>}</Card>}
       <Card><h2 className="flex items-center gap-2 text-base font-semibold mb-3"><ClipboardCheck size={20} aria-hidden="true" className="shrink-0 text-primary-700" />Revisión posterior</h2><div className="space-y-4">
         {entry.revisiones.map((review, i) => <section key={review.objetivo} aria-label={i === 0 ? 'Revisión original' : 'Revisión diferencia ' + i} className="border-b border-neutral-200 pb-3 last:border-0">

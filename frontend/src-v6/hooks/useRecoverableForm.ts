@@ -5,23 +5,27 @@ type RecordValue<T> = { version: 1; revision: string; savedAt: number; value: T 
 const pendingConflicts = new Map<string, { value: unknown; revision: string | null; savedAt: number }>();
 /** A keyed form must remount when its verified account/role/record scope changes.
  * Saves input immediately (mobile shutdown has no reliable unload event). Never stores files. */
-export function useRecoverableForm<T>(key: string, initial: T, validate: (value: unknown) => value is T) {
-  const journal = draftConflicts(key, validate);
+export function useRecoverableForm<T>(key: string, initial: T, validate: (value: unknown) => value is T,
+  options?: { retainExpired?: (value: T) => boolean; rejectUnreadable?: boolean }) {
+  const journal = draftConflicts(key, validate, options?.retainExpired, !!options?.rejectUnreadable);
   const writer = useRef(crypto.randomUUID());
   const read = (): RecordValue<T> | null => {
     const raw = localStorage.getItem(key);
-    if (!raw) return null;
+    if (raw === null || (!raw && !options?.rejectUnreadable)) return null;
     try {
       const data = JSON.parse(raw);
-      return data.version === 1 && typeof data.revision === 'string' && Number.isFinite(data.savedAt)
-        && data.savedAt <= Date.now() && Date.now() - data.savedAt < 7 * 86400000
-        && (data.value === null || validate(data.value)) ? data : null;
-    } catch { return null; }
+      const valid = data?.version === 1 && typeof data.revision === 'string' && Number.isFinite(data.savedAt)
+        && (data.value === null || validate(data.value));
+      if (!valid) { if (options?.rejectUnreadable) throw new Error('Borrador ilegible'); return null; }
+      const recent = data.savedAt <= Date.now() && Date.now() - data.savedAt < 7 * 86400000;
+      return recent || (data.value !== null && options?.retainExpired?.(data.value)) ? data : null;
+    } catch (error) { if (options?.rejectUnreadable) throw error; return null; }
   };
   const [loaded] = useState(() => { try { return { record: read(), error: false }; } catch { return { record: null, error: true }; } });
+  const [journalError] = useState(() => { try { journal.list(); return false; } catch { return true; } });
   const [recovery] = useState(() => {
     const pending = pendingConflicts.get(key);
-    if (pending && Date.now() - pending.savedAt < 7 * 86400000 && validate(pending.value)) return { ...pending, entry: null, durable: false, count: 1 };
+    if (pending && validate(pending.value) && (Date.now() - pending.savedAt < 7 * 86400000 || options?.retainExpired?.(pending.value))) return { ...pending, entry: null, durable: false, count: 1 };
     try {
       const entries = journal.list();
       return entries[0] ? { value: entries[0].value, revision: loaded.record?.revision ?? null, entry: entries[0], durable: true, count: entries.length } : null;
@@ -34,13 +38,15 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
   const [value, setValue] = useState<T>(recovery ? recovery.value as T : loaded.record?.value ?? initial);
   const current = useRef(value), revision = useRef(recovery ? recovery.revision : loaded.record?.revision ?? null), edited = useRef(!!recovery);
   const [saved, setSaved] = useState(!!loaded.record?.value && !recovery);
-  const [error, setError] = useState(loaded.error), [conflict, setConflict] = useState(!!recovery);
+  const [error, setError] = useState(loaded.error || journalError), [conflict, setConflict] = useState(!!recovery);
   const conflicted = useRef(!!recovery);
   const [restored, setRestored] = useState(!!loaded.record?.value);
   const preserveConflict = () => {
     pendingConflicts.set(key, { value: current.current, revision: revision.current, savedAt: Date.now() });
     conflicted.current = true; setConflict(true); setSaved(false);
     try {
+      if (options?.rejectUnreadable && !validate(current.current)) throw new Error('Borrador incompleto');
+      if (options?.rejectUnreadable) journal.list();
       written.current = journal.save(current.current, writer.current);
       journal.remove(selected.current); selected.current = null;
       pendingConflicts.delete(key); setConflictSaved(true); setConflictCount(journal.list().length); setError(false);
@@ -59,6 +65,8 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
   };
   const persist = (next: T | null, force = false) => {
     try {
+      if (next !== null && options?.rejectUnreadable && !validate(next)) throw new Error('Borrador incompleto');
+      if (options?.rejectUnreadable) journal.list();
       const latest = read();
       if (!force && (conflicted.current || (latest?.revision ?? null) !== revision.current)) {
         preserveConflict(); return false;
@@ -71,7 +79,11 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
   };
   const update = (change: SetStateAction<T>) => {
     const next = typeof change === 'function' ? (change as (v: T) => T)(current.current) : change;
-    current.current = next; edited.current = true; setValue(next); const saved=persist(next);return {saved,conflict:conflicted.current};
+    current.current = next; edited.current = true; setValue(next);
+    // Keep an invalid intermediate value on screen, never serialize it over a
+    // previously recoverable record (e.g. a non-finite number becomes null).
+    if (options?.rejectUnreadable && !validate(next)) { setError(true); setSaved(false); return { saved:false, conflict:conflicted.current }; }
+    const saved=persist(next);return {saved,conflict:conflicted.current};
   };
   const reload = () => {
     try {

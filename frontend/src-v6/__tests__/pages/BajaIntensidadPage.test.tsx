@@ -1,11 +1,12 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import BajaIntensidadPage from '../../pages/manifiestos/BajaIntensidadPage';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { emptyEventualDraft, eventualDraftScope, eventualSubmissionKey } from '../../services/eventualDraft';
 const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), user: { id: 'qa-operator', rol: 'OPERADOR' } }));
-vi.mock('../../services/api', () => ({ api: mock }));
+vi.mock('../../services/api', () => ({ api: mock, getAccessToken: () => 'qa.' + btoa(JSON.stringify({ id: mock.user.id })) + '.qa' }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mock.user }) }));
 const id = '00000000-0000-4000-8000-000000000001';
 const entry = { id, referencia: 'BI-' + id, version: 0, etapa: 'RECIBIDO', puedeRegistrar: true, puedeResolver: false,
@@ -19,10 +20,220 @@ function view(detail = false, client = new QueryClient({ defaultOptions: { queri
   </QueryClientProvider>);
 }
 beforeEach(() => {
+  localStorage.clear(); sessionStorage.clear();
+  Object.defineProperty(navigator, 'locks', { configurable:true, value:{ request: async (name:string, _options:unknown, callback:(lock:unknown)=>Promise<void>) => callback({ name }) } });
   vi.clearAllMocks(); mock.user = { id: 'qa-operator', rol: 'OPERADOR' }; vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED', 'true');
   mock.get.mockResolvedValue({ data: { data: { registro: entry, registros: [], total: 0 } } });
 });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
+it('restores a creation draft after leaving and isolates it from a different role', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ const view1 = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Transportista · Nombre o razón social'), { target:{ value:'Transporte propio del borrador' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'Motivo de Generador' } });
+ view1.unmount();
+ mock.user = { id:'qa-person', rol:'OPERADOR', actorId:'op-1' } as typeof mock.user;
+ const view2 = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toHaveValue('');
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'Motivo de Operador' } }); view2.unmount();
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toHaveValue('Motivo de Generador');
+ expect(screen.getByLabelText('Transportista · Nombre o razón social')).toHaveValue('Transporte propio del borrador');
+});
+it('persists the submitted identity before dispatch and reuses it after a lost response and reopen', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.post.mockRejectedValueOnce(new Error('offline'));
+ const first = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } });
+ fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA no duplicar' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'}));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1)); const original = mock.post.mock.calls[0];
+ await screen.findByText(/podría haberse guardado/i); first.unmount();
+ mock.post.mockResolvedValueOnce({ data:{ data:{ registro:{ ...entry, id:original[1].id } } } });
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2)); expect(mock.post.mock.calls[1]).toEqual(original);
+});
+it.each([400, 403, 422])('keeps an uncertain request after a later %i rejection', async status => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.post.mockRejectedValueOnce(new Error('response lost')).mockRejectedValueOnce({ response:{ status, data:{ message:'No se pudo verificar' } } });
+ const first = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA envío incierto' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'})); await screen.findByText(/podría haberse guardado/i);
+ const original = mock.post.mock.calls[0]; fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ await screen.findByText('No se pudo verificar'); expect(mock.post.mock.calls[1]).toEqual(original); first.unmount();
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByText(/podría haberse guardado/i)).toBeVisible();
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Comprobar envío'})).toBeEnabled();
+});
+it('allows correction after an initial validation rejection', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.post.mockRejectedValueOnce({ response:{ status:400, data:{ message:'Revisá la corriente' } } });
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA corregir' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'})); await screen.findByText('Revisá la corriente');
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Guardar operación'})).toBeVisible();
+});
+it('recovers the exact send when a competing tab replaces the editable draft', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.post.mockRejectedValueOnce(new Error('response lost'));
+ const first = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA referencia protegida' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'})); await screen.findByText(/podría haberse guardado/i);
+ const original = mock.post.mock.calls[0]; first.unmount();
+ const key = 'sitrep:eventual-form:v1:' + eventualDraftScope(inspectionWorkspaceOwner(mock.user as never), mock.user.id, 'qa.' + btoa(JSON.stringify({ id:mock.user.id })) + '.qa');
+ localStorage.setItem(key, JSON.stringify({ version:1, revision:'stale-tab', savedAt:Date.now(), value:emptyEventualDraft() }));
+ mock.post.mockResolvedValueOnce({ data:{ data:{ registro:{ ...entry, id:original[1].id } } } });
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByText('Motivo del envío a comprobar: QA referencia protegida')).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Guardar operación'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2)); expect(mock.post.mock.calls[1]).toEqual(original);
+ await screen.findByRole('button',{name:'Ver registros'});
+ expect(localStorage.getItem(eventualSubmissionKey(key))).toBeNull();
+ expect(JSON.parse(localStorage.getItem(key)!).value.motivo).toBe('');
+});
+it.each(['{invalid', '', '{"version":1}'])('blocks a new send when the separate pending reference is unreadable: %s', async raw => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ const key = 'sitrep:eventual-form:v1:' + eventualDraftScope(inspectionWorkspaceOwner(mock.user as never), mock.user.id, 'qa.' + btoa(JSON.stringify({ id:mock.user.id })) + '.qa');
+ localStorage.setItem(eventualSubmissionKey(key), raw);
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByText(/No pudimos leer o guardar el borrador o la referencia/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Guardar operación'})).toBeDisabled(); expect(mock.post).not.toHaveBeenCalled();
+});
+it('keeps the declared alternative when switching to a registered participant and reopening', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.get.mockImplementation(async (url:string) => url.endsWith('/participantes')
+  ? { data:{ data:{ participantes:[{ padronId:'t-1', nombre:'Transporte registrado', identificacion:'QA', domicilio:'QA' }] } } }
+  : { data:{ data:{ registro:entry, registros:[], total:0 } } });
+ const first = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Transportista · Nombre o razón social'), { target:{ value:'Transporte declarado' } });
+ fireEvent.click(screen.getByRole('button',{name:'Transportista · Buscar en padrón'}));
+ fireEvent.click(screen.getByLabelText('Transportista del padrón'));
+ fireEvent.click(await screen.findByRole('option',{name:'Transporte registrado · QA'})); first.unmount();
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByLabelText('Transportista · Nombre o razón social')).toHaveValue('Transporte registrado');
+ fireEvent.click(screen.getByRole('button',{name:'Transportista · Usar datos declarados'}));
+ expect(screen.getByLabelText('Transportista · Nombre o razón social')).toHaveValue('Transporte declarado');
+});
+it('does not copy creation quantities into a later finding', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.get.mockImplementation(async (url:string) => url.endsWith('/' + id) ? { data:{ data:{ registro:entry } } } : { data:{ data:{ registros:[], total:0 } } });
+ mock.post.mockResolvedValueOnce({ data:{ data:{ registro:entry } } }); view();
+ fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA creación' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'}));
+ await screen.findByText('Operación: Recibido'); fireEvent.click(screen.getByRole('button',{name:'Registrar diferencia'}));
+ expect(screen.getByLabelText('Corriente')).toHaveValue(''); expect(screen.getByLabelText('Cantidad')).toHaveValue(null);
+});
+it('does not dispatch a creation if the reference cannot be stored', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ const broken = vi.spyOn(Storage.prototype,'setItem').mockImplementation(() => { throw new Error('storage unavailable'); });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA conservado' } });
+ expect(await screen.findByText(/No pudimos leer o guardar el borrador/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Guardar operación'})).toBeDisabled(); expect(mock.post).not.toHaveBeenCalled();
+ broken.mockRestore();
+});
+it('does not dispatch if another tab holds the send lock or the browser cannot provide it', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ const first = view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'QA bloqueo' } });
+ Object.defineProperty(navigator, 'locks', { configurable:true, value:{ request: async (_name:string, _options:unknown, callback:(lock:unknown)=>Promise<void>) => callback(null) } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'}));
+ expect(await screen.findByText(/Otra pestaña está enviando/)).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
+ first.unmount(); Object.defineProperty(navigator, 'locks', { configurable:true, value:undefined });
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'}));
+ expect(await screen.findByText(/navegador no puede proteger el envío/)).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
+});
+it('does not navigate or mix a pending creation when its response arrives after changing role', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.get.mockResolvedValue({ data:{ data:{ registros:[], total:0 } } });
+ let finish:(value:unknown)=>void = () => {}; mock.post.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+ const client = new QueryClient({ defaultOptions:{ queries:{ retry:false } } });
+ const element = () => <QueryClientProvider client={client}><MemoryRouter initialEntries={['/manifiestos/baja-intensidad']}><BajaIntensidadPage /></MemoryRouter></QueryClientProvider>;
+ const rendered = render(element()); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'Envío en Generador' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'})); await waitFor(() => expect(mock.post).toHaveBeenCalledOnce());
+ mock.user = { id:'qa-person', rol:'OPERADOR', actorId:'op-1' } as typeof mock.user; rendered.rerender(element());
+ await act(async () => { finish({ data:{ data:{ registro:entry } } }); await Promise.resolve(); });
+ expect(screen.queryByText('Operación: Recibido')).toBeNull();
+ fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ expect(screen.getByLabelText('Motivo del registro excepcional')).toHaveValue('');
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user; rendered.rerender(element());
+ fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByText(/podría haberse guardado/i)).toBeVisible();
+});
+it('never overwrites an unconfirmed send from another tab with an older form', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'Mi edición' } });
+ const key = 'sitrep:eventual-form:v1:' + eventualDraftScope(inspectionWorkspaceOwner(mock.user as never), mock.user.id, 'qa.' + btoa(JSON.stringify({ id: mock.user.id })) + '.qa');
+ const other = { ...emptyEventualDraft(), pendingCreate:{ id:'00000000-0000-4000-8000-000000000002',
+  body:{ patente:'', motivo:'Otro envío', residuos:[{ corriente:'Y1', cantidad:1, unidad:'kg' }] } } };
+ localStorage.setItem(key, JSON.stringify({ version:1, revision:'other', savedAt:Date.now(), value:other }));
+ act(() => window.dispatchEvent(new StorageEvent('storage',{ key, storageArea:localStorage })));
+ expect(await screen.findByText(/Hay un envío sin confirmar/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Conservar mi versión'})).toBeNull();
+ expect(screen.getByRole('button',{name:'Cargar la otra versión'})).toBeVisible();
+ expect(mock.post).not.toHaveBeenCalled();
+});
+it('does not discard its own unconfirmed send when another tab changes the draft', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ mock.post.mockRejectedValueOnce(new Error('offline')); view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'Mi envío' } });
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'})); await screen.findByText(/podría haberse guardado/i);
+ const key = 'sitrep:eventual-form:v1:' + eventualDraftScope(inspectionWorkspaceOwner(mock.user as never), mock.user.id, 'qa.' + btoa(JSON.stringify({ id: mock.user.id })) + '.qa');
+ const other = { ...emptyEventualDraft(), pendingCreate:{ id:'00000000-0000-4000-8000-000000000002',
+  body:{ patente:'', motivo:'Otro envío', residuos:[{ corriente:'Y1', cantidad:1, unidad:'kg' }] } } };
+ localStorage.setItem(key, JSON.stringify({ version:1, revision:'other', savedAt:Date.now(), value:other }));
+ act(() => window.dispatchEvent(new StorageEvent('storage',{ key, storageArea:localStorage })));
+ expect(await screen.findByText(/Esta versión tiene un envío sin confirmar/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Cargar la otra versión'})).toBeNull();
+ expect(screen.queryByRole('button',{name:'Conservar mi versión'})).toBeNull();
+ const firstRequest = mock.post.mock.calls[0]; mock.post.mockRejectedValueOnce(new Error('offline'));
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2)); expect(mock.post.mock.calls[1]).toEqual(firstRequest);
+ expect(JSON.parse(localStorage.getItem(key)!).value.pendingCreate.id).toBe(other.pendingCreate.id);
+ await screen.findByText(/No se pudo confirmar/);
+ mock.post.mockResolvedValueOnce({ data:{ data:{ registro:{ ...entry, id:firstRequest[1].id } } } });
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Ver registros'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Continuar borrador'}));
+ expect(screen.getByText(/operación ya fue confirmada/)).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Cargar la otra versión'}));
+ mock.post.mockRejectedValueOnce(new Error('offline'));
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar envío'}));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(4)); expect(mock.post.mock.calls[3][1].id).toBe(other.pendingCreate.id);
+});
+it('does not turn an unsent conflicting candidate into a second send', async () => {
+ mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'gen-1' } as typeof mock.user;
+ view(); fireEvent.click(await screen.findByRole('button',{name:'Registrar operación'}));
+ fireEvent.change(screen.getByLabelText('Corriente'), { target:{ value:'Y1' } }); fireEvent.change(screen.getByLabelText('Cantidad'), { target:{ value:'3' } });
+ fireEvent.change(screen.getByLabelText('Motivo del registro excepcional'), { target:{ value:'Mi edición' } });
+ const key = 'sitrep:eventual-form:v1:' + eventualDraftScope(inspectionWorkspaceOwner(mock.user as never), mock.user.id, 'qa.' + btoa(JSON.stringify({ id:mock.user.id })) + '.qa');
+ const other = { ...emptyEventualDraft(), pendingCreate:{ id:'00000000-0000-4000-8000-000000000002',
+  body:{ patente:'', motivo:'Otro envío', residuos:[{ corriente:'Y1', cantidad:1, unidad:'kg' }] } } };
+ // Simulate the other tab writing just before the storage event is delivered.
+ localStorage.setItem(key, JSON.stringify({ version:1, revision:'other', savedAt:Date.now(), value:other }));
+ fireEvent.click(screen.getByRole('button',{name:'Guardar operación'}));
+ expect(await screen.findByText(/Hay un envío sin confirmar/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Comprobar envío'})).toBeNull();
+ expect(screen.getByRole('button',{name:'Cargar la otra versión'})).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
+});
 it('disabled feature never fetches or shows write controls', () => {
   vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED', 'false'); view();
   expect(screen.getByText('Circuito no habilitado.')).toBeVisible();

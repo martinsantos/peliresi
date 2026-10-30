@@ -3,14 +3,14 @@ const lifetime = 7 * 86400000;
 
 /** Separate keys prevent two tabs from overwriting each other's unresolved input.
  * Values are scoped by the caller's verified owner/role/record key. No File objects. */
-export function draftConflicts<T>(ownerKey: string, validate: (value: unknown) => value is T) {
+export function draftConflicts<T>(ownerKey: string, validate: (value: unknown) => value is T, retainExpired?: (value: T) => boolean, rejectUnreadable = false) {
   const prefix = 'sitrep:draft-conflict:v1:' + encodeURIComponent(ownerKey) + ':';
   const parse = (raw: string | null): DraftConflict<T> | null => {
     try {
       const value = JSON.parse(raw || 'null');
       return value?.version === 1 && typeof value.id === 'string' && typeof value.revision === 'string'
-        && Number.isFinite(value.savedAt) && value.savedAt <= Date.now() && Date.now() - value.savedAt < lifetime
-        && validate(value.value) ? value : null;
+        && Number.isFinite(value.savedAt) && validate(value.value)
+        && ((value.savedAt <= Date.now() && Date.now() - value.savedAt < lifetime) || !!retainExpired?.(value.value)) ? value : null;
     } catch { return null; }
   };
   return {
@@ -19,7 +19,9 @@ export function draftConflicts<T>(ownerKey: string, validate: (value: unknown) =
       for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
         if (!key?.startsWith(prefix)) continue;
-        const entry = parse(localStorage.getItem(key));
+        const raw = localStorage.getItem(key);
+        const entry = parse(raw);
+        if ((!entry || key !== prefix + entry.id) && raw !== null && rejectUnreadable) throw new Error('Copia de conflicto ilegible');
         if (entry && key === prefix + entry.id) entries.push(entry);
       }
       return entries.sort((a, b) => b.savedAt - a.savedAt || a.id.localeCompare(b.id));
