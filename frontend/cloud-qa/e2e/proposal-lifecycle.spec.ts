@@ -174,7 +174,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
    expect(await download.failure()).toBeNull();const stream=await download.createReadStream();const chunks:Buffer[]=[];
    for await(const chunk of stream)chunks.push(Buffer.from(chunk));const bytes=Buffer.concat(chunks);expect(bytes.subarray(0,4).toString()).toBe('%PDF');return createHash('sha256').update(bytes).digest('hex');
   }
-  const certificates=[];
+  const certificates=[], certificateLoads: { role: string; kind: string; elapsedMs: number }[]=[];
   for(const kind of ['PARCIAL','FINAL'] as const){
    for(const role of ['generador','transportista'] as const)await pages[role].goto(prefix(info)+'/notificaciones');
    if(kind==='FINAL'){
@@ -231,7 +231,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
    }
    for(const role of ['generador','transportista'] as const){
     const p=pages[role],notice=p.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:record.numero});
-    await expect(notice).toBeVisible({timeout:40000});await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
+    await expect(notice).toBeVisible({timeout:40000});const openedAt=Date.now();await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
     const certificateUrl=new RegExp('/manifiestos/'+m.id+'\\?certificado='+record.id+'#certificaciones$');
     await p.waitForURL(url=>certificateUrl.test(url.pathname+url.search+url.hash)||/\/notificaciones\/[^/]+$/.test(url.pathname));
     if (/\/notificaciones\/[^/]+$/.test(new URL(p.url()).pathname)) {
@@ -242,7 +242,8 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
      await selectContext.click();
     }
     await expect(p).toHaveURL(certificateUrl);
-    await expect(p.locator('[data-certificate-id="'+record.id+'"]')).toBeVisible();expect(await downloadHash(p,label)).toBe(record.pdfSha256);
+    await expect(p.locator('[data-certificate-id="'+record.id+'"]')).toBeVisible({timeout:20000});
+    certificateLoads.push({role,kind,elapsedMs:Date.now()-openedAt});expect(await downloadHash(p,label)).toBe(record.pdfSha256);
     await expect(p.getByRole('button',{name:'Emitir certificación parcial',exact:true})).toHaveCount(0);
     await proof(p,info,kind.toLowerCase()+'-received-'+role);
    }
@@ -259,7 +260,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
   expect(details.residuos[0].tipoResiduo.codigo).toBe('Y1');
   expect(Number(details.residuos[0].cantidad)).toBe(21);
   expect(Number(details.residuos[0].cantidadRecibida)).toBe(22);
-  writeFileSync(info.outputPath('complete-lifecycle.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,certificates,partialQuantity:7,originalDeclaration:21,received:22,treatedFinding:{corriente:'Y12',cantidad:1},finding:finding.id,rectification:rectification.id,originalRemainsObserved:true,samePdfAcrossParties:true,noticesWithoutReload:true,actualRoles:true,externalDelivery:false}));
+  writeFileSync(info.outputPath('complete-lifecycle.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,certificates,certificateLoads,partialQuantity:7,originalDeclaration:21,received:22,treatedFinding:{corriente:'Y12',cantidad:1},finding:finding.id,rectification:rectification.id,originalRemainsObserved:true,samePdfAcrossParties:true,noticesWithoutReload:true,actualRoles:true,externalDelivery:false}));
 
   expect(errors).toEqual([]);writeFileSync(info.outputPath('proof.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,realLogins:3,cap:false,liveWithoutReload:true,errors}));
  }finally{for(const c of contexts)await c.close();}

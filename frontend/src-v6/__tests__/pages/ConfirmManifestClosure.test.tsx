@@ -13,7 +13,7 @@ describe('manifest closure confirmation', () => {
       mutations={{firmar:pending,confirmarRetiro:pending,confirmarEntrega:pending,confirmarRecepcion:pending,confirmarRecepcionInSitu:pending,pesaje:pending,registrarTratamiento:pending,cerrar:pending,rechazar:pending,registrarIncidente:pending,revertir:pending}}
       onCerrar={noop} onFirmar={noop} onConfirmarRetiro={noop} onConfirmarEntrega={noop} onConfirmarRecepcion={noop} onConfirmarRecepcionInSitu={noop}
       onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} />);
-    expect(screen.getByRole('region',{name:'Estado del borrador'})).toHaveTextContent('Las tres partes deben aprobar');
+    expect(screen.getByRole('region',{name:'Aprobaciones pendientes'})).toHaveTextContent('Las tres partes deben aprobar');
     expect(screen.queryByRole('button',{name:'Firmar Manifiesto'})).not.toBeInTheDocument();
     vi.unstubAllEnvs();
   });

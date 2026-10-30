@@ -8,6 +8,7 @@ export type ManifestWork = {
   inicio?: string | null;
   requiereMiAprobacion?: boolean;
   requiereNuevaPropuesta?: boolean;
+  requiereRevisionPropuesta?: boolean;
   pesajePendiente?: boolean;
   rechazo?: string | null;
   finalEmitido?: boolean;
@@ -30,6 +31,7 @@ export function manifestWork(m: ManifestWork, role: string) {
   const required = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'];
   const missing = m.partes ? required.filter(role => !m.partes?.some(part => part.rol === role && part.aprobada)).map(role => partyNames[role]) : [];
   const result = (label: string, responsible: string, detail: string, tone: 'pending' | 'active' | 'done' | 'blocked' = 'active') => ({ label, responsible, detail, tone });
+  if (m.requiereRevisionPropuesta) return result('Propuesta por revisar', 'Ambiente', 'No se pueden comprobar las aprobaciones. Contactá a Ambiente; el historial se conserva y no se puede iniciar.', 'blocked');
   if (m.rechazo) return result('Propuesta detenida', 'Partes vinculadas', 'Hay una participación rechazada. Revisá el motivo antes de preparar otra propuesta.', 'blocked');
   if (m.requiereNuevaPropuesta) return result('Necesita nueva propuesta', 'Partes vinculadas', 'Creá una nueva propuesta con las tres partes; el registro anterior se conserva.', 'blocked');
   if (m.estado === 'APROBADO' && m.partes && (m.partes.length !== required.length || missing.length)) return result('Revisar aprobaciones', missing.join(', ') || 'Administración', 'No se puede iniciar hasta comprobar todas las aprobaciones.', 'blocked');

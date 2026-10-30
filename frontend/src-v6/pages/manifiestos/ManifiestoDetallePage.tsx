@@ -456,6 +456,7 @@ const ManifiestoDetailPage: React.FC = () => {
 
       {/* One action surface, before the long field context on every screen size. */}
       <ManifiestoActions
+        onRetryApprovalCheck={() => void reloadManifest()}
         manifiesto={m}
         manifiestoId={id!}
         isAdmin={isAdmin}

@@ -127,6 +127,25 @@ it('includes a draft with its next responsible party without inventing three app
  client.clear();
 });
 
+it('keeps other work visible while an inconsistent proposal requires review',async()=>{
+ mock.get.mockImplementation(async(_url,options)=>reply([
+  {id:'broken',numero:'QA-BROKEN',estado:'PENDIENTE_APROBACION',partes:null,requiereRevisionPropuesta:true,requiereMiAprobacion:false,detail:'Contactá a Ambiente',actores:{generador:'Origen',operador:'Destino'}},
+  {id:'moving',numero:'QA-MOVING',estado:'EN_TRANSITO',partes:null,advertenciaPropuesta:true,actores:{generador:'Origen',operador:'Destino'}},
+  ...items,
+ ],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ const broken=await screen.findByRole('link',{name:/QA-BROKEN/});
+ expect(broken).toHaveTextContent('Propuesta por revisar');
+ expect(broken).toHaveAccessibleName(/Contactá a Ambiente/);
+ expect(within(broken).queryByLabelText(/Aprobado/)).not.toBeInTheDocument();
+ const moving=screen.getByRole('link',{name:/QA-MOVING/});
+ expect(moving).toHaveTextContent('En viaje');
+ expect(moving).toHaveTextContent('Aprobaciones históricas por revisar');
+ expect(screen.getByText('CAP-NEW')).toBeVisible();
+ client.clear();
+});
+
 function ReturnHome(){const navigate=useNavigate();return <button onClick={()=>navigate(-1)}>Volver</button>;}
 it.each(['id','rol','actorId','empresaId','establecimientoId'] as const)('discards filters before the first request after changing %s',async field=>{
  mock.get.mockImplementation(async(_url,options)=>reply(items,options));

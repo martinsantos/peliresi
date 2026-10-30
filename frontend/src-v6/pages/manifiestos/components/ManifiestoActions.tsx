@@ -31,6 +31,7 @@ interface ManifiestoActionsProps {
   deliveryChecking?: boolean;
   deliveryCheckError?: boolean;
   onRetryDeliveryCheck?: () => void;
+  onRetryApprovalCheck?: () => void;
   isInSitu?: boolean;
   training?: boolean;
   mutations: {
@@ -73,6 +74,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   deliveryChecking,
   deliveryCheckError,
   onRetryDeliveryCheck,
+  onRetryApprovalCheck,
   isInSitu,
   training,
   mutations,
@@ -102,6 +104,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const legacyBlocked = ['BORRADOR','APROBADO'].includes(m.estado || '') && !m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1');
+  const pendingWithoutProposal = m.estado === 'PENDIENTE_APROBACION' && !m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1');
+  const inconsistentProposal = ['PENDIENTE_APROBACION','APROBADO'].includes(m.estado || '') && ['INCONSISTENTE','RECHAZADA'].includes(m.aprobacionOperacion || '');
   const originWithoutCarrier = m.estado === 'APROBADO' && !!isInSitu && !m.transportistaId;
   const proposalsVisible = manifestProposalsVisible({training});
 
@@ -114,8 +118,11 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             <h3 className="font-bold">Este manifiesto necesita una nueva propuesta</h3>
             <p className="mt-1">{proposalsVisible ? 'Creá una nueva propuesta con generador, transporte y operador.' : 'Contactá a Ambiente para habilitar una nueva propuesta con generador, transporte y operador.'} Las tres partes deben aprobar antes de iniciar; este registro se conserva.</p>
           </section>}
+          {(pendingWithoutProposal || inconsistentProposal) && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">No se pueden comprobar las aprobaciones. Contactá a Ambiente para revisar este manifiesto; el historial se conserva y no se puede iniciar.</p>}
+          {m.estado === 'APROBADO' && !m.aprobacionOperacion && !legacyBlocked && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">No se pudo verificar si están cumplidas las aprobaciones. Actualizá el manifiesto antes de continuar. {onRetryApprovalCheck && <button type="button" className="min-h-11 font-semibold underline" onClick={onRetryApprovalCheck}>Actualizar manifiesto</button>}</p>}
+          {m.estado === 'APROBADO' && !proposalsVisible && !legacyBlocked && !inconsistentProposal && !originWithoutCarrier && m.aprobacionOperacion && m.aprobacionOperacion !== 'LISTA' && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">La operación todavía no está lista para iniciarse. Contactá a Ambiente para revisar las aprobaciones y la coordinación.</p>}
           {originWithoutCarrier && !legacyBlocked && !proposalsVisible && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Esta propuesta anterior no tiene transporte aprobador. Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.</p>}
-          {m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
+          {!inconsistentProposal && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           {['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','CANCELADO','RECHAZADO'].includes(m.estado || '') && <div className="mb-4"><ManifestNextStep work={{estado:m.estado,modalidad:m.modalidad,pesajePendiente:m.residuos?.some(r=>!r.cantidadRecibida)}} role={userRol}/></div>}
           {deliveryPending && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Hay una entrega guardada en este dispositivo. Revisá la sincronización antes de continuar.</p>}
           {deliveryCheckError && <p role="alert" className="mb-4 rounded-lg bg-error-50 p-3 text-sm text-error-800">No pudimos revisar las entregas guardadas. <button type="button" className="font-semibold underline" onClick={onRetryDeliveryCheck}>Reintentar</button></p>}
@@ -127,7 +134,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             isActionPending={isActionPending}
             deliveryUnavailable={deliveryPending || deliveryChecking || deliveryCheckError}
             legacyDraftBlocked={legacyBlocked}
-            pickupBlocked={legacyBlocked || originWithoutCarrier || !!(m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo)))}
+            pickupBlocked={m.estado === 'APROBADO' && m.aprobacionOperacion !== 'LISTA'}
             isInSitu={isInSitu}
             isCancelling={isCancelling}
             mutations={{

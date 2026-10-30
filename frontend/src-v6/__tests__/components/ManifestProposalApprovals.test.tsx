@@ -50,15 +50,27 @@ it('shows the busy response and lets the user refresh approvals without replayin
  expect(mock.post).toHaveBeenCalledTimes(1);
  expect(screen.getByLabelText('Transporte: Pendiente')).toBeVisible();client.clear();
 });
-it('shows only generator and operator for in-situ, with no transport approval or GPS step',async()=>{
+it('keeps a historical in-situ agreement without transport blocked',async()=>{
  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
- mock.get.mockResolvedValue({data:{data:{modalidad:'IN_SITU',autorRol:'GENERADOR',estado:'APROBADO',inicio:null,puedeIniciar:false,puedeAprobar:null,partes:[{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:true}]}}});
+ mock.get.mockResolvedValue({data:{data:{modalidad:'IN_SITU',autorRol:'GENERADOR',estado:'APROBADO',inicio:null,puedeIniciar:false,puedeAprobar:null,requiereNuevaPropuesta:true,partes:[{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:true}]}}});
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<QueryClientProvider client={client}><ManifestProposalApprovals id="in-situ" onSign={()=>{}}/></QueryClientProvider>);
- expect(await screen.findByText('2 de 2 · Aprobado')).toBeVisible();
+ expect(await screen.findByText('Propuesta anterior')).toBeVisible();
  expect(screen.getByLabelText('Generador: Aprobado')).toBeVisible();
  expect(screen.getByLabelText('Operador: Aprobado')).toBeVisible();
  expect(screen.queryByLabelText(/^Transporte:/)).not.toBeInTheDocument();
+ expect(screen.getByRole('alert')).toHaveTextContent('no tiene transporte aprobador');
+ expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();
+ client.clear();
+});
+it('requires the three approved parties before coordinating in-situ without a trip',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{modalidad:'IN_SITU',autorRol:'GENERADOR',estado:'APROBADO',inicio:null,puedeIniciar:true,puedeAprobar:null,partes:['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({rol,aprobada:true}))}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="in-situ-three" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByText('3 de 3 · Aprobado')).toBeVisible();
+ expect(screen.getByLabelText('Transporte: Aprobado')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Iniciar coordinación'})).toBeEnabled();
  fireEvent.click(screen.getByText('Cómo continuar'));
  expect(screen.getByText('Coordiná la recepción en origen con la otra parte. No hay viaje ni GPS.')).toBeVisible();
  client.clear();

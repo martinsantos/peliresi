@@ -461,8 +461,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     .map(({ unidad, cantidad }) => `${formatDeclaredQuantity(cantidad)} ${unidad}`).join(' · ') || 'Sin cantidades informadas';
   const eventos: EventoManifiesto[] = Array.isArray(m.eventos) ? m.eventos : [];
   const hasProposal = eventos.some(e => e.tipo === 'PROPUESTA_PARTES_V1');
-  const canConfirmPickup = hasProposal && ['FIRMA','APROBACION_TRANSPORTISTA','APROBACION_OPERADOR'].every(tipo => eventos.some(e => e.tipo === tipo))
-    && eventos.some(e => ['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo));
+  const canConfirmPickup = m.aprobacionOperacion === 'LISTA';
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
@@ -504,6 +503,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           <p className="mt-1">{manifestProposalsVisible(currentUser) ? 'Creá una nueva propuesta con las tres partes.' : 'Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.'} El registro anterior se conserva.</p>
           <Link to={mp(`/manifiestos/${id}`)} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">Ver manifiesto</Link>
         </div>}
+        {m.estado === EstadoManifiesto.APROBADO && hasProposal && ['INCONSISTENTE','RECHAZADA'].includes(m.aprobacionOperacion || '') && <p role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">No se pueden comprobar las aprobaciones. Contactá a Ambiente para revisar este manifiesto; el historial se conserva y no se puede iniciar.</p>}
+        {m.estado === EstadoManifiesto.APROBADO && hasProposal && !m.aprobacionOperacion && <p role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">No se pudo verificar si están cumplidas las aprobaciones. Actualizá el manifiesto antes de continuar. <button type="button" className="min-h-11 font-semibold underline" onClick={() => void reloadTrip()}>Actualizar manifiesto</button></p>}
+        {m.estado === EstadoManifiesto.APROBADO && hasProposal && !manifestProposalsVisible(currentUser) && m.aprobacionOperacion && !['LISTA','INCONSISTENTE','RECHAZADA'].includes(m.aprobacionOperacion) && <p role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">La operación todavía no está lista para iniciarse. Contactá a Ambiente para revisar las aprobaciones y la coordinación.</p>}
         {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${gpsOwner}:${id}`} ownerId={currentUser.id} contextOwner={gpsOwner} manifestId={id} />}
         {trackingDuringPending && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">El seguimiento sigue abierto en esta pantalla para conservar las ubicaciones. Sincronizalas y cerrá esta pantalla antes de continuar con la entrega.</p>}
         {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && !handoffUnknown && (deliveryQueue === 'none' || trackingDuringPending) && <GpsStatusPanel
@@ -529,7 +531,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
         </dl>}
-        {eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && m.estado === EstadoManifiesto.APROBADO && <ManifestProposalApprovals id={id!} estado={m.estado} onSign={()=>{}}/>}
+        {hasProposal && m.estado === EstadoManifiesto.APROBADO && !['INCONSISTENTE','RECHAZADA'].includes(m.aprobacionOperacion || '') && <ManifestProposalApprovals id={id!} estado={m.estado} onSign={()=>{}}/>}
         {/* APROBADO state: Show confirm pickup */}
         {m.estado === EstadoManifiesto.APROBADO && canConfirmPickup && (
           <>

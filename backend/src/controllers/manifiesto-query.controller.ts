@@ -6,6 +6,7 @@ import { parsePagination } from '../utils/pagination';
 import { applyRoleFilter, canAccessManifiesto } from '../utils/roleFilter';
 import { MANIFIESTO_DETAIL_INCLUDE } from '../utils/manifiestoIncludes';
 import { parseDateParam } from '../utils/dateRange';
+import { manifestReadiness } from '../domain/manifestProposal';
 
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -154,7 +155,7 @@ export const getManifiestoById = async (req: AuthRequest, res: Response, next: N
 
     res.json({
       success: true,
-      data: { manifiesto }
+      data: { manifiesto: { ...manifiesto, aprobacionOperacion: manifestReadiness(manifiesto, manifiesto.eventos) } }
     });
   } catch (error) {
     next(error);

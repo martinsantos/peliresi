@@ -13,7 +13,7 @@ it('reaches scheduled records beyond the first 50 and resets to page one when se
  await screen.findByText(/CAP-PAGE-1/);expect(screen.getByRole('button',{name:'Anterior'})).toBeDisabled();
  fireEvent.click(screen.getByRole('button',{name:'Siguiente'}));await screen.findByText(/CAP-PAGE-2/);expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
  fireEvent.change(screen.getByLabelText('Buscar manifiesto programado'),{target:{value:'CAP-NEW'}});await screen.findByText(/CAP-NEW/);
- await waitFor(()=>expect(mock.get).toHaveBeenLastCalledWith('/manifiestos/agenda-partes',{params:{page:1,search:'CAP-NEW'}}));
+ await waitFor(()=>expect(mock.get).toHaveBeenLastCalledWith('/manifiestos/agenda-partes',{params:{page:1,search:'CAP-NEW',incluirPendientes:'true'}}));
  expect(screen.getByRole('link',{name:/CAP-NEW/})).toHaveAttribute('href','/manifiestos/found');
 });
 
@@ -30,7 +30,21 @@ it('drops another context’s agenda filters before fetching',async()=>{
  mock.get.mockResolvedValue({data:{data:{total:0,items:[]}}});
  const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<MemoryRouter initialEntries={[{pathname:'/manifiestos',search:'?vista=programados&programado=OTHER&paginaProgramados=8',state:{filterOwners:{'manifest-agenda':'other-context'}}}]}><QueryClientProvider client={q}><ManifestAgenda/></QueryClientProvider></MemoryRouter>);
- await screen.findByText('Sin retiros aprobados para esta búsqueda.');
- expect(mock.get).toHaveBeenCalledWith('/manifiestos/agenda-partes',{params:{page:1,search:''}});
+ await screen.findByText('Sin manifiestos programados para esta búsqueda.');
+ expect(mock.get).toHaveBeenCalledWith('/manifiestos/agenda-partes',{params:{page:1,search:'',incluirPendientes:'true'}});
  expect(screen.getByLabelText('Buscar manifiesto programado')).toHaveValue('');q.clear();
+});
+
+it('distinguishes scheduled review, coordination and an unknown status',async()=>{
+ mock.get.mockResolvedValue({data:{data:{total:3,items:[
+  {id:'bad',numero:'QA-REVISION',fechaEstimadaRetiro:'2099-10-20',aprobacionOperacion:'INCONSISTENTE'},
+  {id:'ready',numero:'QA-COORDINAR',fechaEstimadaRetiro:'2099-10-20',aprobacionOperacion:'FALTA_COORDINACION'},
+  {id:'unknown',numero:'QA-UNKNOWN',fechaEstimadaRetiro:'2099-10-20'},
+ ]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><ManifestAgenda/></QueryClientProvider></MemoryRouter>);
+ expect(await screen.findByRole('link',{name:/QA-REVISION/})).toHaveTextContent('Propuesta por revisar');
+ expect(screen.getByRole('link',{name:/QA-COORDINAR/})).toHaveTextContent('Listo para coordinar');
+ expect(screen.getByRole('link',{name:/QA-UNKNOWN/})).toHaveTextContent('Estado por verificar');
+ client.clear();
 });

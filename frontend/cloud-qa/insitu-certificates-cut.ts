@@ -11,7 +11,7 @@ assert.equal(process.env.TRAINING_DATABASE_URL,'');
 assert.equal(process.env.DISABLE_EMAILS,'true');
 assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED,'false');
 const out=process.env.QA_ARTIFACTS!;
-assert.match(out,/^\/work\/sitrep\/\.qa-operational-ui-current\d+$/);
+assert.ok(/^\/work\/sitrep\/\.qa-operational-ui-current\d+$/.test(out) || out === '/work/sitrep/.qa-legacy-integrity-20261030');
 const resultFile=path.join(out,'insitu-certificates.json');
 assert.equal(existsSync(resultFile),false,'Do not repeat the synthetic issuance on the same cases');
 const root=path.join(out,'proposal-e2e-'+(process.env.QA_BROWSER_ATTEMPT||'initial'));

@@ -276,6 +276,7 @@ export interface TipoResiduo {
 }
 
 export interface Manifiesto {
+  aprobacionOperacion?: 'SIN_PROPUESTA' | 'INCONSISTENTE' | 'SIN_TRANSPORTE' | 'RECHAZADA' | 'FALTAN_APROBACIONES' | 'FALTA_COORDINACION' | 'LISTA';
   contextoEmpresa?:import('../services/companyContext').CompanyContext|null;
   id: string;
   numero: string;

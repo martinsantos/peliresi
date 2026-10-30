@@ -10,7 +10,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
-import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, legacyInSituWithoutCarrier, parseProposal, proposalRole, proposalRoles, ProposalRole } from '../domain/manifestProposal';
+import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, inspectProposal, legacyInSituWithoutCarrier, manifestReadiness, proposalApprovalEvidenceValid, proposalRole, proposalRoles, ProposalRole } from '../domain/manifestProposal';
 
 const LEGACY_IN_SITU_MESSAGE = 'Esta propuesta anterior no tiene transporte aprobador. Creá una nueva propuesta con las tres partes para iniciar.';
 import { agendaQuery } from '../domain/manifestAgenda';
@@ -22,13 +22,14 @@ const PROPOSAL_TRANSACTION_OPTIONS = { maxWait: 12_000 };
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 async function load(tx: Tx, id: string) {
-  const marker = await tx.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } });
-  if (!marker) return null;
-  const proposal = parseProposal(marker.descripcion);
+  const markers = await tx.eventoManifiesto.findMany({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } });
+  if (!markers.length) return null;
   const manifest = await tx.manifiesto.findUniqueOrThrow({ where: { id } });
-  if ((manifest.modalidad || 'FIJO') !== (proposal.modalidad || 'FIJO')) throw new AppError('La modalidad no coincide con la propuesta original', 409);
-  if (manifest.generadorId !== proposal.generadorId || manifest.transportistaId !== proposal.transportistaId || manifest.operadorId !== proposal.operadorId || manifest.creadoPorId !== proposal.creadoPorId) throw new AppError('Las partes no coinciden con la propuesta original', 409);
+  const snapshot = inspectProposal(manifest, markers);
+  if (!('proposal' in snapshot)) throw new AppError('No se pueden comprobar los datos de la propuesta. Contactá a Ambiente para revisarlos; el historial se conserva.', 409);
+  const proposal = snapshot.proposal;
   const events = await tx.eventoManifiesto.findMany({ where: { manifiestoId: id, tipo: { in: [...Object.values(APPROVAL_EVENTS), 'RECHAZO_PARTE', ...COORDINATION_EVENTS] } }, orderBy: { createdAt: 'asc' } });
+  if (snapshot.kind === 'valid' && !proposalApprovalEvidenceValid(proposal, events)) throw new AppError('No se pueden comprobar las aprobaciones. Contactá a Ambiente para revisarlas; el historial se conserva.', 409);
   return { proposal, manifest, events };
 }
 export async function getManifestProposal(req: AuthRequest, res: Response, next: NextFunction) {
@@ -131,17 +132,24 @@ export async function assertManifestProposalApproved(tx: Tx, id: string) {
 export async function getProposalAgenda(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     if (!manifestProposalsEnabled()) throw new AppError('Función no habilitada',404);
-    const page=Number(req.query.page??1),search=req.query.search??'';
-    if(!Number.isInteger(page)||page<1||page>100000||typeof search!=='string'||search.length>80)throw new AppError('Filtros de agenda inválidos',400);
+    const page=Number(req.query.page??1),search=req.query.search??'',includePending=req.query.incluirPendientes;
+    if(!Number.isInteger(page)||page<1||page>100000||typeof search!=='string'||search.length>80||![undefined,'true','false'].includes(includePending as string | undefined))throw new AppError('Filtros de agenda inválidos',400);
     const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Mendoza'}).format(new Date());
-    const where: any={estado:'APROBADO',fechaEstimadaRetiro:{gte:new Date(day+'T00:00:00-03:00')},eventos:{some:{tipo:MANIFEST_PROPOSAL}}};
+    // Older clients display every row as approved. Only clients that can show
+    // its readiness opt into pending and historical records as well.
+    const where: any={fechaEstimadaRetiro:{gte:new Date(day+'T00:00:00-03:00')},...(includePending==='true'
+      ? {estado:{in:['PENDIENTE_APROBACION','APROBADO']}}
+      : {estado:'APROBADO',eventos:{some:{tipo:MANIFEST_PROPOSAL}}})};
     if(search.trim())where.numero={contains:search.trim(),mode:'insensitive'};
     applyRoleFilter(where,req.user);
     const [items,total]=await prisma.$transaction([
-      prisma.manifiesto.findMany({where,select:{id:true,numero:true,fechaEstimadaRetiro:true,generador:{select:{razonSocial:true}},operador:{select:{razonSocial:true}}},orderBy:[{fechaEstimadaRetiro:'asc'},{id:'asc'}],take:50,skip:(page-1)*50}),
+      prisma.manifiesto.findMany({where,select:{id:true,numero:true,fechaEstimadaRetiro:true,modalidad:true,generadorId:true,transportistaId:true,operadorId:true,creadoPorId:true,
+        generador:{select:{razonSocial:true}},operador:{select:{razonSocial:true}},eventos:{where:{tipo:{in:[MANIFEST_PROPOSAL,...Object.values(APPROVAL_EVENTS),'RECHAZO_PARTE',...COORDINATION_EVENTS]}},select:{tipo:true,descripcion:true,usuarioId:true}}},
+        orderBy:[{fechaEstimadaRetiro:'asc'},{id:'asc'}],take:50,skip:(page-1)*50}),
       prisma.manifiesto.count({where}),
     ]);
-    res.json({success:true,data:{items,total,page,pageSize:50}});
+    res.json({success:true,data:{items:items.map(item=>({id:item.id,numero:item.numero,fechaEstimadaRetiro:item.fechaEstimadaRetiro,
+      generador:item.generador,operador:item.operador,aprobacionOperacion:manifestReadiness(item,item.eventos)})),total,page,pageSize:50}});
   }catch(e){next(e);}
 }
 
@@ -184,13 +192,19 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     const total = counts[agenda.filter], page = Math.min(agenda.page, Math.max(1, Math.ceil(total / agenda.limit)));
     const rows = await tx.manifiesto.findMany({ where: { AND: [agenda.base, agenda.categories[agenda.filter]] }, orderBy: agenda.orderBy,
       skip: (page - 1) * agenda.limit, take: agenda.limit,
-      include: { generador: { select: { razonSocial: true } }, transportista: { select: { razonSocial: true } }, operador: { select: { razonSocial: true } }, eventos: { where: { tipo: { in: [MANIFEST_PROPOSAL, ...Object.values(APPROVAL_EVENTS), ...COORDINATION_EVENTS, 'CERTIFICADO_CAP_V1'] } } }, residuos: { select: { cantidadRecibida: true } } },
+      include: { generador: { select: { razonSocial: true } }, transportista: { select: { razonSocial: true } }, operador: { select: { razonSocial: true } }, eventos: { where: { tipo: { in: [MANIFEST_PROPOSAL, ...Object.values(APPROVAL_EVENTS), 'RECHAZO_PARTE', ...COORDINATION_EVENTS, 'CERTIFICADO_CAP_V1'] } } }, residuos: { select: { cantidadRecibida: true } } },
     });
     return { rows, counts, total, page };
   }, { isolationLevel: 'RepeatableRead' });
   const labels:Record<string,string>={GENERADOR:'generador',TRANSPORTISTA:'transporte',OPERADOR:'operador'};
   const items=rows.flatMap(m=>{
-   const marker=m.eventos.find(e=>e.tipo===MANIFEST_PROPOSAL),proposal=marker?parseProposal(marker.descripcion):null;
+   const snapshot=inspectProposal(m,m.eventos);
+   const proposal='proposal' in snapshot?snapshot.proposal:null;
+   const damaged=['invalid','mismatch','duplicate'].includes(snapshot.kind)
+    || (snapshot.kind==='valid'&&!proposalApprovalEvidenceValid(snapshot.proposal,m.eventos));
+   const conflictingRejection=['PENDIENTE_APROBACION','APROBADO'].includes(m.estado)&&m.eventos.some(e=>e.tipo==='RECHAZO_PARTE');
+   const requiresReview=['BORRADOR','PENDIENTE_APROBACION','APROBADO'].includes(m.estado)
+    && (damaged||conflictingRejection||(m.estado==='PENDIENTE_APROBACION'&&snapshot.kind==='missing'));
    const role=proposal?(proposalRole(req.user,proposal)||(req.user.rol==='ADMIN'?'ADMIN':null)):req.user.rol;
    let action='',detail='';
    if(m.estado==='BORRADOR'){
@@ -209,18 +223,19 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action=isTrainingSession()?'Emití un parcial o cerrá el tratamiento':'Cerrá el tratamiento cuando corresponda';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
    else if(m.estado==='TRATADO'){action=role==='OPERADOR'?'Revisá y emití la certificación final total':'Esperando la certificación final del operador';detail='El operador decide cuándo firmarla y liberarla. El cierre no la emite automáticamente.';}
    if (!action) { action = 'Esperando al operador'; detail = 'El operador continúa la recepción y el tratamiento.'; }
-   const partes=proposal?proposalRoles(proposal).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
+   const partes=proposal&&!conflictingRejection&&!damaged?proposalRoles(proposal).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
    if(m.estado==='APROBADO'&&partes?.some(p=>!p.aprobada)){
     action='Revisar aprobaciones';
     detail='Falta aprobar: '+partes.filter(p=>!p.aprobada).map(p=>labels[p.rol]).join(', ')+'. No se puede iniciar.';
    }
    const inicio=m.eventos.find(e=>COORDINATION_EVENTS.includes(e.tipo))?.createdAt||null;
-   const legacyBlocked=(['BORRADOR','APROBADO'].includes(m.estado)&&!proposal)||(!!proposal&&legacyInSituWithoutCarrier(proposal)&&['PENDIENTE_APROBACION','APROBADO'].includes(m.estado));
+   const legacyBlocked=!requiresReview&&((['BORRADOR','APROBADO'].includes(m.estado)&&snapshot.kind==='missing')||(!!proposal&&legacyInSituWithoutCarrier(proposal)&&['PENDIENTE_APROBACION','APROBADO'].includes(m.estado)));
    if(legacyBlocked){
     action='Necesita nueva propuesta';detail=!proposal?'Este manifiesto anterior no registra las tres aprobaciones. Creá una nueva propuesta con las tres partes; el registro se conserva.':LEGACY_IN_SITU_MESSAGE;
    }
-   const requiereMiAprobacion=!legacyBlocked&&!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
-   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereNuevaPropuesta:legacyBlocked,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];
+   if(requiresReview){action='Propuesta por revisar';detail='No se pueden comprobar las aprobaciones. Contactá a Ambiente; el historial se conserva y no se puede iniciar.';}
+   const requiereMiAprobacion=!legacyBlocked&&!requiresReview&&!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
+   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereNuevaPropuesta:legacyBlocked,requiereRevisionPropuesta:requiresReview,advertenciaPropuesta:damaged&&!requiresReview,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];
   });
   res.json({success:true,data:{items,total,page,limit:agenda.limit,counts,limited:false}});
  }catch(e){next(e);}
