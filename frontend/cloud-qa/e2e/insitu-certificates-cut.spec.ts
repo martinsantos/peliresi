@@ -34,8 +34,8 @@ test('origin final certificate reaches all linked parties and its real mail link
    const link=page.locator(`[data-mail-action="${info.project.name==='app'?'app':'web'}"]`);
    await expect(link).toHaveCount(1);const target=new URL((await link.getAttribute('href'))!);
    const companyNotice=proof.mailDestinations[role]==='notice';
-   expect(target.pathname).toBe(prefix(info)+(companyNotice?'/notificaciones/'+proof.notices[role]:'/manifiestos/'+proof.id));
-   if(!companyNotice)expect(target.searchParams.get('certificado')).toBe(proof.finalId);
+   expect(['notice','personal-notice']).toContain(proof.mailDestinations[role]);
+   expect(target.pathname).toBe(prefix(info)+'/notificaciones/'+proof.notices[role]);
    await page.screenshot({path:info.outputPath('correo-'+role+'.png'),fullPage:true});
    await link.click();await expect(page).toHaveURL(/\/login$/);
    await page.getByLabel('Correo electrónico o CUIT').fill(role+'@night-qa.invalid');
@@ -45,12 +45,12 @@ test('origin final certificate reaches all linked parties and its real mail link
    await expect(page).toHaveURL(target.href);
    const welcome=page.getByRole('button',{name:'Saltar introducción',exact:true});
    if(await welcome.isVisible())await welcome.click();
+   await expect(page.getByRole('region',{name:'Aviso recibido'})).toContainText('Certificación final total disponible');
    if(companyNotice){
-    await expect(page.getByRole('region',{name:'Aviso recibido'})).toContainText('Certificación final total disponible');
     const roleName=role==='generador'?'Generador':'Transporte';
     await page.getByRole('button',{name:new RegExp('^(Usar '+roleName+' y abrir certificado|Abrir certificado)$')}).click();
-    await expect(page).toHaveURL(new RegExp('/manifiestos/'+proof.id+'\\?certificado='+proof.finalId+'#certificaciones$'));
-   }
+   } else await page.getByRole('link',{name:'Ver certificación y descargar →',exact:true}).click();
+   await expect(page).toHaveURL(new RegExp('/manifiestos/'+proof.id+'\\?certificado='+proof.finalId+'#certificaciones$'));
    const card=page.locator('[data-certificate-id="'+proof.finalId+'"]');await expect(card).toBeVisible();
    expect(await hashDownload(page)).toBe(proof.finalSha256);
    await expect(page.getByRole('button',{name:'Emitir certificación parcial',exact:true})).toHaveCount(0);

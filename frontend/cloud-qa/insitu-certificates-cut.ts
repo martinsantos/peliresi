@@ -74,9 +74,8 @@ try{
     const mail=notificationMailContent({...notice.usuario,...notice});
     assert.ok(mail);
     const companyAccess=Array.isArray(metadata.accesosEmpresa)&&metadata.accesosEmpresa.length>0;
-    if(companyAccess)assert.ok(mail.html.includes('/notificaciones/'+notice.id));
-    else {assert.match(mail.html,/certificado=/);assert.match(mail.html,/certificaciones/);}
-    mailDestinations[role]=companyAccess?'notice':'manifest';
+    assert.ok(mail.html.includes('/notificaciones/'+notice.id));
+    mailDestinations[role]=companyAccess?'notice':'personal-notice';
     notices[role]=notice.id;
     const file='insitu-final-mail-'+proof.surface+'-'+role+'.html';writeFileSync(path.join(out,file),mail.html);mails[role]=file;
    }
