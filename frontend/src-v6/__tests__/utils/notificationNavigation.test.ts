@@ -127,6 +127,24 @@ describe('resolveNotificationPath', () => {
     expect(resolveNotificationPath(notice, '/app', 'ADMIN_OPERADOR')).toBe('/app/admin/solicitudes/case-1');
     expect(resolveNotificationPath({ ...notice, datos: '{"solicitudId":"../other"}' }, '/app', 'GENERADOR')).toBe('/app/notificaciones');
   });
+  it.each(['', '/app', '/mobile'])('opens the exact application for a repeated-receipt notice in %s', prefix => {
+    const notice = { ...base, tipo: 'ALERTA_SISTEMA' as Notificacion['tipo'], datos: JSON.stringify({
+      tipo: 'comprobante_repetido', solicitudId: 'operador-2', documentoId: 'doc-2', ruta: '/mi-solicitud',
+    }) };
+    for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
+      expect(resolveNotificationPath(notice, prefix, role)).toBe(prefix + '/mi-solicitud?solicitud=operador-2');
+    }
+    expect(resolveNotificationPath(notice, prefix, 'ADMIN_OPERADOR')).toBe(prefix + '/admin/solicitudes/operador-2');
+    expect(notificationActionLabel(resolveNotificationPath(notice, prefix, 'OPERADOR'), notice)).toBe('Abrir solicitud y ver su estado →');
+  });
+  it('does not follow a malformed repeated-receipt application identifier or an unrelated supplied route', () => {
+    for (const solicitudId of ['../otra', '', null]) {
+      const notice = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', solicitudId, ruta: '/mi-solicitud' }) };
+      expect(resolveNotificationPath(notice, '/app', 'GENERADOR')).toBe('/app/notificaciones');
+    }
+    const actorReceipt = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', actorTipo: 'operador', actorId: 'o-1', ruta: '/mi-perfil' }) };
+    expect(resolveNotificationPath(actorReceipt, '/app', 'OPERADOR')).toBe('/app/mi-perfil');
+  });
   it('refreshes owned application data when opening a notice on an already open result', () => {
     const invalidateQueries = vi.fn(); refreshInspectionNotification({ ...base, datos: '{"tipo":"solicitud_observada","solicitudId":"own-1"}' }, { invalidateQueries } as any);
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['solicitudes'] });

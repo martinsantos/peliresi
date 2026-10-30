@@ -157,6 +157,13 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   const data = parseNotificationData(notificacion.datos);
   if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+  // An older generic ruta must not hide the specific application in this notice.
+  if (data.tipo === 'comprobante_repetido' && Object.prototype.hasOwnProperty.call(data, 'solicitudId')) {
+    if (!safeId(data.solicitudId)) return withBasePath('/notificaciones', basePath);
+    const id = encodeURIComponent(data.solicitudId);
+    return withBasePath(recipientRole?.startsWith('ADMIN')
+      ? `/admin/solicitudes/${id}` : `/mi-solicitud?solicitud=${id}`, basePath);
+  }
   if (companyTarget && representativeManifestAlert(notificacion.tipo, data)) {
     return withBasePath(safeId(notificacion.manifiestoId) ? '/manifiestos/' + notificacion.manifiestoId : '/notificaciones', basePath);
   }

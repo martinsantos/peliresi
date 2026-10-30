@@ -1,6 +1,6 @@
 # SITREP · balance de cierre de la revisión
 
-**Estado: avance técnico verificable en preview; aceptación integral y publicación pendientes.** El producto ensayado es `67f330a711e5d12b268897d22366b428cf44b44f`, descendiente de `df3e5f97`. No se consultaron datos reales ni se publicó esta versión. El registro detallado, las reproducciones anteriores y los límites de cada corrección están en [REFACTOR-UX-20261025.md](REFACTOR-UX-20261025.md).
+**Estado: avance técnico verificable en preview; aceptación integral y publicación pendientes.** La regresión integrada utilizó `67f330a711e5d12b268897d22366b428cf44b44f`, descendiente de `df3e5f97`. Luego se corrigió el destino del aviso de comprobante repetido y se probó por separado en web y app (UX224). No se consultaron datos reales ni se publicó esta versión. El registro detallado, las reproducciones anteriores y los límites de cada corrección están en [REFACTOR-UX-20261025.md](REFACTOR-UX-20261025.md).
 
 ## Qué se comprobó en el corte actual
 
@@ -16,6 +16,8 @@ La regresión usó datos artificiales, el producto real compilado para web y la 
 | Accesibilidad y documentos | Pasaron nueve pruebas de navegador de foco, formularios, campana y navegación ampliada; dos descargas de un acta larga verificaron sus páginas. Pasaron 175 pruebas dirigidas de interfaz, 32 de PDF y 29 del manual. | No son un barrido completo de todas las pantallas, lectores de pantalla o tecnologías de asistencia. |
 
 En total son **37 pruebas de navegador** distribuidas entre esos grupos. Algunas etapas y datos se repiten; no representan 37 personas ni 37 flujos independientes. Las pruebas unitarias y del manual se repitieron sobre la misma fuente y no se suman a ejecuciones anteriores. El archivo del manual servido coincidió con su fuente por SHA-256.
+
+La prueba posterior UX224 añadió seis recorridos específicos de un aviso de comprobante repetido para una cuenta artificial multirrol: campana, lista de Avisos y correo renderizado, en web y app. El enlace identifica la solicitud correcta; el documento todavía debe localizarse en Documentos presentados. Esta prueba específica no sustituye la regresión integrada anterior ni la revisión del resto de los avisos.
 
 La comparación cotejó 2.162 archivos versionados de producto y QA; no hubo diferencias de producto. Cuatro diferencias correspondían al arnés de QA, entre ellas la selección explícita del backend aislado; un arnés GPS anterior distinto no se ejecutó en esta corrida. El backend se compiló desde una lista explícita de archivos comprometidos y se comprobó que no incorporara el trabajo GPS local no validado. Las compilaciones web/app usaron la misma fuente del commit y las opciones necesarias para este ensayo.
 

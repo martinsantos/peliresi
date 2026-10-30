@@ -28,6 +28,12 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('repeated receipt guidance distinguishes the specific application from an actor profile', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'correos-decisiones-documentos'));
+  assert.match(text, /se abre esa solicitud, incluso si tu cuenta tiene varias actividades/);
+  assert.match(text, /Abrí Documentos presentados para localizarlo/);
+  assert.match(text, /Si pertenece a una ficha, se abre Mi perfil/);
+});
 test('inspection guidance distinguishes the saved act and its continued fields', () => {
   const text = JSON.stringify(guides);
   assert.match(text, /Otras descargas elegí Acta de inspección/i);
