@@ -81,6 +81,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-manifest-owner-20261030') {
     return path.join(root, 'backend/dist-qa-manifest-owner-20261030/index.js');
   }
+  if (version === 'manifest-followup'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-followup-notice-20261030') {
+    return path.join(root, 'backend/dist-qa-followup-notice-20261030/index.js');
+  }
   if (version === '17152d81'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
     return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');

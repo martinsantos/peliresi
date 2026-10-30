@@ -145,6 +145,7 @@ try{
    for(const [id,role,expected] of [
      ['operacion-prevista-FIJO','OPERADOR','/manifiestos/MUESTRA-001'],
      ['adenda-CREADA-OPERADOR','GENERADOR','/manifiestos/MUESTRA-001/adendas?adenda=ADENDA-001'],
+     ['seguimiento-RECIBIDO-7','OPERADOR','/manifiestos/MUESTRA-001'],
    ]){
      const item=data.cases.find((entry:any)=>entry.id===id);assert.ok(item,'missing '+id);
      assert.equal(item.paths[role],expected,id);

@@ -4,7 +4,7 @@ export function personalManifestNotice(tipo: string, data: Record<string, unknow
     || ['relevo_transporte', 'manifiesto_eventual'].includes(String(data.tipo))) return false;
   return ['propuesta_partes', 'adenda_manifiesto', 'ADENDA_POST_FACTO', 'certificado_manifiesto', 'estado_manifiesto',
     'reversion_manifiesto', 'alerta_evento_manifiesto', 'duracion_transito_configurada', 'alerta_regla_manifiesto',
-    'recordatorio_firma', 'recordatorio_operacion'].includes(String(data.tipo))
+    'recordatorio_firma', 'recordatorio_operacion', 'seguimiento_cierre'].includes(String(data.tipo))
     || ['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO',
-      'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'].includes(tipo);
+      'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO', 'INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA'].includes(tipo);
 }

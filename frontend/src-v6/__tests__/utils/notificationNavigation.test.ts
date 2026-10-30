@@ -18,6 +18,16 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each([
+    ['INFO_GENERAL', { tipo: 'seguimiento_cierre', version: 1, casoId: 'case' }],
+    ['INCIDENTE_REPORTADO', {}],
+    ['ANOMALIA_DETECTADA', {}],
+  ])('routes %s manifest alerts through the owned notice for multiple roles', (tipo, datos) => {
+    const n = { ...base, tipo: tipo as Notificacion['tipo'], manifiestoId: 'm', datos: JSON.stringify(datos) };
+    expect(resolveNotificationPath(n, '/app', 'GENERADOR', false, true)).toBe('/app/notificaciones/n-1');
+    expect(resolveNotificationPath(n, '/app', 'GENERADOR', true, true)).toBe('/app/manifiestos/m');
+    expect(resolveNotificationPath(n, '/app', 'GENERADOR')).toBe('/app/manifiestos/m');
+  });
   it.each(['', '/app'])('routes a multirole manifest reminder to its owned notice on %s', prefix => {
     const n = { ...base, tipo: 'ALERTA_SISTEMA' as Notificacion['tipo'], manifiestoId: 'm', datos: JSON.stringify({ tipo: 'recordatorio_operacion', version: 1 }) };
     expect(needsPersonalManifestChoice({ rol: 'GENERADOR', actividades: ['GENERADOR', 'OPERADOR'] })).toBe(true);

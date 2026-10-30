@@ -18,6 +18,14 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each([
+    ['INFO_GENERAL', { tipo: 'seguimiento_cierre', version: 1, casoId: 'case' }],
+    ['INCIDENTE_REPORTADO', {}], ['ANOMALIA_DETECTADA', {}],
+  ])('links actor %s manifest alert to the owned notice without changing the admin destination', (tipo, datos) => {
+    const n = { ...notice, id: 'followup-notice', rol: 'GENERADOR', tipo, manifiestoId: 'm', datos: JSON.stringify(datos) };
+    expect(notificationMailContent(n)?.html).toContain('/notificaciones/followup-notice');
+    expect(notificationMailContent({ ...n, rol: 'ADMIN' })?.html).toContain('/manifiestos/m');
+  });
   it('renders a reversion through the owned notice and rechecks the original company access without sending', async () => {
     const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
     const n = { ...notice, id: 'reversion-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
