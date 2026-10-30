@@ -11,7 +11,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas, useEliminarNotificacion } from '../../hooks/useNotificaciones';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole, notificationInboxReturnState } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole, notificationInboxReturnState, needsPersonalManifestChoice } from '../../utils/notificationNavigation';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { notificationFollowup } from '../../utils/notificationFollowup';
 import { gpsNoticeContext, gpsNoticeTitle } from '../../utils/gpsNoticeContext';
@@ -80,7 +80,7 @@ const NotificacionesPage: React.FC = () => {
     refreshInspectionNotification(notice, queryClient);
     if (!notice.leida) mark.mutate(notice.id);
     // Opening the expediente must not depend on a successful acknowledgement.
-    navigate(resolveNotificationPath(notice, mp(''), currentUser?.rol), { state: notificationInboxReturnState(params.toString(), inspectionWorkspaceOwner(currentUser)) });
+    navigate(resolveNotificationPath(notice, mp(''), currentUser?.rol, false, needsPersonalManifestChoice(currentUser)), { state: notificationInboxReturnState(params.toString(), inspectionWorkspaceOwner(currentUser)) });
   };
 
   return (
@@ -142,7 +142,7 @@ const NotificacionesPage: React.FC = () => {
             // A configurable rule has an identity. Do not replace its saved
             // name with a generic title; retain the fallback for legacy data.
             const title = gpsNoticeTitle(notice) || (followup ? notice.titulo?.trim() || 'Seguimiento de manifiesto' : notice.titulo);
-            const path = resolveNotificationPath(notice, mp(''), currentUser?.rol);
+            const path = resolveNotificationPath(notice, mp(''), currentUser?.rol, false, needsPersonalManifestChoice(currentUser));
             const activity = notificationActorRole(notice);
             const otherActivity = activity && activity !== currentUser?.rol ? { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' }[activity] : null;
             const linked = path !== mp('/notificaciones');

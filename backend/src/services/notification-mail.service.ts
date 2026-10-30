@@ -22,6 +22,8 @@ import { matchingEventualRecipient } from './eventualNoticeContext.service';
 import { manifestFeatureEnabled } from '../lib/manifestTraining';
 import { RENEWAL_NOTICE_LABELS, renewalNoticeReference, validRenewalNotice } from '../domain/renewalNotice';
 import { OPERATION_REMINDER_WINDOW_MS, operationReminderDate } from '../domain/operationReminder';
+import { approvedActivities, isActorActivity } from '../domain/actorActivities';
+import { personalManifestNotice } from '../domain/manifestNoticeContext';
 
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
@@ -72,12 +74,25 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
   }
   if (notice.manifiestoId) {
     const manifest = await prisma.manifiesto.findUnique({ where: { id: notice.manifiestoId }, select: {
-      isDemoData: true, estado: true, fechaFirma: true, modalidad: true, fechaEstimadaRetiro: true, generador: { select: { usuarioId: true } },
-      transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
+      isDemoData: true, estado: true, fechaFirma: true, modalidad: true, fechaEstimadaRetiro: true, generador: { select: { id: true, activo: true, usuarioId: true } },
+      transportista: { select: { id: true, activo: true, usuarioId: true } }, operador: { select: { id: true, activo: true, usuarioId: true } },
     } });
     if (!manifest || manifest.isDemoData) return false;
     const owner = notice.rol === 'GENERADOR' ? manifest.generador : notice.rol === 'TRANSPORTISTA' ? manifest.transportista : notice.rol === 'OPERADOR' ? manifest.operador : null;
-    const directOwner = Boolean(notice.usuarioId && owner?.usuarioId === notice.usuarioId);
+    let directOwner = Boolean(notice.usuarioId && owner?.activo !== false && owner?.usuarioId === notice.usuarioId);
+    if (!directOwner && notice.usuarioId && process.env.ACTOR_MULTIROLE_ENABLED === 'true' && isActorActivity(notice.rol)
+      && [manifest.generador, manifest.transportista, manifest.operador].some(actor => actor?.activo && actor.usuarioId === notice.usuarioId)) {
+      const account = await prisma.usuario.findUnique({ where: { id: notice.usuarioId }, select: { id: true, rol: true, activo: true, emailVerified: true,
+        generador: { select: { id: true, activo: true } }, transportista: { select: { id: true, activo: true } }, operador: { select: { id: true, activo: true } } } });
+      if (account?.activo && account.emailVerified && account.rol === notice.rol) {
+        const approvals = await prisma.solicitudInscripcion.findMany({ where: { usuarioId: account.id, estado: 'APROBADA' },
+          select: { tipoActor: true, generadorId: true, transportistaId: true, operadorId: true } });
+        directOwner = approvedActivities(account, approvals).some(role => {
+          const key = role.toLowerCase() as 'generador' | 'transportista' | 'operador';
+          return manifest[key]?.activo && manifest[key]?.usuarioId === account.id && manifest[key]?.id === account[key]?.id;
+        });
+      }
+    }
     const representativeRule = isManifestRuleCompanyNotice(notice, data);
     if (representativeRule && !directOwner && !isFullAccess(notice)) {
       if (!notice.usuarioId) return false;
@@ -97,7 +112,7 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
         || !Number.isFinite(planned.getTime()) || planned.getTime() < Date.now()
         || planned.getTime() > Date.now() + OPERATION_REMINDER_WINDOW_MS || operationReminderDate(planned) !== data.fechaDia) return false;
     }
-    if (!representativeRule && !isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
+    if (!representativeRule && !isFullAccess(notice) && !directOwner) {
       // A registered replacement can see its own leg history in the carrier
       // profile. This never grants it the private original manifest dossier.
       if (['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo)) && data.version === 1 && Array.isArray(data.accesosEmpresa)) {
@@ -313,6 +328,10 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   } else return null;
   if (['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo)) && data.version === 1 && Array.isArray(data.accesosEmpresa) && data.accesosEmpresa.length) path = '/notificaciones/' + encodeURIComponent(notice.id);
   if (isManifestRuleCompanyNotice(notice, data) && data.version === 1 && Array.isArray(data.accesosEmpresa) && data.accesosEmpresa.length) path = '/notificaciones/' + encodeURIComponent(notice.id);
+  if (isActorActivity(notice.rol) && personalManifestNotice(notice.tipo, data, notice.manifiestoId)) {
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(notice.id)) return null;
+    path = '/notificaciones/' + encodeURIComponent(notice.id);
+  }
   // Only controlled event labels. Never copy free text, notes, attachments or amounts.
   const labels: Record<string, [string, string]> = {
     SOLICITUD_ENVIADA: ['Inscripción presentada para revisar', 'Hay una inscripción presentada. Revisá sus datos y documentación en SITREP.'],

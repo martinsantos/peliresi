@@ -1,9 +1,9 @@
 const renewalRecipients = vi.hoisted(() => vi.fn());
 vi.mock('../../services/renewalCompanyRecipients.service', () => ({ renewalCompanyRecipients: renewalRecipients }));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), exchange: vi.fn(), companyRecipients: vi.fn(), certificate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), user: vi.fn(), exchange: vi.fn(), companyRecipients: vi.fn(), certificate: vi.fn() }));
 vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: mocks.companyRecipients }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application, findMany: mocks.applicationContexts }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account }, intercambioInspeccion: { findUnique: mocks.exchange }, certificadoManifiesto: { findFirst: mocks.certificate } } }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application, findMany: mocks.applicationContexts }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account, findUnique: mocks.user }, intercambioInspeccion: { findUnique: mocks.exchange }, certificadoManifiesto: { findFirst: mocks.certificate } } }));
 import { notificationMailContent, notificationSourceEligible, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
@@ -126,7 +126,7 @@ describe('committed notice mail relay', () => {
     expect(content.subject).toContain('Coordinación en origen iniciada');
     expect(mailText(content.html)).toContain('No hay retiro, viaje ni GPS');
     expect(mailText(content.html)).not.toContain('preparar el retiro');
-    expect(content.html).toContain('/manifiestos/manifest');
+    expect(content.html).toContain('/notificaciones/qa-notice');
     expect(mocks.insert).not.toHaveBeenCalled();
   });
   it('keeps ordinary and historical coordination notices truthful', () => {
@@ -206,14 +206,14 @@ describe('committed notice mail relay', () => {
     expect(approved.subject).toBe('[SITREP] Una parte aprobó la adenda');
     expect(mailText(approved.html)).toContain('aprobación individual');
     expect(mailText(approved.html)).toContain('No representa la decisión de las otras partes ni el cierre documental');
-    expect(approved.html).toContain('/manifiestos/manifest/adendas');
+    expect(approved.html).toContain(rol === 'ADMIN' ? '/manifiestos/manifest/adendas' : '/notificaciones/qa-notice');
     expect(approved.html).not.toContain('PRIVATE');
     const closed = notificationMailContent({ ...common, tipo: 'MANIFIESTO_TRATADO', datos: '{}' })!;
     expect(closed.subject).toBe('[SITREP] Tratamiento finalizado');
     expect(mailText(closed.html)).toContain('no confirma que se haya emitido una certificación');
     expect(mailText(closed.html)).toContain('firma y emisión expresa del operador');
     expect(closed.html).not.toContain('Podés consultar su certificado de disposición');
-    expect(closed.html).toContain('/manifiestos/manifest');
+    expect(closed.html).toContain(rol === 'ADMIN' ? '/manifiestos/manifest' : '/notificaciones/qa-notice');
   });
   it.each([{ solicitudId: 'application' }, { documentoId: 'document' }])('names the repeated receipt without leaking receipt or actor data: %j', origin => {
     const repeated = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', rol: 'GENERADOR', datos: JSON.stringify({ tipo: 'comprobante_repetido', ...origin, ruta: 'https://untrusted.invalid', texto: 'PRIVATE', cuit: 'PRIVATE', importe: 'PRIVATE' }) })!;
@@ -318,16 +318,16 @@ describe('committed notice mail relay', () => {
     expect(await queuedNoticeStillEligible('notification:qa-notice', certificate.email)).toBe(false);
   });
   const manifestNotice = { ...notice, tipo: 'MANIFIESTO_FIRMADO', manifiestoId: 'manifest', usuarioId: 'owner', rol: 'TRANSPORTISTA', datos: null };
-  it.each(['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO', 'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'])('routes %s to the actual manifest, without copying free text', tipo => {
-    expect(notificationMailContent({ ...manifestNotice, tipo })?.html).toContain('/manifiestos/manifest');
+  it.each(['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO', 'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'])('routes %s through the owned notice, without copying free text', tipo => {
+    expect(notificationMailContent({ ...manifestNotice, tipo })?.html).toContain('/notificaciones/qa-notice');
     expect(notificationMailContent({ ...manifestNotice, tipo, manifiestoId: null })).toBeNull();
   });
   it('renders proposal and adenda mail from controlled events without copying private notes', () => {
     const proposal = { ...manifestNotice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'propuesta_partes', fase: 'creada', motivo: 'PRIVATE' }) };
     const adenda = { ...manifestNotice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: 'OBSERVADA', nota: 'PRIVATE' }) };
     expect(notificationMailContent(proposal)?.subject).toContain('pendiente de aprobación');
-    expect(notificationMailContent(proposal)?.html).toContain('/manifiestos/manifest');
-    expect(notificationMailContent(adenda)?.html).toContain('/manifiestos/manifest/adendas');
+    expect(notificationMailContent(proposal)?.html).toContain('/notificaciones/qa-notice');
+    expect(notificationMailContent(adenda)?.html).toContain('/notificaciones/qa-notice');
     expect(notificationMailContent(adenda)?.html).not.toContain('PRIVATE');
     expect(notificationMailContent({ ...adenda, manifiestoId: null })).toBeNull();
   });
@@ -488,6 +488,22 @@ describe('signature reminder mail freshness',()=>{
 });
 
 describe('operation reminder mail', () => {
+  it('recognizes a separately approved personal activity and suppresses it after revocation', async () => {
+    vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
+    const planned = new Date(Date.now() + 3600000), fechaDia = planned.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' });
+    const n = { ...notice, id: 'owner-multi', usuarioId: 'owner', rol: 'GENERADOR', manifiestoId: 'm', tipo: 'ALERTA_SISTEMA',
+      datos: JSON.stringify({ tipo: 'recordatorio_operacion', version: 1, modalidad: 'FIJO', fechaDia }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, estado: 'APROBADO', modalidad: 'FIJO', fechaEstimadaRetiro: planned,
+      generador: { id: 'other-g', activo: true, usuarioId: 'other' }, operador: { id: 'own-o', activo: true, usuarioId: 'owner' } });
+    mocks.user.mockResolvedValue({ id: 'owner', rol: 'GENERADOR', activo: true, emailVerified: true,
+      generador: { id: 'own-g', activo: true }, operador: { id: 'own-o', activo: true }, transportista: null });
+    mocks.applicationContexts.mockResolvedValue([{ tipoActor: 'OPERADOR', operadorId: 'own-o' }]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(true);
+    expect(notificationMailContent(n)?.html).toContain('/notificaciones/owner-multi');
+    mocks.applicationContexts.mockResolvedValue([]); expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'false'); expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['FIJO', 'IN_SITU'])('keeps %s context and suppresses changed, closed or revoked cases', async modalidad => {
     const planned = new Date(Date.now() + 3600000);
     const fechaDia = planned.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' });

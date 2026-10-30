@@ -1,5 +1,6 @@
 import CompanyNoticeAction from '../../components/CompanyNoticeAction';
 import EventualNoticeAction from '../../components/EventualNoticeAction';
+import PersonalManifestNoticeAction from '../../components/PersonalManifestNoticeAction';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
@@ -7,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses, notificationEventualActors, notificationEnvironmentalCertificate, notificationFiscalReminder, notificationActorReceipt, isActorReceiptNotice, notificationInboxReturnPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses, notificationEventualActors, notificationEnvironmentalCertificate, notificationFiscalReminder, notificationActorReceipt, isActorReceiptNotice, notificationInboxReturnPath, refreshInspectionNotification, isPersonalManifestNotice, needsPersonalManifestChoice } from '../../utils/notificationNavigation';
 import { activateActorActivity } from '../../services/activateActorActivity';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import type { Notificacion } from '../../types/models';
@@ -38,6 +39,7 @@ export default function AvisoPage() {
   const receipt = notice ? notificationActorReceipt(notice) : null;
   const actorTarget = certificate || fiscal || receipt;
   const actorRole = notice ? notificationActorRole(notice) : null;
+  const personalManifest = !!(notice && currentUser && isPersonalManifestNotice(notice) && needsPersonalManifestChoice(currentUser));
   const actorContextMatches = !!(actorTarget && currentUser?.rol === actorTarget.role && currentUser.actorId === actorTarget.actorId
     && (!currentUser.empresaContexto || currentUser.empresaContexto.todasSedes));
   const otherRole = actorRole && (actorTarget ? !actorContextMatches : actorRole !== currentUser?.rol);
@@ -74,7 +76,8 @@ export default function AvisoPage() {
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
       {eventualActors.length > 0 && currentUser && <EventualNoticeAction key={inspectionWorkspaceOwner(currentUser) + ':' + notice.id} notice={notice} target={target} user={currentUser} />}
       {companyAccesses.length > 0 && currentUser && <CompanyNoticeAction key={inspectionWorkspaceOwner(currentUser)} notice={notice} target={target} userId={String(currentUser.id)} context={currentUser.empresaContexto} returnState={inboxState} onOpenFiscal={() => refreshInspectionNotification(notice, queryClient)} />}
-      {!companyAccesses.length && !eventualActors.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal || receipt) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
+      {personalManifest && currentUser && notice.manifiestoId && <PersonalManifestNoticeAction key={inspectionWorkspaceOwner(currentUser) + ':' + notice.id} manifestId={notice.manifiestoId} target={target} user={currentUser} quietEmpty={companyAccesses.length > 0} />}
+      {!personalManifest && !companyAccesses.length && !eventualActors.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal || receipt) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
     </article>}
   </section>;
 }

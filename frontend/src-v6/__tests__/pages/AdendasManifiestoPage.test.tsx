@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -57,8 +57,8 @@ it('retains an uncertain command when a retry receives a conflict', async () => 
   expect(screen.getByRole('button', { name: 'Comprobar envío' })).toBeEnabled();
   expect(screen.getByLabelText('Motivo de resolución')).toBeDisabled();
 });
-function view() {
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } })}>
+function view(client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } })) {
+  return render(<QueryClientProvider client={client}>
     <MemoryRouter initialEntries={['/manifiestos/qa-id/adendas']}><Routes><Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} /></Routes></MemoryRouter>
   </QueryClientProvider>);
 }
@@ -96,6 +96,15 @@ it('successful write invalidates even a fresh list and shows the server resoluti
 it('read errors are not an empty-list success', async () => {
   mock.get.mockRejectedValue(new Error('offline')); view(); await screen.findByRole('alert');
   expect(screen.queryByText('Todavía no hay adendas.')).not.toBeInTheDocument();
+});
+it('hides cached addenda when a fresh request denies access', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } });
+  view(client); await screen.findByText('Y1 · 10 kg');
+  mock.get.mockRejectedValue({ response: { status: 404 } });
+  await act(async () => { await client.invalidateQueries({ queryKey: ['manifiesto-adendas'] }); });
+  await screen.findByText(/No se pudieron cargar las adendas/);
+  expect(screen.queryByText('Y1 · 10 kg')).not.toBeInTheDocument();
+  expect(screen.queryByText('Diferencia de carga')).not.toBeInTheDocument();
 });
 it('shows global documentary counts, not a false closure inferred from the visible page', async () => {
   mock.get.mockResolvedValue({ data: { data: { ...data, total: 25, documental: { pendientes: 23, observadas: 1, rechazadas: 1, estado: 'RECHAZADA', cierreAcreditado: false } } } });

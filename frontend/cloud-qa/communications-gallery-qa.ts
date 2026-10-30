@@ -141,6 +141,19 @@ try{
      if(suffix)assert.equal(item.paths.GENERADOR,'/notificaciones/'+item.notice.id);
    }
  });
+ await check('multirole manifest mail and inbox open the owned notice before the precise destination',async()=>{
+   for(const [id,role,expected] of [
+     ['operacion-prevista-FIJO','OPERADOR','/manifiestos/MUESTRA-001'],
+     ['adenda-CREADA-OPERADOR','GENERADOR','/manifiestos/MUESTRA-001/adendas?adenda=ADENDA-001'],
+   ]){
+     const item=data.cases.find((entry:any)=>entry.id===id);assert.ok(item,'missing '+id);
+     assert.equal(item.paths[role],expected,id);
+     assert.equal(item.personalPaths[role],'/notificaciones/'+item.notice.id,id);
+     const html=data.blobs[item.mailRefs[role].ref];
+     const web=html.match(/data-mail-action="web" href="([^"]+)"/);assert.ok(web,id);
+     assert.equal(new URL(web[1].replace(/&amp;/g,'&')).pathname,'/notificaciones/'+item.notice.id,id);
+   }
+ });
  await check('current delivery and operational producers include their scoped representative notices',async()=>{
    for(const [id,role] of [
      ['entrega-representante-GENERADOR','GENERADOR'],['entrega-representante-TRANSPORTISTA','TRANSPORTISTA'],

@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { notificacionService } from '../services/notificacion.service';
-import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel } from '../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, needsPersonalManifestChoice } from '../utils/notificationNavigation';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -16,10 +16,10 @@ export function NotificacionesPoller() {
   const { currentUser, isRestricted } = useAuth();
   if(currentUser?.training && !isRestricted)return <TrainingLiveNotices key={currentUser.id} userId={currentUser.id}/>;
   const owner = inspectionWorkspaceOwner(currentUser);
-  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={owner} owner={owner} userId={currentUser.id} userRole={currentUser.rol} /> : null;
+  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={owner} owner={owner} userId={currentUser.id} userRole={currentUser.rol} personalChoice={needsPersonalManifestChoice(currentUser)} /> : null;
 }
 
-function AuthorizedNotificationsPoller({ userId, userRole, owner }: { userId: string | number; userRole: string; owner: string }) {
+function AuthorizedNotificationsPoller({ userId, userRole, owner, personalChoice }: { userId: string | number; userRole: string; owner: string; personalChoice: boolean }) {
   usePushNotifications();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
@@ -79,11 +79,11 @@ function AuthorizedNotificationsPoller({ userId, userRole, owner }: { userId: st
         message: n.mensaje,
         messagePreview: true,
         duration: n.prioridad === 'URGENTE' ? 12_000 : 10_000,
-        actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole), n), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
+        actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole, false, personalChoice), n), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole, false, personalChoice))); },
       }));
     });
     if (seen.current.size > 200) seen.current = new Set(data.items.map(n => n.id));
-  }, [data, navigate, mp, qc, userRole]);
+  }, [data, navigate, mp, qc, userRole, personalChoice]);
   useEffect(() => () => toastIds.current.forEach(id => toast.remove(id)), []);
 
   return null;

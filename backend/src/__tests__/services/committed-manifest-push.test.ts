@@ -17,7 +17,7 @@ afterEach(() => vi.unstubAllEnvs());
 it('attempts a controlled notification only for the committed notice IDs and verifies current ownership', async () => {
   expect(await dispatchCommittedManifestPush(['notice', 'notice'])).toBe(1);
   expect(mocks.notices).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ['notice'] } } }));
-  expect(mocks.send).toHaveBeenCalledWith('carrier', expect.objectContaining({ title: 'Nueva adenda para revisar', url: '/manifiestos/manifest/adendas', tag: 'notification:notice' }));
+  expect(mocks.send).toHaveBeenCalledWith('carrier', expect.objectContaining({ title: 'Nueva adenda para revisar', url: '/notificaciones/notice', tag: 'notification:notice' }));
   expect(JSON.stringify(mocks.send.mock.calls)).not.toContain('PRIVATE');
 });
 it.each([{ activo: false }, { emailVerified: false }])('suppresses an ineligible recipient %j', async change => {
@@ -41,7 +41,7 @@ it('uses the replacement profile for its own registered leg history without expo
 });
 it('recognizes approval events without trusting arbitrary links or event labels', () => {
   for (const phase of ['creada', 'aprobada', 'iniciada', 'rechazada', 'aprobacion-OPERADOR']) {
-    expect(manifestPushContent({ ...notice, rol: 'TRANSPORTISTA', datos: JSON.stringify({ tipo: 'propuesta_partes', fase: phase, url: '//untrusted.invalid' }) })?.url).toBe('/manifiestos/manifest');
+    expect(manifestPushContent({ ...notice, rol: 'TRANSPORTISTA', datos: JSON.stringify({ tipo: 'propuesta_partes', fase: phase, url: '//untrusted.invalid' }) })?.url).toBe('/notificaciones/notice');
   }
   expect(manifestPushContent({ ...notice, rol: 'TRANSPORTISTA', datos: '{"tipo":"propuesta_partes","fase":"__proto__"}' })).toBeNull();
   expect(manifestPushContent({ ...notice, rol: 'TRANSPORTISTA', datos: 'null' })).toBeNull();

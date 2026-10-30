@@ -16,7 +16,7 @@ import { getAccessToken } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Notificacion } from '../types/models';
 import { TipoNotificacion } from '../types/models';
-import { resolveNotificationPath, refreshInspectionNotification } from '../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, needsPersonalManifestChoice } from '../utils/notificationNavigation';
 import { gpsNoticeContext, gpsNoticeTitle, isGpsNotice } from '../utils/gpsNoticeContext';
 import { notificationManifestReference } from '../utils/notificationManifestReference';
 
@@ -192,9 +192,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
         .catch(() => { /* Keep the notice unread if acknowledgement was not confirmed. */ });
       setIsOpen(false);
 
-      navigate(resolveNotificationPath(notif, basePath, currentUser?.rol));
+      navigate(resolveNotificationPath(notif, basePath, currentUser?.rol, false, needsPersonalManifestChoice(currentUser)));
     },
-    [navigate, queryClient, basePath, currentUser?.rol]
+    [navigate, queryClient, basePath, currentUser]
   );
 
   const handleViewAll = useCallback(() => {

@@ -544,3 +544,12 @@ test('operation reminders distinguish the planned date from pickup and origin tr
   assert.match(text, /no aprueba la propuesta ni inicia el viaje/);
   assert.match(text, /recordatorios anteriores conservan su texto original/);
 });
+
+test('notice links explain verified personal activities and preserve historical addendum targets', () => {
+  const guide = guides.find((g: any) => g.id === 'avisos-enlaces-plazos');
+  const text = guide.steps.find((s: any) => s.title === 'Elegir app o web').body.join(' ');
+  assert.match(text, /varias actividades/);
+  assert.match(text, /comprueba los permisos antes de cambiar/);
+  assert.match(text, /enlace anterior/);
+  assert.match(text, /sin perder la adenda solicitada/);
+});

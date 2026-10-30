@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationInboxReturnState, notificationInboxReturnPath, notificationCompanyAccesses } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationInboxReturnState, notificationInboxReturnPath, notificationCompanyAccesses, needsPersonalManifestChoice } from '../../utils/notificationNavigation';
 import type { Notificacion } from '../../types/models';
 import { QueryClient } from '@tanstack/react-query';
 
@@ -18,6 +18,24 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app'])('routes a multirole manifest reminder to its owned notice on %s', prefix => {
+    const n = { ...base, tipo: 'ALERTA_SISTEMA' as Notificacion['tipo'], manifiestoId: 'm', datos: JSON.stringify({ tipo: 'recordatorio_operacion', version: 1 }) };
+    expect(needsPersonalManifestChoice({ rol: 'GENERADOR', actividades: ['GENERADOR', 'OPERADOR'] })).toBe(true);
+    expect(resolveNotificationPath(n, prefix, 'GENERADOR', false, true)).toBe(prefix + '/notificaciones/n-1');
+    expect(resolveNotificationPath(n, prefix, 'GENERADOR', true, true)).toBe(prefix + '/manifiestos/m');
+    expect(resolveNotificationPath(n, prefix, 'GENERADOR')).toBe(prefix + '/manifiestos/m');
+  });
+  it('preserves a registered handoff destination even for a multirole account', () => {
+    const n = { ...base, manifiestoId: 'm', datos: JSON.stringify({ tipo: 'relevo_transporte', ruta: '/transporte/perfil' }) };
+    expect(resolveNotificationPath(n, '', 'TRANSPORTISTA', false, true)).toBe('/transporte/perfil');
+  });
+  it.each(['', '/app'])('preserves the addendum from an owned notice in %s', prefix => {
+    const n = { ...base, manifiestoId: 'm', datos: JSON.stringify({ tipo: 'adenda_manifiesto', adendaId: 'a' }) };
+    expect(resolveNotificationPath(n, prefix, 'GENERADOR', false, true)).toBe(prefix + '/notificaciones/n-1');
+    expect(resolveNotificationPath(n, prefix, 'GENERADOR', true, true)).toBe(prefix + '/manifiestos/m/adendas?adenda=a');
+    expect(resolveNotificationPath({ ...n, datos: JSON.stringify({ tipo: 'adenda_manifiesto' }) }, prefix, 'GENERADOR', true)).toBe(prefix + '/manifiestos/m/adendas');
+    expect(resolveNotificationPath({ ...n, datos: JSON.stringify({ tipo: 'adenda_manifiesto', adendaId: '../bad' }) }, prefix, 'GENERADOR', true)).toBe(prefix + '/notificaciones');
+  });
   it.each(['', '/app'])('opens an operation reminder through the representative context on %s', prefix => {
     const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa' };
     const notice = { ...base, tipo: 'ALERTA_SISTEMA' as Notificacion['tipo'], manifiestoId: 'm',

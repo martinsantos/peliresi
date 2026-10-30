@@ -29,6 +29,23 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
   }
 }
 
+/** A personal activity still has to be verified against the manifest API. */
+export function isPersonalManifestNotice(notice: Pick<Notificacion, 'manifiestoId' | 'tipo' | 'datos'>): boolean {
+  if (typeof notice.manifiestoId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(notice.manifiestoId)) return false;
+  const data = parseNotificationData(notice.datos);
+  if (['relevo_transporte', 'manifiesto_eventual'].includes(String(data.tipo))) return false;
+  return ['propuesta_partes', 'adenda_manifiesto', 'ADENDA_POST_FACTO', 'certificado_manifiesto', 'estado_manifiesto',
+    'reversion_manifiesto', 'alerta_evento_manifiesto', 'duracion_transito_configurada', 'alerta_regla_manifiesto',
+    'recordatorio_firma', 'recordatorio_operacion'].includes(String(data.tipo))
+    || ['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO',
+      'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'].includes(String(notice.tipo));
+}
+
+export function needsPersonalManifestChoice(user?: { rol?: string; actividades?: string[]; empresaContexto?: unknown } | null): boolean {
+  return !!user && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(user.rol || '')
+    && (new Set((user.actividades || []).filter(role => ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(role))).size > 1 || !!user.empresaContexto);
+}
+
 function representativeManifestAlert(tipo: string, data: Record<string, unknown>): boolean {
  if (data.destino !== 'representante' || data.version !== 1) return false;
  if (tipo === 'INFO_GENERAL' && data.tipo === 'reversion_manifiesto') return true;
@@ -186,10 +203,11 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   return 'Abrir detalle →';
 }
 
-export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string, companyTarget = false): string {
+export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string, companyTarget = false, personalChoice = false): string {
   const data = parseNotificationData(notificacion.datos);
   if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+  if (!companyTarget && personalChoice && isPersonalManifestNotice(notificacion) && safeId(notificacion.id)) return withBasePath('/notificaciones/' + notificacion.id, basePath);
   // An older generic ruta must not hide the specific application in this notice.
   if (data.tipo === 'comprobante_repetido' && Object.prototype.hasOwnProperty.call(data, 'solicitudId')) {
     if (!safeId(data.solicitudId)) return withBasePath('/notificaciones', basePath);
@@ -223,7 +241,10 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
       ? '/mi-perfil?certificadoAmbiental=' + encodeURIComponent(certificate.documentoId) + '#certificado-ambiental'
       : '/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   }
-  if (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) && safeId(notificacion.manifiestoId) && safeId(data.adendaId)) return withBasePath(`/manifiestos/${notificacion.manifiestoId}/adendas?adenda=${data.adendaId}`, basePath);
+  if (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) && safeId(notificacion.manifiestoId)) {
+    if (data.adendaId !== undefined && !safeId(data.adendaId)) return withBasePath('/notificaciones', basePath);
+    return withBasePath(`/manifiestos/${notificacion.manifiestoId}/adendas${safeId(data.adendaId) ? '?adenda=' + data.adendaId : ''}`, basePath);
+  }
   if (data.tipo === 'soporte' && safeId(data.ticketId)) return withBasePath('/soporte/' + data.ticketId, basePath);
   if(data.tipo === 'certificado_manifiesto') {
     const safe=(v:unknown):v is string=>typeof v==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v);

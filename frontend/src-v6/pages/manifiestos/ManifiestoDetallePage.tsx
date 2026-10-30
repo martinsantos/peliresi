@@ -72,6 +72,9 @@ import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import ManifiestoActions from './components/ManifiestoActions';
 import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
 import { subscribeDeliveryConfirmed } from '../../services/offlineSyncEvents';
+import PersonalManifestNoticeAction from '../../components/PersonalManifestNoticeAction';
+import { needsPersonalManifestChoice } from '../../utils/notificationNavigation';
+import { tripAccessDenied } from '../../services/tripSnapshot';
 
 const ACTOR_SUMMARY = {
   GENERADOR: { label: 'Generador', Icon: Factory, icon: 'bg-purple-50 text-purple-600', interactive: 'hover:bg-purple-50/50' },
@@ -147,7 +150,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const returnContext = manifestWorkspaceReturn(location.state, mp('/manifiestos'));
   const returnToList = returnContext.path;
   const isApp = location.pathname.startsWith('/app');
-  const { data: apiData, isLoading, isError, refetch: reloadManifest } = useManifiesto(id || '');
+  const { data: apiData, isLoading, isError, error: loadError, refetch: reloadManifest } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
 
   // Auth context for role-based visibility
@@ -185,7 +188,8 @@ const ManifiestoDetailPage: React.FC = () => {
     || rechazar.isPending || registrarIncidente.isPending || revertir.isPending;
 
   // Use API data only
-  const manifiesto = apiData;
+  // Do not keep a cached dossier visible after the server revokes access.
+  const manifiesto = isError && tripAccessDenied(loadError) ? undefined : apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
   const isInSitu = m.modalidad === 'IN_SITU' || (!m.modalidad && !m.transportistaId);
   const quantityTotals = declaredQuantities(Array.isArray(m.residuos) ? m.residuos : []);
@@ -408,14 +412,18 @@ const ManifiestoDetailPage: React.FC = () => {
   }
 
   if (!manifiesto && (isError || !isLoading)) {
+    const status = (loadError as { response?: { status?: number } } | null)?.response?.status;
+    const chooseActivity = (status === 403 || status === 404) && !!id && !!currentUser && needsPersonalManifestChoice(currentUser);
     return (
       <div className="space-y-6 animate-fade-in">
         <Button variant="ghost" aria-label={`Volver a ${returnContext.label}`} onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>{returnContext.label}</Button>
         <Card>
           <CardContent className="py-16 text-center">
             <AlertCircle size={48} className="mx-auto text-warning-400 mb-4" />
-            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Manifiesto no encontrado</h3>
-            <p className="text-neutral-600">No se pudo cargar el manifiesto solicitado. Verifica que el ID sea correcto o intenta nuevamente.</p>
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">{chooseActivity ? 'Manifiesto no disponible en esta actividad' : 'Manifiesto no encontrado'}</h3>
+            <p className="text-neutral-600">{chooseActivity ? 'Comprobá si otra de tus actividades puede abrirlo.' : 'No se pudo cargar el manifiesto solicitado. Verificá el enlace o intentá nuevamente.'}</p>
+            {chooseActivity && id && currentUser && <div className="mx-auto mt-4 max-w-lg"><PersonalManifestNoticeAction manifestId={id}
+              target={'/manifiestos/' + id + location.search + location.hash} user={currentUser} onCurrent={() => void reloadManifest()} /></div>}
           </CardContent>
         </Card>
       </div>

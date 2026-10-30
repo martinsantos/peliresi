@@ -2,7 +2,7 @@ import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, FileSearch, ClipboardCheck, UserRound } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { api, getAccessToken } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -21,6 +21,9 @@ import { addendumCommandConfirmed, addendumCommandPath, addendumDraftScope, adde
   dispatchAddendumSubmission, legacyAddendumCommand, legacyAddendumSignature, readAddendumSubmission, validAddendumCommand,
   writeAddendumSubmission, type AddendumCommand, type AddendumSubmission } from '../../services/addendumSubmission';
 import { formatEstado } from '../../utils/formatters';
+import { needsPersonalManifestChoice } from '../../utils/notificationNavigation';
+import PersonalManifestNoticeAction from '../../components/PersonalManifestNoticeAction';
+import { tripAccessDenied } from '../../services/tripSnapshot';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Author = { nombre: string; rol: string };
@@ -85,6 +88,7 @@ export default function AdendasManifiestoPage() {
 }
 function AddendumContext({scope,session,impersonator}:{scope:string;session:string;impersonator:string|null}) {
   const { id } = useParams(); const { currentUser } = useAuth(); const mp = useMobilePrefix();
+  const location = useLocation();
   const enabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser);
   const [params, setParams] = useSearchParams();
   const selected = params.get('adenda');
@@ -230,7 +234,7 @@ function AddendumContext({scope,session,impersonator}:{scope:string;session:stri
     }finally{lock.current=false;if(sameSession())setBusy(false);}
   }
   if (!enabled) return <p>Adendas no habilitadas.</p>;
-  const data = query.data;
+  const data = query.isError && tripAccessDenied(query.error) ? undefined : query.data;
   const blocked = ownership.status!=='owned'||busy||draft.conflict||draft.error||query.isError||submission.error||legacyError||identityConflict||!!command;
   return <section className="mx-auto w-full max-w-[960px] space-y-4" aria-label="Adendas del manifiesto">
     <Link to={mp(`/manifiestos/${id}`)} className="inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"><ArrowLeft size={18} aria-hidden="true"/>Volver al manifiesto</Link>
@@ -264,7 +268,10 @@ function AddendumContext({scope,session,impersonator}:{scope:string;session:stri
     </div>}
     <details className="text-sm text-neutral-600"><summary className="min-h-11 cursor-pointer py-3 font-medium text-primary-800 focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se revisa una adenda</summary><p className="pb-3">La revisión de adendas no detiene el circuito operativo. Cada revisión expresa la decisión de su autor. La última revisión indica el estado actual; no representa unanimidad ni cierre documental.</p></details>
     {query.isPending && <p role="status">Cargando adendas…</p>}
-    {query.isError && <p role="alert">No se pudieron cargar las adendas. <Button variant="outline" onClick={() => void query.refetch()}>Reintentar carga</Button></p>}
+    {query.isError && <div role="alert" className="space-y-3"><p>No se pudieron cargar las adendas. <Button variant="outline" onClick={() => void query.refetch()}>Reintentar carga</Button></p>
+      {id && currentUser && [403, 404].includes((query.error as { response?: { status?: number } } | null)?.response?.status || 0)
+        && needsPersonalManifestChoice(currentUser) && <PersonalManifestNoticeAction manifestId={id}
+          target={'/manifiestos/' + id + '/adendas' + location.search + location.hash} user={currentUser} onCurrent={() => void query.refetch()} />}</div>}
     {error && <p role="alert" className="text-error-700">{error} <Button variant="outline" onClick={() => void query.refetch()}>Actualizar revisiones</Button></p>}
     {saved && <p role="status">{saved}</p>}
     {(submission.error||legacyError||identityConflict)&&<div role="alert" className="space-y-2 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-900">

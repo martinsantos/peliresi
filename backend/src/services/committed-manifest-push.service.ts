@@ -3,6 +3,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import logger from '../utils/logger';
 import { enviarPushAlUsuario, type PushPayload } from './push.service';
 import { notificationSourceEligible, type NoticeForMail } from './notification-mail.service';
+import { personalManifestNotice } from '../domain/manifestNoticeContext';
 
 /** Controlled labels only: notes, quantities and declarations stay behind login. */
 export function manifestPushContent(notice: Pick<NoticeForMail, 'tipo' | 'datos' | 'manifiestoId' | 'rol'> & { id?: string }): PushPayload | null {
@@ -14,9 +15,11 @@ export function manifestPushContent(notice: Pick<NoticeForMail, 'tipo' | 'datos'
   // A representative first opens their own notice and chooses a current,
   // verified activity/site; the push must never select a company on its own.
   const companyContext = data.destino === 'representante' || (Array.isArray(data.accesosEmpresa) && data.accesosEmpresa.length > 0);
-  const ownedNotice = companyContext && typeof notice.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(notice.id)
+  const personalContext = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(notice.rol) && personalManifestNotice(notice.tipo, data, notice.manifiestoId);
+  const needsOwnedNotice = companyContext || personalContext;
+  const ownedNotice = needsOwnedNotice && typeof notice.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(notice.id)
     ? '/notificaciones/' + encodeURIComponent(notice.id) : null;
-  if (companyContext && !ownedNotice) return null;
+  if (needsOwnedNotice && !ownedNotice) return null;
   const state: Record<string, { tipo: string; title: string }> = {
     EN_TRANSITO: { tipo: 'MANIFIESTO_EN_TRANSITO', title: 'Retiro confirmado' },
     ENTREGADO: { tipo: 'MANIFIESTO_ENTREGADO', title: 'Entrega confirmada' },

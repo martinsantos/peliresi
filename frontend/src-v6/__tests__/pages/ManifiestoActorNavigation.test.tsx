@@ -6,14 +6,14 @@ import ManifiestoDetallePage from '../../pages/manifiestos/ManifiestoDetallePage
 import { canAccessMobilePath } from '../../utils/mobileAccess';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1', empresaContexto: undefined as {todasSedes:boolean}|undefined}, writes: vi.fn(), status: 'TRATADO', modalidad: undefined as string|undefined }));
+const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1', empresaContexto: undefined as {todasSedes:boolean}|undefined}, writes: vi.fn(), status: 'TRATADO', modalidad: undefined as string|undefined, denied: 0, proposal: false }));
 vi.mock('../../contexts/AuthContext', () => ({useAuth: () => ({currentUser: state.user, isAdmin: state.user.rol === 'ADMIN'})}));
 vi.mock('../../hooks/useManifiestos', () => {
   const mutation = () => ({isPending: false, mutateAsync: state.writes});
   return {
     useManifiesto: () => ({data: {id: 'm-1', numero: 'QA-1', estado: state.status, modalidad: state.modalidad, createdAt: '2026-10-02T12:00:00Z',
       generadorId: 'g-1', transportistaId: 't-1', operadorId: 'o-1',
-      generador: {razonSocial: 'QA Generador', cuit: '30123456789'}, transportista: {razonSocial: 'QA Transporte'}, operador: {razonSocial: 'QA Operador'}, residuos: [], eventos: []}}),
+      generador: {razonSocial: 'QA Generador', cuit: '30123456789'}, transportista: {razonSocial: 'QA Transporte'}, operador: {razonSocial: 'QA Operador'}, residuos: [], eventos: state.proposal ? [{tipo:'PROPUESTA_PARTES_V1'}] : []}, isError: !!state.denied, error: state.denied ? {response:{status:state.denied}} : null}),
     useFirmarManifiesto: mutation, useConfirmarRetiro: mutation, useConfirmarEntrega: mutation,
     useConfirmarRecepcion: mutation, useConfirmarRecepcionInSitu: mutation, usePesaje: mutation,
     useRegistrarTratamiento: mutation, useCerrarManifiesto: mutation, useCancelarManifiesto: mutation,
@@ -30,13 +30,19 @@ vi.mock('../../services/manifiesto.service', () => ({manifiestoService: {}}));
 
 let queryClient: QueryClient;
 beforeEach(() => {
-  state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1', empresaContexto: undefined}; state.writes.mockClear(); state.status = 'TRATADO'; state.modalidad = undefined;
+  state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1', empresaContexto: undefined}; state.writes.mockClear(); state.status = 'TRATADO'; state.modalidad = undefined; state.denied = 0; state.proposal = false;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   queryClient.setQueryData(['tramos-transporte', 'm-1', undefined], { tramos: [], puedeRegistrar: false });
 });
 afterEach(() => { cleanup(); queryClient.clear(); });
 const open = () => render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/manifiestos/m-1']}><Routes><Route path="/manifiestos/:id" element={<ManifiestoDetallePage/>}/></Routes></MemoryRouter></QueryClientProvider>);
 const actorLinks = () => screen.queryAllByRole('link').filter(link => (link.getAttribute('href') || '').includes('/admin/actores/'));
+test('hides cached manifest content after access is denied', () => {
+  state.denied = 404; open();
+  expect(screen.getByText('Manifiesto no encontrado')).toBeVisible();
+  expect(screen.queryByText('QA Generador')).not.toBeInTheDocument();
+  expect(screen.queryByText('QA-1')).not.toBeInTheDocument();
+});
 test('administrator actor blocks are semantic keyboard links to the exact three fichas', () => {
   open();
   expect(actorLinks().map(link => link.getAttribute('href'))).toEqual(['/admin/actores/generadores/g-1','/admin/actores/transportistas/t-1','/admin/actores/operadores/o-1']);
@@ -68,13 +74,20 @@ test('app ordinary transportista cannot render another actor detail', () => {
 });
 
 for (const prefix of ['', '/app']) test(`carrier opens its ready trip without a blank page on ${prefix || 'web'}`, async () => {
-  state.user.rol = 'TRANSPORTISTA'; state.status = 'APROBADO';
+  state.user.rol = 'TRANSPORTISTA'; state.status = 'APROBADO'; state.proposal = true;
   render(<MemoryRouter initialEntries={[prefix+'/manifiestos/m-1']}><Routes>
     <Route path={prefix+'/manifiestos/:id'} element={<ManifiestoDetallePage/>}/>
     <Route path={prefix+'/transporte/viaje/:id'} element={<h1>Viaje listo para retirar</h1>}/>
   </Routes></MemoryRouter>);
   expect(await screen.findByRole('heading',{name:'Viaje listo para retirar'})).toBeVisible();
   expect(state.writes).not.toHaveBeenCalled();
+});
+
+test('a historical approved manifest without recorded proposal stays in its dossier', async () => {
+  state.user.rol = 'TRANSPORTISTA'; state.status = 'APROBADO'; state.proposal = false;
+  open();
+  expect(await screen.findByRole('heading', { name: 'QA-1' })).toBeVisible();
+  expect(screen.getByText('Aprobado · registro anterior')).toBeVisible();
 });
 
 for (const prefix of ['', '/app']) test(`in-situ approver stays on the manifest with no invented trip on ${prefix || 'web'}`, async () => {
