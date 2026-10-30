@@ -469,6 +469,22 @@ describe('signature reminder mail freshness',()=>{
     expect(await notificationSourceEligible(n,'alertas')).toBe(expected);
     expect(notificationMailContent(n)?.html).toContain('30 días desde la firma:</strong>');
   });
+  it('rechecks the original company and site for a representative before rendering the private notice link', async () => {
+    const fechaFirma = new Date(Date.now() - 24 * 86400000);
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
+    const n = { ...notice, id: 'signature-notice', usuarioId: 'rep', rol: 'OPERADOR', manifiestoId: 'm', tipo: 'VENCIMIENTO_PROXIMO',
+      datos: JSON.stringify({ tipo: 'recordatorio_firma', version: 1, fase: 'SEMANA', fechaFirma: fechaFirma.toISOString(), destino: 'representante', accesosEmpresa: [access] }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, fechaFirma, estado: 'RECIBIDO', generador: { usuarioId: 'owner' }, operador: { usuarioId: 'other' } });
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(true);
+    const content = notificationMailContent(n)!;
+    expect(content.html).toContain('/notificaciones/signature-notice'); expect(content.html).not.toContain('PRIVATE');
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [{ ...access, establecimientoId: 'other' }] }]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    mocks.companyRecipients.mockResolvedValue([]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
 });
 
 it('rechecks renewal representative access and decision before future mail without sending', async () => {

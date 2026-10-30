@@ -122,6 +122,17 @@ try{
    await select('atm-repetido-perfil');await channel('email');
    await expect(page.locator('#review')).toContainText('confirmar la actividad');
  });
+ await check('signature reminder samples keep the representative context in inbox and mail',async()=>{
+   for(const fase of ['SEMANA','TREINTA_DIAS']){
+     const item=data.cases.find((entry:any)=>entry.id==='firma-representante-'+fase);assert.ok(item);
+     for(const role of ['GENERADOR','TRANSPORTISTA','OPERADOR']){
+       assert.equal(item.paths[role],'/notificaciones/'+item.notice.id);
+       const html=data.blobs[item.mailRefs[role].ref];
+       const web=html.match(/data-mail-action="web" href="([^"]+)"/);assert.ok(web);
+       assert.equal(new URL(web[1].replace(/&amp;/g,'&')).pathname,'/notificaciones/'+item.notice.id);
+     }
+   }
+ });
  await check('current delivery and operational producers include their scoped representative notices',async()=>{
    for(const [id,role] of [
      ['entrega-representante-GENERADOR','GENERADOR'],['entrega-representante-TRANSPORTISTA','TRANSPORTISTA'],

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationInboxReturnState, notificationInboxReturnPath } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationInboxReturnState, notificationInboxReturnPath, notificationCompanyAccesses } from '../../utils/notificationNavigation';
 import type { Notificacion } from '../../types/models';
 import { QueryClient } from '@tanstack/react-query';
 
@@ -18,6 +18,14 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app'])('opens a representative signature reminder in its authorized context on %s', prefix => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa', establecimientoId: 'site', establecimiento: 'Norte' };
+    const notice = { ...base, tipo: 'VENCIMIENTO_PROXIMO' as Notificacion['tipo'], manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'recordatorio_firma', version: 1, fase: 'SEMANA', destino: 'representante', accesosEmpresa: [access] }) };
+    expect(notificationCompanyAccesses(notice)).toEqual([access]);
+    expect(resolveNotificationPath(notice, prefix, 'OPERADOR')).toBe(prefix + '/notificaciones/n-1');
+    expect(resolveNotificationPath(notice, prefix, 'OPERADOR', true)).toBe(prefix + '/manifiestos/m');
+  });
   it.each(['', '/app', '/mobile'])('routes fiscal reminders via the owned notice in %s and ignores the obsolete profile path', prefix => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil' }) };
     expect(resolveNotificationPath(notice, prefix, 'OPERADOR')).toBe(prefix + '/notificaciones/n-1');

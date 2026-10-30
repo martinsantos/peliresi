@@ -525,3 +525,13 @@ test('classroom new proposals separate authorship, three decisions, agenda and s
   assert.match(text,/las adendas resueltas/);
   assert.match(text,/CAPACITACIÓN — SIN VALIDEZ OFICIAL/);
 });
+
+test('signature reminders explain authorized representatives and the two phases', () => {
+  const guide = guides.find((g: any) => g.id === 'avisos-enlaces-plazos');
+  const step = guide.steps.find((s: any) => s.title === 'Leer los plazos y el seguimiento');
+  const text = step.body.join(' ');
+  assert.match(text, /23 días/); assert.match(text, /30/); assert.match(text, /representantes autorizados/);
+  assert.match(text, /cuando la representación de empresas esté habilitada/);
+  assert.match(text, /empresa, actividad y sede/); assert.match(text, /una sola vez por persona/);
+  assert.match(text, /no una declaración automática de infracción/);
+});
