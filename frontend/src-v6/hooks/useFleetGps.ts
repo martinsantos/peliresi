@@ -1,17 +1,18 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {getApiErrorMessage} from '../utils/api-error';
 import {createGpsFixOrder,gpsFixFingerprint} from '../utils/gpsFixOrder';
+import {gpsObservationIsFresh} from '../utils/gpsFreshness';
 import {newGpsPointId} from '../services/gpsQueue';
 import {acknowledgeFleetGpsPoint,bindFleetGpsCapability,rebindFleetGpsCapabilityAfterAbsence,readFleetGpsPoints,saveFleetGpsPoint,type FleetStoredPoint} from '../services/fleetGpsStorage';
 import {adoptParkedGpsLease,gpsLeaseClosing,parkGpsLease,startGpsLease,type GpsLease} from '../services/gpsCoordination';
 import {clearVolatileFleetObservation,getVolatileFleetObservation,rememberVolatileFleetObservation,showVolatileFleetWarning,type FleetGpsObservation} from '../services/fleetGpsVolatile';
 
 export interface FleetGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
-export interface FleetGpsTarget {key:string;lockId?:string;persist?:boolean;beforeSend?:()=>Promise<void>;prepareCapability?:()=>Promise<string>;recoveryMessage?:string;send:(point:FleetGpsPoint,puntoId:string,version?:string)=>Promise<unknown>;verify?:(point:FleetGpsPoint,puntoId:string,version?:string|null)=>Promise<boolean>}
-export interface FleetGpsDelivery {state:'sending'|'received'|'verified'|'error';receivedAt?:Date;message?:string;terminal?:boolean;statusCode?:number;saved?:boolean}
+export interface FleetGpsTarget {key:string;lockId?:string;persist?:boolean;beforeSend?:()=>Promise<void>;prepareCapability?:()=>Promise<string>;recoveryMessage?:string;send:(point:FleetGpsPoint,puntoId:string,version?:string,assertFresh?:()=>void)=>Promise<unknown>;verify?:(point:FleetGpsPoint,puntoId:string,version?:string|null)=>Promise<boolean>}
+export interface FleetGpsDelivery {state:'sending'|'received'|'verified'|'error';receivedAt?:Date;observedAt?:number;message?:string;terminal?:boolean;statusCode?:number;saved?:boolean}
 type Observation=FleetGpsObservation;
 type Status='idle'|'acquiring'|'active'|'denied'|'unavailable';
-const recent=(observedAt:number)=>Number.isFinite(observedAt)&&Date.now()-observedAt>=0&&Date.now()-observedAt<=60000;
+const recent=gpsObservationIsFresh;
 function responseStatus(error:unknown):number|undefined {
   if(!error||typeof error!=='object')return;
   if('status'in error&&typeof error.status==='number')return error.status;
@@ -184,8 +185,16 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
                 if(item.capabilityVersion===null)item=bindFleetGpsCapability(item,version);
                 (observation.capabilityVersions??=new Map()).set(key,version);
               }
-              if(target.prepareCapability)await target.send(observation.point,reference,version);
-              else await target.send(observation.point,reference);
+              // Preparing a delivery check, a lock or a relay authorization may
+              // take longer than the freshness window. Never dispatch this
+              // attempt as a current fix after those asynchronous steps.
+              const assertFresh=()=>{
+                if(!activeRef.current||generation.current!==run||!targetsRef.current.some(item=>item.key===key))
+                  throw new Error('El seguimiento cambió antes de este envío. La ubicación se conserva en este dispositivo.');
+                if(!recent(observation.observedAt))throw new Error('La ubicación dejó de ser reciente antes de este envío. Se conserva en este dispositivo; consultá a soporte antes de continuar.');
+              };
+              assertFresh();
+              await target.send(observation.point,reference,version,assertFresh);
               if(target.persist!==false){try{acknowledgeFleetGpsPoint(item);}catch(error){markVolatile(observation);throw error;}}
               clearVolatile();
               return 'received' as const;
@@ -205,7 +214,8 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
           if(unconfirmedRef.current.get(key)===observation)unconfirmedRef.current.delete(key);
           if(activeRef.current&&generation.current===run){
             if(observation.fingerprint!==null)receivedRef.current.set(key,observation.fingerprint);
-            if(targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:outcome==='verified'?{state:'verified'}:{state:'received',receivedAt:new Date()}}));
+            if(targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:outcome==='verified'||!recent(observation.observedAt)
+              ?{state:'verified'}:{state:'received',receivedAt:new Date(),observedAt:observation.observedAt}}));
           }
         }catch(error){
           if(target.lockId&&getVolatileFleetObservation(key))showVolatileFleetWarning(key,target.recoveryMessage);

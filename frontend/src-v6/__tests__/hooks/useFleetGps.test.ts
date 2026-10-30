@@ -140,7 +140,7 @@ it('retains a failed observation through a newer fix and blocks delivery until i
   const [original, reference] = a.mock.calls[0];
   await act(async () => { vi.setSystemTime(Date.now() + 30_000); locate({ ...position(), coords: { ...position().coords, latitude: -34 } } as GeolocationPosition); await flush(); });
   expect(a).toHaveBeenCalledTimes(2);
-  expect(a.mock.calls[1]).toEqual([original, reference]);
+  expect(a.mock.calls[1]).toEqual([original, reference, undefined, expect.any(Function)]);
   expect(b).toHaveBeenCalledTimes(2);
   await expect(hook.result.current.holdAndDrain('a')).resolves.toBeUndefined();
   hook.unmount();
@@ -208,7 +208,7 @@ it('recovers a failed attempted point after the screen is reopened, with the sam
   const send=vi.fn().mockResolvedValue({});
   const reopened=renderHook(()=>useFleetGps([{key:'account-a:trip',send}],true));
   await act(flush);
-  expect(send).toHaveBeenCalledWith(point,reference);
+  expect(send).toHaveBeenCalledWith(point,reference,undefined,expect.any(Function));
   expect(reopened.result.current.deliveries['account-a:trip'].state).toBe('received');
   await expect(reopened.result.current.holdAndDrain('account-a:trip')).resolves.toBeUndefined();
   reopened.unmount();
@@ -234,7 +234,7 @@ it('can synchronize a saved point even if this device no longer exposes a GPS se
   vi.stubGlobal('navigator',{});
   const send=vi.fn().mockResolvedValue({});
   const reopened=renderHook(()=>useFleetGps([{key:'a',send}],true));await act(flush);
-  expect(send).toHaveBeenCalledWith(point,reference);expect(reopened.result.current.status).toBe('unavailable');
+  expect(send).toHaveBeenCalledWith(point,reference,undefined,expect.any(Function));expect(reopened.result.current.status).toBe('unavailable');
   expect(localStorage.length).toBe(0);reopened.unmount();
 });
 
@@ -335,7 +335,7 @@ it('protects an unsaved fleet point across navigation and recovers only in its o
     blocked=false;
     const reopened=renderHook(()=>useFleetGps([{key,lockId:'volatile-trip',send}],true));
     await act(async()=>{await flush();await flush();});
-    expect(send).toHaveBeenCalledWith(original.point,reference);
+    expect(send).toHaveBeenCalledWith(original.point,reference,undefined,expect.any(Function));
     expect(getVolatileFleetObservation(key)).toBeUndefined();
     await expect(withGpsTransitionLock('volatile-trip',async()=>true)).resolves.toBe(true);
     const safeClose=new Event('beforeunload',{cancelable:true});window.dispatchEvent(safeClose);expect(safeClose.defaultPrevented).toBe(false);
@@ -420,7 +420,7 @@ it('saves an unsent relay point before obtaining its capability and recovers the
     await act(async()=>{locate(position());await flush();await flush();});
     const [saved]=readFleetGpsPoints(key);expect(saved.capabilityVersion).toBeNull();expect(send).not.toHaveBeenCalled();first.unmount();
     const reopened=renderHook(()=>useFleetGps([target],true));await act(async()=>{await flush();await flush();});
-    expect(send).toHaveBeenCalledWith(saved.point,saved.puntoId,version);expect(readFleetGpsPoints(key)).toEqual([]);reopened.unmount();
+    expect(send).toHaveBeenCalledWith(saved.point,saved.puntoId,version,expect.any(Function));expect(readFleetGpsPoints(key)).toEqual([]);reopened.unmount();
   }finally{const lease=adoptParkedGpsLease('relevo:relay-offline',key);if(lease)await lease.release();clearVolatileFleetObservation(key);restoreLocks();}
 });
 it('does not send a relay point when binding its authorization fails',async()=>{
@@ -435,7 +435,7 @@ it('does not send a relay point when binding its authorization fails',async()=>{
     await act(async()=>{locate(position());await flush();await flush();});
     const [saved]=readFleetGpsPoints(key);expect(saved.capabilityVersion).toBeNull();expect(send).not.toHaveBeenCalled();first.unmount();
     const reopened=renderHook(()=>useFleetGps([target],true));await act(async()=>{await flush();await flush();});
-    expect(send).toHaveBeenCalledWith(saved.point,saved.puntoId,version);expect(readFleetGpsPoints(key)).toEqual([]);reopened.unmount();
+    expect(send).toHaveBeenCalledWith(saved.point,saved.puntoId,version,expect.any(Function));expect(readFleetGpsPoints(key)).toEqual([]);reopened.unmount();
   }finally{const lease=adoptParkedGpsLease('relevo:binding-failure',key);if(lease)await lease.release();clearVolatileFleetObservation(key);restoreLocks();}
 });
 it('retains a relay point and refuses a different capability version after reopening',async()=>{
@@ -463,7 +463,7 @@ it.each([true,false])('checks a fresh point under the renewed relay capability, 
     await act(async()=>{await flush();await flush();});
     expect(verify).toHaveBeenCalledWith(saved.point,saved.puntoId,old);
     if(received){expect(send).not.toHaveBeenCalled();expect(hook.result.current.deliveries[key].state).toBe('verified');}
-    else{expect(send).toHaveBeenCalledWith(saved.point,saved.puntoId,current);expect(hook.result.current.deliveries[key].state).toBe('received');}
+    else{expect(send).toHaveBeenCalledWith(saved.point,saved.puntoId,current,expect.any(Function));expect(hook.result.current.deliveries[key].state).toBe('received');}
     expect(readFleetGpsPoints(key)).toEqual([]);hook.unmount();
   }finally{const lease=adoptParkedGpsLease(lockId,key);if(lease)await lease.release();clearVolatileFleetObservation(key);restoreLocks();}
 });

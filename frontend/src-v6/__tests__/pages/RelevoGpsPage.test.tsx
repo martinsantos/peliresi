@@ -3,7 +3,7 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 vi.mock('react-router-dom',()=>({useParams:()=>({tramoId:'leg-qa'})}));
 import RelevoGpsPage from '../../pages/transporte/RelevoGpsPage';
-let success:PositionCallback;const clearWatch=vi.fn();
+let success:PositionCallback;let failGps:PositionErrorCallback;const clearWatch=vi.fn();
 let restoreLocks:()=>void;
 const access=`header.${btoa(JSON.stringify({jti:'1949916e-22df-4dc1-9d1e-98f98a3eab26'}))}.signature`;
 const info={tramoId:'leg-qa',numero:'QA-001',empresa:'Auxilio artificial',destino:'Planta QA',domicilioDestino:'QA 100',orden:1,training:true,ultimaPosicion:null,vence:'2099-01-01'};
@@ -18,7 +18,7 @@ const confirmReceipt=(sent:any)=>vi.mocked(fetch).mockImplementation(async(url,o
 beforeEach(()=>{
   sessionStorage.clear();localStorage.clear();history.replaceState({},'',`/relevo/leg-qa#${access}`);
   vi.stubGlobal('fetch',vi.fn(async(_url:string,options:RequestInit)=>({ok:true,status:200,json:async()=>({success:true,data:options.method==='POST'?{tracking:{timestamp:new Date().toISOString()},idempotencia:{version:1,puntoId:JSON.parse(options.body as string).puntoId,repetido:false}}:info})})));
-  vi.stubGlobal('navigator',{geolocation:{watchPosition:vi.fn((ok:PositionCallback)=>{success=ok;return 17;}),clearWatch}});clearWatch.mockClear();
+  vi.stubGlobal('navigator',{geolocation:{watchPosition:vi.fn((ok:PositionCallback,fail:PositionErrorCallback)=>{success=ok;failGps=fail;return 17;}),clearWatch}});clearWatch.mockClear();
   restoreLocks=installMockGpsLocks();
 });
 afterEach(()=>{restoreLocks();vi.restoreAllMocks();vi.unstubAllGlobals();localStorage.clear();});
@@ -32,6 +32,21 @@ it('starts only by explicit tap, acknowledges actual uploads, and stops its watc
   const call=vi.mocked(fetch).mock.calls.find(([,init])=>init?.method==='POST')!;
   expect(call[1]).toMatchObject({credentials:'omit',cache:'no-store',headers:expect.objectContaining({Authorization:'Bearer '+access})});
   expect(JSON.parse(call[1]!.body as string)).toMatchObject({latitud:-32.8,longitud:-68.8});view.unmount();expect(clearWatch).toHaveBeenCalledWith(17);
+});
+it('does not keep a green recent status after the sensor stops or the captured fix ages',async()=>{
+  let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
+  const view=render(<RelevoGpsPage/>);await screen.findByText('Auxilio artificial');
+  fireEvent.click(screen.getByRole('button',{name:'Compartir ubicación'}));
+  await waitFor(()=>expect(navigator.geolocation.watchPosition).toHaveBeenCalledOnce());
+  const coords={latitude:-32.8,longitude:-68.8,accuracy:10,speed:0,heading:null};
+  await act(async()=>success({coords,timestamp:now} as GeolocationPosition));
+  expect(await screen.findByRole('status')).toHaveTextContent('Ubicación recibida por SITREP');
+  now+=61_000;view.rerender(<RelevoGpsPage/>);
+  expect(screen.getByRole('status')).toHaveTextContent('Última ubicación sin actualización reciente');
+  await act(async()=>failGps({code:1} as GeolocationPositionError));
+  expect(screen.getByRole('status')).toHaveTextContent('GPS sin ubicación');
+  expect(screen.getByRole('alert')).toHaveTextContent('Permití la ubicación');
+  view.unmount();
 });
 it('shows a revoked access without trying to acquire location',async()=>{
   vi.mocked(fetch).mockResolvedValue({ok:false,status:403,json:async()=>({message:'Este seguimiento ya no está activo'})} as Response);

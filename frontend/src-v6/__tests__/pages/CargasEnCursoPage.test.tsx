@@ -46,7 +46,7 @@ it('stops tracking a load confirmed by another account in this browser and keeps
   expect(selected).toHaveTextContent('QA-B');
   view.unmount();
 });
-afterEach(() => { restoreLocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => { restoreLocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const tree = () => <QueryClientProvider client={client}><MemoryRouter><CargasEnCursoPage/></MemoryRouter></QueryClientProvider>;
@@ -58,6 +58,15 @@ async function chooseAndStart() {
   await act(async () => { locate({ coords: { latitude: -33, longitude: -69, accuracy: 10, speed: null, heading: null }, timestamp: Date.now() } as GeolocationPosition); });
   await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(2));
 }
+it('marks each confirmed GPS as no longer recent when the sensor capture ages', async () => {
+  let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
+  const view=setup();await chooseAndStart();
+  const selected=screen.getByRole('region',{name:'Cargas marcadas'});
+  await waitFor(()=>expect(within(selected).getAllByText(/GPS recibido/)).toHaveLength(2));
+  now+=61_000;fireEvent.click(screen.getByRole('button',{name:'Elegir otras cargas'}));
+  expect(within(selected).getAllByText(/GPS sin actualización reciente/)).toHaveLength(2);
+  view.unmount();
+});
 it('does not create a GPS obligation after another tab queues delivery', async () => {
   mocks.queue.mockResolvedValue([{type:'POST',endpoint:'/manifiestos/A/confirmar-entrega-idempotente'}]);
   const view=setup();

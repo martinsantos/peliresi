@@ -28,6 +28,12 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('fleet GPS explains a stale capture and does not promise a server capture time', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'transporte-cargas-simultaneas'));
+  assert.match(text, /SITREP confirmó una ubicación anterior/);
+  assert.match(text, /no se envía en ese intento/);
+  assert.match(text, /servidor aún registra la hora de recepción, no la de captura/);
+});
 test('addenda distinguish local drafts from an uncertain or confirmed submission', () => {
   const guide = guides.find((g: any) => g.id === 'adendas-hallazgos-partes');
   const step = guide.steps.find((s: any) => s.title === 'Guardar y recuperar la adenda');

@@ -30,6 +30,15 @@ it('does not use a relay capability if the account or activity changes while it 
   await expect(sending).rejects.toThrow('cuenta o actividad cambió');
   expect(credentials.size).toBe(0);expect(mocks.relay).not.toHaveBeenCalled();
 });
+it('checks freshness again after requesting relay access and before sending coordinates',async()=>{
+  let resolve!:(value:unknown)=>void,fresh=true;
+  mocks.post.mockImplementationOnce(()=>new Promise(done=>{resolve=done;}));
+  const guard=()=>{if(!fresh)throw new Error('ubicación antigua');};
+  const sending=fleetGpsService.send({...base,kind:'RELEVO'},point,new Map(),reference,()=>true,undefined,guard);
+  fresh=false;resolve({data:{data:{acceso:token(reference)}}});
+  await expect(sending).rejects.toThrow('ubicación antigua');
+  expect(mocks.relay).not.toHaveBeenCalled();
+});
 it('does not retry an uncertain relay point under a rotated capability version',async()=>{
   const id='3a999c28-2e6a-4fd0-9127-777a7db7af3e',credentials=new Map<string,string>();
   mocks.post.mockResolvedValueOnce({data:{data:{acceso:token('qa-version-1')}}}).mockResolvedValueOnce({data:{data:{acceso:token('qa-version-2')}}});

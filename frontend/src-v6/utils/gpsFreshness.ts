@@ -3,6 +3,13 @@ import type { GpsStatus } from '../hooks/useGPSTracking';
 // This is a device-fix freshness window, not a duration limit for the trip.
 export const GPS_EVENT_MAX_AGE_MS = 60_000;
 
+/** Device time is useful for local presentation only; the server does not yet
+ * store the sensor capture time and must not treat it as verified evidence. */
+export function gpsObservationIsFresh(observedAt: number | null | undefined, now = Date.now()): boolean {
+  return typeof observedAt === 'number' && Number.isFinite(observedAt) && Number.isFinite(now)
+    && observedAt <= now && now - observedAt < GPS_EVENT_MAX_AGE_MS;
+}
+
 export type GpsFixFreshness = 'fresh' | 'stale' | 'unknown';
 
 export function gpsFixFreshness(lastUpdate: Date | null, now = Date.now()): GpsFixFreshness {

@@ -36,10 +36,10 @@ export const fleetGpsService={
     try{const result=await limitedLegReceipt(load.id,token,point,puntoId,expectedVersion);if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');return result;}
     catch(error){if(error&&typeof error==='object'&&'status'in error&&[401,403].includes(Number(error.status)))credentials.delete(load.key);throw error;}
   },
-  async send(load:FleetGpsLoad,point:TransportGpsPoint,credentials:Map<string,string>,puntoId:string,isCurrent:()=>boolean=()=>true,expectedVersion?:string) {
+  async send(load:FleetGpsLoad,point:TransportGpsPoint,credentials:Map<string,string>,puntoId:string,isCurrent:()=>boolean=()=>true,expectedVersion?:string,assertFresh?:()=>void) {
     const ensureSession=()=>{if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');};
     ensureSession();
-    if(load.kind==='MANIFIESTO'){await manifiestoService.actualizarUbicacion(load.id,point.latitud,point.longitud,point.velocidad,point.direccion,puntoId);ensureSession();return;}
+    if(load.kind==='MANIFIESTO'){assertFresh?.();await manifiestoService.actualizarUbicacion(load.id,point.latitud,point.longitud,point.velocidad,point.direccion,puntoId);ensureSession();return;}
     const {token,version}=await relayAccess(load,credentials,isCurrent);
     try{
       ensureSession();
@@ -49,6 +49,7 @@ export const fleetGpsService={
       // Keep the in-memory guard for older callers without that proof.
       if(expectedVersion?expectedVersion!==version:previous&&previous!==version)throw changedRelay();
       if(!expectedVersion)relayPointVersions.set(pointKey,version);
+      assertFresh?.();
       const result=await limitedLegRequest<LimitedTransportUpload>(load.id,token,point,puntoId);
       ensureSession();relayPointVersions.delete(pointKey);return result;
     }
