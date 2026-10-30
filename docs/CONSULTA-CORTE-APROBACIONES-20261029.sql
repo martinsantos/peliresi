@@ -2,6 +2,8 @@
 -- Ejecutar únicamente contra la base elegida y autorizada para el análisis del corte.
 -- Los grupos se superponen: no deben sumarse. Son candidatos para revisión;
 -- no se infiere consentimiento ni se valida aquí el contenido del marcador.
+-- La alternativa con validación de contenido y sus límites se describe en
+-- AUDITORIA-APROBACIONES-CORTE-20261030.md; sólo se ensayó en preview.
 BEGIN TRANSACTION READ ONLY;
 
 SELECT 'SIN_PROPUESTA_REGISTRADA' AS motivo,
