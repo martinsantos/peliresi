@@ -7,8 +7,10 @@ import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError, gpsQueueKey } from '../.
 import { withGpsTransitionLock } from '../../services/gpsCoordination';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
+const session = vi.hoisted(() => ({ context: 'session-a', ownerMatches: true }));
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { actualizarUbicacion: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { add: vi.fn().mockReturnValue('storage-notice'), error: vi.fn(), warning: vi.fn(), remove: vi.fn() } }));
+vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => session.context, supportSessionMatches: () => session.ownerMatches }));
 
 const position = (latitude = -33, longitude = -69): GeolocationPosition => ({
   coords: { latitude, longitude, accuracy: 10, speed: null, heading: null, altitude: null, altitudeAccuracy: null },
@@ -28,6 +30,7 @@ describe('GPS position provenance and cleanup', () => {
     restoreLocks = installMockGpsLocks();
     vi.useFakeTimers();
     vi.resetAllMocks();
+    session.context = 'session-a'; session.ownerMatches = true;
     vi.mocked(toast.add).mockReturnValue('storage-notice');
     localStorage.clear();
     watchSuccess = []; watchError = []; coarseSuccess = []; coarseError = [];
@@ -700,7 +703,7 @@ describe('GPS position provenance and cleanup', () => {
   });
 
   it('does not adopt a parked GPS queue under another company activity', async () => {
-    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId), original = Storage.prototype.setItem;
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId, 'company-a'), original = Storage.prototype.setItem;
     const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
       if (name === key) throw new DOMException('Storage full', 'QuotaExceededError');
       return original.call(this, name, value);
@@ -716,6 +719,87 @@ describe('GPS position provenance and cleanup', () => {
     const originalContext = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-a' }));
     await act(async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); });
     expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledOnce(); originalContext.unmount();
+  });
+
+  it('does not replay a stored point under another activity of the same account', async () => {
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
+    const first = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-a' }));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId, 'company-a');
+    expect(localStorage.getItem(key)).not.toBeNull();
+    first.unmount();
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+
+    vi.mocked(manifiestoService.actualizarUbicacion).mockClear().mockResolvedValue(undefined);
+    const other = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-b' }));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).not.toBeNull();
+    other.unmount();
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+
+    const original = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-a' }));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledOnce();
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledWith(trip.manifiestoId, -34, -70, null, null, expect.any(String));
+    original.unmount();
+  });
+
+  it('clears the prior position when activity changes in an open trip', async () => {
+    const view = renderHook(({ leaseOwner }: { leaseOwner: string }) => useGPSTracking({ ...trip, leaseOwner }),
+      { initialProps: { leaseOwner: 'company-a' } });
+    act(() => watchSuccess[0](position(-34, -70)));
+    expect(view.result.current.position).toEqual([-34, -70]);
+    view.rerender({ leaseOwner: 'company-b' });
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(view.result.current.position).toBeNull();
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('keeps a point under its original activity if the session changes before upload', async () => {
+    const view = renderHook(() => useGPSTracking({ ...trip, leaseOwner:'company-a', sessionContext:'session-a' }));
+    act(() => watchSuccess[0](position(-34,-70)));
+    session.context = 'session-b';
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    expect(localStorage.getItem(gpsQueueKey(trip.ownerId,trip.manifiestoId,'company-a'))).not.toBeNull();
+    expect(view.result.current.sendError).toMatch(/cuenta o actividad cambió/i);
+    view.unmount();
+  });
+
+  it('retains an accepted point if the session changes before the response', async () => {
+    let complete!: () => void;
+    vi.mocked(manifiestoService.actualizarUbicacion).mockImplementationOnce(() => new Promise<void>(resolve => { complete = resolve; }));
+    const view = renderHook(() => useGPSTracking({ ...trip, leaseOwner:'company-a', sessionContext:'session-a' }));
+    act(() => watchSuccess[0](position(-34,-70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const key = gpsQueueKey(trip.ownerId,trip.manifiestoId,'company-a');
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledOnce();
+    const original = JSON.parse(localStorage.getItem(key)!);
+    session.context = 'session-b';
+    await act(async () => { complete(); for (let i=0;i<20;i++) await Promise.resolve(); });
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual(original);
+    view.unmount();
+    await act(async () => { for (let i=0;i<30;i++) await Promise.resolve(); });
+    session.context = 'session-a';
+    const reopened = renderHook(() => useGPSTracking({ ...trip, leaseOwner:'company-a', sessionContext:'session-a' }));
+    await act(async () => { for (let i=0;i<30;i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(manifiestoService.actualizarUbicacion).mock.calls[1][5]).toBe(original[0].puntoId);
+    reopened.unmount();
+  });
+
+  it('does not start GPS when older locations have no identifiable activity', async () => {
+    const key = gpsQueueKey(trip.ownerId,trip.manifiestoId), raw = JSON.stringify([{lat:-34,lng:-70,speed:null,heading:null}]);
+    localStorage.setItem(key,raw);
+    const view = renderHook(() => useGPSTracking({ ...trip, leaseOwner:'company-a' }));
+    await act(async () => { for (let i=0;i<20;i++) await Promise.resolve(); });
+    expect(view.result.current.storageIssue).toBe('unscoped');
+    expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled();
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled(); expect(localStorage.getItem(key)).toBe(raw);
+    view.unmount();
   });
 
   it('preserves unreadable GPS data and blocks transitions until it can be reviewed', async () => {

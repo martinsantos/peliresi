@@ -1,5 +1,5 @@
 import api from './api';
-import { GpsPendingError, readPendingGpsQueue, type PendingGpsPoint } from './gpsQueue';
+import { GpsPendingError, gpsScopeMatchesRequest, readPendingGpsQueue, type PendingGpsPoint } from './gpsQueue';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 
 export type GpsReceiptSummary = { checked: number; confirmed: number; unconfirmed: number };
@@ -15,17 +15,18 @@ export function matchesGpsReceipt(response: unknown, point: PendingGpsPoint): bo
 
 /** Read-only reconciliation. It deliberately never removes or rewrites the
  * shared queue: another tab may still be adding a location. */
-export async function verifyStoredGpsReceipts(ownerId: string | number, id: string): Promise<GpsReceiptSummary> {
+export async function verifyStoredGpsReceipts(ownerId: string | number, id: string, contextOwner?: string): Promise<GpsReceiptSummary> {
   const owner = String(ownerId), context = supportRequestContext();
   const ensureSession = () => {
-    if (!owner || !context || !supportSessionMatches(owner) || supportRequestContext() !== context) {
+    if (!owner || !context || (contextOwner !== undefined && !gpsScopeMatchesRequest(contextOwner, context)) || !supportSessionMatches(owner) || supportRequestContext() !== context) {
       throw new GpsPendingError('La cuenta o actividad cambió. Volvé a abrir el viaje antes de comprobar las ubicaciones.');
     }
   };
   const read = () => {
-    const saved = readPendingGpsQueue(owner, id);
+    const saved = readPendingGpsQueue(owner, id, contextOwner);
     if (!saved.ok) throw new GpsPendingError(saved.reason === 'legacy'
       ? 'Hay ubicaciones anteriores sin titular identificado. Conservá este dispositivo y contactá a soporte.'
+      : saved.reason === 'unscoped' ? 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.'
       : 'No se pudieron leer las ubicaciones guardadas. Conservá este dispositivo y contactá a soporte.');
     if (!saved.durable) throw new GpsPendingError('No se pudo confirmar el guardado local. Conservá esta pantalla y revisá el almacenamiento.');
     return saved.points;

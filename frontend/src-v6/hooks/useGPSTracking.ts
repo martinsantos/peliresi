@@ -17,6 +17,7 @@ import { subscribeDeliveryConfirmed } from '../services/offlineSyncEvents';
 import { adoptParkedGpsLease, gpsLeaseClosing, parkGpsLease, rememberGpsLeaseClosing, startGpsLease, withGpsTransitionLock, type GpsLease } from '../services/gpsCoordination';
 import { EstadoManifiesto } from '../types/models';
 import { createGpsFixOrder } from '../utils/gpsFixOrder';
+import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 
 // Bound the rendered route independently from the persisted upload queue.
 const MAX_LOCAL_TRACK_POINTS = 500;
@@ -36,6 +37,7 @@ interface UseGPSTrackingOptions {
   manifiestoId: string | undefined;
   ownerId: string | number | undefined;
   leaseOwner?: string;
+  sessionContext?: string;
   estado: string | undefined;
   viajeStatus: 'ACTIVO' | 'PAUSADO';
 }
@@ -83,12 +85,14 @@ function gpsSendErrorMessage(error: unknown): string {
 
 function gpsStorageErrorMessage(issue: GpsStorageIssue): string {
   if (issue === 'legacy') return 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.';
+  if (issue === 'unscoped') return 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.';
+  if (issue === 'context') return 'Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad o contactá a soporte.';
   if (issue === 'invalid') return 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.';
   if (issue === 'reference') return 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.';
   return 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta y revisá el almacenamiento o la conexión.';
 }
 
-export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {
+export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionContext, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
   const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
   const [trackPoints, setTrackPoints] = useState<[number, number][]>([]);
@@ -128,17 +132,27 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
 
   const id = manifiestoId;
   const owner = ownerId == null ? undefined : String(ownerId);
+  const contextOwner = leaseOwner || undefined;
   const leaseScope = leaseOwner || owner;
-  const context = id && owner ? JSON.stringify([owner, id]) : null;
+  const context = id && owner ? JSON.stringify([owner, id, leaseScope, sessionContext ?? null]) : null;
   const activeContextRef = useRef(context);
   activeContextRef.current = context;
   const previousContextRef = useRef(context);
   const uploadsStoppedRef = useRef(false);
   const deliveryConfirmedRef = useRef(false);
   const [restart, setRestart] = useState(0);
-  const sendPoint = useCallback((tripId: string, p: PendingGpsPoint) => {
-    return manifiestoService.actualizarUbicacion(tripId, p.lat, p.lng, p.speed, p.heading, p.puntoId);
-  }, []);
+  const sendPoint = useCallback(async (tripId: string, p: PendingGpsPoint) => {
+    const ensureSession = () => {
+      if (sessionContext !== undefined && (!owner || !sessionContext || !supportSessionMatches(owner) || supportRequestContext() !== sessionContext)) {
+        throw new GpsPendingError('La cuenta o actividad cambió. Volvé a la actividad original para sincronizar las ubicaciones.');
+      }
+    };
+    ensureSession();
+    await manifiestoService.actualizarUbicacion(tripId, p.lat, p.lng, p.speed, p.heading, p.puntoId);
+    // A response after a context switch is uncertain for this screen. Keep
+    // the original reference so the authorized activity can safely retry.
+    ensureSession();
+  }, [owner, sessionContext]);
   const reportSendError = useCallback((error: unknown) => {
     const message = gpsSendErrorMessage(error);
     gpsSendErrorRef.current = message; setGpsSendError(message); setGpsSendStatus('error');
@@ -151,7 +165,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       setPendingCount(points.length);
     }
     if (!id || !owner) return false;
-    const saved = savePendingGpsQueue(owner, id, points);
+    const saved = savePendingGpsQueue(owner, id, points, contextOwner);
     if (saved && context) {
       const noticeId = storageRecoveryNotices.get(context);
       storageRecoveryNotices.delete(context);
@@ -163,11 +177,11 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       setStorageIssue(saved ? null : 'storage');
     }
     return saved;
-  }, [context, id, owner]);
+  }, [context, contextOwner, id, owner]);
 
   const acknowledgePendingUpdate = useCallback((point: PendingGpsPoint) => {
     if (!id || !owner || !point.puntoId) return null;
-    const result = acknowledgeGpsPoint(owner, id, point.puntoId);
+    const result = acknowledgeGpsPoint(owner, id, point.puntoId, contextOwner);
     if (activeContextRef.current === context) {
       if (!result.ok) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(result.reason); }
       else {
@@ -176,7 +190,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       }
     }
     return result;
-  }, [context, id, owner]);
+  }, [context, contextOwner, id, owner]);
 
   // Persist the latest unsent observation before stopping. The usual timer
   // samples at 30-second intervals, so the last fix may still be in memory.
@@ -199,11 +213,11 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
     const observation = observationRef.current, position = currentPositionRef.current, details = gpsDetailsRef.current;
     if (restartingSensorRef.current || !leaseHeldRef.current || !id || !owner || deliveryConfirmedRef.current || !observation || !position
       || observation.key === lastQueuedObservationRef.current) return;
-    const saved = readPendingGpsQueue(owner, id);
+    const saved = readPendingGpsQueue(owner, id, contextOwner);
     if (!saved.ok) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason); return; }
     try {
       if (!observation.puntoId) observation.puntoId = newGpsPointId();
-      const pending = prepareGpsPoints(owner, id, saved.points);
+      const pending = prepareGpsPoints(owner, id, saved.points, contextOwner);
       pending.push({ lat: position[0], lng: position[1], speed: details.speed, heading: details.heading, puntoId: observation.puntoId });
       setPendingUpdates(pending);
       lastQueuedObservationRef.current = observation.key;
@@ -211,7 +225,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       storageErrorRef.current = true; setStorageError(true);
       setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage');
     }
-  }, [id, owner, setPendingUpdates]);
+  }, [contextOwner, id, owner, setPendingUpdates]);
 
   const leaseKey = context && estado === EstadoManifiesto.EN_TRANSITO && viajeStatus === 'ACTIVO'
     ? JSON.stringify([context, restart]) : null;
@@ -238,12 +252,12 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
     const released = (async () => {
       await attempt.ready;
       await Promise.allSettled(gpsTasksForTrip(attempt.id));
-      if (owner && leaseScope && attempt.granted && attempt.lease && hasVolatileGpsQueue(owner, attempt.id)) {
+      if (owner && leaseScope && attempt.granted && attempt.lease && hasVolatileGpsQueue(owner, attempt.id, contextOwner)) {
         parkGpsLease(attempt.id, leaseScope, attempt.lease);
         if (stopWatcher) {
           const noticeId = toast.add({ type: 'error', title: 'Ubicaciones sin guardar',
             message: 'Volvé a este viaje en esta pestaña y reintentá el guardado antes de cerrarla.', duration: 0 });
-          storageRecoveryNotices.set(JSON.stringify([owner, attempt.id]), noticeId);
+          if (context) storageRecoveryNotices.set(context, noticeId);
         }
         return;
       }
@@ -252,7 +266,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
     attempt.released = released;
     rememberGpsLeaseClosing(attempt.id, released);
     return released;
-  }, [cleanupGps, owner, leaseScope]);
+  }, [cleanupGps, context, contextOwner, owner, leaseScope]);
 
   useEffect(() => {
     if (!leaseKey || !id) return;
@@ -297,20 +311,20 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
   // Called after stopAndDrain, before a state change that would reject older GPS points.
   const flushPending = useCallback(async (): Promise<boolean> => {
     if (!id || !owner || !uploadsStoppedRef.current || deliveryConfirmedRef.current) return false;
-    if (hasVolatileGpsQueue(owner, id)) {
+    if (hasVolatileGpsQueue(owner, id, contextOwner)) {
       reportSendError(new GpsPendingError(gpsStorageErrorMessage('storage'))); return false;
     }
     const generation = trackingGenerationRef.current;
     let completed = false;
     try { await runExclusiveGpsTask(id, () => withGpsTransitionLock(id, async () => {
       if (activeContextRef.current !== context || trackingGenerationRef.current !== generation || deliveryConfirmedRef.current) return;
-      const saved = readPendingGpsQueue(owner, id);
+      const saved = readPendingGpsQueue(owner, id, contextOwner);
       if (!saved.ok) {
         storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason);
         reportSendError(new GpsPendingError(gpsStorageErrorMessage(saved.reason))); return;
       }
       let pending: PendingGpsPoint[];
-      try { pending = prepareGpsPoints(owner, id, saved.points); }
+      try { pending = prepareGpsPoints(owner, id, saved.points, contextOwner); }
       catch (error) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage'); reportSendError(error); return; }
       if (!setPendingUpdates(pending)) { reportSendError(new GpsPendingError(gpsStorageErrorMessage('storage'))); return; }
       let sent = false;
@@ -330,7 +344,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       completed = true;
     })); } catch (error) { reportSendError(error); return false; }
     return completed;
-  }, [context, id, owner, sendPoint, setPendingUpdates, acknowledgePendingUpdate, reportSendError, clearSendError]);
+  }, [context, contextOwner, id, owner, sendPoint, setPendingUpdates, acknowledgePendingUpdate, reportSendError, clearSendError]);
   const resumeGps = useCallback(() => { if (!deliveryConfirmedRef.current) setRestart(value => value + 1); }, []);
   // A retry must not re-enable tracking if a delivery, handoff or unmount
   // stopped it while an outstanding GPS upload was being drained.
@@ -411,7 +425,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
     uploadsStoppedRef.current = false;
     let isMounted = true;
     const earlierTasks = gpsTasksForTrip(id);
-    const savedPending = readPendingGpsQueue(owner, id);
+    const savedPending = readPendingGpsQueue(owner, id, contextOwner);
     if (!savedPending.ok) {
       storageErrorRef.current = true;
       setStorageError(true);
@@ -423,7 +437,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       const replay = (async () => {
         if (earlierTasks.length > 0) await Promise.allSettled(earlierTasks);
         if (!isMounted || uploadsStoppedRef.current || activeContextRef.current !== context) return;
-        const saved = readPendingGpsQueue(owner, id);
+        const saved = readPendingGpsQueue(owner, id, contextOwner);
         if (!saved.ok) {
           storageErrorRef.current = true;
           setStorageError(true);
@@ -431,7 +445,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
           return;
         }
         let parsed: PendingGpsPoint[];
-        try { parsed = prepareGpsPoints(owner, id, saved.points); }
+        try { parsed = prepareGpsPoints(owner, id, saved.points, contextOwner); }
         catch (error) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage'); return; }
         if (parsed.length > 0) {
             if (!setPendingUpdates(parsed)) { setGpsSendStatus('error'); return; }
@@ -455,11 +469,18 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
     return () => {
       isMounted = false;
     };
-  }, [context, id, owner, estado, viajeStatus, restart, ownsGpsLease, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
+  }, [context, contextOwner, id, owner, estado, viajeStatus, restart, ownsGpsLease, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
 
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
     if (!id || !owner || !ownsGpsLease || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    if (contextOwner) {
+      const saved = readPendingGpsQueue(owner, id, contextOwner);
+      if (!saved.ok) {
+        storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason); setGpsStatus('error');
+        return;
+      }
+    }
     if (!('geolocation' in navigator)) {
       setGpsStatus('unavailable');
       return;
@@ -571,11 +592,11 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
             setStorageError(true); setStorageIssue('reference'); setGpsSendStatus('error'); return;
           }
         }
-        const saved = readPendingGpsQueue(owner, id);
+        const saved = readPendingGpsQueue(owner, id, contextOwner);
         if (!saved.ok) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason); return; }
         let pending: PendingGpsPoint[];
         try {
-          pending = prepareGpsPoints(owner, id, saved.points);
+          pending = prepareGpsPoints(owner, id, saved.points, contextOwner);
           if (isNewObservation) pending = [...pending, { lat: pos[0], lng: pos[1], speed: details.speed, heading: details.heading, puntoId: observation.puntoId! }];
         }
         catch (error) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage'); setGpsSendStatus('error'); return; }
@@ -607,7 +628,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
     // beforeunload listener to flush GPS data when PWA closes
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       cleanupGps();
-      if (hasVolatileGpsQueue(owner, id)) { event.preventDefault(); event.returnValue = ''; }
+      if (hasVolatileGpsQueue(owner, id, contextOwner)) { event.preventDefault(); event.returnValue = ''; }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -615,7 +636,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, estado, viaj
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [context, estado, viajeStatus, id, owner, restart, ownsGpsLease, cleanupGps, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
+  }, [context, contextOwner, estado, viajeStatus, id, owner, restart, ownsGpsLease, cleanupGps, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
 
   useEffect(() => {
     const onDelivery = (event: Event) => {

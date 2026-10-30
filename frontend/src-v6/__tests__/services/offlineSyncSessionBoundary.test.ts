@@ -25,7 +25,7 @@ it('stops a queued delivery before sending another point under a different sessi
     queueMicrotask(() => request.onsuccess?.()); return request;
   }) });
   const first = { lat:-33.1, lng:-68.1, speed:null, heading:null }, second = { lat:-33.2, lng:-68.2, speed:null, heading:null };
-  const key = gpsQueueKey('account-a', 'trip');
+  const key = gpsQueueKey('account-a', 'trip', transportContext.owner);
   localStorage.setItem(key, JSON.stringify([first, second]));
   let acknowledge!: (value: unknown) => void;
   mock.post.mockImplementationOnce(() => new Promise<unknown>(resolve => { acknowledge = resolve; }));
@@ -161,7 +161,7 @@ it('marks a lost delivery response as uncertain and keeps the same reference', a
 it('reports a GPS synchronization failure before delivery without claiming the delivery was sent', async () => {
   const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega-idempotente',data:{referencia:'ref-1'},userId:'account-a',contextOwner:'transport-context',createdAt:'2026-10-28T00:00:00Z'};
   const store=mockQueue([action]);
-  localStorage.setItem(gpsQueueKey('account-a','trip'),JSON.stringify([{lat:-33,lng:-68,speed:null,heading:null}]));
+  localStorage.setItem(gpsQueueKey('account-a','trip',transportContext.owner),JSON.stringify([{lat:-33,lng:-68,speed:null,heading:null}]));
   mock.post.mockRejectedValueOnce(Object.assign(new Error('Network Error'),{isAxiosError:true}));
   const {processSyncQueue}=await import('../../services/indexeddb');
   const result=await processSyncQueue('account-a',transportContext,true);
@@ -169,6 +169,17 @@ it('reports a GPS synchronization failure before delivery without claiming the d
   expect(store.remaining()[0]).toMatchObject({lastFailureUncertain:false});
   expect(mock.post.mock.calls[0][0]).toContain('/ubicacion-idempotente');
   expect(mock.post).toHaveBeenCalledOnce();
+});
+
+it('retains an offline delivery when the same account has GPS pending in another activity', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega-idempotente',data:{referencia:'ref-1'},userId:'account-a',contextOwner:'company-b',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]); const key=gpsQueueKey('account-a','trip','company-a');
+  const points=[{lat:-33,lng:-68,speed:null,heading:null}]; localStorage.setItem(key,JSON.stringify(points));
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const result=await processSyncQueue('account-a',{owner:'company-b',role:'TRANSPORTISTA',companyScoped:true},true);
+  expect(result.pending).toBe(1); expect(result.lastError).toMatch(/otra actividad/i);
+  expect(store.remaining()).toHaveLength(1); expect(mock.post).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem(key)!)).toEqual(points);
 });
 
 it('a targeted delivery retry does not send other queued actions', async () => {

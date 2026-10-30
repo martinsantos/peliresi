@@ -10,6 +10,7 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
   currentUser: { id: 'pending-carrier', rol: 'TRANSPORTISTA' }, isTransportista: true, isRestricted: mocks.restricted,
 }) }));
 vi.mock('../../services/api', () => ({ getAccessToken: () => 'synthetic-unit-token', default: { get: mocks.get } }));
+vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => 'synthetic-request-context', supportSessionMatches: () => true }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: { getNoLeidas: mocks.unread, list: mocks.notices } }));
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { list: mocks.list } }));
 vi.mock('../../services/offline-sync', () => ({ syncOfflineData: mocks.sync }));

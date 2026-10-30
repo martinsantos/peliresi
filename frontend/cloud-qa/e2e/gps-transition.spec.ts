@@ -3,14 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase } from '../safety';
-import { login, prefix } from './helpers';
+import { activeGpsQueueKey, login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 
 async function setup(page: Page, info: TestInfo, kind: string) {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-transition-private.json'), 'utf8'));
   const manifest = fixture.cases[info.project.name][kind];
-  const queueKey = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let queueKey = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
   const point = { lat: -33.123, lng: -68.123, speed: null, heading: null, puntoId: randomUUID() };
   let blocked = true, attempts = 0, transitions = 0;
   const events: string[] = [];
@@ -27,6 +27,7 @@ async function setup(page: Page, info: TestInfo, kind: string) {
     attempts++; if (blocked) await route.abort('failed'); else await route.continue();
   });
   await login(page, info, kind === 'admin-delivery' ? 'admin' : 'transportista');
+  if(kind!=='admin-delivery')queueKey=await activeGpsQueueKey(page,fixture.owner,manifest.id);
   if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
   await page.evaluate(({ key, data }) => localStorage.setItem(key, JSON.stringify([data])), { key: queueKey, data: point });
   return { manifest, other: fixture.cases[info.project.name]['fleet-other'], queueKey, point, attempts: () => attempts, transitions: () => transitions, events,

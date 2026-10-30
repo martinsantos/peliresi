@@ -39,7 +39,7 @@ describe('transport handoff form',()=>{
     fireEvent.change(screen.getByLabelText('Motivo del traspaso'),{target:{value:'Rotura de prueba'}});
     fireEvent.submit(screen.getByRole('form',{name:'Registrar traspaso de carga'}));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron enviar las ubicaciones pendientes');
-    expect(screen.getByRole('alert')).toHaveFocus();
+    await waitFor(()=>expect(screen.getByRole('alert')).toHaveFocus());
     expect(mocks.create).not.toHaveBeenCalled();expect(resume).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('Motivo del traspaso')).toHaveValue('Rotura de prueba');
   });

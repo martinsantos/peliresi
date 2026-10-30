@@ -58,6 +58,16 @@ describe('GpsStatusPanel', () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
+  it('explains when older positions need review without offering an ineffective GPS retry', () => {
+    render(<GpsStatusPanel status="error" sendStatus="error" position={null}
+      details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={0} lastSyncAt={null} storageError storageIssue="unscoped" onRetry={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('sin actividad identificada');
+    expect(screen.getByRole('alert')).toHaveTextContent('contactá a soporte');
+    expect(screen.queryByRole('button', {name:'Reintentar GPS'})).toBeNull();
+    expect(screen.queryByText('Error GPS')).toBeNull();
+  });
+
   it('offers a single retry after a GPS permission failure', () => {
     const retry=vi.fn();
     const props={status:'denied' as const,sendStatus:'idle' as const,position:null,details:{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null},pendingCount:0,lastSyncAt:null,onRetry:retry};

@@ -1,19 +1,19 @@
 import { enqueueDeliveryOnce, getSyncQueue, processSyncQueue } from './indexeddb';
 import { OFFLINE_QUEUE_WAKE_EVENT } from './offlineSyncEvents';
-import { newGpsPointId } from './gpsQueue';
+import { assertNoOtherGpsQueue, gpsContextScope, newGpsPointId } from './gpsQueue';
 import { assertNoStoredFleetGpsForManifest } from './fleetGpsStorage';
 import { withGpsTransitionLock } from './gpsCoordination';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import type { ConfirmarEntregaRequest } from '../types/api';
 
 export type DeliveryOutcome = { status: 'confirmed' } | { status: 'pending'; message: string };
-export type DeliveryContext = { userId: string | number; owner: string; role: string; companyScoped: boolean };
+export type DeliveryContext = { userId: string | number; owner: string; role: string; companyScoped: boolean; requestContext: string };
 
 /** Persist the exact command before sending it. An uncertain response never
  * discards its reference, so another tab or a later session can verify it. */
 export async function submitDelivery(id: string, data: ConfirmarEntregaRequest, context: DeliveryContext): Promise<DeliveryOutcome> {
   const requestContext = supportRequestContext();
-  const isCurrent = () => Boolean(requestContext && supportSessionMatches(String(context.userId))
+  const isCurrent = () => Boolean(requestContext && context.requestContext === requestContext && supportSessionMatches(String(context.userId))
     && supportRequestContext() === requestContext);
   if (!id || !context.owner || !['TRANSPORTISTA', 'ADMIN'].includes(context.role) || !isCurrent()) {
     throw new Error('La cuenta o actividad cambió. Volvé a abrir el viaje antes de confirmar la entrega.');
@@ -27,6 +27,9 @@ export async function submitDelivery(id: string, data: ConfirmarEntregaRequest, 
   const saved = await withGpsTransitionLock(id, async () => {
     if (!isCurrent()) throw new Error('La cuenta o actividad cambió. Volvé a abrir el viaje antes de confirmar la entrega.');
     assertNoStoredFleetGpsForManifest(id);
+    // An offline delivery would stop tracking in another activity and could
+    // make its pending locations impossible to recover from that screen.
+    assertNoOtherGpsQueue(context.userId, id, gpsContextScope(context.owner, requestContext));
     return enqueueDeliveryOnce({ type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega-idempotente`,
       data: { ...data, referencia }, userId: context.userId, contextOwner: context.owner });
   });
@@ -41,7 +44,7 @@ export async function submitDelivery(id: string, data: ConfirmarEntregaRequest, 
   if (!navigator.onLine) return pending('La entrega quedó guardada. Se intentará enviar al reconectar con la misma cuenta y actividad.');
   const queueId = saved.action.id;
   if (queueId == null) return pending('La entrega quedó guardada. Revisá su sincronización antes de continuar.');
-  const executionContext = { owner: context.owner, role: context.role, companyScoped: context.companyScoped };
+  const executionContext = { owner: context.owner, gpsOwner: gpsContextScope(context.owner, requestContext), role: context.role, companyScoped: context.companyScoped };
   try {
     let attempt = await processSyncQueue(context.userId, executionContext, true, isCurrent, queueId);
     let remaining = (await getSyncQueue()).find(action => action.id === queueId);

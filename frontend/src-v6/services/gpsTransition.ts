@@ -1,16 +1,16 @@
 import api from './api';
-import { GpsPendingError, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
+import { GpsPendingError, flushStoredGpsQueue, gpsScopeMatchesRequest, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
 import { withGpsTransitionLock } from './gpsCoordination';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import { assertNoStoredFleetGpsForManifest } from './fleetGpsStorage';
 
 /** Flush this device's owned queue before a delivery or handoff. This does not
  * guarantee that another device has no unsent points. */
-export async function withStoredGpsBeforeTransition<T>(ownerId: string | number | undefined, manifestId: string, transition: () => Promise<T>): Promise<T> {
+export async function withStoredGpsBeforeTransition<T>(ownerId: string | number | undefined, manifestId: string, transition: () => Promise<T>, contextOwner?: string): Promise<T> {
   const owner = ownerId == null ? '' : String(ownerId);
   const context = supportRequestContext();
   const ensureSession = () => {
-    if (!owner || !context || !supportSessionMatches(owner) || supportRequestContext() !== context) {
+    if (!owner || !context || (contextOwner !== undefined && !gpsScopeMatchesRequest(contextOwner, context)) || !supportSessionMatches(owner) || supportRequestContext() !== context) {
       throw new GpsPendingError('La cuenta o actividad cambió. Volvé a abrir el viaje y revisá las ubicaciones pendientes antes de continuar.');
     }
   };
@@ -26,7 +26,7 @@ export async function withStoredGpsBeforeTransition<T>(ownerId: string | number 
         // If the session changed during the response, retain the point; its
         // stable reference makes a later retry safe for the original owner.
         ensureSession();
-      });
+      }, contextOwner);
     } catch (error) {
       if (error instanceof GpsPendingError) throw error;
       if (error instanceof Error && /sin titular identificado|leer las ubicaciones|guardar las ubicaciones/.test(error.message)) {

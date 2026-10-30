@@ -51,9 +51,10 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   storageError = false,
   storageIssue = null,
 }) => {
-  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{storageIssue === 'legacy' ? 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'reference' ? 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.' : 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.'}</p>;
+  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{storageIssue === 'legacy' ? 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'unscoped' ? 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.' : storageIssue === 'context' ? 'Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad o contactá a soporte.' : storageIssue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'reference' ? 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.' : 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.'}</p>;
   const sendNotice = sendStatus === 'error' && sendError && !storageError && <p role="alert" data-gps-send-error className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{sendError}</p>;
   if (paused) return <div className="space-y-2"><p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>{storageNotice}{sendNotice}</div>;
+  if (storageError && storageIssue && ['legacy', 'unscoped', 'context', 'invalid'].includes(storageIssue)) return <div>{storageNotice}</div>;
   const copy = STATUS_COPY[status];
   const retryStorage = storageError && (!storageIssue || storageIssue === 'storage');
 
@@ -74,7 +75,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
             </div>
           </div>
 
-          {onRetry && (retryStorage || ['denied', 'unavailable', 'error'].includes(status)) && (
+          {onRetry && (retryStorage || (!storageError && ['denied', 'unavailable', 'error'].includes(status))) && (
             <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
               className="mt-3 min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
               {retrying ? 'Reintentando GPS' : retryStorage ? 'Reintentar guardado' : 'Reintentar GPS'}

@@ -58,6 +58,9 @@ import {
 import { useAuth, type User } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { usePendingDeliveryIds } from '../../hooks/usePendingDeliveryIds';
+import { useQueryOwner } from '../../hooks/useQueryOwner';
+import { gpsContextScope } from '../../services/gpsQueue';
+import { supportRequestContext } from '../../utils/supportSession';
 import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { formatDateTime, formatEstado, formatCuit } from '../../utils/formatters';
@@ -149,6 +152,9 @@ const ManifiestoDetailPage: React.FC = () => {
 
   // Auth context for role-based visibility
   const { currentUser, isAdmin } = useAuth();
+  const workspaceOwner = useQueryOwner();
+  const requestContext = React.useMemo(() => supportRequestContext(), [currentUser, workspaceOwner]);
+  const contextOwner = gpsContextScope(workspaceOwner, requestContext);
   const userRol = currentUser?.rol || '';
   const pendingDeliveries = usePendingDeliveryIds(['TRANSPORTISTA', 'ADMIN'].includes(userRol));
   React.useEffect(() => subscribeDeliveryConfirmed(event => {
@@ -446,7 +452,7 @@ const ManifiestoDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(userRol) && !isInSitu && m.estado !== EstadoManifiesto.EN_TRANSITO && <PendingGpsReceipts key={`${currentUser.id}:${userRol}:${id}`} ownerId={currentUser.id} manifestId={id} />}
+      {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(userRol) && !isInSitu && m.estado !== EstadoManifiesto.EN_TRANSITO && <PendingGpsReceipts key={`${contextOwner}:${id}`} ownerId={currentUser.id} contextOwner={contextOwner} manifestId={id} />}
 
       {/* One action surface, before the long field context on every screen size. */}
       <ManifiestoActions

@@ -52,13 +52,13 @@ export function newGpsPointId(): string {
 }
 
 /** Assign and persist IDs to owned queues produced by an older app version. */
-export function prepareGpsPoints(owner: string | number, id: string, points: PendingGpsPoint[]): PendingGpsPoint[] {
+export function prepareGpsPoints(owner: string | number, id: string, points: PendingGpsPoint[], contextOwner?: string): PendingGpsPoint[] {
   if (points.some(point => point.puntoId !== undefined && !UUID.test(point.puntoId))) {
     throw new GpsPendingError('Una ubicación guardada tiene una referencia inválida. Contactá a soporte.', 'invalid');
   }
   if (points.every(point => point.puntoId)) return points;
   const prepared = points.map(point => point.puntoId ? point : { ...point, puntoId: newGpsPointId() });
-  if (!savePendingGpsQueue(owner, id, prepared)) {
+  if (!savePendingGpsQueue(owner, id, prepared, contextOwner)) {
     throw new GpsPendingError('No se pudieron guardar las ubicaciones en el dispositivo.', 'storage');
   }
   return prepared;
@@ -84,35 +84,54 @@ export async function sendIdempotentGps(api: GpsApiClient, id: string, point: Pe
   }
 }
 
-export type GpsStorageIssue = 'legacy' | 'invalid' | 'storage' | 'reference';
+export type GpsStorageIssue = 'legacy' | 'unscoped' | 'context' | 'invalid' | 'storage' | 'reference';
 type QueueRead = { ok: true; durable: boolean; points: PendingGpsPoint[] } | { ok: false; reason: GpsStorageIssue };
 
-export function gpsQueueKey(owner: string | number, id: string): string {
-  return `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(owner), id]))}`;
+/** Include the request identity (including temporary views) without storing a token. */
+export function gpsContextScope(owner: string, requestContext: string): string {
+  return owner && requestContext ? JSON.stringify([owner, requestContext]) : '';
+}
+export function gpsScopeMatchesRequest(scope: string, requestContext: string): boolean {
+  try {
+    const value:unknown = JSON.parse(scope);
+    return Array.isArray(value) && value.length === 2 && typeof value[0] === 'string' && !!value[0]
+      && !!requestContext && value[1] === requestContext;
+  } catch { return false; }
 }
 
-export function hasVolatileGpsQueue(owner: string | number, id: string): boolean {
-  return (volatileQueues.get(gpsQueueKey(owner, id))?.length ?? 0) > 0;
+export function gpsQueueKey(owner: string | number, id: string, contextOwner?: string): string {
+  return contextOwner
+    ? `sitrep_gps_v3_${encodeURIComponent(JSON.stringify([String(owner), id, contextOwner]))}`
+    : `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(owner), id]))}`;
+}
+
+export function hasVolatileGpsQueue(owner: string | number, id: string, contextOwner?: string): boolean {
+  return (volatileQueues.get(gpsQueueKey(owner, id, contextOwner))?.length ?? 0) > 0;
 }
 
 /** A different account's pending work must not be uploaded under this session
  * or silently stranded by finishing the same trip on this device. */
-export function assertNoOtherGpsQueue(owner: string | number, id: string): void {
-  const prefix = 'sitrep_gps_v2_';
+export function assertNoOtherGpsQueue(owner: string | number, id: string, contextOwner?: string): void {
+  const ownKey = gpsQueueKey(owner, id, contextOwner);
+  const check = (key: string, raw: string | null) => {
+    const version = key.startsWith('sitrep_gps_v2_') ? 'sitrep_gps_v2_' : key.startsWith('sitrep_gps_v3_') ? 'sitrep_gps_v3_' : null;
+    if (!version || key === ownKey || raw === null) return;
+    let identity: unknown;
+    try { identity = JSON.parse(decodeURIComponent(key.slice(version.length))); } catch { return; }
+    if (!Array.isArray(identity) || identity[1] !== id || (version === 'sitrep_gps_v2_' ? identity.length !== 2 : identity.length !== 3)) return;
+    // An empty queue is harmless. Invalid saved data must remain available for review.
+    try { const value: unknown = JSON.parse(raw); if (Array.isArray(value) && value.length === 0) return; } catch { /* preserve it */ }
+    if (String(identity[0]) === String(owner)) {
+      throw new GpsPendingError('Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad y sincronizalas. Si no la encontrás, contactá a soporte.', 'context');
+    }
+    throw new GpsPendingError('Hay ubicaciones pendientes de otra cuenta en este navegador o app. Ingresá con esa cuenta y sincronizalas antes de continuar.');
+  };
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!key?.startsWith(prefix) || key === gpsQueueKey(owner, id)) continue;
-      let identity: unknown;
-      try { identity = JSON.parse(decodeURIComponent(key.slice(prefix.length))); } catch { continue; }
-      if (!Array.isArray(identity) || identity.length !== 2 || identity[1] !== id || String(identity[0]) === String(owner)) continue;
-      const raw = localStorage.getItem(key);
-      if (raw === null) continue;
-      // A deliberately empty array does not represent unsent work. Malformed
-      // data remains untouched and blocks the transition for manual review.
-      try { const value: unknown = JSON.parse(raw); if (Array.isArray(value) && value.length === 0) continue; } catch { /* preserve it */ }
-      throw new GpsPendingError('Hay ubicaciones pendientes de otra cuenta en este navegador o app. Ingresá con esa cuenta y sincronizalas antes de continuar.');
+      if (key) check(key, localStorage.getItem(key));
     }
+    for (const [key, points] of volatileQueues) check(key, JSON.stringify(points));
   } catch (error) {
     if (error instanceof GpsPendingError) throw error;
     throw new GpsPendingError('No se pudo revisar el almacenamiento de ubicaciones. Reintentá antes de continuar.', 'storage');
@@ -120,8 +139,8 @@ export function assertNoOtherGpsQueue(owner: string | number, id: string): void 
 }
 
 /** Keep unsaved points in memory and report storage failures to the user. */
-export function savePendingGpsQueue(owner: string | number, id: string, points: PendingGpsPoint[]): boolean {
-  const key = gpsQueueKey(owner, id);
+export function savePendingGpsQueue(owner: string | number, id: string, points: PendingGpsPoint[], contextOwner?: string): boolean {
+  const key = gpsQueueKey(owner, id, contextOwner);
   try {
     if (points.length) localStorage.setItem(key, JSON.stringify(points));
     else localStorage.removeItem(key);
@@ -135,13 +154,23 @@ export function savePendingGpsQueue(owner: string | number, id: string, points: 
   }
 }
 
-export function readPendingGpsQueue(owner: string | number, id: string): QueueRead {
-  const key = gpsQueueKey(owner, id);
+export function readPendingGpsQueue(owner: string | number, id: string, contextOwner?: string): QueueRead {
+  const key = gpsQueueKey(owner, id, contextOwner);
   let saved: string | null;
   try {
     // Old queues did not record their owner. Do not attach them to a new
     // account or erase them until their provenance can be checked.
     if (localStorage.getItem(`gps_pending_${id}`) !== null) return { ok: false, reason: 'legacy' };
+    // The v2 key identified an account but not its activity/company. Do not
+    // silently attribute those points to whichever activity is now active.
+    if (contextOwner) {
+      const old = localStorage.getItem(gpsQueueKey(owner, id));
+      if (old !== null) {
+        try { const value: unknown = JSON.parse(old); if (!Array.isArray(value) || value.length) return { ok: false, reason: 'unscoped' }; }
+        catch { return { ok: false, reason: 'unscoped' }; }
+      }
+      if (hasVolatileGpsQueue(owner, id)) return { ok: false, reason: 'unscoped' };
+    }
     const memory = volatileQueues.get(key);
     if (memory) return { ok: true, durable: false, points: [...memory] };
     saved = localStorage.getItem(key);
@@ -161,13 +190,13 @@ export function readPendingGpsQueue(owner: string | number, id: string): QueueRe
 }
 
 /** Remove only the acknowledged point from the latest queue, retaining later additions. */
-export function acknowledgeGpsPoint(owner: string | number, id: string, puntoId: string): QueueRead {
-  const saved = readPendingGpsQueue(owner, id);
+export function acknowledgeGpsPoint(owner: string | number, id: string, puntoId: string, contextOwner?: string): QueueRead {
+  const saved = readPendingGpsQueue(owner, id, contextOwner);
   if (!saved.ok) return saved;
   const index = saved.points.findIndex(point => point.puntoId === puntoId);
   if (index < 0) return saved;
   const remaining = [...saved.points.slice(0, index), ...saved.points.slice(index + 1)];
-  return { ok: true, durable: savePendingGpsQueue(owner, id, remaining), points: remaining };
+  return { ok: true, durable: savePendingGpsQueue(owner, id, remaining, contextOwner), points: remaining };
 }
 
 export function gpsTasksForTrip(id: string): Promise<void>[] {
@@ -200,17 +229,18 @@ export function runExclusiveGpsTask(id: string, work: () => Promise<void>): Prom
 }
 
 /** Advance the durable queue after each confirmed response, preserving the rest on failure. */
-export async function flushStoredGpsQueue(owner: string | number, id: string, send: (point: PendingGpsPoint) => Promise<unknown>): Promise<void> {
-  const key = gpsQueueKey(owner, id);
+export async function flushStoredGpsQueue(owner: string | number, id: string, send: (point: PendingGpsPoint) => Promise<unknown>, contextOwner?: string): Promise<void> {
+  const key = gpsQueueKey(owner, id, contextOwner);
   const read = (): PendingGpsPoint[] => {
-    const saved = readPendingGpsQueue(owner, id);
-    if (!saved.ok) throw new Error(saved.reason === 'legacy'
+    const saved = readPendingGpsQueue(owner, id, contextOwner);
+    if (!saved.ok) throw new GpsPendingError(saved.reason === 'legacy'
       ? 'Hay ubicaciones anteriores sin titular identificado. Contactá a soporte para revisarlas.'
-      : 'No se pudieron leer las ubicaciones guardadas.');
+      : saved.reason === 'unscoped' ? 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.'
+      : 'No se pudieron leer las ubicaciones guardadas.', saved.reason);
     if (!saved.durable) throw new Error('No se pudieron guardar las ubicaciones en el dispositivo.');
     return saved.points;
   };
-  let pending = prepareGpsPoints(owner, id, read());
+  let pending = prepareGpsPoints(owner, id, read(), contextOwner);
   while (pending.length) {
     const first = pending[0];
     await send(first);
@@ -224,5 +254,5 @@ export async function flushStoredGpsQueue(owner: string | number, id: string, se
   }
   // Let this owner synchronize their own work first. Another account's work
   // still blocks the transition and is never uploaded under this session.
-  assertNoOtherGpsQueue(owner, id);
+  assertNoOtherGpsQueue(owner, id, contextOwner);
 }

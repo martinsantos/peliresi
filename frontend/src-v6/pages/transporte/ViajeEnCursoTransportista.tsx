@@ -46,7 +46,7 @@ import { formatDateTime } from '../../utils/formatters';
 import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
-import { GpsPendingError } from '../../services/gpsQueue';
+import { GpsPendingError, gpsContextScope } from '../../services/gpsQueue';
 import { getSyncQueue } from '../../services/indexeddb';
 import { subscribeDeliveryConfirmed, subscribeOfflineQueueChanged } from '../../services/offlineSyncEvents';
 import { queuedDeliveryContext } from '../../services/syncQueuePolicy';
@@ -54,6 +54,7 @@ import { clearTripSnapshot, readTripSnapshot, readInitialTripStatus, tripAccessD
 import { useAuth } from '../../contexts/AuthContext';
 import { useConnectivity } from '../../hooks/useConnectivity';
 import { useQueryOwner } from '../../hooks/useQueryOwner';
+import { supportRequestContext } from '../../utils/supportSession';
 import { getApiErrorMessage } from '../../utils/api-error';
 
 // Recenter map when position changes (respects user pan/zoom)
@@ -91,6 +92,8 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const { currentUser } = useAuth();
   const { isOnline } = useConnectivity({ enablePing: false, debounceMs: 0 });
   const syncOwner = useQueryOwner();
+  const requestContext = useMemo(() => supportRequestContext(), [currentUser, syncOwner]);
+  const gpsOwner = gpsContextScope(syncOwner, requestContext);
   const queryClient = useQueryClient();
   const [snapshotError, setSnapshotError] = useState(false);
   const [snapshotRevision, setSnapshotRevision] = useState(0);
@@ -217,15 +220,16 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   // GPS tracking via custom hook
   // A delivery queued in another tab must not silently stop an active GPS:
   // that screen owns its live observations until the user closes it safely.
-  const recoveryKey = JSON.stringify([String(currentUser?.id ?? ''), syncOwner, id]);
-  if (id && currentUser?.id != null && hasParkedGpsLease(id, syncOwner || String(currentUser.id))) parkedRecoveryKey.current = recoveryKey;
+  const recoveryKey = JSON.stringify([String(currentUser?.id ?? ''), gpsOwner, id]);
+  if (id && currentUser?.id != null && gpsOwner && hasParkedGpsLease(id, gpsOwner)) parkedRecoveryKey.current = recoveryKey;
   const trackingDuringPending = (deliveryQueue === 'pending' || deliveryQueue === 'other' || deliveryQueue === 'error') && viajeStatus === 'ACTIVO'
     && (gpsWasActive.current || parkedRecoveryKey.current === recoveryKey) && !deliveryInitiatedHere.current;
   const gps = useGPSTracking({
     manifiestoId: id,
     ownerId: currentUser?.id,
-    leaseOwner: syncOwner || undefined,
-    estado: hasHandoff||handoffUnknown||m.modalidad==='IN_SITU'||(deliveryQueue!=='none'&&!trackingDuringPending)?undefined:m.estado,
+    leaseOwner: gpsOwner || undefined,
+    sessionContext: requestContext,
+    estado: !gpsOwner||hasHandoff||handoffUnknown||m.modalidad==='IN_SITU'||(deliveryQueue!=='none'&&!trackingDuringPending)?undefined:m.estado,
     viajeStatus,
   });
   useEffect(() => { if (deliveryQueue === 'none' && gps.status === 'active') gpsWasActive.current = true; }, [deliveryQueue, gps.status]);
@@ -500,7 +504,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           <p className="mt-1">{manifestProposalsVisible(currentUser) ? 'Creá una nueva propuesta con las tres partes.' : 'Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.'} El registro anterior se conserva.</p>
           <Link to={mp(`/manifiestos/${id}`)} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">Ver manifiesto</Link>
         </div>}
-        {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${currentUser.id}:${currentUser.rol}:${id}`} ownerId={currentUser.id} manifestId={id} />}
+        {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${gpsOwner}:${id}`} ownerId={currentUser.id} contextOwner={gpsOwner} manifestId={id} />}
         {trackingDuringPending && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">El seguimiento sigue abierto en esta pantalla para conservar las ubicaciones. Sincronizalas y cerrá esta pantalla antes de continuar con la entrega.</p>}
         {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && !handoffUnknown && (deliveryQueue === 'none' || trackingDuringPending) && <GpsStatusPanel
           status={gpsStatus}

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushStoredGpsQueue, gpsPointPayload, gpsQueueKey, gpsTasksForTrip, hasVolatileGpsQueue, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask } from '../../services/gpsQueue';
+import { flushStoredGpsQueue, gpsContextScope, gpsScopeMatchesRequest, gpsPointPayload, gpsQueueKey, gpsTasksForTrip, hasVolatileGpsQueue, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask } from '../../services/gpsQueue';
 
 const first = { lat: -33.1, lng: -68.1, speed: null, heading: null };
 const second = { lat: -33.2, lng: -68.2, speed: null, heading: null };
@@ -58,6 +58,47 @@ describe('GPS queue before an offline delivery', () => {
     expect(localStorage.getItem('gps_pending_trip')).toBe(JSON.stringify([second]));
     expect(localStorage.getItem(key)).toBe(JSON.stringify([first]));
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('keeps each activity queue separate and blocks a transition until the other is synchronized', async () => {
+    const keyA = gpsQueueKey('carrier-a', 'trip', 'company-a');
+    const keyB = gpsQueueKey('carrier-a', 'trip', 'company-b');
+    expect(keyA).not.toBe(keyB);
+    expect(savePendingGpsQueue('carrier-a', 'trip', [first], 'company-a')).toBe(true);
+    expect(readPendingGpsQueue('carrier-a', 'trip', 'company-b')).toMatchObject({ ok: true, points: [] });
+    const sendB = vi.fn();
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', sendB, 'company-b')).rejects.toThrow('otra actividad');
+    expect(sendB).not.toHaveBeenCalled(); expect(JSON.parse(localStorage.getItem(keyA)!)).toEqual([first]);
+    const sendA = vi.fn().mockResolvedValue(undefined);
+    await flushStoredGpsQueue('carrier-a', 'trip', sendA, 'company-a');
+    expect(sendA).toHaveBeenCalledOnce(); expect(localStorage.getItem(keyA)).toBeNull();
+  });
+
+  it('distinguishes a temporary view from a personal session without storing credentials', () => {
+    const personal = gpsContextScope('same-user-and-activity', '["user","TRANSPORTISTA",null,false,null,null]');
+    const temporary = gpsContextScope('same-user-and-activity', '["user","TRANSPORTISTA","admin",false,null,null]');
+    expect(personal).not.toBe(temporary);
+    expect(gpsContextScope('', 'session')).toBe(''); expect(gpsContextScope('owner', '')).toBe('');
+    expect(gpsScopeMatchesRequest(personal,'["user","TRANSPORTISTA",null,false,null,null]')).toBe(true);
+    expect(gpsScopeMatchesRequest(personal,'["user","TRANSPORTISTA","admin",false,null,null]')).toBe(false);
+  });
+
+  it('preserves an old account-only queue without assigning it to the current activity', async () => {
+    const raw = JSON.stringify([first]); localStorage.setItem(key, raw);
+    expect(readPendingGpsQueue('carrier-a', 'trip', 'company-a')).toEqual({ ok: false, reason: 'unscoped' });
+    const send = vi.fn();
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send, 'company-a')).rejects.toThrow('sin actividad identificada');
+    expect(send).not.toHaveBeenCalled(); expect(localStorage.getItem(key)).toBe(raw);
+    localStorage.setItem(key, '[]');
+    expect(readPendingGpsQueue('carrier-a', 'trip', 'company-a')).toMatchObject({ ok: true, points: [] });
+  });
+
+  it('does not send points belonging to a different account or authorization scope', async () => {
+    const foreign = gpsQueueKey('carrier-b', 'trip', 'other-company');
+    localStorage.setItem(foreign, JSON.stringify([second]));
+    const send = vi.fn();
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send, 'company-a')).rejects.toThrow('otra cuenta');
+    expect(send).not.toHaveBeenCalled(); expect(localStorage.getItem(foreign)).not.toBeNull();
   });
 
   it('does not send or remove another account’s pending points before a transition', async () => {

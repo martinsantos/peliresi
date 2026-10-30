@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase } from '../safety';
-import { isolatedMapTiles, login, prefix } from './helpers';
+import { activeGpsQueueKey, isolatedMapTiles, login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 
@@ -203,7 +203,7 @@ test('retry preserves queued points without resending one already accepted', asy
 test('a lost GPS response retries the same observation without duplicating it', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), 'utf8'));
   const manifest = fixture.lostCases[info.project.name];
-  const key = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let key:string;
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
     isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
   const page = await context.newPage(), errors: string[] = [], references: string[] = [], acknowledgements: any[] = [];
@@ -232,6 +232,7 @@ test('a lost GPS response retries the same observation without duplicating it', 
   });
   try {
     await login(page, info, 'transportista');
+    key=await activeGpsQueueKey(page,fixture.owner,manifest.id);
     if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
     await expect(page.getByText('GPS activo', { exact: true })).toBeVisible();
@@ -264,7 +265,7 @@ test('a lost GPS response retries the same observation without duplicating it', 
 test('a second tab keeps its queued point while the first waits for confirmation', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), 'utf8'));
   const manifest = fixture.crossTabCases[info.project.name];
-  const key = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let key:string;
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
     isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
   const first = await context.newPage(), second = await context.newPage();
@@ -300,6 +301,7 @@ test('a second tab keeps its queued point while the first waits for confirmation
   });
   try {
     await login(first, info, 'transportista');
+    key=await activeGpsQueueKey(first,fixture.owner,manifest.id);
     await first.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
     await second.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
     await expect(first.getByText(manifest.numero, { exact: true }).first()).toBeVisible();

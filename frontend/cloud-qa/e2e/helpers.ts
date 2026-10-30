@@ -152,6 +152,33 @@ export async function readableMapLayers(group: Locator) {
 
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
 
+/** Build the v3 key from this test page's already validated synthetic session.
+ * The token stays in the browser; only the storage key is returned to the test. */
+export async function activeGpsQueueKey(page:Page, owner:string, manifestId:string):Promise<string> {
+  await expect.poll(()=>page.evaluate(()=>{
+    const raw=sessionStorage.getItem('sitrep_offline_session_v1')??localStorage.getItem('sitrep_offline_session_v1');
+    try{return raw?String(JSON.parse(raw).user.id):'';}catch{return '';}
+  })).toBe(String(owner));
+  return page.evaluate(({id,ownerId})=>{
+    const raw=sessionStorage.getItem('sitrep_offline_session_v1')??localStorage.getItem('sitrep_offline_session_v1');
+    const user=JSON.parse(raw!).user,token=localStorage.getItem('sitrep_access_token')!;
+    const part=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const claims=JSON.parse(atob(part.padEnd(Math.ceil(part.length/4)*4,'=')));
+    if(String(user.id)!==String(ownerId)||claims.id!==String(ownerId))throw new Error('QA account scope changed');
+    const baseOwner=claims.restricted||claims.impersonatedBy?null:claims.id;
+    const actRaw=baseOwner?(sessionStorage.getItem('sitrep_activity:'+baseOwner)??localStorage.getItem('sitrep_activity:'+baseOwner)):null;
+    const activity=['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(actRaw||'')?actRaw:null;
+    let company:unknown=null;
+    try {const value=baseOwner?(sessionStorage.getItem('sitrep_company:'+baseOwner)??localStorage.getItem('sitrep_company:'+baseOwner)):null;company=value?JSON.parse(value):null;}catch{company=null;}
+    const request=JSON.stringify([claims.id,claims.rol,claims.impersonatedBy,!!claims.restricted,activity,company]);
+    const selected=user.empresaContexto;
+    const companyScope=selected?`${selected.empresaId}:${selected.actividadId}:${selected.establecimientoId||'todos'}`:'personal';
+    const workspace=JSON.stringify([user.id,user.rol,user.actorId,companyScope,selected?.autorizacionId,selected?.revision,!!user.esInspector,!!user.training]);
+    const scope=JSON.stringify([workspace,request]);
+    return `sitrep_gps_v3_${encodeURIComponent(JSON.stringify([String(ownerId),id,scope]))}`;
+  },{id:manifestId,ownerId:String(owner)});
+}
+
 const fixturePages = new WeakSet<Page>();
 let consoleCapture = 0;
 export async function isolatedMapTiles(page: Page, info: TestInfo) {

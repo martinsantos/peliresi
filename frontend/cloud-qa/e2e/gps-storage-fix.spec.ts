@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase } from '../safety';
-import { login, prefix } from './helpers';
+import { activeGpsQueueKey, login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 async function installStorageFailure(page: Page) {
@@ -14,7 +14,7 @@ async function installStorageFailure(page: Page) {
    timestamp: Date.now(),
   } as GeolocationPosition) };
   Storage.prototype.setItem = function (name: string, value: string) {
-   if ((window as any).__storageTest.fail && name.startsWith('sitrep_gps_v2_')) {
+   if ((window as any).__storageTest.fail && name.startsWith('sitrep_gps_v3_')) {
     (window as any).__storageTest.failures++; throw new DOMException('QA storage full', 'QuotaExceededError');
    }
    return original.call(this, name, value);
@@ -29,7 +29,7 @@ async function installStorageFailure(page: Page) {
 test('another tab waits until the original page saves its GPS after navigation', async ({ browser }, info) => {
  const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-transition-private.json'), 'utf8'));
  const manifest = fixture.cases[info.project.name]['fleet-delivery'], mp = prefix(info);
- const key = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+ let key:string;
  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
   isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'block' });
  const tracking = await context.newPage(), delivery = await context.newPage(); let deliveryRequests = 0, gpsRequests = 0;
@@ -39,6 +39,7 @@ test('another tab waits until the original page saves its GPS after navigation',
  await delivery.route(`**/api/manifiestos/${manifest.id}/confirmar-entrega-idempotente`, async route => { deliveryRequests++; await route.continue(); });
  try {
   await login(tracking, info, 'transportista');
+  key=await activeGpsQueueKey(tracking,fixture.owner,manifest.id);
   if (info.project.name === 'app') { await tracking.setViewportSize({ width: 320, height: 800 }); await delivery.setViewportSize({ width: 320, height: 800 }); }
   await tracking.goto(`${mp}/transporte/viaje/${manifest.id}`);
   await expect.poll(() => tracking.evaluate(() => (window as any).__storageTest.ready())).toBe(true);
@@ -56,10 +57,10 @@ test('another tab waits until the original page saves its GPS after navigation',
   await delivery.getByRole('button', { name: 'Buscar', exact: true }).click();
   await delivery.getByRole('checkbox', { name: `Llevo ${manifest.numero} en este móvil`, exact: true }).check();
   await delivery.getByRole('button', { name: `Entregar ${manifest.numero}`, exact: true }).click();
-  await delivery.getByRole('dialog', { name: 'Confirmar entrega', exact: true }).getByRole('button', { name: 'Confirmar entrega de esta carga', exact: true }).click();
-  const retryNotice = delivery.getByRole('status').filter({ hasText: 'Hay cambios esperando reintento' });
-  await expect(retryNotice).toContainText(/otra pestaña|otra ventana/i, { timeout: 30000 });
-  await expect(delivery.getByText('Entrega pendiente en este dispositivo. Revisá la sincronización.')).toBeVisible();
+  const dialog = delivery.getByRole('dialog', { name: 'Confirmar entrega', exact: true });
+  await dialog.getByRole('button', { name: 'Confirmar entrega de esta carga', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText(/otra pestaña|otra ventana/i, { timeout: 30000 });
+  await expect(delivery.getByText('Entrega pendiente en este dispositivo. Revisá la sincronización.')).toHaveCount(0);
   await expect(delivery.getByRole('region', { name: 'Avisos del sistema' }).getByText('Entrega pendiente', { exact: true })).toHaveCount(0);
   expect(deliveryRequests).toBe(0); expect(gpsRequests).toBe(0);
   await delivery.screenshot({ path: info.outputPath('delivery-blocked-storage.png'), animations: 'disabled', scale: 'css' });
@@ -73,8 +74,7 @@ test('another tab waits until the original page saves its GPS after navigation',
   const confirmed = delivery.waitForResponse(item => item.request().method() === 'POST' && item.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega-idempotente`), { timeout: 90000 });
   await tracking.getByRole('link', { name: 'Ver todos mis viajes' }).click();
   await expect.poll(() => tracking.evaluate(async id => !(await navigator.locks.query()).held.some(lock => lock.name === `sitrep:gps:${id}`), manifest.id)).toBe(true);
-  const retry = retryNotice.getByRole('button', { name: 'Reintentar', exact: true });
-  if (await retry.isVisible() && await retry.isEnabled()) await retry.click();
+  await dialog.getByRole('button', { name: 'Confirmar entrega de esta carga', exact: true }).click();
   expect((await confirmed).status()).toBe(200);
   expect(gpsRequests).toBe(1); expect(deliveryRequests).toBe(1); expect(errors).toEqual([]);
   writeFileSync(info.outputPath('storage-recovered-proof.json'), JSON.stringify({ surface: info.project.name, synthetic: true,

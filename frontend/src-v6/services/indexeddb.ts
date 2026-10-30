@@ -52,7 +52,7 @@ export interface SyncQueueResult {
   cleanupError?: boolean;
 }
 
-export interface SyncExecutionContext { owner: string; role: string; companyScoped: boolean }
+export interface SyncExecutionContext { owner: string; role: string; companyScoped: boolean; gpsOwner?: string }
 
 export function classifySyncFailure(error: unknown): { failureKind: NonNullable<SyncAction['failureKind']>; lastError: string } {
   const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
@@ -446,7 +446,7 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
               await runExclusiveGpsTask(deliveryId, () => withGpsTransitionLock(deliveryId, async () => {
                 if (!isCurrent()) throw new SyncContextChangedError();
                 checkingGps = true;
-                await flushGpsBeforeQueuedDelivery(api, action.endpoint, currentUserId, isCurrent);
+                await flushGpsBeforeQueuedDelivery(api, action.endpoint, currentUserId, context.gpsOwner || context.owner, isCurrent);
                 checkingGps = false;
                 if (!isCurrent()) throw new SyncContextChangedError();
                 deliveryAttempted = true;
@@ -539,13 +539,13 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
 
 type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };
 
-async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, owner: string | number, isCurrent: () => boolean): Promise<void> {
+async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, owner: string | number, contextOwner: string, isCurrent: () => boolean): Promise<void> {
   const manifiestoId = queuedDeliveryManifestId(endpoint);
   if (!manifiestoId || typeof localStorage === 'undefined') return;
   await flushStoredGpsQueue(owner, manifiestoId, point => {
     if (!isCurrent()) throw new SyncContextChangedError();
     return sendIdempotentGps(api, manifiestoId, point);
-  });
+  }, contextOwner);
 }
 
 function cleanupAfterSuccessfulSync(endpoint: string, owner: string): void {

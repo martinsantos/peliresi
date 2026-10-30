@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft, Copy, MapPin, Truck, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -9,8 +9,10 @@ import { useTransportLegs,transportHandoffService,transportLegKey,handoffLink,ty
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateTime } from '../../../utils/formatters';
 import { manifestFeatureVisible } from '../../../utils/manifestFeatures';
-import { GpsPendingError } from '../../../services/gpsQueue';
+import { GpsPendingError, gpsContextScope } from '../../../services/gpsQueue';
 import { withStoredGpsBeforeTransition } from '../../../services/gpsTransition';
+import { useQueryOwner } from '../../../hooks/useQueryOwner';
+import { supportRequestContext } from '../../../utils/supportSession';
 
 const fieldClass='mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100';
 interface Props {id:string;beforeHandoff?:()=>Promise<void>;onHandoffError?:()=>void}
@@ -21,6 +23,9 @@ export function TransportLegs(props:Props) {
 }
 function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
   const {currentUser}=useAuth();
+  const workspaceOwner=useQueryOwner();
+  const requestContext=useMemo(()=>supportRequestContext(),[currentUser,workspaceOwner]);
+  const contextOwner=gpsContextScope(workspaceOwner,requestContext);
   const query=useTransportLegs(id);const qc=useQueryClient();
   const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[link,setLink]=useState('');
   const errorRef=useRef<HTMLParagraphElement>(null);
@@ -40,7 +45,7 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
     try{
       await beforeHandoff?.();
       const result=await withStoredGpsBeforeTransition(currentUser?.id,id,()=>transportHandoffService.create(id,{id:commandId,anteriorId:expectedLeg,tipo:kind,motivo:reason,
-        ...(kind==='REGISTRADO'?{transportistaId:carrierId,...(vehicle?{vehiculoId:vehicle}:{}),...(driver?{choferId:driver}:{})}:{}),datos:declared}));
+        ...(kind==='REGISTRADO'?{transportistaId:carrierId,...(vehicle?{vehiculoId:vehicle}:{}),...(driver?{choferId:driver}:{})}:{}),datos:declared}),contextOwner);
       setLink(result.acceso?handoffLink(result.tramo.id,result.acceso):'');setOpen(false);setReason('');setDeclared({});setCommandId(crypto.randomUUID());await refresh();
     }catch(err:any){onHandoffError?.();setError(err instanceof GpsPendingError ? err.message : err?.response?.data?.message||'No se pudo registrar el traspaso. Los datos del formulario se conservaron.');}
     finally{setBusy(false);}

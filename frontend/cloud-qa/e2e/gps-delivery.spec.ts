@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase } from '../safety';
-import { login, prefix } from './helpers';
+import { activeGpsQueueKey, login, prefix } from './helpers';
 
 // These ordering scenarios start with two explicitly saved points. Keep the
 // simulated sensor quiet so a new fix does not change the number under test;
@@ -20,7 +20,7 @@ test.beforeAll(async () => { await assertCloudDatabase(); });
 test('preserves unsent GPS before confirming delivery', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-delivery-private.json'), 'utf8'));
   const manifest = fixture.cases[info.project.name];
-  const queueKey = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let queueKey:string;
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
     isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
   const page = await context.newPage(), errors: string[] = [], events: string[] = [];
@@ -41,6 +41,7 @@ test('preserves unsent GPS before confirming delivery', async ({ browser }, info
   const pending = [{ lat: -33.123, lng: -68.123, speed: null, heading: null }, { lat: -33.456, lng: -68.456, speed: null, heading: null }];
   try {
     await login(page, info, 'transportista');
+    queueKey=await activeGpsQueueKey(page,fixture.owner,manifest.id);
     if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
     await page.evaluate(({ key, points }) => localStorage.setItem(key, JSON.stringify(points)), { key: queueKey, points: pending });
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
@@ -70,7 +71,7 @@ test('preserves unsent GPS before confirming delivery', async ({ browser }, info
 test('retries an offline delivery without resending an acknowledged location', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-delivery-private.json'), 'utf8'));
   const manifest = fixture.offlineCases[info.project.name];
-  const queueKey = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let queueKey:string;
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
     isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
   const page = await context.newPage(), errors: string[] = [], events: string[] = [];
@@ -89,6 +90,7 @@ test('retries an offline delivery without resending an acknowledged location', a
   const pending = [{ lat: -33.123, lng: -68.123, speed: null, heading: null }, { lat: -33.456, lng: -68.456, speed: null, heading: null }];
   try {
     await login(page, info, 'transportista');
+    queueKey=await activeGpsQueueKey(page,fixture.owner,manifest.id);
     if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
     await page.evaluate(({ key, points }) => localStorage.setItem(key, JSON.stringify(points)), { key: queueKey, points: pending });
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
@@ -137,7 +139,7 @@ test('retries an offline delivery without resending an acknowledged location', a
 test('sends pending GPS before handing the trip to a replacement', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-delivery-private.json'), 'utf8'));
   const manifest = fixture.handoffCases[info.project.name];
-  const queueKey = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let queueKey:string;
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
     isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
   const page = await context.newPage(), errors: string[] = [], events: string[] = [];
@@ -156,6 +158,7 @@ test('sends pending GPS before handing the trip to a replacement', async ({ brow
   const pending = [{ lat: -33.123, lng: -68.123, speed: null, heading: null }, { lat: -33.456, lng: -68.456, speed: null, heading: null }];
   try {
     await login(page, info, 'transportista');
+    queueKey=await activeGpsQueueKey(page,fixture.owner,manifest.id);
     if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
     await page.evaluate(({ key, points }) => localStorage.setItem(key, JSON.stringify(points)), { key: queueKey, points: pending });
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);

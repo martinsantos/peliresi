@@ -3,14 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase } from '../safety';
-import { login, prefix } from './helpers';
+import { activeGpsQueueKey, login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 
 test('checks a lost GPS response after delivery without changing stored points', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-receipt-private.json'), 'utf8'));
   const manifest = fixture.cases[info.project.name];
-  const key = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  let key:string;
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
     isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
   const page = await context.newPage(), errors: string[] = [];
@@ -32,6 +32,7 @@ test('checks a lost GPS response after delivery without changing stored points',
   });
   try {
     await login(page, info, 'transportista');
+    key=await activeGpsQueueKey(page,fixture.owner,manifest.id);
     if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
     await expect(page.getByText('GPS activo', { exact: true })).toBeVisible();

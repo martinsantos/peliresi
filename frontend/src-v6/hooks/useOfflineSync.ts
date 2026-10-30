@@ -6,13 +6,14 @@ import { supportRequestContext } from '../utils/supportSession';
  * Auto-syncs data to IndexedDB when online. Mount in MobileLayout.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useConnectivity } from './useConnectivity';
 import { syncOfflineData } from '../services/offline-sync';
 import { processSyncQueue, type SyncQueueResult } from '../services/indexeddb';
 import { OFFLINE_QUEUE_WAKE_EVENT } from '../services/offlineSyncEvents';
 import { getAccessToken } from '../services/api';
+import { gpsContextScope } from '../services/gpsQueue';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -27,6 +28,9 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
   const { currentUser, isRestricted } = useAuth();
   const { isOnline } = useConnectivity({ enablePing: false });
   const owner = useQueryOwner();
+  // Bind the snapshot to the server-validated user object. A token/context
+  // change before that user is refreshed must not redirect queued work.
+  const renderedRequestContext = useMemo(() => supportRequestContext(), [currentUser, owner]);
   const companyScoped = !!currentUser?.empresaContexto;
   const activeOwner = useRef(owner);
   activeOwner.current = owner;
@@ -49,10 +53,10 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
       if (syncingRef.current) { resyncRequested.current = true; return; }
       syncingRef.current = true;
       setSyncing(true);
-      const context = supportRequestContext();
+      const context = renderedRequestContext;
       let token: string | null = null;
       try { token = getAccessToken(); } catch { /* Storage may be unavailable. */ }
-      if (!token) {
+      if (!token || !context || context !== supportRequestContext()) {
         syncingRef.current = false;
         setSyncing(false);
         setResult({ ...EMPTY_RESULT, auth:1, lastError:'No se pudo verificar la sesión. Volvé a ingresar antes de sincronizar.' });
@@ -63,7 +67,7 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
         catch { return false; }
       };
       try {
-        const next = await processSyncQueue(currentUser.id, { owner, role: currentUser.rol, companyScoped }, manual, matches);
+        const next = await processSyncQueue(currentUser.id, { owner, gpsOwner: gpsContextScope(owner, context), role: currentUser.rol, companyScoped }, manual, matches);
         if (!matches()) return;
         setResult(next);
         if (downloadManifests && document.visibilityState !== 'hidden') await syncOfflineData(currentUser.id, owner);
@@ -79,7 +83,7 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
           setSyncRequest(value => value + 1);
         }
       }
-  }, [currentUser?.id, currentUser?.rol, companyScoped, owner, isOnline, isRestricted, downloadManifests, enabled]);
+  }, [currentUser?.id, currentUser?.rol, companyScoped, owner, renderedRequestContext, isOnline, isRestricted, downloadManifests, enabled]);
 
   useEffect(() => {
     if (!enabled || !currentUser?.id || !owner || !isOnline || isRestricted) return;

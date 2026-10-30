@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { gpsQueueKey } from '../../services/gpsQueue';
+import { gpsContextScope,gpsQueueKey } from '../../services/gpsQueue';
 
 const mock = vi.hoisted(() => ({ get: vi.fn(), owner: 'carrier-a', context: 'carrier-a:transportista' }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get } }));
@@ -47,6 +47,13 @@ it('retains the queue and reports a changed account or activity while requests a
   mock.get.mockImplementationOnce(async () => { mock.context = 'carrier-a:otra-actividad'; return confirmation(); });
   await expect(verifyStoredGpsReceipts('carrier-a', id)).rejects.toThrow('cuenta o actividad cambió');
   expect(localStorage.getItem(key)).toBe(original);
+});
+
+it('does not query receipts from a stale rendered activity', async () => {
+  const scope=gpsContextScope('company-a','old-session'),scopedKey=gpsQueueKey('carrier-a',id,scope);
+  localStorage.setItem(scopedKey,JSON.stringify([point]));
+  await expect(verifyStoredGpsReceipts('carrier-a',id,scope)).rejects.toThrow('cuenta o actividad cambió');
+  expect(mock.get).not.toHaveBeenCalled();expect(JSON.parse(localStorage.getItem(scopedKey)!)).toEqual([point]);
 });
 
 it('does not report a stale count if another tab changes the queue while checking', async () => {

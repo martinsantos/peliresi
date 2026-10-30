@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gpsQueueKey } from '../../services/gpsQueue';
+import { gpsContextScope,gpsQueueKey } from '../../services/gpsQueue';
 import { saveFleetGpsPoint } from '../../services/fleetGpsStorage';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
@@ -59,6 +59,33 @@ describe('GPS safety before a trip transition', () => {
     await expect(withStoredGpsBeforeTransition('carrier-a', id, action)).rejects.toThrow('otra cuenta');
     expect(mocks.post).not.toHaveBeenCalled(); expect(action).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem(otherKey)!)).toEqual([point]);
+  });
+
+  it('blocks a handoff from another activity of the same account without moving the points', async () => {
+    const scopeA = gpsContextScope('company-a',mocks.context),scopeB=gpsContextScope('company-b',mocks.context);
+    const keyA = gpsQueueKey('carrier-a', id, scopeA);
+    localStorage.setItem(keyA, JSON.stringify([point]));
+    const action = vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a', id, action, scopeB)).rejects.toThrow('otra actividad');
+    expect(mocks.post).not.toHaveBeenCalled(); expect(action).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(keyA)!)).toEqual([point]);
+    await withStoredGpsBeforeTransition('carrier-a', id, action, scopeA);
+    expect(mocks.post).toHaveBeenCalledOnce(); expect(action).toHaveBeenCalledOnce();
+  });
+
+  it('does not assign a legacy account-only queue to the active activity', async () => {
+    localStorage.setItem(ownKey, JSON.stringify([point])); const action = vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a', id, action, gpsContextScope('company-a',mocks.context))).rejects.toThrow('sin actividad identificada');
+    expect(mocks.post).not.toHaveBeenCalled(); expect(action).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(ownKey)!)).toEqual([point]);
+  });
+
+  it('rejects a stale activity scope before sending points or registering a handoff', async () => {
+    const oldScope=gpsContextScope('company-a','previous-session'),keyA=gpsQueueKey('carrier-a',id,oldScope);
+    localStorage.setItem(keyA,JSON.stringify([point])); const action=vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a',id,action,oldScope)).rejects.toThrow('cuenta o actividad cambió');
+    expect(mocks.post).not.toHaveBeenCalled();expect(action).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(keyA)!)).toEqual([point]);
   });
 
   it('can synchronize the current account first while preserving the other account’s pending work', async () => {

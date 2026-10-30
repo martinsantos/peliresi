@@ -6,14 +6,14 @@ import { verifyStoredGpsReceipts, type GpsReceiptSummary } from '../../services/
 
 /** A completed/reassigned trip may have an accepted point whose response was
  * lost. Verify it without removing the shared local queue or sending a point. */
-export function PendingGpsReceipts({ ownerId, manifestId }: { ownerId: string | number; manifestId: string }) {
+export function PendingGpsReceipts({ ownerId, contextOwner, manifestId }: { ownerId: string | number; contextOwner: string; manifestId: string }) {
   const owner = String(ownerId);
-  const [queue, setQueue] = useState(() => readPendingGpsQueue(owner, manifestId));
+  const [queue, setQueue] = useState(() => contextOwner ? readPendingGpsQueue(owner, manifestId, contextOwner) : { ok: false as const, reason: 'context' as const });
   const [summary, setSummary] = useState<GpsReceiptSummary | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false), mounted = useRef(true);
-  const refresh = useCallback(() => setQueue(readPendingGpsQueue(owner, manifestId)), [owner, manifestId]);
+  const refresh = useCallback(() => setQueue(contextOwner ? readPendingGpsQueue(owner, manifestId, contextOwner) : { ok: false, reason: 'context' }), [owner, contextOwner, manifestId]);
 
   useEffect(() => {
     mounted.current = true; refresh();
@@ -27,6 +27,8 @@ export function PendingGpsReceipts({ ownerId, manifestId }: { ownerId: string | 
   const issue = !queue.ok ? queue.reason : !queue.durable ? 'storage' : null;
   const issueText = issue === 'legacy'
     ? 'Hay ubicaciones antiguas sin titular identificado. Conservá este dispositivo y contactá a soporte.'
+    : issue === 'unscoped' ? 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.'
+    : issue === 'context' ? 'No se pudo identificar la actividad. Volvé a ingresar antes de comprobar las ubicaciones.'
     : issue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Conservá este dispositivo y contactá a soporte.'
       : issue ? 'No se pudo confirmar el guardado local. Conservá esta pantalla y revisá el almacenamiento.' : '';
 
@@ -34,7 +36,7 @@ export function PendingGpsReceipts({ ownerId, manifestId }: { ownerId: string | 
     if (inFlight.current || issue) return;
     inFlight.current = true; setBusy(true); setError(''); setSummary(null);
     try {
-      const result = await verifyStoredGpsReceipts(owner, manifestId);
+      const result = await verifyStoredGpsReceipts(owner, manifestId, contextOwner);
       if (mounted.current) { refresh(); setSummary(result); }
     } catch (failure) {
       if (mounted.current) { refresh(); setError(failure instanceof Error ? failure.message : 'No se pudo comprobar la recepción. Conservá este dispositivo y contactá a soporte.'); }
