@@ -26,9 +26,26 @@ beforeEach(() => {
 afterEach(() => {
   if (originalInstance === undefined) delete process.env.NODE_APP_INSTANCE;
   else process.env.NODE_APP_INSTANCE = originalInstance;
+  vi.unstubAllEnvs();
 });
 
 describe('configured travel duration independently of GPS reception', () => {
+  it('schedules and runs the check on a migrated production service without a PM2 numeric instance', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.NODE_APP_INSTANCE = 'migration-rehearsal';
+    iniciarDuracionTransitoJob();
+    expect(mocks.schedule).toHaveBeenCalledOnce();
+    await mocks.schedule.mock.calls[0][1]();
+    expect(mocks.rules).toHaveBeenCalledOnce();
+  });
+
+  it('schedules on each production worker so a stopped primary does not disable checks', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.NODE_APP_INSTANCE = '0'; iniciarDuracionTransitoJob();
+    process.env.NODE_APP_INSTANCE = '1'; iniciarDuracionTransitoJob();
+    expect(mocks.schedule).toHaveBeenCalledTimes(2);
+  });
+
   it('schedules the periodic check only on the designated instance', async () => {
     process.env.NODE_APP_INSTANCE = '1'; iniciarDuracionTransitoJob();
     expect(mocks.schedule).not.toHaveBeenCalled();

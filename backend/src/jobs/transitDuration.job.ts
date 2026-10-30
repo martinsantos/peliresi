@@ -66,7 +66,13 @@ export async function evaluarDuracionTransito(now?: Date): Promise<{ evaluados: 
 }
 
 export function iniciarDuracionTransitoJob(): void {
-  if ((process.env.NODE_APP_INSTANCE || process.env.pm_id || '0') !== '0') return;
+  // The production service can have a non-numeric instance name under
+  // systemd, so a PM2-only leader check would silently disable monitoring.
+  // Each worker may scan; the subscriber serializes and deduplicates each
+  // rule/manifest case in PostgreSQL before saving its notices. Keep the
+  // existing instance guard in non-production environments such as QA.
+  if (process.env.NODE_ENV !== 'production'
+    && (process.env.NODE_APP_INSTANCE || process.env.pm_id || '0') !== '0') return;
   let running = false;
   cron.schedule('*/5 * * * *', async () => {
     if (running) return;
