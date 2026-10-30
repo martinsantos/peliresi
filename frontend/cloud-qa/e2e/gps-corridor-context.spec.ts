@@ -28,7 +28,7 @@ test('corridor observations show the capture-time limit and preserve the manifes
   await page.screenshot({ path: info.outputPath('corredor-avisos.png'), animations: 'disabled', scale: 'css' });
   await page.getByRole('button', { name: /^Notificaciones(?: \(|$)/ }).click();
   const bell = page.getByRole('region', { name: 'Notificaciones recientes', exact: true });
-  const message = bell.getByText(/Tres posiciones recibidas superan 50 km/).filter({ hasText: item.numero });
+  const message = bell.getByText(/Tres posiciones recibidas.*superan 50 km/).filter({ hasText: item.numero });
   await expect(message).toHaveCount(1);
   await message.scrollIntoViewIfNeeded();
   await expect(bell).toContainText('GPS: corredor para revisar');

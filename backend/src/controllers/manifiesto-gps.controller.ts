@@ -7,7 +7,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { canAccessManifiesto } from '../utils/roleFilter';
-import { assessGeographicCorridor } from '../services/gpsCorridor.service';
+import { observeGpsCorridor } from '../services/gpsCorridorObservation.service';
 import { clearGpsAnomalySampling, sampleGpsAnomalies } from '../services/gpsAnomalySampling.service';
 import { createHash } from 'node:crypto';
 
@@ -180,34 +180,14 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
       }
     }
 
-    // Geographic anomaly only after 3 consecutive samples. This is not called a
-    // route deviation because SITREP does not store an authorised road geometry.
-    if (
-      cacheEntry.genLat !== null && cacheEntry.genLon !== null &&
-      cacheEntry.opLat !== null && cacheEntry.opLon !== null
-    ) {
-      const recentPoints = await prisma.trackingGPS.findMany({
-        where: { manifiestoId: id },
-        orderBy: { timestamp: 'desc' },
-        take: 3,
-        select: { latitud: true, longitud: true },
-      });
-      const corridorAssessment = assessGeographicCorridor(recentPoints, {
-        origin: { latitud: cacheEntry.genLat, longitud: cacheEntry.genLon },
-        destination: { latitud: cacheEntry.opLat, longitud: cacheEntry.opLon },
-      });
-      if (corridorAssessment) {
-        domainEvents.emit({
-          type: 'ANOMALIA_GPS',
-          manifiestoId: id,
-          numero: cacheEntry.numero,
-          tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO',
-          descripcion: `Tres posiciones recibidas superan 50 km del corredor geográfico estimado (mín. ${corridorAssessment.minimumDistanceKm.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km). No se compara una ruta vial autorizada. Hora de captura no disponible. Verificá el caso con transporte.`,
-          severidad: 'ALTA',
-          userId,
-        });
-      }
-    }
+    await observeGpsCorridor({
+      manifiestoId: id,
+      numero: cacheEntry.numero,
+      origin: { latitud: cacheEntry.genLat, longitud: cacheEntry.genLon },
+      destination: { latitud: cacheEntry.opLat, longitud: cacheEntry.opLon },
+      segment: { kind: 'original' },
+      userId,
+    });
 
     // Sampling remains best-effort and per worker; it is not a durable queue.
     sampleGpsAnomalies(id, userId, (manifestId, authorId) => anomaliaDetector.detectarAnomalias(manifestId, authorId));

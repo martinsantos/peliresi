@@ -20,7 +20,9 @@ test('travel-duration monitoring documents explicit thresholds, periodic checks 
   assert.match(manual, /seguimiento GPS actual no activa las reglas históricas de Desvío de ruta/i);
   assert.match(manual, /no con una ruta vial autorizada/i);
   assert.match(manual, /se desconoce cuándo las captó el teléfono y pueden ser anteriores/i);
-  assert.match(manual, /observaciones de corredor también pueden basarse en posiciones captadas antes de su recepción/i);
+  assert.match(manual, /observación de corredor compara tres posiciones recibidas del transporte original o de un mismo tramo de relevo/i);
+  assert.match(manual, /Pueden haber sido captadas antes de su recepción/i);
+  assert.match(manual, /La ausencia de aviso no garantiza que el trayecto sea correcto/i);
 });
 const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };

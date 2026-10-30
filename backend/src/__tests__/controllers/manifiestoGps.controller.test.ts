@@ -57,7 +57,11 @@ describe('GPS concurrency and recovery guards', () => {
     expect(next).not.toHaveBeenCalled();
     const event = mocks.emit.mock.calls.map(([value]) => value).find(value => value.tipoAnomalia === 'FUERA_CORREDOR_GEOGRAFICO');
     expect(event).toBeDefined();
+    expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({
+      where: { manifiestoId: trip.id, tramoId: null },
+    }));
     expect(event.descripcion).toMatch(/posiciones recibidas/i);
+    expect(event.descripcion).toMatch(/transporte original/i);
     expect(event.descripcion).toMatch(/hora de captura no disponible/i);
     expect(event.descripcion).toMatch(/verific[aá].*transporte/i);
     expect(event.descripcion).toMatch(/no se compara una ruta vial autorizada/i);

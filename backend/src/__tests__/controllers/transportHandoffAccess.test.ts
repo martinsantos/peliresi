@@ -1,9 +1,9 @@
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import jwt from 'jsonwebtoken';
 import {createHash} from 'node:crypto';
-const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn(),find:vi.fn(),create:vi.fn(),query:vi.fn(),emit:vi.fn(),detect:vi.fn()}));
+const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn(),list:vi.fn(),find:vi.fn(),create:vi.fn(),query:vi.fn(),emit:vi.fn(),detect:vi.fn()}));
 vi.mock('../../config/config',()=>({config:{JWT_SECRET:'unit-handoff-secret'}}));
-vi.mock('../../lib/prisma',()=>({default:{$transaction:async(callback:any)=>callback({tramoTransporte:{findUnique:mocks.leg},usuario:{findUnique:mocks.user},trackingGPS:{findUnique:mocks.find,create:mocks.create},$queryRaw:mocks.query}),trackingGPS:{findFirst:mocks.latest}}}));
+vi.mock('../../lib/prisma',()=>({default:{$transaction:async(callback:any)=>callback({tramoTransporte:{findUnique:mocks.leg},usuario:{findUnique:mocks.user},trackingGPS:{findUnique:mocks.find,create:mocks.create},$queryRaw:mocks.query}),trackingGPS:{findFirst:mocks.latest,findMany:mocks.list}}}));
 vi.mock('../../services/domainEvent.service',()=>({domainEvents:{emit:mocks.emit}}));
 vi.mock('../../controllers/notification.controller',()=>({anomaliaDetector:{detectarAnomalias:mocks.detect}}));
 vi.mock('../../services/blockchain.service',()=>({computeRollingHash:vi.fn()}));
@@ -16,7 +16,7 @@ const req=(value:string)=>({params:{tramoId:id},headers:{authorization:'Bearer '
 const res=()=>({json:vi.fn(),setHeader:vi.fn()}) as any;
 beforeEach(()=>{
   vi.clearAllMocks();clearGpsAnomalySampling('manifest');mocks.leg.mockResolvedValue({id,manifiestoId:'manifest',creadoPorId:'original-user',impersonadoPorId:null,fin:null,accesoVersion:'version',accesoHasta:new Date(Date.now()+3600000),datos:{},orden:1,tipo:'EXTERNO',inicio:new Date(),manifiesto:{id:'manifest',numero:'QA',estado:'EN_TRANSITO',transportistaId:'original',operador:{razonSocial:'QA destino',domicilio:'QA 100'}}});
-  mocks.user.mockResolvedValue({activo:true,transportista:{id:'original'}});mocks.latest.mockResolvedValue(null);
+  mocks.user.mockResolvedValue({activo:true,transportista:{id:'original'}});mocks.latest.mockResolvedValue(null);mocks.list.mockResolvedValue([]);
   mocks.create.mockResolvedValue({id:'point',timestamp:new Date(),tramoId:id});mocks.find.mockResolvedValue(null);mocks.query.mockResolvedValue([]);
 });
 afterEach(()=>vi.unstubAllEnvs());
@@ -47,6 +47,47 @@ it('evaluates configured duration rules for an accepted handoff position, from t
   expect(mocks.emit).toHaveBeenCalledWith(expect.objectContaining({type:'DURACION_TRANSITO_OBSERVADA',manifiestoId:'manifest',horasTransito:expect.any(Number)}));
   expect(mocks.emit.mock.calls[0][0].horasTransito).toBeGreaterThanOrEqual(25);
   expect(mocks.emit.mock.calls[0][0]).not.toHaveProperty('userId');
+});
+it('examines only this relay leg and does not attribute its GPS to a user',async()=>{
+  const leg=await mocks.leg();
+  mocks.leg.mockResolvedValue({...leg,manifiesto:{...leg.manifiesto,
+    generador:{latitud:-32.89,longitud:-68.84},
+    operador:{...leg.manifiesto.operador,latitud:-34.62,longitud:-68.33}}});
+  mocks.list.mockResolvedValue([
+    {latitud:-31.4,longitud:-66.0},{latitud:-31.5,longitud:-66.1},{latitud:-31.6,longitud:-66.2},
+  ]);
+  const response=res(),next=vi.fn();
+  await limitedTransportGps({...req(token()),body:{latitud:-31.4,longitud:-66}},response,next);
+  expect(next).not.toHaveBeenCalled();
+  expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({where:{manifiestoId:'manifest',tramoId:id}}));
+  const event=mocks.emit.mock.calls.map(([value])=>value).find(value=>value.tipoAnomalia==='FUERA_CORREDOR_GEOGRAFICO');
+  expect(event).toMatchObject({type:'ANOMALIA_GPS',manifiestoId:'manifest'});
+  expect(event.descripcion).toMatch(/tramo de relevo 1/i);
+  expect(event.descripcion).toMatch(/hora de captura no disponible/i);
+  expect(event).not.toHaveProperty('userId');
+  expect(JSON.stringify(response.json.mock.calls)).not.toMatch(/generador|latitud.*-32\.89/);
+});
+it('does not report a corridor observation with fewer than three relay positions',async()=>{
+  const leg=await mocks.leg();
+  mocks.leg.mockResolvedValue({...leg,manifiesto:{...leg.manifiesto,
+    generador:{latitud:-32.89,longitud:-68.84},
+    operador:{...leg.manifiesto.operador,latitud:-34.62,longitud:-68.33}}});
+  mocks.list.mockResolvedValue([{latitud:-31.4,longitud:-66.0},{latitud:-31.5,longitud:-66.1}]);
+  const next=vi.fn();await limitedTransportGps({...req(token()),body:{latitud:-31.4,longitud:-66}},res(),next);
+  expect(next).not.toHaveBeenCalled();
+  expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({where:{manifiestoId:'manifest',tramoId:id}}));
+  expect(mocks.emit.mock.calls.map(([value])=>value).filter(value=>value.tipoAnomalia==='FUERA_CORREDOR_GEOGRAFICO')).toHaveLength(0);
+});
+it('keeps an acknowledged relay point successful if the later corridor analysis fails',async()=>{
+  const leg=await mocks.leg();
+  mocks.leg.mockResolvedValue({...leg,manifiesto:{...leg.manifiesto,
+    generador:{latitud:-32.89,longitud:-68.84},
+    operador:{...leg.manifiesto.operador,latitud:-34.62,longitud:-68.33}}});
+  mocks.list.mockRejectedValueOnce(new Error('synthetic query failure'));
+  const response=res(),next=vi.fn();
+  await limitedTransportGps({...req(token()),body:{latitud:-31.4,longitud:-66}},response,next);
+  expect(response.json).toHaveBeenCalledWith(expect.objectContaining({success:true}));
+  expect(next).not.toHaveBeenCalled();
 });
 it('samples GPS observations from an authorized relay without inventing a user identity',async()=>{
   mocks.detect.mockResolvedValue([]);

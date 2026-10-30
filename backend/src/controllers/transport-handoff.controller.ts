@@ -15,6 +15,7 @@ import { declaredTransportLabel, gpsPointSchema, handoffSchema, isOriginalCarrie
 import { computeRollingHash } from '../services/blockchain.service';
 import { recordInspectionIntake } from '../services/inspectionIntake.service';
 import { domainEvents } from '../services/domainEvent.service';
+import { observeGpsCorridor } from '../services/gpsCorridorObservation.service';
 import { sampleGpsAnomalies } from '../services/gpsAnomalySampling.service';
 import { anomaliaDetector } from './notification.controller';
 import type { TramoTransporte, Prisma } from '@prisma/client';
@@ -181,7 +182,8 @@ function trackingClaim(req:AuthRequest) {
   }catch{throw new AppError('El enlace de seguimiento no es válido o venció. Pedí uno nuevo a la transportista de origen.',401);}
 }
 async function liveLeg(tx:Tx,claim:jwt.JwtPayload) {
-  const leg=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},include:{manifiesto:{select:{id:true,numero:true,estado:true,fechaRetiro:true,transportistaId:true,operador:{select:{razonSocial:true,domicilio:true}}}}}});
+  const leg=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},include:{manifiesto:{select:{id:true,numero:true,estado:true,fechaRetiro:true,transportistaId:true,
+    generador:{select:{latitud:true,longitud:true}},operador:{select:{razonSocial:true,domicilio:true,latitud:true,longitud:true}}}}}});
   if(!leg||leg.fin||leg.accesoVersion!==claim.jti||!leg.accesoHasta||leg.accesoHasta<=new Date()||leg.manifiesto.estado!=='EN_TRANSITO') throw new AppError('Este seguimiento ya no está activo',403);
   assertClassroomIssuerOpen(leg.creadoPorId);
   const author=await tx.usuario.findUnique({where:{id:leg.creadoPorId},select:{activo:true,transportista:{select:{id:true}}}});
@@ -256,11 +258,11 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
             ||previous.latitud!==latitud||previous.longitud!==longitud||(previous.precision??null)!==(precision??null)
             ||(previous.velocidad??null)!==(velocidad??null)||(previous.direccion??null)!==(direccion??null))
             throw new AppError('La referencia de ubicación ya corresponde a otros datos. Revisá la sincronización.',409);
-          return {tracking:{id:previous.id,timestamp:previous.timestamp,tramoId:previous.tramoId},manifest:leg.manifiesto,repetido:true};
+          return {tracking:{id:previous.id,timestamp:previous.timestamp,tramoId:previous.tramoId},manifest:leg.manifiesto,legOrder:leg.orden,repetido:true};
         }
       }
       const tracking=await tx.trackingGPS.create({data:{...(trackingId?{id:trackingId}:{}),latitud,longitud,velocidad,direccion,precision,manifiestoId:leg.manifiestoId,tramoId:leg.id,emisor},select:{id:true,timestamp:true,tramoId:true}});
-      return {tracking,manifest:leg.manifiesto,repetido:false};
+      return {tracking,manifest:leg.manifiesto,legOrder:leg.orden,repetido:false};
     });
     res.setHeader('Cache-Control','private, no-store');res.json({success:true,data:{tracking:result.tracking,
       ...(puntoId?{idempotencia:{version:1,puntoId,repetido:result.repetido}}:{})}});
@@ -271,6 +273,9 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
       const hours=(Date.now()-result.manifest.fechaRetiro.getTime())/3_600_000;
       if(Number.isFinite(hours)&&hours>=0) domainEvents.emit({type:'DURACION_TRANSITO_OBSERVADA',manifiestoId:result.manifest.id,numero:result.manifest.numero,horasTransito:hours});
     }
+    await observeGpsCorridor({manifiestoId:result.manifest.id,numero:result.manifest.numero,
+      origin:result.manifest.generador,destination:result.manifest.operador,
+      segment:{kind:'relay',id:result.tracking.tramoId!,order:result.legOrder}});
     // The limited capability is not an authenticated SITREP user. A system
     // analysis must not falsely attribute the relay's positions to its issuer.
     sampleGpsAnomalies(result.manifest.id,undefined,(manifestId,userId)=>anomaliaDetector.detectarAnomalias(manifestId,userId));
