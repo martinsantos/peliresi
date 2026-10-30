@@ -33,6 +33,8 @@ test('eventual records without a site require full company authorization', () =>
   assert.match(text, /eventuales no identifican una sede/);
   assert.match(text, /autorización limitada a una sede no alcanza/);
   assert.match(text, /todavía no garantizan avisar a cada actividad de una cuenta multirrol ni a todas las personas representantes/);
+  assert.match(text, /sólo ves los eventuales en los que participa esa actividad/);
+  assert.match(text, /un reintento usa la actividad original/);
 });
 test('an authenticated link opens the requested task without covering it with the welcome', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'bienvenida-preferencia-ayuda'));

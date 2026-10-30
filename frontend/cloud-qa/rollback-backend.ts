@@ -33,6 +33,14 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-eventual-site-20261030') {
     return path.join(root, 'backend/dist-qa-eventual-site-20261030/index.js');
   }
+  if (version === 'eventual-context-before'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-eventual-context-20261030') {
+    return path.join(root, 'backend/dist-qa-eventual-site-20261030/index.js');
+  }
+  if (version === 'eventual-context-after'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-eventual-context-20261030') {
+    return path.join(root, 'backend/dist-qa-eventual-context-20261030/index.js');
+  }
   if (version === '17152d81'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
     return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');

@@ -82,6 +82,16 @@ it('hides a previously loaded eventual when the server revokes access', async ()
   expect(screen.queryByText('QA externo')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Registrar tratado' })).toBeNull();
 });
+it('explains an unavailable detail without retaining its previously loaded data', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  view(true, client); await screen.findByText('Operación: Recibido');
+  mock.get.mockRejectedValue({ response: { status: 404 } });
+  await client.invalidateQueries({ queryKey: ['baja-intensidad'] });
+  expect(await screen.findByRole('alert')).toHaveTextContent('no está disponible para esta actividad');
+  expect(screen.queryByText('Operación: Recibido')).toBeNull();
+  expect(screen.queryByText('QA externo')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Volver a Eventuales' })).toBeEnabled();
+});
 it('does not show an earlier company record while a new context is loading', async () => {
   mock.user = { id:'qa-person', rol:'GENERADOR', actorId:'actor-a', empresaContexto:{ empresaId:'company-a', actividadId:'activity-a', todasSedes:true } } as typeof mock.user;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

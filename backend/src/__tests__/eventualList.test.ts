@@ -13,9 +13,10 @@ it('searches across pages and combines stage with the authorized actor scope', a
   const { json, next } = await invoke({ search: '  QA Cooperativa  ', etapa: 'RECIBIDO', page: '2' });
   expect(next).not.toHaveBeenCalled();
   const where = db.registroManifiestoExcepcional.findMany.mock.calls[0][0].where;
-  expect(where.AND).toContainEqual({ OR: [{ creadoPorId: 'actor' }, { operadorId: 'plant' }] });
+  expect(where.AND).toContainEqual({ operadorId: 'plant' });
   const sql = db.$queryRaw.mock.calls[0][0];
-  expect(sql.values).toEqual(expect.arrayContaining(['actor', 'plant', 'RECIBIDO', '%QA Cooperativa%']));
+  expect(sql.values).toEqual(expect.arrayContaining(['plant', 'RECIBIDO', '%QA Cooperativa%']));
+  expect(sql.values).not.toContain('actor');
   expect(sql.sql).toContain('ILIKE');
   expect(db.$queryRaw.mock.calls[1][0].values.slice(0, -1)).toEqual(sql.values);
   expect(json).toHaveBeenCalledWith({ success: true, data: { registros: [], total: 43, page: 2, pageSize: 20 } });
@@ -48,6 +49,7 @@ it('escapes SQL wildcards and keeps the search value out of executable SQL', asy
 it.each([['GENERADOR', 'generador'], ['TRANSPORTISTA', 'transportista']] as const)('retains %s scope in both paginated SQL and the final authorized read', async (rol, slot) => {
   await invoke({ search: 'QA' }, { id: 'account', rol, activo: true, [slot]: { id: 'linked' } } as never);
   const query = db.$queryRaw.mock.calls[0][0];
-  expect(query.values).toEqual(expect.arrayContaining(['account', 'linked']));
+  expect(query.values).toContain('linked');
+  expect(query.values).not.toContain('account');
   expect(query.sql).toContain("datos->'" + slot + "'->>'padronId'");
 });

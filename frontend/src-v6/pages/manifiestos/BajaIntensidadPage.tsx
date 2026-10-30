@@ -177,6 +177,10 @@ export default function BajaIntensidadPage() {
     <Link className="inline-flex min-h-11 items-center text-primary-700 underline" to={mp('/manifiestos')}>Volver a Manifiestos</Link>
     <div role="alert" className="space-y-3 rounded-lg border border-warning-200 bg-warning-50 p-4 text-neutral-900"><p>No podés consultar los eventuales con el contexto actual. Revisá tus permisos o cambiá de empresa.</p><Button variant="outline" onClick={() => void query.refetch()}>Reintentar</Button></div>
   </div>;
+  if (id && query.isError && (query.error as { response?: { status?: number } } | null)?.response?.status === 404) return <div className="mx-auto max-w-4xl space-y-4 p-4">
+    <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-neutral-900">El eventual no está disponible para esta actividad. Revisá el contexto actual o volvé a la lista.</div>
+    <Button variant="outline" onClick={() => changeParams({ registro: null })}>Volver a Eventuales</Button>
+  </div>;
   return <div className="max-w-4xl mx-auto py-5 space-y-4 pb-24">
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">

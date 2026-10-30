@@ -14,15 +14,15 @@ export const externalTrackingQuery = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 }).strict();
 
-/** Spec v2 §5: the designated reviewer reads all; the creator and registered parties only their own records. */
+/** Reviewer or administrator-owned records; actors are scoped to the active actor. */
 export function externalTrackingAccess(user: AuthRequest['user']): { reviewer: boolean; filter: Prisma.Sql | null } {
   if (exceptionalDesignatedReviewer(user)) return { reviewer: true, filter: null };
   if (user?.id && !user.restricted) {
     const own = Prisma.sql`r."creadoPorId" = ${user.id}`;
     if (user.rol === 'ADMIN') return { reviewer: false, filter: own };
-    if (user.rol === 'OPERADOR' && user.operador?.id) return { reviewer: false, filter: Prisma.sql`(${own} OR r."operadorId" = ${user.operador.id})` };
-    if (user.rol === 'GENERADOR' && user.generador?.id) return { reviewer: false, filter: Prisma.sql`(${own} OR r.datos -> 'generador' ->> 'padronId' = ${user.generador.id})` };
-    if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) return { reviewer: false, filter: Prisma.sql`(${own} OR r.datos -> 'transportista' ->> 'padronId' = ${user.transportista.id})` };
+    if (user.rol === 'OPERADOR' && user.operador?.id) return { reviewer: false, filter: Prisma.sql`r."operadorId" = ${user.operador.id}` };
+    if (user.rol === 'GENERADOR' && user.generador?.id) return { reviewer: false, filter: Prisma.sql`r.datos -> 'generador' ->> 'padronId' = ${user.generador.id}` };
+    if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) return { reviewer: false, filter: Prisma.sql`r.datos -> 'transportista' ->> 'padronId' = ${user.transportista.id}` };
   }
   throw new AppError('Seguimiento reservado a las partes del eventual y al revisor designado', 403);
 }

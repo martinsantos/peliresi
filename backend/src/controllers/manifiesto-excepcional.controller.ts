@@ -12,7 +12,7 @@ import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { advanceExceptional, exceptionalApproval, exceptionalApprovers, exceptionalCanApprove, exceptionalCanRegister,
   exceptionalCreateSchema, exceptionalCreator, exceptionalEventSchema, exceptionalPending, planExceptionalSlots,
-  EXCEPTIONAL_SLOTS, ExceptionalApprover, ExceptionalEvent, ExceptionalSlot, ExceptionalStage } from '../domain/manifiestoExcepcional';
+  EXCEPTIONAL_SLOTS, ExceptionalApprover, ExceptionalCreator, ExceptionalEvent, ExceptionalSlot, ExceptionalStage } from '../domain/manifiestoExcepcional';
 
 // Operational sessions stay fail-closed; school sessions use their isolated store.
 export function exceptionalEnabled(req: AuthRequest, _res: Response, next: NextFunction) {
@@ -37,17 +37,24 @@ export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: st
   });
   return Boolean(counterpart || (reviewer(req) && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id));
 }
-/** Spec v2 §5: the reviewer reads all; the creator its own; each party where it figures with padrón. */
+/** An operational account reads records of its current actor, not every
+ * record the person may have created under another activity or company. */
 export function exceptionalReadWhere(user: AuthRequest['user']): Prisma.RegistroManifiestoExcepcionalWhereInput {
   if (exceptionalDesignatedReviewer(user)) return {};
   if (!user.restricted) {
-    const own = { creadoPorId: user.id };
-    if (user.rol === 'ADMIN') return own;
-    if (user.rol === 'OPERADOR' && user.operador?.id) return { OR: [own, { operadorId: user.operador.id }] };
-    if (user.rol === 'GENERADOR' && user.generador?.id) return { OR: [own, { datos: { path: ['generador', 'padronId'], equals: user.generador.id } }] };
-    if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) return { OR: [own, { datos: { path: ['transportista', 'padronId'], equals: user.transportista.id } }] };
+    if (user.rol === 'ADMIN') return { creadoPorId: user.id };
+    if (user.rol === 'OPERADOR' && user.operador?.id) return { operadorId: user.operador.id };
+    if (user.rol === 'GENERADOR' && user.generador?.id) return { datos: { path: ['generador', 'padronId'], equals: user.generador.id } };
+    if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) return { datos: { path: ['transportista', 'padronId'], equals: user.transportista.id } };
   }
   throw new AppError('Acceso reservado a las partes del eventual y al revisor designado', 403);
+}
+/** The same request ID can recover a result only in the original activity.
+ * Pre-v2 records without autorRol are documented as operator-created. */
+export function sameExceptionalCreator(record: { autorRol?: string | null; autorActorId?: string | null; operadorId?: string | null }, creator: ExceptionalCreator): boolean {
+  if (creator.rol === 'ADMIN') return record.autorRol === 'ADMIN';
+  if (record.autorRol == null) return creator.rol === 'OPERADOR' && record.operadorId === creator.actorId;
+  return record.autorRol === creator.rol && record.autorActorId === creator.actorId;
 }
 const scope = (req: AuthRequest) => exceptionalReadWhere(req.user);
 export async function exceptionalParticipants(req: AuthRequest, res: Response, next: NextFunction) {
@@ -93,9 +100,9 @@ export async function listExceptional(req: AuthRequest, res: Response, next: Nex
     const user = req.user;
     let visibility = Prisma.sql`"creadoPorId" = ${user.id}`;
     if (reviewer(req)) visibility = Prisma.sql`TRUE`;
-    else if (user.rol === 'OPERADOR' && user.operador?.id) visibility = Prisma.sql`(${visibility} OR "operadorId" = ${user.operador.id})`;
-    else if (user.rol === 'GENERADOR' && user.generador?.id) visibility = Prisma.sql`(${visibility} OR datos->'generador'->>'padronId' = ${user.generador.id})`;
-    else if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) visibility = Prisma.sql`(${visibility} OR datos->'transportista'->>'padronId' = ${user.transportista.id})`;
+    else if (user.rol === 'OPERADOR' && user.operador?.id) visibility = Prisma.sql`"operadorId" = ${user.operador.id}`;
+    else if (user.rol === 'GENERADOR' && user.generador?.id) visibility = Prisma.sql`datos->'generador'->>'padronId' = ${user.generador.id}`;
+    else if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) visibility = Prisma.sql`datos->'transportista'->>'padronId' = ${user.transportista.id}`;
     const term = search.trim();
     const pattern = '%' + term.replace(/[\\%_]/g, '\\$&') + '%';
     const condition = Prisma.sql`${visibility}
@@ -133,7 +140,7 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
     const huellaSolicitud = createHash('sha256').update(JSON.stringify(input.data)).digest('hex');
     const existing = await prisma.registroManifiestoExcepcional.findUnique({ where: { id: input.data.id } });
     if (existing) {
-      if (existing.creadoPorId !== req.user.id || existing.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || existing.huellaSolicitud !== huellaSolicitud) throw new AppError('La referencia ya se usó para otro registro', 409);
+      if (existing.creadoPorId !== req.user.id || existing.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || existing.huellaSolicitud !== huellaSolicitud || !sameExceptionalCreator(existing, creator)) throw new AppError('La referencia ya se usó para otro registro', 409);
       res.status(201).json({ success: true, data: { registro: present(existing, req) } }); return;
     }
     const slots = planExceptionalSlots(creator, input.data);
@@ -167,7 +174,7 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
       return created;
     });
     // Compare the normalized request fingerprint; the original padrón snapshot remains immutable.
-    if (record.creadoPorId !== req.user.id || record.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || record.huellaSolicitud !== huellaSolicitud) throw new AppError('La referencia ya se usó para otro registro', 409);
+    if (record.creadoPorId !== req.user.id || record.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || record.huellaSolicitud !== huellaSolicitud || !sameExceptionalCreator(record, creator)) throw new AppError('La referencia ya se usó para otro registro', 409);
     res.status(201).json({ success: true, data: { registro: present(record, req) } });
   } catch (error) { next(error); }
 }
