@@ -1,6 +1,6 @@
 vi.mock('../../hooks/useInspectionDraftOwnership',()=>({useInspectionDraftOwnership:(_:string,enabled:boolean)=>({status:enabled?'owned':'unavailable',canWrite:()=>enabled,retry:vi.fn()})}));
 import { beforeEach, expect, it, vi } from 'vitest';
-import {render,screen,fireEvent,waitFor} from '@testing-library/react';
+import {render,screen,fireEvent,waitFor,within} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {MemoryRouter} from 'react-router-dom';
 import {TrainingCertificates} from '../../pages/manifiestos/components/TrainingCertificates';
@@ -24,6 +24,42 @@ it('prefills remaining partial quantities and method, retains form after a faile
  await screen.findByText('Servicio no disponible');expect(screen.getByText(/Y1: 6 kg/)).toBeVisible();
  fireEvent.click(screen.getByText('Reintentar misma emisión'));await waitFor(()=>expect(mocks.post).toHaveBeenCalledTimes(2));
  expect(mocks.post.mock.calls[0][1].id).toBe(mocks.post.mock.calls[1][1].id);
+});
+
+it('keeps the receipt across reopening and only condenses it when the exact document is visible',async()=>{
+ const response=(documents:any[])=>({data:{data:documents,emisionHabilitada:true,adendasSinResolver:0}});
+ mocks.get.mockResolvedValue(response([]));
+ mocks.post.mockImplementation(async(_url,body)=>({data:{data:{id:body.id,numero:'M-P01',pdfSha256:'signed-hash'}}}));
+ const view=show();fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación parcial'}));
+ fireEvent.click(screen.getByText('Use QA signature'));fireEvent.click(screen.getByRole('button',{name:'Firmar y publicar certificación'}));
+ await screen.findByText('Certificación emitida');
+ expect(screen.getAllByText('Continuá para emitir').length).toBeGreaterThan(0);
+ expect(screen.queryByText('Todo listo para firmar la certificación final total.')).toBeNull();
+ const command=[...mocks.rows.values()].find(row=>row.status==='confirmed');expect(command).toBeDefined();
+ expect(within(screen.getByLabelText('Recuperación de certificación')).getByText('M-P01')).toBeVisible();
+ // Older stored receipts can include an untreated finding absent from the document card.
+ mocks.rows.set(command.id,{...command,input:{...command.input,exclusionesHallazgos:['hallazgo:Y12:kg']}});
+ view.unmount();show();await screen.findByText('Certificación emitida');
+ const receipt=()=>screen.getByLabelText('Recuperación de certificación');
+ expect(within(receipt()).getByText(/Y1: 10 kg/)).toBeVisible();
+ const document={id:command.key,numero:'M-P01',pdfSha256:'different-hash',createdAt:'2026-10-21T10:00:00Z',documento:{tipo:'PARCIAL',cantidades:[{residuoId:'r',corriente:'Y1',cantidad:10,unidad:'kg'}]}};
+ mocks.get.mockResolvedValue(response([document]));fireEvent.click(screen.getByRole('button',{name:'Actualizar certificados'}));
+ await screen.findByRole('button',{name:'Descargar parcial 1'});
+ expect(within(receipt()).getByText('M-P01')).toBeVisible();
+ mocks.get.mockRejectedValue(new Error('Offline'));fireEvent.click(screen.getByRole('button',{name:'Actualizar certificados'}));
+ await screen.findByText(/No se pudieron comprobar los certificados/);
+ expect(within(receipt()).getByText('M-P01')).toBeVisible();
+ mocks.get.mockResolvedValue(response([{...document,pdfSha256:'signed-hash'}]));
+ fireEvent.click(screen.getByRole('button',{name:'Reintentar certificados'}));
+ const continueButton=within(receipt()).getByRole('button',{name:'Continuar con certificados'});continueButton.focus();
+ await waitFor(()=>expect(within(receipt()).getByText('M-P01')).not.toBeVisible());
+ expect(within(receipt()).getByText('No tratadas: hallazgo:Y12:kg')).toBeVisible();
+ expect(continueButton).toHaveFocus();expect(screen.getByRole('button',{name:'Descargar parcial 1'})).toBeVisible();
+ expect(screen.getAllByText(/Y1: 10 kg/).filter(node=>!node.closest('[hidden]'))).toHaveLength(1);
+ expect(mocks.post).toHaveBeenCalledTimes(1);
+ fireEvent.click(continueButton);await waitFor(()=>expect(screen.queryByLabelText('Recuperación de certificación')).toBeNull());
+ expect(screen.getAllByText('Lista para firmar').length).toBeGreaterThan(0);
+ expect([...mocks.rows.values()].some(row=>row.status==='confirmed')).toBe(false);
 });
 it('a counterpart sees released documents, never emission controls',async()=>{
  mocks.user={id:'g',rol:'GENERADOR',actorId:'g',training:false};mocks.get.mockResolvedValue({data:{data:[{id:'f',numero:'M-F',createdAt:'2026-10-21T10:00:00Z',documento:{tipo:'FINAL',cantidades:[{residuoId:'r',cantidad:10,corriente:'Y1',unidad:'kg'}]}}],emisionHabilitada:true,adendasSinResolver:0}});

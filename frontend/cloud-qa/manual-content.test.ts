@@ -28,6 +28,12 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('certificate recovery explains the receipt when the document list is available or unavailable', () => {
+  const guide = guides.find((g: any) => g.id === 'certificados-operador-partes');
+  const step = guide.steps.find((s: any) => s.title === 'Recuperar una emisión al cerrar web o app');
+  const text = JSON.stringify(step);
+  for (const phrase of ['Comprobar resultado', 'se muestran allí una sola vez', 'el recibo conserva esos datos', 'Continuar con certificados', 'retira la copia local']) assert.ok(text.includes(phrase), phrase);
+});
 test('fleet GPS explains a stale capture and does not promise a server capture time', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'transporte-cargas-simultaneas'));
   assert.match(text, /SITREP confirmó una ubicación anterior/);
@@ -389,6 +395,8 @@ test('MIME aliases preserve the original evidence bytes and replace active refer
   assert.ok(aliases.files.length > 0);
   assert.equal(new Set(aliases.files.map((file: any) => file.previous)).size, aliases.files.length);
   const active = read('help-data.js') + read('directorio.html');
+  // Keep historical bytes verified even when a newer product capture replaces one.
+  const superseded = new Set(['screenshots/mobile/certificate-recovery-20261026.jpg']);
   for (const file of aliases.files) {
     const old = readFileSync(new URL(file.previous, root));
     const current = readFileSync(new URL(file.current, root));
@@ -396,7 +404,7 @@ test('MIME aliases preserve the original evidence bytes and replace active refer
     assert.equal(current.readUInt16BE(0), 0xffd8);
     assert.ok(old.equals(current), file.previous);
     assert.equal(createHash('sha256').update(current).digest('hex'), file.sha256);
-    assert.ok(active.includes(file.current.replace(/^screenshots\//, '')), file.current);
+    assert.ok(active.includes(file.current.replace(/^screenshots\//, '')) || superseded.has(file.current), file.current);
     assert.ok(!active.includes(file.previous.replace(/^screenshots\//, '')), file.previous);
   }
 });

@@ -89,6 +89,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026103080') {
     return path.join(root, 'backend/dist-qa-closure-d7d29dde/index.js');
   }
+  if (version === 'certificate-receipt-ux'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-certificate-receipt-ux-20261030') {
+    return path.join(root, 'backend/dist-qa-closure-d7d29dde/index.js');
+  }
   if (version === '17152d81'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
     return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');
