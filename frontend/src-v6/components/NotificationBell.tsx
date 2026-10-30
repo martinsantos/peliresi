@@ -194,7 +194,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       <button
         ref={buttonRef}
         onClick={handleBellClick}
-        className={'relative flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ' + (inverse ? 'text-white hover:bg-white/15 focus-visible:outline-white' : 'text-neutral-700 hover:bg-neutral-100')}
+        className={'relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors ' + (inverse ? 'text-white hover:bg-white/15 focus-visible:outline-white' : 'text-neutral-700 hover:bg-neutral-100')}
         aria-expanded={isOpen}
         aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
       >
@@ -212,12 +212,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           ref={panelRef}
           role="region" aria-label="Notificaciones recientes"
           style={{ '--notification-panel-top': `${panelTop}px` } as React.CSSProperties}
-          className="fixed inset-x-4 top-[var(--notification-panel-top)] mt-2 flex max-h-[calc(100dvh-var(--notification-panel-top)-1rem)] flex-col bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-96"
+          className="fixed inset-x-[12px] top-[var(--notification-panel-top)] mt-[8px] flex max-h-[calc(100dvh-var(--notification-panel-top)-16px)] flex-col bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-96"
         >
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b border-neutral-100">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-neutral-900 text-sm">Notificaciones</h3>
+          <div className="flex shrink-0 flex-wrap items-start justify-between gap-[8px] px-[16px] py-[12px] border-b border-neutral-100">
+            <div className="flex min-w-[min(100%,9ch)] flex-1 flex-wrap items-center gap-[8px]">
+              <h3 className="min-w-0 font-semibold text-neutral-900 text-sm [overflow-wrap:anywhere]">Notificaciones</h3>
               {unreadCount > 0 && (
                 <span className="px-1.5 py-0.5 bg-error-100 text-error-700 text-xs font-semibold rounded-full">
                   {unreadCount}
@@ -226,7 +226,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 transition-colors"
+              className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 transition-colors"
               aria-label="Cerrar notificaciones"
             >
               <X size={16} />
@@ -302,10 +302,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           </div>
 
           {/* Footer */}
-          <div className="shrink-0 border-t border-neutral-100 p-2">
+          <div className="shrink-0 border-t border-neutral-100 p-[8px]">
             <button
               onClick={handleViewAll}
-              className="min-h-11 w-full py-2 text-sm font-semibold text-primary-800 hover:bg-primary-50 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
+              className="min-h-[44px] w-full px-[8px] py-[8px] text-sm font-semibold text-primary-800 hover:bg-primary-50 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
             >
               Ver todas las notificaciones
             </button>

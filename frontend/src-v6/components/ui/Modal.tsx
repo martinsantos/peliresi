@@ -26,6 +26,25 @@ function cn(...inputs: ClassValue[]) {
 type ModalSize = 'sm' | 'base' | 'lg' | 'xl' | 'full';
 type VisibleViewport = { width: number; height: number; top: number; left: number };
 
+/** Keep the focused field and its nearby label together when the body can fit them. */
+function revealFocusedField(body: HTMLDivElement | null, element: Element | null) {
+  if (!body || !(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)
+    || document.activeElement !== element || !body.contains(element)) return;
+  const visible = body.getBoundingClientRect(), field = element.getBoundingClientRect();
+  if (visible.height <= 0 || field.height <= 0) return;
+  const label = Array.from(element.labels || []).find(candidate => body.contains(candidate) && candidate.getClientRects().length > 0);
+  const labelRect = label?.getBoundingClientRect();
+  const top = labelRect ? Math.min(labelRect.top, field.top) : field.top;
+  const bottom = field.bottom;
+  const margin = 8;
+  const includeLabel = bottom - top <= visible.height - margin * 2;
+  const targetTop = includeLabel ? top : field.top;
+  let offset = 0;
+  if (bottom > visible.bottom - margin) offset = bottom - (visible.bottom - margin);
+  else if (targetTop < visible.top + margin) offset = targetTop - (visible.top + margin);
+  if (offset) body.scrollTop += offset;
+}
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -70,6 +89,7 @@ export const Modal: React.FC<ModalProps> = ({
   isBusy = false,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isOpen && error) errorRef.current?.scrollIntoView?.({ block: 'nearest' });
@@ -100,6 +120,14 @@ export const Modal: React.FC<ModalProps> = ({
       visible.removeEventListener('scroll', measure);
     };
   }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !viewport) return;
+    const active = document.activeElement;
+    if (!bodyRef.current?.contains(active)) return;
+    const frame = requestAnimationFrame(() => revealFocusedField(bodyRef.current, active));
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, viewport]);
 
   // Focus trap: Tab cycles within the modal
   useEffect(() => {
@@ -157,7 +185,7 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{
+    <div className="fixed inset-0 flex items-center justify-center p-[12px] sm:p-[16px]" style={{
       zIndex: 120 + depth * 10,
       ...(viewport && { top: viewport.top, left: viewport.left, width: viewport.width, height: viewport.height, right: 'auto', bottom: 'auto' }),
     }}>
@@ -186,15 +214,15 @@ export const Modal: React.FC<ModalProps> = ({
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex shrink-0 items-start justify-between p-4 sm:p-6 border-b border-neutral-100">
-            <div className="flex-1 pr-4">
+          <div className="flex shrink-0 flex-wrap items-start justify-between gap-[8px] p-[16px] sm:p-[24px] border-b border-neutral-100">
+            <div className="min-w-[min(100%,9ch)] flex-1">
               {title && (
-                <h3 id={titleId} className="text-xl font-semibold text-neutral-900">
+                <h3 id={titleId} className="text-xl font-semibold text-neutral-900 [overflow-wrap:anywhere]">
                   {title}
                 </h3>
               )}
               {description && (
-                <p id={descriptionId} className="mt-1 text-sm text-neutral-600">{description}</p>
+                <p id={descriptionId} className="mt-1 text-sm text-neutral-600 [overflow-wrap:anywhere]">{description}</p>
               )}
             </div>
             {showCloseButton && (
@@ -202,7 +230,7 @@ export const Modal: React.FC<ModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isBusy}
-                className="min-h-11 min-w-11 p-2 rounded-lg hover:bg-neutral-100 transition-colors text-neutral-600"
+                className="ml-auto min-h-[44px] min-w-[44px] shrink-0 p-[8px] rounded-lg hover:bg-neutral-100 transition-colors text-neutral-600"
                 aria-label="Cerrar"
               >
                 <X size={20} />
@@ -212,14 +240,17 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Content */}
-        <div className={cn('min-h-0 p-4 sm:p-6 overflow-y-auto flex-1', !title && !showCloseButton && 'pt-6')}>
+        <div ref={bodyRef} onFocusCapture={(event) => {
+          const target = event.target;
+          if (bodyRef.current?.getClientRects().length) requestAnimationFrame(() => revealFocusedField(bodyRef.current, target));
+        }} className={cn('min-h-0 p-[16px] sm:p-[24px] overflow-y-auto flex-1', !title && !showCloseButton && 'pt-[24px]')}>
           {error && <div ref={errorRef} role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800">{error}</div>}
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 p-4 sm:p-6 border-t border-neutral-100">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-[12px] p-[16px] sm:p-[24px] border-t border-neutral-100 [&_button]:min-h-[44px] [&_button]:px-[16px] [&_button]:py-[8px]">
             {footer}
           </div>
         )}

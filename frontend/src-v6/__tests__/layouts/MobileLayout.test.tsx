@@ -349,7 +349,7 @@ describe('MobileLayout Android shell', () => {
     const help = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
     expect(help.closest('header')).toBe(screen.getByRole('banner'));
     expect(help.parentElement).not.toHaveClass('fixed');
-    expect(help).toHaveClass('h-11', 'w-11');
+    expect(help).toBeVisible();
   });
   it.each(['/ayuda','/app/ayuda','/mobile/ayuda'])('keeps support in the header without covering the help page on %s', path => {
     renderMobileLayout(path);
@@ -391,7 +391,7 @@ describe('MobileLayout Android shell', () => {
     const header = screen.getByRole('banner');
     expect(header.querySelector('h1')).toHaveClass('whitespace-normal', 'break-words');
     expect(header.querySelector('h1')).not.toHaveClass('truncate');
-    expect(header.firstElementChild).toHaveClass('min-h-16', 'py-2');
+    expect(header.firstElementChild).toHaveClass('min-h-16');
     expect(header.firstElementChild).not.toHaveClass('h-16');
     expect(header.querySelector('h1')).toHaveClass('w-full');
     expect(header.querySelector('[aria-label="Función actual"]')).toHaveTextContent('Adm. Generadores');

@@ -2,6 +2,8 @@
 
 Esta herramienta se probó **sólo en el preview artificial**. No se ejecutó en producción y no determina por sí sola si una publicación es segura. Su propósito es cuantificar candidatos a revisión antes de que una versión que exige tres aprobaciones pueda impedir iniciar un manifiesto anterior.
 
+**Decisión vigente:** el usuario indicó continuar sin consultar datos reales, incluso para obtener totales agregados. La herramienta queda limitada al preview artificial; no se debe ejecutar sobre producción. Por esa razón el impacto histórico real permanece sin medir.
+
 ## Qué informa
 
 El servicio examina manifiestos con `isDemoData=false` en estado Borrador, Pendiente de aprobación o Aprobado. Usa las mismas reglas de la versión candidata para comprobar la propuesta y las decisiones: detecta marcadores ausentes, inválidos o duplicados, partes o modalidad que no coinciden, decisiones con metadatos inconsistentes, rechazo, aprobaciones faltantes y coordinación pendiente. Las filas del informe agrupan por estado, modalidad, resultado y motivo; esas categorías son excluyentes y suman el total examinado.

@@ -75,7 +75,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) =
       to={to}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-1 border-t-2 py-2 px-1 min-w-0 min-h-14 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700',
+        'flex flex-1 flex-col items-center justify-center gap-1 border-t-2 py-2 px-2 min-w-max min-h-14 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700',
         isActive
           ? 'text-primary-800 border-current bg-primary-50'
           : 'border-transparent text-neutral-600 hover:bg-neutral-50'
@@ -89,7 +89,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) =
           </span>
         ) : null}
       </div>
-      <span className="text-xs font-semibold">{label}</span>
+      <span className="whitespace-nowrap text-xs font-semibold">{label}</span>
     </Link>
   );
 };
@@ -237,13 +237,13 @@ export const MobileLayout: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 shrink-0 bg-white border-b border-neutral-200 safe-area-top">
-        <div className="flex items-center justify-between gap-2 min-h-16 px-4 py-2" style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+      <header className="sticky top-0 z-[45] shrink-0 bg-white border-b border-neutral-200 safe-area-top">
+        <div className="flex flex-wrap items-center justify-between gap-x-[8px] gap-y-[4px] min-h-16 px-[16px] py-[8px]" style={{ paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' }}>
+          <div className="flex min-w-[min(100%,8rem)] flex-1 items-center gap-[10px]">
             <button
               ref={menuButtonRef}
               onClick={() => setIsMenuOpen(true)}
-              className="shrink-0 p-2 -ml-2 text-primary-800 hover:bg-primary-50 rounded-xl transition-colors touch-target"
+              className="shrink-0 p-[8px] -ml-[8px] text-primary-800 hover:bg-primary-50 rounded-xl transition-colors touch-target"
               aria-label="Abrir menu"
             >
               <Menu size={24} />
@@ -256,7 +256,7 @@ export const MobileLayout: React.FC = () => {
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {inlineSupport && <SupportBubble mobile inline hidden={isMenuOpen || searchOpen} />}
             <NotificationBell basePath={mp('')} />
           </div>
@@ -277,8 +277,8 @@ export const MobileLayout: React.FC = () => {
       {floatingSupport && <SupportBubble mobile hidden={isMenuOpen || searchOpen} />}
 
       {/* Bottom Navigation */}
-      {!isInspectionCase && <nav aria-label="Navegación principal" className="relative shrink-0 bottom-nav-polished safe-area-bottom z-40">
-        <div className="flex items-center justify-around safe-bottom">
+      {!isInspectionCase && <nav aria-label="Navegación principal" className="relative min-w-0 shrink-0 overflow-x-auto overscroll-x-contain bottom-nav-polished safe-area-bottom z-40">
+        <div className="flex w-full min-w-max items-center justify-around safe-bottom">
           {bottomNavItems.map((item) => (
             <NavItem 
               key={item.to} 

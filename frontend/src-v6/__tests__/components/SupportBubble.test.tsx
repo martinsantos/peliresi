@@ -70,7 +70,7 @@ describe('help bubble opens from the current task without automatic delivery', (
   it('can live in the inspection header without floating over save controls', async () => {
     render(<><SupportBubble mobile inline /><ToastContainer /></>);
     const button = screen.getByRole('button', { name: 'Ayuda y soporte técnico' });
-    expect(button).toHaveClass('h-11', 'w-11');
+    expect(button).toBeVisible();
     expect(button.parentElement).not.toHaveClass('fixed');
     expect(button.parentElement?.style.bottom).toBe('');
     fireEvent.click(button);

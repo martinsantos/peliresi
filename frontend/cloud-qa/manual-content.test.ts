@@ -34,6 +34,12 @@ test('inspection guidance distinguishes the saved act and its continued fields',
   assert.match(text, /versión guardada en el servidor/i);
   assert.match(text, /Los campos extensos continúan en páginas identificadas/i);
 });
+test('inspection guidance explains how to enlarge and close an evidence photograph', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'psip-flujo-inspecciones'));
+  assert.match(text, /En Evidencias, elegí una miniatura para ampliar la fotografía/);
+  assert.match(text, /Cerrala con Cerrar o Escape: volvés a la miniatura sin salir del expediente/);
+  assert.match(text, /deslizá la barra inferior para ver más opciones/);
+});
 test('operational notices identify the target and recheck the representative activity and site', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-avisos'));
   assert.match(text, /incidente en tránsito avisa a la cuenta del operador/i);

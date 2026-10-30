@@ -52,6 +52,47 @@ describe('modal remains usable above the mobile keyboard', () => {
     expect(input).toHaveValue('Dato elegido por la persona');
   });
 
+  it('scrolls the focused field and its label into the available dialog body', async () => {
+    render(<Modal isOpen title="Nueva inspección" onClose={vi.fn()}>
+      <label htmlFor="field-reference">Ubicación prevista</label><input id="field-reference" />
+    </Modal>);
+    const modal = screen.getByRole('dialog');
+    const input = within(modal).getByLabelText('Ubicación prevista');
+    const label = within(modal).getByText('Ubicación prevista');
+    const body = label.closest('.overflow-y-auto') as HTMLDivElement;
+    const box = (top: number, height: number) => ({ x: 0, y: top, top, bottom: top + height, left: 0, right: 320, width: 320, height, toJSON: () => ({}) }) as DOMRect;
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(box(0, 160));
+    vi.spyOn(body, 'getClientRects').mockReturnValue([box(0, 160)] as unknown as DOMRectList);
+    vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(box(70, 30));
+    vi.spyOn(label, 'getClientRects').mockReturnValue([box(70, 30)] as unknown as DOMRectList);
+    vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(box(110, 90));
+    input.focus();
+    await waitFor(() => expect(body.scrollTop).toBe(48));
+    expect(input).toHaveFocus();
+  });
+
+  it('keeps the focused field and label visible when the visual viewport shrinks', async () => {
+    const viewport = new VisibleViewport();
+    vi.stubGlobal('visualViewport', viewport);
+    render(<Modal isOpen title="Nueva inspección" onClose={vi.fn()}>
+      <label htmlFor="field-resize">Ubicación prevista</label><input id="field-resize" />
+    </Modal>);
+    const modal = screen.getByRole('dialog'), input = within(modal).getByLabelText('Ubicación prevista');
+    const label = within(modal).getByText('Ubicación prevista');
+    const body = label.closest('.overflow-y-auto') as HTMLDivElement;
+    const box = (top: number, height: number) => ({ x: 0, y: top, top, bottom: top + height, left: 0, right: 320, width: 320, height, toJSON: () => ({}) }) as DOMRect;
+    let bodyHeight = 300;
+    vi.spyOn(body, 'getBoundingClientRect').mockImplementation(() => box(0, bodyHeight));
+    vi.spyOn(body, 'getClientRects').mockImplementation(() => [box(0, bodyHeight)] as unknown as DOMRectList);
+    vi.spyOn(label, 'getBoundingClientRect').mockImplementation(() => box(70 - body.scrollTop, 30));
+    vi.spyOn(label, 'getClientRects').mockImplementation(() => [box(70 - body.scrollTop, 30)] as unknown as DOMRectList);
+    vi.spyOn(input, 'getBoundingClientRect').mockImplementation(() => box(110 - body.scrollTop, 90));
+    input.focus();
+    act(() => { bodyHeight = 160; viewport.resize(420); });
+    await waitFor(() => expect(body.scrollTop).toBe(48));
+    expect(input).toHaveFocus();
+  });
+
   it('fits the visible viewport as the keyboard opens, keeping typed text and focus', async () => {
     const viewport = new VisibleViewport();
     vi.stubGlobal('visualViewport', viewport);
