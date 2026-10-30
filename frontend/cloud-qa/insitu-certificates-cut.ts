@@ -4,6 +4,7 @@ import {existsSync,readdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {assertCloudDatabase,backendRequire} from './safety.ts';
+import {qaBackendEntry} from './rollback-backend.ts';
 
 await assertCloudDatabase();
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'),'proposal_operations_20261021');
@@ -21,7 +22,7 @@ const proofs=readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory())
  .filter(p=>p.creator==='operador'&&p.noTripOrGps===true);
 assert.deepEqual(proofs.map(p=>p.surface).sort(),['app','web-desktop']);
 const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
-const {notificationMailContent}=backendRequire('./dist/services/notification-mail.service.js');
+const {notificationMailContent}=backendRequire(path.join(path.dirname(qaBackendEntry()),'services/notification-mail.service.js'));
 const sharp=backendRequire('sharp');
 const signature='data:image/png;base64,'+(await sharp(Buffer.from('<svg width="300" height="100"><rect width="300" height="100" fill="white"/><path d="M10 70 L40 20 L80 75 L120 15 L180 80 L270 30" stroke="black" stroke-width="3" fill="none"/></svg>')).png().toBuffer()).toString('base64');
 const roles=['generador','transportista','operador'] as const,tokens=new Map<string,string>();
