@@ -225,6 +225,17 @@ describe('committed notice mail relay', () => {
     expect(repeated.html).not.toMatch(/PRIVATE|untrusted|fraude/);
     expect(notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', datos: '{}' })?.subject).toBe('[SITREP] Alerta para revisar');
   });
+  it.each([['GENERADOR', '/app/mi-solicitud?solicitud=application&documento=document'], ['ADMIN_OPERADOR', '/app/admin/solicitudes/application?documento=document']])('links the repeated receipt to its document for %s', (rol, destination) => {
+    const data = { tipo: 'comprobante_repetido', solicitudId: 'application', documentoId: 'document', ruta: '/mi-solicitud' };
+    const rendered = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', rol, datos: JSON.stringify(data) })!;
+    expect(mailText(rendered.html)).toContain(destination);
+    expect(rendered.html).not.toContain('PRIVATE');
+  });
+  it('does not put a malformed document identifier into the receipt mail destination', () => {
+    const rendered = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', rol: 'GENERADOR', datos: JSON.stringify({ tipo: 'comprobante_repetido', solicitudId: 'application', documentoId: '../otro' }) })!;
+    expect(mailText(rendered.html)).toContain('/app/notificaciones');
+    expect(rendered.html).not.toContain('../otro');
+  });
   it.each([{ tipo: 'intercambio_inspeccion' }, { tipo: 'intercambio_inspeccion', soloCampana: true }, { soloCampana: true }])('never relays a PSIP or bell-only notice even with SMTP/family enabled: %j', async metadata => {
     const internal = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ inspeccionId: 'inspection', ...metadata }) };
     expect(notificationMailContent(internal)).toBeNull();

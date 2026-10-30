@@ -36,3 +36,31 @@ it('blocks duplicate download commands while the first is pending',async()=>{
 it('shows rejected originals first without changing the supplied document order',()=>{
  const reverse=[docs[1],docs[0]];render(<ApplicantDocuments applicationId="s" documents={reverse} fresh onRetry={()=>{}} />);open();expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Factura completa.png');expect(reverse[0].id).toBe('approved');
 });
+it('opens and focuses only the document identified by the notice',()=>{
+ render(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={()=>{}} targetDocumentId="approved" />);
+ expect(screen.getByRole('button',{name:/Documentos presentados/})).toHaveAttribute('aria-expanded','true');
+ const target=screen.getByRole('listitem',{name:'Documento del aviso: Constancia.pdf'});
+ expect(target).toHaveTextContent('Documento indicado en el aviso');expect(target).toHaveFocus();expect(download).not.toHaveBeenCalled();
+});
+it('does not substitute another document when the linked one is unavailable',()=>{
+ render(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={()=>{}} targetDocumentId="other-account" />);
+ expect(screen.getByRole('status')).toHaveTextContent('El documento indicado en el aviso no está disponible en esta solicitud');
+ expect(screen.queryByText('Documento indicado en el aviso')).toBeNull();expect(download).not.toHaveBeenCalled();
+});
+it('waits for a fresh read before locating a document and respects closing the list',()=>{
+ const retry=vi.fn();const view=render(<ApplicantDocuments applicationId="s" documents={docs} fresh={false} onRetry={retry} targetDocumentId="approved" />);
+ expect(screen.queryByText('Documento indicado en el aviso')).toBeNull();expect(screen.queryByText(/no está disponible en esta solicitud/)).toBeNull();
+ view.rerender(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={retry} targetDocumentId="approved" />);
+ expect(screen.getByRole('listitem',{name:'Documento del aviso: Constancia.pdf'})).toHaveFocus();
+ open(); expect(screen.getByRole('button',{name:/Documentos presentados/})).toHaveAttribute('aria-expanded','false');
+ view.rerender(<ApplicantDocuments applicationId="s" documents={[...docs]} fresh onRetry={retry} targetDocumentId="approved" />);
+ expect(screen.getByRole('button',{name:/Documentos presentados/})).toHaveAttribute('aria-expanded','false');
+ view.rerender(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={retry} targetDocumentId="rejected" />);
+ expect(screen.getByRole('listitem',{name:'Documento del aviso: Factura completa.png'})).toHaveFocus();
+});
+it('reopens the same document if its notice is selected again',()=>{
+ const view=render(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={()=>{}} targetDocumentId="approved" targetVisitKey="first" />);
+ open();expect(screen.getByRole('button',{name:/Documentos presentados/})).toHaveAttribute('aria-expanded','false');
+ view.rerender(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={()=>{}} targetDocumentId="approved" targetVisitKey="second" />);
+ expect(screen.getByRole('listitem',{name:'Documento del aviso: Constancia.pdf'})).toHaveFocus();
+});

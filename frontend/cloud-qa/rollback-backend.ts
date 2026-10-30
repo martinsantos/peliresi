@@ -13,6 +13,14 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-receipt-link-20261030') {
     return path.join(root, 'backend/dist-qa-closure-67f330a7/index.js');
   }
+  if (version === 'receipt-document-before'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-receipt-document-20261030') {
+    return path.join(root, 'backend/dist-qa-closure-67f330a7/index.js');
+  }
+  if (version === 'receipt-document-after'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-receipt-document-20261030') {
+    return path.join(root, 'backend/dist-qa-receipt-document-20261030/index.js');
+  }
   if (version === '17152d81'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
     return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');

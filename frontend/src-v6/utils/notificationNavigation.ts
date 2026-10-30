@@ -160,9 +160,12 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   // An older generic ruta must not hide the specific application in this notice.
   if (data.tipo === 'comprobante_repetido' && Object.prototype.hasOwnProperty.call(data, 'solicitudId')) {
     if (!safeId(data.solicitudId)) return withBasePath('/notificaciones', basePath);
+    if (Object.prototype.hasOwnProperty.call(data, 'documentoId') && !safeId(data.documentoId)) return withBasePath('/notificaciones', basePath);
     const id = encodeURIComponent(data.solicitudId);
-    return withBasePath(recipientRole?.startsWith('ADMIN')
-      ? `/admin/solicitudes/${id}` : `/mi-solicitud?solicitud=${id}`, basePath);
+    const admin = recipientRole?.startsWith('ADMIN');
+    const destination = admin ? `/admin/solicitudes/${id}` : `/mi-solicitud?solicitud=${id}`;
+    const document = safeId(data.documentoId) ? `${admin ? '?' : '&'}documento=${encodeURIComponent(data.documentoId)}` : '';
+    return withBasePath(destination + document, basePath);
   }
   if (companyTarget && representativeManifestAlert(notificacion.tipo, data)) {
     return withBasePath(safeId(notificacion.manifiestoId) ? '/manifiestos/' + notificacion.manifiestoId : '/notificaciones', basePath);

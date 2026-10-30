@@ -22,6 +22,20 @@ it('opens the requested own application from the activity button', () => {
   expect(screen.getByLabelText('Solicitud por actividad')).toHaveValue('o');
   expect(screen.getByText('Inscripción de Operador')).toBeVisible();
 });
+it('locates the linked document and removes its target when changing activity', () => {
+  vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
+  requests.applications = [
+    { id: 'g', tipoActor: 'GENERADOR', estado: 'APROBADA', documentos: [{ id: 'g-doc', nombre: 'Generador.pdf', estado: 'PENDIENTE' }] },
+    { id: 'o', tipoActor: 'OPERADOR', estado: 'APROBADA', documentos: [{ id: 'o-doc', nombre: 'Operador.pdf', estado: 'PENDIENTE' }] },
+  ];
+  render(<MemoryRouter initialEntries={['/mi-solicitud?solicitud=o&documento=o-doc']}><MiSolicitudPage /></MemoryRouter>);
+  expect(screen.getByRole('listitem', { name: 'Documento del aviso: Operador.pdf' })).toHaveFocus();
+  expect(screen.getByRole('listitem', { name: 'Documento del aviso: Operador.pdf' })).toHaveTextContent('Inscripción: Operador');
+  fireEvent.change(screen.getByLabelText('Solicitud por actividad'), { target: { value: 'g' } });
+  expect(screen.getByText('Inscripción de Generador')).toBeVisible();
+  expect(screen.queryByText('Documento indicado en el aviso')).toBeNull();
+  expect(screen.getByRole('button', { name: /Documentos presentados/ })).toHaveAttribute('aria-expanded', 'false');
+});
 it('keeps unsent conversations separate when selecting another application', () => {
   vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
   render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);

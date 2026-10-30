@@ -132,9 +132,9 @@ describe('resolveNotificationPath', () => {
       tipo: 'comprobante_repetido', solicitudId: 'operador-2', documentoId: 'doc-2', ruta: '/mi-solicitud',
     }) };
     for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
-      expect(resolveNotificationPath(notice, prefix, role)).toBe(prefix + '/mi-solicitud?solicitud=operador-2');
+      expect(resolveNotificationPath(notice, prefix, role)).toBe(prefix + '/mi-solicitud?solicitud=operador-2&documento=doc-2');
     }
-    expect(resolveNotificationPath(notice, prefix, 'ADMIN_OPERADOR')).toBe(prefix + '/admin/solicitudes/operador-2');
+    expect(resolveNotificationPath(notice, prefix, 'ADMIN_OPERADOR')).toBe(prefix + '/admin/solicitudes/operador-2?documento=doc-2');
     expect(notificationActionLabel(resolveNotificationPath(notice, prefix, 'OPERADOR'), notice)).toBe('Abrir solicitud y ver su estado →');
   });
   it('does not follow a malformed repeated-receipt application identifier or an unrelated supplied route', () => {
@@ -144,6 +144,10 @@ describe('resolveNotificationPath', () => {
     }
     const actorReceipt = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', actorTipo: 'operador', actorId: 'o-1', ruta: '/mi-perfil' }) };
     expect(resolveNotificationPath(actorReceipt, '/app', 'OPERADOR')).toBe('/app/mi-perfil');
+    const historical = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', solicitudId: 'own-1', ruta: '/mi-solicitud' }) };
+    expect(resolveNotificationPath(historical, '/app', 'GENERADOR')).toBe('/app/mi-solicitud?solicitud=own-1');
+    const invalidDocument = { ...base, datos: JSON.stringify({ tipo: 'comprobante_repetido', solicitudId: 'own-1', documentoId: '../otro', ruta: '/mi-solicitud' }) };
+    expect(resolveNotificationPath(invalidDocument, '/app', 'GENERADOR')).toBe('/app/notificaciones');
   });
   it('refreshes owned application data when opening a notice on an already open result', () => {
     const invalidateQueries = vi.fn(); refreshInspectionNotification({ ...base, datos: '{"tipo":"solicitud_observada","solicitudId":"own-1"}' }, { invalidateQueries } as any);

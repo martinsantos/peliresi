@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, CheckCircle, Clock, AlertTriangle, XCircle, Send,
   ArrowRight, Eye, MessageSquare,
@@ -76,6 +76,7 @@ const MiSolicitudPage: React.FC = () => {
 };
 const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isRestricted, logout } = useAuth();
   const [, refreshFileState] = useState(0);
   useEffect(() => {
@@ -274,7 +275,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
       {replyText && solicitud.estado !== 'OBSERVADA' && <div className="rounded-xl border p-4"><p className="font-medium">Respuesta local conservada</p><p className="whitespace-pre-wrap break-words">{replyText}</p><p>El estado actual no admite reenviar esta respuesta.</p></div>}
 
       {solicitud.estado === 'OBSERVADA' && <ApplicantDocuments key={solicitud.id} applicationId={solicitud.id} documents={solicitud.documentos}
-        fresh={!isError && !isFetching} onRetry={() => void refetch()} />}
+        fresh={!isError && !isFetching} targetDocumentId={params.get('documento')} targetVisitKey={location.key} activityLabel={ACTOR_LABELS[solicitud.tipoActor] || solicitud.tipoActor} onRetry={() => void refetch()} />}
 
       {/* OBSERVADA Banner */}
       {solicitud.estado === 'OBSERVADA' && (
@@ -355,7 +356,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
       {solicitud.estado === 'RECHAZADA' && import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities mode="request" />}
 
       {solicitud.estado !== 'OBSERVADA' && <ApplicantDocuments key={solicitud.id} applicationId={solicitud.id} documents={solicitud.documentos}
-        fresh={!isError && !isFetching} onRetry={() => void refetch()} />}
+        fresh={!isError && !isFetching} targetDocumentId={params.get('documento')} targetVisitKey={location.key} activityLabel={ACTOR_LABELS[solicitud.tipoActor] || solicitud.tipoActor} onRetry={() => void refetch()} />}
 
       {/* Messages Thread */}
       <Card padding="none">

@@ -100,6 +100,18 @@ try{
      await expect(page.locator('#review')).toContainText('Corregido:');
    }
  });
+ await check('repeated receipt sample links the same application and document in inbox and email',async()=>{
+   const item=data.cases.find((entry:any)=>entry.id==='atm-repetido');assert.ok(item);
+   const expected='/mi-solicitud?solicitud=SOLICITUD-MUESTRA&documento=DOCUMENTO-MUESTRA';
+   for(const role of ['GENERADOR','TRANSPORTISTA','OPERADOR']){
+     assert.equal(item.paths[role],expected);
+     const html=data.blobs[item.mailRefs[role].ref];
+     const web=html.match(/data-mail-action="web" href="([^"]+)"/);assert.ok(web);
+     const url=new URL(web[1].replace(/&amp;/g,'&'));assert.equal(url.pathname+url.search,expected);
+   }
+   await select('atm-repetido');await channel('email');
+   await expect(page.locator('#review')).toContainText('señala el documento');
+ });
  await check('current delivery and operational producers include their scoped representative notices',async()=>{
    for(const [id,role] of [
      ['entrega-representante-GENERADOR','GENERADOR'],['entrega-representante-TRANSPORTISTA','TRANSPORTISTA'],

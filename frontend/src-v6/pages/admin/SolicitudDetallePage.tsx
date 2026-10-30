@@ -150,6 +150,10 @@ const SolicitudReview: React.FC = () => {
   const running = useRef(false);
   const [feedback, setFeedback] = useState<{ error: boolean; text: string; documentId?: string } | null>(null);
   const feedbackRef = useRef<HTMLParagraphElement>(null);
+  const linkedDocumentRef = useRef<HTMLDivElement>(null);
+  const missingDocumentRef = useRef<HTMLParagraphElement>(null);
+  const locatedDocument = useRef<string | null>(null);
+  const linkedDocumentId = new URLSearchParams(location.search).get('documento');
   useEffect(() => {
     const target = feedbackRef.current;
     if (!feedback || !target) return;
@@ -164,6 +168,18 @@ const SolicitudReview: React.FC = () => {
   const observarSolicitud = useObservarSolicitud(), aprobarSolicitud = useAprobarSolicitud();
   const rechazarSolicitud = useRechazarSolicitud(), revisarDocumento = useRevisarDocumento();
   const fresh = !!solicitud && !detail.isError && !detail.isPending && !detail.isFetching;
+  const linkedDocumentMissing = !!linkedDocumentId && fresh && Array.isArray(solicitud?.documentos)
+    && !solicitud.documentos.some(doc => doc.id === linkedDocumentId);
+  useEffect(() => { locatedDocument.current = null; }, [linkedDocumentId, id, location.key]);
+  useEffect(() => {
+    if (!linkedDocumentId || !fresh || !Array.isArray(solicitud?.documentos) || locatedDocument.current === linkedDocumentId
+      || documentDecision || observarModal || rechazarModal || confirmarAprobar) return;
+    const target = linkedDocumentMissing ? missingDocumentRef.current : linkedDocumentRef.current;
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+    locatedDocument.current = linkedDocumentId;
+  }, [linkedDocumentId, location.key, fresh, solicitud?.documentos, linkedDocumentMissing, documentDecision, observarModal, rechazarModal, confirmarAprobar]);
   const reviewer = !!solicitud && !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol);
   const canDecide = fresh && reviewer && solicitud?.estado === 'EN_REVISION' && !busy;
   const canApprove = canDecide && applicationDeclarationsReadable(solicitud);
@@ -313,13 +329,18 @@ const SolicitudReview: React.FC = () => {
             <Badge variant="soft" color="neutral" size="sm">{documentos.length}</Badge>
           </div>
           <div className="p-4 space-y-3">
+            {linkedDocumentMissing && <p ref={missingDocumentRef} tabIndex={-1} role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-800">El documento indicado en el aviso no está disponible en esta solicitud.</p>}
             {documentos.length === 0 ? (
               <p className="text-sm text-neutral-400 text-center py-6">Sin documentos</p>
             ) : (
               documentos.map((doc: DocumentoSolicitud) => {
                 const dCfg = DOC_ESTADO_CONFIG[doc.estado] || DOC_ESTADO_CONFIG.PENDIENTE;
                 return (
-                  <div key={doc.id} role="group" aria-label={'Documento: ' + doc.nombre} className="border border-neutral-200 rounded-xl p-3 space-y-2">
+                  <div key={doc.id} role="group" aria-label={'Documento: ' + doc.nombre}
+                    ref={doc.id === linkedDocumentId ? linkedDocumentRef : undefined} tabIndex={doc.id === linkedDocumentId ? -1 : undefined}
+                    className={'border rounded-xl p-3 space-y-2 ' + (doc.id === linkedDocumentId ? 'border-primary-300 bg-primary-50 outline-none focus-visible:ring-2 focus-visible:ring-primary-700' : 'border-neutral-200')}>
+                    {doc.id === linkedDocumentId && <p className="text-sm font-semibold text-primary-800">Documento indicado en el aviso</p>}
+                    {doc.id === linkedDocumentId && <p className="text-sm text-neutral-700">Inscripción: {ACTOR_NAMES[solicitud.tipoActor] || solicitud.tipoActor}</p>}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-neutral-800 truncate" title={doc.nombre}>

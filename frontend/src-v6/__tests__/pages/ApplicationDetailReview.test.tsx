@@ -20,7 +20,7 @@ vi.mock('../../services/solicitud.service', () => ({ solicitudService: { analiza
 vi.mock('../../components/PaymentIdentityReview', () => ({ PaymentIdentityReview: () => <input aria-label="Identidad del pago" defaultValue="" /> }));
 import SolicitudDetallePage from '../../pages/admin/SolicitudDetallePage';
 const query = (data: unknown) => ({ data, isPending: false, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) });
-function tree(prefix = '') { return <MemoryRouter basename={prefix || '/'} initialEntries={[prefix + '/admin/solicitudes/s1']}><Routes><Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} /></Routes></MemoryRouter>; }
+function tree(prefix = '', search = '') { return <MemoryRouter basename={prefix || '/'} initialEntries={[prefix + '/admin/solicitudes/s1' + search]}><Routes><Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} /></Routes></MemoryRouter>; }
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks();
   HTMLElement.prototype.scrollIntoView = state.scroll; state.owner = 'admin:one'; state.role = 'ADMIN';
@@ -29,6 +29,21 @@ beforeEach(() => {
   for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document,state.read]) fn.mockResolvedValue({});
 });
 afterEach(cleanup);
+it.each(['', '/app'])('locates the specific document from an administrative notice (%s)', prefix => {
+ state.detail.data.documentos=[{id:'pay',tipo:'COMPROBANTE_PAGO',estado:'PENDIENTE',nombre:'Pago artificial',size:100}, {id:'other',tipo:'OTRO',estado:'PENDIENTE',nombre:'Otro.pdf',size:100}];
+ render(tree(prefix, '?documento=pay'));
+ const target=screen.getByRole('group',{name:'Documento: Pago artificial'});
+ expect(within(target).getByText('Documento indicado en el aviso')).toBeVisible();expect(target).toHaveFocus();
+ expect(within(target).getByText('Inscripción: Generador')).toBeVisible();
+ expect(within(screen.getByRole('group',{name:'Documento: Otro.pdf'})).queryByText('Documento indicado en el aviso')).toBeNull();
+ expect(state.document).not.toHaveBeenCalled();
+});
+it('explains that a linked administrative document is unavailable instead of selecting another',()=>{
+ state.detail.data.documentos=[{id:'other',tipo:'OTRO',estado:'PENDIENTE',nombre:'Otro.pdf',size:100}];
+ render(tree('', '?documento=missing'));
+ expect(screen.getByText('El documento indicado en el aviso no está disponible en esta solicitud.')).toBeVisible();
+ expect(screen.queryByText('Documento indicado en el aviso')).toBeNull();expect(state.document).not.toHaveBeenCalled();
+});
 it.each(['', '/app'])('uses only the current actor activity for administrative current inputs (%s)', prefix => {
  state.detail.data.tipoActor='OPERADOR';
  state.detail.data.datosActor=JSON.stringify({razonSocial:'Empresa QA',corrientesControl:'Y8',corrientesY:'Y12; y48',corrientesAutorizadas:'Y1'});

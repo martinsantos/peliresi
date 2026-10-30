@@ -275,7 +275,11 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     path = notice.rol === 'TRANSPORTISTA' ? '/transporte/perfil' : '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
   } else if (notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' && typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {
     family = 'alertas'; title = 'Comprobante repetido';
-    path = notice.rol.startsWith('ADMIN') ? '/admin/solicitudes/' + data.solicitudId : '/mi-solicitud?solicitud=' + data.solicitudId;
+    const admin = notice.rol.startsWith('ADMIN');
+    const invalidDocument = Object.prototype.hasOwnProperty.call(data, 'documentoId')
+      && (typeof data.documentoId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.documentoId));
+    path = invalidDocument ? '/notificaciones' : (admin ? '/admin/solicitudes/' + data.solicitudId : '/mi-solicitud?solicitud=' + data.solicitudId)
+      + (typeof data.documentoId === 'string' ? (admin ? '?' : '&') + 'documento=' + encodeURIComponent(data.documentoId) : '');
   } else if (ALERT_TYPES.includes(notice.tipo) || (notice.tipo === 'INFO_GENERAL' && (data.familia === 'catalogo_verificable' || (data.tipo === 'seguimiento_cierre' && notice.manifiestoId)) && typeof data.casoId === 'string')) {
     family = 'alertas'; title = 'Aviso de seguimiento'; path = notice.manifiestoId ? '/manifiestos/' + encodeURIComponent(notice.manifiestoId) : '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
