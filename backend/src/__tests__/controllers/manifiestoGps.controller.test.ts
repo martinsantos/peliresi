@@ -44,6 +44,26 @@ describe('GPS concurrency and recovery guards', () => {
     expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point,emisor:'usuario:user-carrier-1' } });
   });
 
+  it('describes a corridor observation as received points without claiming a current or sustained route', async () => {
+    mocks.find.mockResolvedValue({ ...trip,
+      generador: { latitud: -32.89, longitud: -68.84 }, operador: { latitud: -34.62, longitud: -68.33 } });
+    mocks.list.mockResolvedValue([
+      { latitud: -31.4, longitud: -66.0 },
+      { latitud: -31.5, longitud: -66.1 },
+      { latitud: -31.6, longitud: -66.2 },
+    ]);
+    const next = vi.fn();
+    await actualizarUbicacion(request(), response(), next);
+    expect(next).not.toHaveBeenCalled();
+    const event = mocks.emit.mock.calls.map(([value]) => value).find(value => value.tipoAnomalia === 'FUERA_CORREDOR_GEOGRAFICO');
+    expect(event).toBeDefined();
+    expect(event.descripcion).toMatch(/posiciones recibidas/i);
+    expect(event.descripcion).toMatch(/hora de captura no disponible/i);
+    expect(event.descripcion).toMatch(/verific[aá].*transporte/i);
+    expect(event.descripcion).toMatch(/no se compara una ruta vial autorizada/i);
+    expect(event.descripcion).not.toMatch(/se mantuvieron|est[aá] fuera/i);
+  });
+
   it.each([true, false])('rejects a foreign carrier with warm cache = %s', async (warm) => {
     if (warm) await actualizarUbicacion(request(), response(), vi.fn());
     mocks.create.mockClear();

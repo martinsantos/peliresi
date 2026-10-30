@@ -202,7 +202,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
           manifiestoId: id,
           numero: cacheEntry.numero,
           tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO',
-          descripcion: `Tres posiciones consecutivas se mantuvieron a más de 50 km del corredor geográfico estimado entre origen y destino (mínimo ${corridorAssessment.minimumDistanceKm.toFixed(1)} km). No se compara una ruta vial autorizada; requiere revisión operativa.`,
+          descripcion: `Tres posiciones recibidas superan 50 km del corredor geográfico estimado (mín. ${corridorAssessment.minimumDistanceKm.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km). No se compara una ruta vial autorizada. Hora de captura no disponible. Verificá el caso con transporte.`,
           severidad: 'ALTA',
           userId,
         });

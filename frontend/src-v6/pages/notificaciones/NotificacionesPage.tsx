@@ -14,7 +14,7 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole, notificationInboxReturnState } from '../../utils/notificationNavigation';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { notificationFollowup } from '../../utils/notificationFollowup';
-import { gpsNoticeContext } from '../../utils/gpsNoticeContext';
+import { gpsNoticeContext, gpsNoticeTitle } from '../../utils/gpsNoticeContext';
 import { notificationManifestReference } from '../../utils/notificationManifestReference';
 import type { Notificacion } from '../../types/models';
 import { useAuth } from '../../contexts/AuthContext';
@@ -141,7 +141,7 @@ const NotificacionesPage: React.FC = () => {
             const manifestReference = notificationManifestReference(notice);
             // A configurable rule has an identity. Do not replace its saved
             // name with a generic title; retain the fallback for legacy data.
-            const title = followup ? notice.titulo?.trim() || 'Seguimiento de manifiesto' : notice.titulo;
+            const title = gpsNoticeTitle(notice) || (followup ? notice.titulo?.trim() || 'Seguimiento de manifiesto' : notice.titulo);
             const path = resolveNotificationPath(notice, mp(''), currentUser?.rol);
             const activity = notificationActorRole(notice);
             const otherActivity = activity && activity !== currentUser?.rol ? { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' }[activity] : null;
@@ -184,13 +184,13 @@ const NotificacionesPage: React.FC = () => {
                 </div>
                 {noticeOptions === notice.id && <div aria-label={'Acciones del aviso: ' + title} className="flex flex-wrap justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-3 py-2">
                   {!notice.leida && (
-                    <button type="button" aria-label={'Marcar como leída: ' + notice.titulo} disabled={mutationPending}
+                    <button type="button" aria-label={'Marcar como leída: ' + title} disabled={mutationPending}
                       onClick={() => { resetMutationErrors(); mark.mutate(notice.id); }}
                       className={'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-60 ' + focus}>
                       <Check size={16} aria-hidden="true" />Marcar leída
                     </button>
                   )}
-                  <button type="button" aria-label={'Eliminar aviso: ' + notice.titulo} disabled={mutationPending}
+                  <button type="button" aria-label={'Eliminar aviso: ' + title} disabled={mutationPending}
                     onClick={() => { resetMutationErrors(); remove.mutate(notice.id); }}
                     className={'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-700 hover:bg-error-50 hover:text-error-800 disabled:opacity-60 ' + focus}>
                     <Trash2 size={16} aria-hidden="true" />Eliminar

@@ -18,7 +18,7 @@ describe('assessGeographicCorridor', () => {
     ], corridor)).toBeNull();
   });
 
-  it('classifies three sustained distant points as a geographic anomaly', () => {
+  it('classifies three received distant points as a geographic observation', () => {
     const result = assessGeographicCorridor([
       { latitud: -31.4, longitud: -66.0 },
       { latitud: -31.5, longitud: -66.1 },

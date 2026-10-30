@@ -33,6 +33,14 @@ describe('assignment notification delivery', () => {
     expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
     expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
   });
+  it('keeps a new GPS observation and its capture-time warning readable in the bell', async () => {
+    const message = 'Tres posiciones recibidas están fuera del corredor geográfico. No se compara una ruta vial autorizada. Hora de captura no disponible. Verificá el caso con transporte.';
+    service.list.mockResolvedValue({ items: [{ ...notice, tipo: 'ALERTA_SISTEMA', titulo: 'QA corredor',
+      mensaje: message, datos: JSON.stringify({ evento: 'ANOMALIA_GPS', tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.getByText(message)).not.toHaveClass('line-clamp-2');
+  });
   it('does not mount an unusable inbox or query full-access notices for a restricted applicant', () => {
     service.restricted = true;
     setup();

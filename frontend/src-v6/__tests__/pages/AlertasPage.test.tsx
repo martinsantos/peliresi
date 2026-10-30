@@ -96,6 +96,14 @@ it('keeps a historical GPS case and shows the uncertainty of its original descri
   expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
   expect(screen.getByText('Parada prolongada de 120 minutos')).toBeVisible();
 });
+it('keeps a historical corridor case and explains that its positions may have arrived late', async () => {
+  service.listAlertas.mockResolvedValue({ items: [{ ...caseRow, regla: { nombre: 'QA corredor', evento: 'ANOMALIA_GPS' },
+    datos: JSON.stringify({ tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO', descripcion: 'Tres posiciones consecutivas se mantuvieron fuera del corredor estimado' }) }],
+    total: 1, page: 1, limit: 10, totalPages: 1 });
+  setup();
+  expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+  expect(screen.getByText('Tres posiciones consecutivas se mantuvieron fuera del corredor estimado')).toBeVisible();
+});
 it('keeps the actor alert unread badge readable without inventing a global count', async () => {
   auth.isAdmin = false; auth.isAnyAdmin = false;
   notices.list.mockResolvedValue({ items: [{ id: 'qa-unread', titulo: 'Visita asignada', mensaje: 'QA aviso interno', leida: false, tipo: 'INFO_GENERAL', createdAt: new Date().toISOString() }], total: 1 });

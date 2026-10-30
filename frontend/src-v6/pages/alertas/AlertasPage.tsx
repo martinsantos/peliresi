@@ -40,7 +40,7 @@ import { alertaService, type FollowupPreview, type CataloguePreview } from '../.
 import { cataloguePath } from '../../utils/alertCatalogue';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import { notificationFollowup } from '../../utils/notificationFollowup';
-import { gpsNoticeContext } from '../../utils/gpsNoticeContext';
+import { gpsNoticeContext, gpsNoticeTitle } from '../../utils/gpsNoticeContext';
 import { EstadoAlerta } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 
@@ -373,7 +373,7 @@ export const AlertasPage: React.FC = () => {
         .map((n: any) => ({
           id: n.id,
           tipo: getTipoFromNotifTipo(n.tipo),
-          titulo: n.titulo || 'Notificacion',
+          titulo: gpsNoticeTitle(n) || n.titulo || 'Notificacion',
           mensaje: n.mensaje || '',
           fecha: n.createdAt,
           leida: n.leida || false,

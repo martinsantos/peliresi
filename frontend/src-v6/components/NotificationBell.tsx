@@ -17,7 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Notificacion } from '../types/models';
 import { TipoNotificacion } from '../types/models';
 import { resolveNotificationPath, refreshInspectionNotification } from '../utils/notificationNavigation';
-import { gpsNoticeContext } from '../utils/gpsNoticeContext';
+import { gpsNoticeContext, gpsNoticeTitle, isGpsNotice } from '../utils/gpsNoticeContext';
 import { notificationManifestReference } from '../utils/notificationManifestReference';
 
 // ========================================
@@ -265,7 +265,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <p className={`text-sm leading-snug break-words ${isUnread ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-700'}`}>
-                              {notif.titulo}
+                              {gpsNoticeTitle(notif) || notif.titulo}
                             </p>
                             {isUnread && (
                               <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0 mt-1.5" />
@@ -273,7 +273,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                           </div>
                           {manifestReference && <p className="mt-1 text-xs font-semibold text-neutral-700">{manifestReference}</p>}
                           {gpsContext && <p className="mt-1 text-sm font-medium text-neutral-700">{gpsContext}</p>}
-                          <p className="text-sm text-neutral-700 mt-1 line-clamp-2">
+                          <p className={`text-sm text-neutral-700 mt-1 ${isGpsNotice(notif) ? 'break-words' : 'line-clamp-2'}`}>
                             {notif.mensaje}
                           </p>
                           {(() => {

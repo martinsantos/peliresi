@@ -17,9 +17,9 @@ export interface GeographicCorridorAssessment {
 }
 
 /**
- * Detects a sustained departure from the geometric origin/destination corridor.
- * This intentionally does not claim a road-route deviation: no authorised route
- * geometry exists in SITREP yet.
+ * Assesses received points against a geometric origin/destination corridor.
+ * Receipt order does not establish capture times or sustained movement, and no
+ * authorised road-route geometry exists in SITREP yet.
  */
 export function assessGeographicCorridor(
   points: Coordinate[],
