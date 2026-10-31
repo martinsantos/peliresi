@@ -16,6 +16,8 @@ Al iniciar el servidor, [index.ts](../backend/src/index.ts) registra los proceso
 
 El [temporizador de correo](../backend/src/services/email.service.ts) no arranca cuando la política de correo está deshabilitada. Algunas operaciones pueden igualmente registrar elementos suprimidos en la cola; deshabilitar la entrega no convierte una prueba mutante en una prueba de sólo lectura.
 
+**Revisión pendiente en preview:** a diferencia de otros recordatorios, el barrido de seguimiento de cierre no filtra en su consulta operativa el indicador `isDemoData`. Si hubiera manifiestos de práctica con ese indicador en el esquema operativo, podría incluirlos en el seguimiento; no se consultó si existen. Se prepararon pruebas artificiales para el barrido, la reconciliación y una marca que cambie antes de escribir. El alcance de capacitación usa un esquema separado y también debe conservarse al corregirlo.
+
 En la regresión aislada actual se exige `NODE_ENV=test`, `NODE_APP_INSTANCE=qa` y blockchain deshabilitado. Con esas condiciones las guardas de instancia no registran estos cron; las funciones ensayadas directamente en pruebas sintéticas no demuestran que su ejecución programada o su configuración en el destino sean correctas.
 
 ## Consecuencias para el corte
