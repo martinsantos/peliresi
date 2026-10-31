@@ -8,6 +8,7 @@ import { login, nonObstructingNotices, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 test('an older approval stays accurate in the live notice, bell, inbox, detail and rendered mail', async ({ page }, info) => {
+  if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 700 });
   const previous = '/work/sitrep/.qa-operational-ui-current2026103090/manifest-complete';
   const proofs = readdirSync(previous, { withFileTypes: true }).filter(entry => entry.isDirectory())
     .map(entry => path.join(previous, entry.name, 'complete-lifecycle.json')).filter(existsSync)
@@ -62,6 +63,7 @@ test('an older approval stays accurate in the live notice, bell, inbox, detail a
     expect(mail.html).toContain(`/notificaciones/${notice.id}`);
     const email = await page.context().newPage();
     try {
+      if (info.project.name === 'app') await email.setViewportSize({ width: 320, height: 700 });
       await email.route('**/*', route => route.abort());
       await email.setContent(mail.html);
       await expect(email.getByText(/Consultá el estado actual de las aprobaciones/)).toBeVisible();
