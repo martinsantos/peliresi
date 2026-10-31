@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "productCommit": "bd86d27e03f9ec90f716bf457a9734922ee76908",
+  "surface": "web in Chromium",
+  "viewport": "1365x900",
+  "file": "screenshots/desktop/actor-overview-20261031.png",
+  "sha256": "9033bf13c47d2537895f58586be15877afe6387e6ee7b587e91988421b290b23",
+  "source": ".qa-actor-overview-20261031/browser-after-final-v2/actor-overview-after-the-c-5f96c-port-and-fiche-return-agree-web-desktop/overview.png"
+}

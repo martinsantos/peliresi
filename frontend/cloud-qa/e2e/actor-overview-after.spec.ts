@@ -98,3 +98,15 @@ test('new actor opens each full form and returns to the same overview without su
  }
  expect(actorPosts).toEqual([]);
 });
+
+test('the manual explains and shows the filtered actor overview',async({page},info)=>{
+ await page.goto('/manual/tutorial.html?guide=padrones-administrativos');
+ const step=page.locator('.guide-step').filter({has:page.getByRole('heading',{name:'Consultar Actores en conjunto',exact:true})});
+ await expect(step).toBeVisible();await expect(step).toContainText('todos los registros autorizados antes de paginar');
+ await expect(step).toContainText('de la página actual');
+ const capture=step.locator('img');await capture.scrollIntoViewIfNeeded();
+ await expect(capture).toHaveAttribute('src',/actor-overview-20261031\.png/);
+ await expect.poll(()=>capture.evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBe(1365);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+ await page.screenshot({path:info.outputPath('manual.png'),animations:'disabled'});
+});

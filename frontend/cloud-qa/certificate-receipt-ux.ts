@@ -6,7 +6,7 @@ import { assertCloudDatabase, assertCloudEnvironment, backendRequire } from './s
 
 await assertCloudDatabase();
 const out=process.env.QA_ARTIFACTS!;
-assert.ok(['/work/sitrep/.qa-certificate-receipt-ux-20261030','/work/sitrep/.qa-certificate-layout-20261030'].includes(out));
+assert.ok(['/work/sitrep/.qa-certificate-receipt-ux-20261030','/work/sitrep/.qa-certificate-layout-20261030','/work/sitrep/.qa-actor-overview-20261031'].includes(out));
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'),'proposal_operations_20261021');
 assert.equal(process.env.TRAINING_DATABASE_URL,'');
 assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL,'2000-01-01T00:00:00Z');

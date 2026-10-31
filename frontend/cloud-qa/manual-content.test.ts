@@ -34,6 +34,12 @@ test('the actor overview explains global filtering, recovery and page-only expor
   const text=JSON.stringify(step);
   for(const phrase of ['todos los registros autorizados antes de paginar','Reintentar consulta','formulario completo','de la página actual']) assert.ok(text.includes(phrase),phrase);
 });
+test('the actor overview capture is unedited evidence from synthetic preview', () => {
+  const proof=JSON.parse(read('actor-overview-provenance.json'));
+  assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);
+  assert.ok(read('help-data.js').includes(proof.file.replace('screenshots/','')));
+  assert.equal(createHash('sha256').update(readFileSync(new URL(proof.file,root))).digest('hex'),proof.sha256);
+});
 test('directory accordions use native buttons with an accessible initial state', () => {
   const directory = read('directorio.html');
   const controls = directory.match(/<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible\(this\)">/g) || [];
