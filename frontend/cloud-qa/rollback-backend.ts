@@ -129,6 +129,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-support-notices-20261031') {
     return path.join(root, 'backend/dist-qa-support-notices-20261031/index.js');
   }
+  if (version === 'support-mail-20261031'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-support-mail-20261031') {
+    return path.join(root, 'backend/dist-qa-support-mail-20261031/index.js');
+  }
   if (version === 'certificate-receipt-ux'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-certificate-receipt-ux-20261030') {
     return path.join(root, 'backend/dist-qa-closure-d7d29dde/index.js');
