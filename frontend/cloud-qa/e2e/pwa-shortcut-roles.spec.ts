@@ -27,7 +27,8 @@ for (const role of roles) test(`${role.label}: inicio, QR y avisos conservan el 
   const base = prefix(info);
   await page.goto(`${base}/dashboard?source=shortcut-home`);
   await expect(page.getByRole('banner').getByLabel('Función actual')).toHaveText(role.label);
-  await page.goto(`${base}/escaner-qr?source=shortcut-qr`);
+  const scanner = info.project.name === 'app' ? '/app/escaner-qr' : '/mobile/escaner-qr';
+  await page.goto(`${scanner}?source=shortcut-qr`);
   await expect(page.getByRole('heading', { name: 'Acceso a camara denegado' })).toBeVisible();
   await page.goto(`${base}/notificaciones?source=shortcut-notices`);
   await expect(page.getByTestId('notification-inbox')).toBeVisible();
