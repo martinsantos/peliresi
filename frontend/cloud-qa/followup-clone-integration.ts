@@ -5,7 +5,7 @@ import path from 'node:path';
 import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 
 await assertCloudDatabase();
-assert.equal(process.env.GITHUB_SHA, '941ee708b23b958050c387211e3977f8d5e147a3');
+assert.equal(process.env.GITHUB_SHA, '78c75f9473ff2a0a08962af6d6d22e441675ee51');
 assert.equal(process.env.DISABLE_EMAILS, 'true');
 assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 const out = '/work/sitrep/.qa-followup-clone-20261031';
