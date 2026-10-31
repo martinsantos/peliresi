@@ -693,3 +693,11 @@ test('directory distinguishes a non-persistent liveness probe from database heal
   assert.match(directory, /no escribe analítica ni contadores persistentes/);
   assert.match(directory, /health\/ready[^<]*<\/td><td>[^<]*contador persistente/);
 });
+
+test('directory describes shared installed-app shortcuts without risking local drafts', () => {
+  const section = read('directorio.html').split('<section id="pwa-instalacion"')[1].split('</section>')[0];
+  assert.match(section, /Inicio, Escanear QR y Avisos/);
+  assert.match(section, /dependen del dispositivo y del navegador/);
+  assert.match(section, /no borres datos ni desinstales para forzar el cambio/i);
+  assert.match(section, /borradores locales/);
+});
