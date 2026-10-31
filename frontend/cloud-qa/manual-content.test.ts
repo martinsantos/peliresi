@@ -38,6 +38,14 @@ test('directory accordions use native buttons with an accessible initial state',
   assert.match(read('directorio.css'), /@media\(max-width:900px\)\{\.back-to-top\.visible\{display:none;\}\}/);
   assert.match(directory, /href="#mainContent" class="nav-link">Volver al inicio del directorio/);
 });
+test('directory index groups identify their panels and offer a search empty state', () => {
+  const directory = read('directorio.html');
+  const groups = [...directory.matchAll(/<button type="button" class="nav-section-title(?: active-parent)?" aria-expanded="true" aria-controls="([^"]+)" onclick="toggleNavGroup\(this\)">[^<]+<\/button>\s*<div class="nav-group-items" id="\1">/g)];
+  assert.equal(groups.length, 18);
+  assert.equal(new Set(groups.map(group => group[1])).size, 18);
+  assert.doesNotMatch(directory, /<div class="nav-section-title/);
+  assert.match(directory, /id="sidebarSearchEmpty" role="status" hidden/);
+});
 test('directory introduction distinguishes three approvals, GPS receipt and certificate publication', () => {
   const directory = read('directorio.html');
   const introduction = directory.split('<h4>Procesos Cubiertos</h4>')[1].split('</table>')[0];
@@ -49,6 +57,13 @@ test('directory introduction distinguishes three approvals, GPS receipt and cert
   assert.match(generator, /lectura no reemplaza una aprobación/i);
   assert.match(generator, /el cierre por sí solo no la emite/i);
   assert.doesNotMatch(generator, /Una vez firmado, el manifiesto pasa a APROBADO/i);
+  const cases = directory.split('<section id="cu-generador"')[1].split('</section>')[0];
+  assert.match(cases, /Crearla no equivale a aprobar por ninguna de las partes/);
+  assert.match(cases, /Una sola firma no habilita la coordinación/);
+  assert.doesNotMatch(cases, /Firma electronica del manifiesto en estado BORRADOR para pasarlo a APROBADO/i);
+  const flow = directory.split('<h4 id="fg-6">')[1].split('</div>')[0];
+  assert.match(flow, /Sólo con las tres decisiones se habilita iniciar la coordinación/);
+  assert.doesNotMatch(flow, /Al firmar, el estado cambia a APROBADO/i);
 });
 test('certificate recovery explains the receipt when the document list is available or unavailable', () => {
   const guide = guides.find((g: any) => g.id === 'certificados-operador-partes');

@@ -113,12 +113,16 @@ function updateProgress() {
   bar.style.width = pct + '%';
 }
 
-// v2026.4: accordion toggle for sidebar nav groups
-function toggleNavGroup(title) {
+// Mantener la visibilidad y el estado accesible sincronizados en cada apertura.
+function setNavGroupExpanded(title, expanded) {
   var items = title.nextElementSibling;
   if (!items || !items.classList.contains('nav-group-items')) return;
-  var collapsed = items.classList.toggle('collapsed');
-  title.classList.toggle('collapsed', collapsed);
+  items.hidden = !expanded;
+  title.classList.toggle('collapsed', !expanded);
+  title.setAttribute('aria-expanded', String(expanded));
+}
+function toggleNavGroup(title) {
+  setNavGroupExpanded(title, title.getAttribute('aria-expanded') !== 'true');
 }
 
 // Collapsible toggle (global, for FAQ etc.)
@@ -135,6 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var sections = document.querySelectorAll('section[id]');
   var navLinks = document.querySelectorAll('.nav-link');
   var searchInput = document.getElementById('searchInput');
+  var searchEmpty = document.getElementById('sidebarSearchEmpty');
   var roleTabs = document.querySelectorAll('.role-tab');
   var backToTop = document.getElementById('backToTop');
   var hamburger = document.getElementById('hamburgerBtn');
@@ -208,15 +213,16 @@ document.addEventListener('DOMContentLoaded', function() {
     navLinks.forEach(function(link) {
       var isActive = link.getAttribute('href') === '#' + current;
       link.classList.toggle('active', isActive);
+      if (isActive) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
       if (isActive) {
-        link.scrollIntoView({ block: 'nearest' });
         // Auto-expandir grupo padre si esta colapsado
         var group = link.closest('.nav-group-items');
-        if (group && group.classList.contains('collapsed')) {
-          group.classList.remove('collapsed');
+        if (group && group.hidden) {
           var title = group.previousElementSibling;
-          if (title) title.classList.remove('collapsed');
+          if (title) setNavGroupExpanded(title, true);
         }
+        link.scrollIntoView({ block: 'nearest' });
         // Marcar section-title padre como active-parent
         var parentGroup = link.closest('.nav-group-items');
         if (parentGroup) {
@@ -236,11 +242,18 @@ document.addEventListener('DOMContentLoaded', function() {
   updateProgress();
 
   // Search — v2026.4: busca dentro de nav-group-items
-  searchInput.addEventListener('input', function() {
-    var q = this.value.toLowerCase();
+  function searchableText(value) {
+    return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  }
+  function filterNavigation() {
+    var q = searchableText(this.value);
+    var matches = 0;
     navLinks.forEach(function(link) {
-      var text = link.textContent.toLowerCase();
-      link.style.display = text.includes(q) || q === '' ? '' : 'none';
+      if (!link.closest('.nav-group-items')) return;
+      var text = searchableText(link.textContent);
+      var visible = text.includes(q) || q === '';
+      link.style.display = visible ? '' : 'none';
+      if (visible) matches++;
     });
     document.querySelectorAll('.nav-section-title').forEach(function(t) {
       var items = t.nextElementSibling;
@@ -251,13 +264,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // Auto-expand when searching
         if (q !== '' && hasVisible) {
-          items.classList.remove('collapsed');
-          t.classList.remove('collapsed');
+          setNavGroupExpanded(t, true);
         }
       }
       t.style.display = hasVisible || q === '' ? '' : 'none';
     });
-  });
+    searchEmpty.hidden = q === '' || matches > 0;
+  }
+  searchInput.addEventListener('input', filterNavigation);
 
   // Role filter tabs — v2026.4: SOLO filtra contenido, NUNCA oculta nav links
   roleTabs.forEach(function(tab) {
@@ -275,8 +289,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (visible && !firstVisible && r === currentRole) firstVisible = sec;
       });
 
-      // Restaurar TODOS los nav links (nunca ocultar sidebar)
-      navLinks.forEach(function(link) { link.style.display = ''; });
+      // Mantener coherente la búsqueda al cambiar el filtro de rol.
+      filterNavigation.call(searchInput);
 
       // Scroll a la primera seccion del rol seleccionado
       if (firstVisible && currentRole !== 'all') {
@@ -297,23 +311,45 @@ document.addEventListener('DOMContentLoaded', function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
+  function syncSidebar() {
+    var mobile = window.matchMedia('(max-width: 900px)').matches;
+    if (!mobile) {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+    }
+    hamburger.setAttribute('aria-label', sidebar.classList.contains('open') ? 'Cerrar índice del manual' : 'Abrir índice del manual');
+    sidebar.toggleAttribute('inert', mobile && !sidebar.classList.contains('open'));
+  }
+  function closeSidebar(restoreFocus) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    hamburger.setAttribute('aria-expanded', 'false');
+    syncSidebar();
+    if (restoreFocus) hamburger.focus({ preventScroll: true });
+  }
+
   // Hamburger (mobile)
   hamburger.addEventListener('click', function() {
     sidebar.classList.toggle('open');
     overlay.classList.toggle('open');
     hamburger.setAttribute('aria-expanded', sidebar.classList.contains('open') ? 'true' : 'false');
+    syncSidebar();
   });
   overlay.addEventListener('click', function() {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('open');
-    hamburger.setAttribute('aria-expanded', 'false');
+    closeSidebar(false);
   });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && window.matchMedia('(max-width: 900px)').matches && sidebar.classList.contains('open')) {
+      closeSidebar(true);
+    }
+  });
+  window.addEventListener('resize', syncSidebar);
+  syncSidebar();
   navLinks.forEach(function(link) {
     link.addEventListener('click', function() {
       if (window.innerWidth <= 900) {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('open');
-        hamburger.setAttribute('aria-expanded', 'false');
+        closeSidebar(false);
       }
     });
   });

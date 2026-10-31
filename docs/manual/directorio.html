@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="sitrep-mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="directorio.css?v=1c64386aadbf">
+<link rel="stylesheet" href="directorio.css?v=ddda239956e8">
 </head>
 <body data-page="directory">
 
@@ -47,75 +47,76 @@
 <div class="overlay" id="overlay"></div>
 
 <!-- Sidebar -->
-<nav class="sidebar" id="sidebar">
+<nav class="sidebar" id="sidebar" aria-label="Índice del manual">
   <div class="directory-sidebar-heading">Directorio completo <span>Índice de temas</span></div>
   <a href="#mainContent" class="nav-link">Volver al inicio del directorio</a>
   <div class="sidebar-search">
     <label class="sr-only" for="searchInput">Buscar en el directorio</label>
     <input type="search" id="searchInput" placeholder="Buscar un tema...">
   </div>
+  <p class="sidebar-search-empty" id="sidebarSearchEmpty" role="status" hidden>No encontramos temas. Probá con otra palabra.</p>
 
-  <div class="nav-section-title active-parent" onclick="toggleNavGroup(this)">0. INSTALACION</div>
-  <div class="nav-group-items">
-    <a href="#instalacion-rapida" class="nav-link">Guia Rapida</a>
-    <a href="#inst-pre" class="nav-link level-2">Pre-Instalacion</a>
-    <a href="#inst-wizard" class="nav-link level-2">Wizard Interactivo</a>
-    <a href="#inst-post" class="nav-link level-2">Post-Instalacion</a>
+  <button type="button" class="nav-section-title active-parent" aria-expanded="true" aria-controls="manual-nav-group-1" onclick="toggleNavGroup(this)">0. Instalación</button>
+  <div class="nav-group-items" id="manual-nav-group-1">
+    <a href="#instalacion-rapida" class="nav-link">Guía rápida</a>
+    <a href="#inst-pre" class="nav-link level-2">Preinstalación</a>
+    <a href="#inst-wizard" class="nav-link level-2">Asistente interactivo</a>
+    <a href="#inst-post" class="nav-link level-2">Postinstalación</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">1. Vision General</div>
-  <div class="nav-group-items">
-    <a href="#que-es-sitrep" class="nav-link">1.1 Que es SITREP</a>
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-2" onclick="toggleNavGroup(this)">1. Visión general</button>
+  <div class="nav-group-items" id="manual-nav-group-2">
+    <a href="#que-es-sitrep" class="nav-link">1.1 Qué es SITREP</a>
     <a href="#marco-legal" class="nav-link level-2">1.2 Marco Legal</a>
     <a href="#actores" class="nav-link level-2">1.3 Actores del Sistema</a>
     <a href="#acceso" class="nav-link level-2">1.4 Acceso al Sistema</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">2. Guia Rapida por Rol</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-3" onclick="toggleNavGroup(this)">2. Guía rápida por rol</button>
+  <div class="nav-group-items" id="manual-nav-group-3">
     <a href="#guia-admin" class="nav-link" data-nav-role="admin">2.1 Administrador</a>
     <a href="#guia-generador" class="nav-link level-2" data-nav-role="generador">2.2 Generador</a>
     <a href="#guia-transportista" class="nav-link level-2" data-nav-role="transportista">2.3 Transportista</a>
     <a href="#guia-operador" class="nav-link level-2" data-nav-role="operador">2.4 Operador</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">3. Modulos del Sistema</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-4" onclick="toggleNavGroup(this)">3. Módulos del sistema</button>
+  <div class="nav-group-items" id="manual-nav-group-4">
     <a href="#mod-dashboard" class="nav-link">3.1 Dashboard</a>
     <a href="#mod-manifiestos" class="nav-link level-2">3.2 Manifiestos</a>
     <a href="#mod-centro-control" class="nav-link level-2">3.3 Centro de Control</a>
     <a href="#mod-reportes" class="nav-link level-2">3.4 Reportes</a>
-    <a href="#mod-gps" class="nav-link level-2">3.5 Tracking GPS</a>
-    <a href="#mod-actores" class="nav-link level-2">3.6 Gestion de Actores</a>
-    <a href="#mod-catalogos" class="nav-link level-2">3.7 Catalogos</a>
+    <a href="#mod-gps" class="nav-link level-2">3.5 Seguimiento GPS</a>
+    <a href="#mod-actores" class="nav-link level-2">3.6 Gestión de actores</a>
+    <a href="#mod-catalogos" class="nav-link level-2">3.7 Catálogos</a>
     <a href="#mod-usuarios" class="nav-link level-2">3.8 Usuarios y Seguridad</a>
     <a href="#mod-herramientas" class="nav-link level-2">3.9 Herramientas</a>
-    <a href="#mod-blockchain" class="nav-link level-2">3.10 Certificacion Blockchain</a>
-    <a href="#mod-estadisticas" class="nav-link level-2">3.11 Estadisticas</a>
-    <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripcion, Wizards y TEF</a>
-    <a href="#mod-emails" class="nav-link level-2">3.13 Emails y Alertas</a>
+    <a href="#mod-blockchain" class="nav-link level-2">3.10 Certificación blockchain</a>
+    <a href="#mod-estadisticas" class="nav-link level-2">3.11 Estadísticas</a>
+    <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripción, asistentes y TEF</a>
+    <a href="#mod-emails" class="nav-link level-2">3.13 Correos y alertas</a>
     <a href="#mod-renovaciones" class="nav-link level-2">3.14 Renovaciones Anuales</a>
     <a href="#mod-monitor" class="nav-link level-2">3.15 Monitor War Room</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">4. Aplicacion Movil</div>
-  <div class="nav-group-items">
-    <a href="#pwa-instalacion" class="nav-link">4.1 Instalacion</a>
-    <a href="#pwa-navegacion" class="nav-link level-2">4.2 Navegacion</a>
-    <a href="#pwa-login" class="nav-link level-2">4.3 Login</a>
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-5" onclick="toggleNavGroup(this)">4. Aplicación móvil</button>
+  <div class="nav-group-items" id="manual-nav-group-5">
+    <a href="#pwa-instalacion" class="nav-link">4.1 Instalación</a>
+    <a href="#pwa-navegacion" class="nav-link level-2">4.2 Navegación</a>
+    <a href="#pwa-login" class="nav-link level-2">4.3 Ingreso</a>
     <a href="#pwa-admin" class="nav-link level-2" data-nav-role="admin">4.4 Administrador</a>
     <a href="#pwa-generador" class="nav-link level-2" data-nav-role="generador">4.5 Generador</a>
     <a href="#pwa-transportista" class="nav-link level-2" data-nav-role="transportista">4.6 Transportista</a>
     <a href="#pwa-operador" class="nav-link level-2" data-nav-role="operador">4.7 Operador</a>
-    <a href="#pwa-gps" class="nav-link level-2" data-nav-role="transportista">4.8 Tracking GPS</a>
-    <a href="#pwa-qr" class="nav-link level-2">4.9 Escaner QR</a>
-    <a href="#pwa-offline" class="nav-link level-2">4.10 Modo Offline</a>
-    <a href="#pwa-tour" class="nav-link level-2">4.11 Tour Bienvenida</a>
-    <a href="#pwa-configuracion" class="nav-link level-2">4.12 Configuracion</a>
+    <a href="#pwa-gps" class="nav-link level-2" data-nav-role="transportista">4.8 Seguimiento GPS</a>
+    <a href="#pwa-qr" class="nav-link level-2">4.9 Escáner QR</a>
+    <a href="#pwa-offline" class="nav-link level-2">4.10 Sin conexión</a>
+    <a href="#pwa-tour" class="nav-link level-2">4.11 Bienvenida</a>
+    <a href="#pwa-configuracion" class="nav-link level-2">4.12 Configuración</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">5. Arquitectura</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-6" onclick="toggleNavGroup(this)">5. Arquitectura</button>
+  <div class="nav-group-items" id="manual-nav-group-6">
     <a href="#arq-general" class="nav-link">5.1 Arquitectura General</a>
     <a href="#arq-datos" class="nav-link level-2">5.2 Modelo de Datos</a>
     <a href="#arq-api" class="nav-link level-2">5.3 API REST</a>
@@ -124,15 +125,15 @@
     <a href="#arq-escalamiento" class="nav-link level-2">5.6 Escalamiento</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">6. Referencia Workflow</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-7" onclick="toggleNavGroup(this)">6. Referencia del proceso</button>
+  <div class="nav-group-items" id="manual-nav-group-7">
     <a href="#wf-estados" class="nav-link">6.1 Diagrama de Estados</a>
     <a href="#wf-acciones" class="nav-link level-2">6.2 Matriz de Acciones</a>
     <a href="#wf-gps" class="nav-link level-2">6.3 Flujo GPS</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">7. Casos de Uso</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-8" onclick="toggleNavGroup(this)">7. Casos de uso</button>
+  <div class="nav-group-items" id="manual-nav-group-8">
     <a href="#cu-admin" class="nav-link" data-nav-role="admin">7.1 Administrador</a>
     <a href="#cu-generador" class="nav-link level-2" data-nav-role="generador">7.2 Generador</a>
     <a href="#cu-transportista" class="nav-link level-2" data-nav-role="transportista">7.3 Transportista</a>
@@ -141,38 +142,38 @@
     <a href="#cu-resumen" class="nav-link level-2" data-nav-role="all">7.6 Resumen</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">8. FAQ</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-9" onclick="toggleNavGroup(this)">8. Preguntas frecuentes</button>
+  <div class="nav-group-items" id="manual-nav-group-9">
     <a href="#faq" class="nav-link">8.1 Preguntas Frecuentes</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">9. Glosario</div>
-  <div class="nav-group-items">
-    <a href="#glosario" class="nav-link">9.1 Terminos y Definiciones</a>
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-10" onclick="toggleNavGroup(this)">9. Glosario</button>
+  <div class="nav-group-items" id="manual-nav-group-10">
+    <a href="#glosario" class="nav-link">9.1 Términos y definiciones</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">10. Procedimientos</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-11" onclick="toggleNavGroup(this)">10. Procedimientos</button>
+  <div class="nav-group-items" id="manual-nav-group-11">
     <a href="#proc-ciclo" class="nav-link">10.1 Ciclo Completo</a>
     <a href="#proc-gps" class="nav-link level-2">10.2 Problemas GPS</a>
-    <a href="#proc-masiva" class="nav-link level-2">10.3 Importacion Masiva</a>
+    <a href="#proc-masiva" class="nav-link level-2">10.3 Importación masiva</a>
     <a href="#proc-reportes" class="nav-link level-2">10.4 Exportar PDF</a>
     <a href="#proc-alertas" class="nav-link level-2">10.5 Reglas de Alerta</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">11. Contacto</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-12" onclick="toggleNavGroup(this)">11. Contacto</button>
+  <div class="nav-group-items" id="manual-nav-group-12">
     <a href="#contacto" class="nav-link">11.1 Soporte y Contacto</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">12. Versiones</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-13" onclick="toggleNavGroup(this)">12. Versiones</button>
+  <div class="nav-group-items" id="manual-nav-group-13">
     <a href="#historial" class="nav-link">12.1 Historial y Roadmap</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">13. Galeria</div>
-  <div class="nav-group-items">
-    <a href="#gal-acceso" class="nav-link">13.1 Autenticacion</a>
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-14" onclick="toggleNavGroup(this)">13. Galería</button>
+  <div class="nav-group-items" id="manual-nav-group-14">
+    <a href="#gal-acceso" class="nav-link">13.1 Autenticación</a>
     <a href="#gal-dashboard" class="nav-link level-2">13.2 Dashboard y Control</a>
     <a href="#gal-manifiestos" class="nav-link level-2">13.3 Manifiestos</a>
     <a href="#gal-reportes" class="nav-link level-2">13.4 Reportes y Alertas</a>
@@ -182,8 +183,8 @@
     <a href="#gal-mobile" class="nav-link level-2">13.8 Vista Mobile PWA</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">14. Flujos por Perfil</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-15" onclick="toggleNavGroup(this)">14. Flujos por perfil</button>
+  <div class="nav-group-items" id="manual-nav-group-15">
     <a href="#flujo-admin" class="nav-link">14.1 Administrador</a>
     <a href="#fa-1" class="nav-link level-3">Acceso</a>
     <a href="#fa-2" class="nav-link level-3">Dashboard</a>
@@ -201,7 +202,7 @@
     <a href="#fg-3" class="nav-link level-3">Crear Manifiesto P1</a>
     <a href="#fg-4" class="nav-link level-3">Agregar Residuos</a>
     <a href="#fg-5" class="nav-link level-3">Transportista y Operador</a>
-    <a href="#fg-6" class="nav-link level-3">Firmar y Aprobar</a>
+    <a href="#fg-6" class="nav-link level-3">Aprobación de las tres partes</a>
     <a href="#fg-7" class="nav-link level-3">Seguimiento</a>
     <a href="#fg-8" class="nav-link level-3">Tratado — Descarga</a>
     <a href="#fg-9" class="nav-link level-3">Mis Reportes</a>
@@ -228,20 +229,20 @@
     <a href="#fo-9" class="nav-link level-3">Certificado</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">15. Referencia DevOps</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-16" onclick="toggleNavGroup(this)">15. Referencia DevOps</button>
+  <div class="nav-group-items" id="manual-nav-group-16">
     <a href="#devops-stack" class="nav-link" data-nav-role="admin">15.1 Stack y Versiones</a>
     <a href="#devops-deploy" class="nav-link level-2" data-nav-role="admin">15.2 Arquitectura Despliegue</a>
     <a href="#devops-schema" class="nav-link level-2" data-nav-role="admin">15.3 Schema BD</a>
     <a href="#devops-middleware" class="nav-link level-2" data-nav-role="admin">15.4 Middleware Pipeline</a>
-    <a href="#devops-auth" class="nav-link level-2" data-nav-role="admin">15.5 Autenticacion</a>
+    <a href="#devops-auth" class="nav-link level-2" data-nav-role="admin">15.5 Autenticación</a>
     <a href="#devops-gps" class="nav-link level-2" data-nav-role="admin">15.6 GPS Tracking</a>
     <a href="#devops-cicd" class="nav-link level-2" data-nav-role="admin">15.7 CI/CD</a>
     <a href="#devops-monitoring" class="nav-link level-2" data-nav-role="admin">15.8 Monitoreo</a>
     <a href="#devops-backups" class="nav-link level-2" data-nav-role="admin">15.9 Backups</a>
     <a href="#devops-perf" class="nav-link level-2" data-nav-role="admin">15.10 Performance</a>
     <a href="#devops-mejoras" class="nav-link level-2" data-nav-role="admin">15.11 Mejoras Propuestas</a>
-    <a href="#devops-instalacion" class="nav-link level-2" data-nav-role="admin">15.12 Operacion restringida</a>
+    <a href="#devops-instalacion" class="nav-link level-2" data-nav-role="admin">15.12 Operación restringida</a>
     <a href="#changelog-v2026-10" class="nav-link" data-nav-role="all">16. Novedades v2026.11</a>
     <a href="#changelog-ui" class="nav-link level-2" data-nav-role="all">16.1-16.4 UI/UX</a>
     <a href="#changelog-mobile" class="nav-link level-2" data-nav-role="all">16.5 Mobile Responsive</a>
@@ -254,17 +255,17 @@
     <a href="#changelog-operations" class="nav-link level-2" data-nav-role="all">16.12 Operaciones</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">17. Capacitacion y QA</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-17" onclick="toggleNavGroup(this)">17. Capacitación y QA</button>
+  <div class="nav-group-items" id="manual-nav-group-17">
     <a href="#capacitacion-qa" class="nav-link" data-nav-role="all">17.1 Guion operativo</a>
     <a href="#cap-dataset" class="nav-link level-2" data-nav-role="all">Dataset CAP</a>
     <a href="#cap-recorrido" class="nav-link level-2" data-nav-role="all">Recorrido guiado</a>
     <a href="#cap-comandos" class="nav-link level-2" data-nav-role="admin">Comandos seguros</a>
-    <a href="#cap-cierre" class="nav-link level-2" data-nav-role="admin">Cierre de sesion</a>
+    <a href="#cap-cierre" class="nav-link level-2" data-nav-role="admin">Cierre de sesión</a>
   </div>
 
-  <div class="nav-section-title" onclick="toggleNavGroup(this)">18. Inspecciones</div>
-  <div class="nav-group-items">
+  <button type="button" class="nav-section-title" aria-expanded="true" aria-controls="manual-nav-group-18" onclick="toggleNavGroup(this)">18. Inspecciones</button>
+  <div class="nav-group-items" id="manual-nav-group-18">
     <a href="#inspecciones" class="nav-link" data-nav-role="admin">18.1 Recorrido de campo</a>
     <a href="#inspecciones-evidencia" class="nav-link level-2" data-nav-role="admin">Fotos y guardado</a>
     <a href="#inspecciones-informe" class="nav-link level-2" data-nav-role="admin">Acta e informe</a>
@@ -2365,7 +2366,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <section id="pwa-generador" data-role="generador">
 <h3>4.5 Pantallas del Generador</h3>
 <div class="info-card role-card-generador">
-<p><strong>Rol GENERADOR:</strong> Responsable de crear manifiestos de residuos peligrosos, firmarlos para aprobar su despacho, y realizar seguimiento de la trazabilidad completa hasta el tratamiento final.</p>
+<p><strong>Rol GENERADOR:</strong> puede proponer un manifiesto, revisar y firmar su participación y seguir el tratamiento. También deben aprobar transporte y operador antes de iniciar la coordinación.</p>
 </div>
 
 <div class="screenshot-grid screenshot-grid-mobile">
@@ -4103,37 +4104,32 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="cu-screenshot-mobile"><a href="screenshots/mobile/M09_nuevo_manifiesto_paso1_mobile.png" target="_blank"><img src="screenshots/mobile/M09_nuevo_manifiesto_paso1_mobile.png" alt="Nuevo manifiesto — móvil" loading="lazy"></a><div class="cu-screenshot-mobile-caption">📱 Móvil</div></div>
 </div>
 
-<p><strong>Descripcion:</strong> Formulario multi-paso para crear un nuevo manifiesto de residuos peligrosos. El manifiesto se guarda como BORRADOR hasta ser firmado.</p>
-<p><strong>Precondiciones:</strong> El usuario autenticado tiene rol GENERADOR. Existen transportistas y operadores registrados en el sistema.</p>
-<p><strong>Flujo principal (5 pasos):</strong></p>
+<p><strong>Descripción:</strong> Generador, transporte u operador pueden crear una propuesta de manifiesto. Crearla no equivale a aprobar por ninguna de las partes.</p>
+<p><strong>Precondiciones:</strong> En el circuito ordinario, las tres partes seleccionadas y sus cuentas deben estar activas. La empresa de quien crea queda en su propio rol.</p>
+<p><strong>Flujo principal:</strong></p>
 <ol>
-<li><strong>Paso 1 - Residuo:</strong> Seleccionar tipo de residuo del catalogo de categorias Y (solo residuos activos). El sistema muestra codigo, nombre y caracteristicas de peligrosidad.</li>
-<li><strong>Paso 2 - Cantidad:</strong> Ingresar cantidad y seleccionar unidad de medida (kg, litros, toneladas, metros cubicos).</li>
-<li><strong>Paso 3 - Transportista:</strong> Seleccionar transportista habilitado del listado. El sistema auto-completa CUIT, telefono, domicilio y numero de habilitacion en una tarjeta informativa.</li>
-<li><strong>Paso 4 - Operador:</strong> Seleccionar operador destino. El sistema auto-completa datos y muestra tratamientos autorizados para el tipo de residuo seleccionado.</li>
-<li><strong>Paso 5 - Revision:</strong> Resumen completo de todos los datos ingresados. Boton para guardar como BORRADOR.</li>
+<li>Elegir las otras partes y la modalidad: con traslado o tratamiento en origen. En origen también se elige transporte como aprobador.</li>
+<li>Completar corrientes Y, cantidades y datos de la operación; revisar el resumen y crear la propuesta.</li>
+<li>Cada parte revisa y decide desde su propia cuenta, incluida la persona que creó la propuesta.</li>
 </ol>
-<p><strong>Postcondiciones:</strong> Manifiesto creado en estado BORRADOR. Evento CREACION registrado en timeline.</p>
+<p><strong>Resultado:</strong> La propuesta queda pendiente de aprobación y las partes reciben avisos. Los borradores anteriores se conservan como antecedentes y no se activan con una sola firma.</p>
 <p><strong>Ruta:</strong> <code>/manifiestos/nuevo</code></p>
-<p><strong>Endpoint:</strong> <code>POST /api/manifiestos</code></p>
+<p><a href="tutorial.html?guide=manifiestos-tres-partes">Ver el circuito de tres partes</a>.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G02: Firmar Manifiesto Electronicamente</button>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-G02: Aprobar la participación</button>
 <div class="collapsible-body">
-<div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firmar Manifiesto — botón Aprobar en estado BORRADOR" loading="lazy"></a><div class="cu-screenshot-caption">Firmar Manifiesto — botón Aprobar en estado BORRADOR</div></div>
-
-<p><strong>Descripcion:</strong> Firma electronica del manifiesto en estado BORRADOR para pasarlo a APROBADO. El sistema genera automaticamente un codigo QR unico para el manifiesto.</p>
-<p><strong>Precondiciones:</strong> El manifiesto esta en estado BORRADOR. El usuario autenticado es el generador propietario del manifiesto o un ADMIN.</p>
+<p><strong>Descripción:</strong> Cada parte revisa la propuesta y registra su propia decisión. El generador firma su participación; transporte y operador aprueban desde sus cuentas.</p>
+<p><strong>Precondiciones:</strong> La cuenta debe estar autorizada para la parte vinculada a la propuesta.</p>
 <p><strong>Flujo:</strong></p>
 <ol>
-<li>Acceder al detalle del manifiesto en estado BORRADOR.</li>
-<li>Revisar todos los datos del manifiesto.</li>
-<li>Hacer clic en &quot;Firmar / Aprobar&quot;.</li>
-<li>Confirmar la accion en el dialogo de confirmacion.</li>
+<li>Abrir el aviso o el manifiesto y revisar sus datos y las decisiones pendientes.</li>
+<li>Firmar o aprobar como la parte correspondiente; si no se puede participar, rechazar e indicar el motivo.</li>
+<li>Con las tres aprobaciones, cualquiera de las partes puede iniciar la coordinación.</li>
 </ol>
-<p><strong>Postcondiciones:</strong> Estado cambia a APROBADO. Se genera codigo QR. Se notifica al transportista asignado. Evento APROBACION registrado.</p>
-<p><strong>Endpoint:</strong> <code>POST /api/manifiestos/:id/aprobar</code></p>
+<p><strong>Resultado:</strong> Una sola firma no habilita la coordinación. La propuesta pasa a Aprobado sólo con las tres decisiones; un rechazo la detiene.</p>
+<p><a href="tutorial.html?guide=manifiestos-tres-partes">Ver avisos, aprobaciones y coordinación</a>.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
@@ -5962,9 +5958,9 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">6</div>
   <div class="wf-step-body">
-    <h4 id="fg-6">Firmar y Aprobar</h4>
-    <p>El manifiesto en estado BORRADOR muestra el botón "Firmar/Aprobar". Al firmar, el estado cambia a APROBADO y se notifica automáticamente al transportista asignado.</p>
-    <a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firmar y Aprobar" loading="lazy" class="wf-step-img"></a>
+    <h4 id="fg-6">Aprobación de las tres partes</h4>
+    <p>El generador firma su participación; transporte y operador aprueban desde sus cuentas. Sólo con las tres decisiones se habilita iniciar la coordinación, también en origen.</p>
+    <p><a href="tutorial.html?guide=manifiestos-tres-partes">Ver avisos y aprobaciones</a>.</p>
   </div>
 </div>
 <div class="wf-step">
@@ -7264,6 +7260,6 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 
 <button class="back-to-top" id="backToTop" aria-label="Volver arriba">&uarr;</button>
 
-<script src="directorio.js?v=07f7c85c59af"></script>
+<script src="directorio.js?v=0708d66bc84c"></script>
 </body>
 </html>
