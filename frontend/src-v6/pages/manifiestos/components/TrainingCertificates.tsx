@@ -1,7 +1,7 @@
 import { useCertificateDraft } from '../../../hooks/useCertificateDraft';
 import { useImpersonation } from '../../../contexts/ImpersonationContext';
 import { useCertificateCommand } from '../../../hooks/useCertificateCommand';
-import { Award, FileCheck2, LockKeyhole, CheckCircle2, Download } from 'lucide-react';
+import { Award, FileCheck2, LockKeyhole, Download } from 'lucide-react';
 import { CardHeader } from '../../../components/ui/CardV2';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMobilePrefix } from '../../../hooks/useMobilePrefix';
@@ -70,6 +70,10 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
  });
  function refreshQuantities(){setAmounts(Object.fromEntries([...currentResidues.map(row=>[row.id,kind==='FINAL'?String(row.cantidadRecibida??''):amounts[row.id]||'']),...findings.map(row=>[row.id,amounts[row.id]||''])]));}
  const final=query.data?.documents.some(d=>d.documento.tipo==='FINAL');
+ const documents=query.data?.documents||[];
+ const pendingTypes=(['PARCIAL','FINAL'] as const).filter(type=>!documents.some(document=>document.documento.tipo===type));
+ let partialNumber=0;
+ const documentRows=documents.map(document=>({document,partialNumber:document.documento.tipo==='PARCIAL'?++partialNumber:null}));
  function open(tipo:'PARCIAL'|'FINAL'){
   if(!canEdit||(!training&&!draft.canWrite()))return;
   const value={kind:tipo,method:(manifest as Partial<Manifiesto> & {tratamientoMetodo?:string}).tratamientoMetodo||'',note:'',amounts:Object.fromEntries([...(manifest.residuos||[]).map(r=>[r.id,String(tipo==='FINAL'?(r.cantidadRecibida??''):Math.max(0,(r.cantidadRecibida??0)-alreadyCertified(r.id))||'')]),...findings.map(f=>[f.id,''])])};
@@ -94,14 +98,17 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
   <CardHeader icon={<Award size={22}/>} title="Certificaciones" subtitle="El operador firma y emite. Las partes vinculadas reciben un aviso y pueden descargarlo."/>
   {readOnly&&<p role="status">Esta vista permite consultar certificados. Para firmar o recuperar un envío, entrá con la cuenta habilitada del operador.</p>}
   {query.isError?<p role="alert">No se pudieron comprobar los certificados. <Button variant="outline" onClick={()=>void query.refetch()}>Reintentar certificados</Button></p>:query.isPending?<p role="status">Comprobando certificados…</p>:<>
-   <div className="grid grid-cols-2 gap-2" aria-label="Estado de certificaciones">{(['PARCIAL','FINAL'] as const).map(type=>{
-    const issued=query.data?.documents.filter(d=>d.documento.tipo===type).length||0;
+   {pendingTypes.length>0&&<div role="group" className={`grid gap-2 ${pendingTypes.length===2?'grid-cols-2':'grid-cols-1'}`} aria-label="Estado de certificaciones">{pendingTypes.map(type=>{
     const otherwiseReady=canRelease&&!final&&(type==='PARCIAL'||manifest.estado==='TRATADO'&&unresolved===0&&!checks.isError&&!findingProblems.length);
     const ready=otherwiseReady&&!recovery.command;
-    const Icon=issued?CheckCircle2:ready?FileCheck2:LockKeyhole;
-    return <div key={type} className={`rounded-lg border p-3 ${issued?'border-emerald-200 bg-emerald-50 text-emerald-900':ready?'border-primary-200 bg-primary-50 text-primary-900':'border-neutral-200 bg-neutral-50 text-neutral-600'}`}><Icon size={22} aria-hidden="true"/><h3 className="mt-2 text-sm font-semibold">{type==='PARCIAL'?'Parcial':'Final total'}</h3><p className="mt-1 text-xs">{issued?`${issued} emitida${issued>1?'s':''}`:otherwiseReady&&recovery.command?(recovery.command.status==='pending'?'Comprobá la emisión':'Continuá para emitir'):ready?'Lista para firmar':!operator?'Pendiente del operador':final?'No emitida':type==='PARCIAL'?'Requiere tratamiento':'Requiere cierre y adendas resueltas'}</p></div>;
-   })}</div>
-   <ul className="space-y-2">{query.data?.documents.map((d,i)=><li key={d.id} id={`certificado-${d.id}`} data-certificate-id={d.id} className={`scroll-mt-32 rounded border p-3 ${selectedCertificate===d.id?'border-primary-400 bg-primary-50':'border-neutral-200'}`}><p className="font-semibold">{d.documento.tipo==='FINAL'?'Certificación final total':'Certificación parcial '+(i+1)} · Emitida</p><p className="text-xs text-neutral-600 break-words">{d.numero || manifest.numero} · {new Date(d.createdAt).toLocaleString('es-AR')}</p><p className="text-sm">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {d.documento.tipo==='FINAL'?'final':'parcial '+(i+1)}{training?' CAP':''}</Button></li>)}</ul>
+    const Icon=ready?FileCheck2:LockKeyhole;
+    return <div key={type} className={`rounded-lg border p-3 ${ready?'border-primary-200 bg-primary-50 text-primary-900':'border-neutral-200 bg-neutral-50 text-neutral-600'}`}><Icon size={22} aria-hidden="true"/><h3 className="mt-2 text-sm font-semibold">{type==='PARCIAL'?'Parcial':'Final total'}</h3><p className="mt-1 text-xs">{otherwiseReady&&recovery.command?(recovery.command.status==='pending'?'Comprobá la emisión':'Continuá para emitir'):ready?'Lista para firmar':final?'No emitida':!operator?'Pendiente del operador':type==='PARCIAL'?'Requiere tratamiento':'Requiere cierre y adendas resueltas'}</p></div>;
+   })}</div>}
+   {documentRows.length>0&&<ul aria-label="Certificaciones emitidas" className="divide-y divide-neutral-200">{documentRows.map(({document:d,partialNumber:n})=>{
+    const label=d.documento.tipo==='FINAL'?'final total':n!==null?`parcial ${n}`:'';
+    const downloadLabel=d.documento.tipo==='FINAL'?'final':n!==null?`parcial ${n}`:'certificado';
+    return <li key={d.id} id={`certificado-${d.id}`} data-certificate-id={d.id} className={`scroll-mt-32 flex flex-col gap-3 px-1 py-4 sm:flex-row sm:items-center sm:justify-between ${selectedCertificate===d.id?'rounded-lg bg-primary-50 ring-1 ring-primary-400':''}`}><div className="min-w-0 space-y-1"><p className="font-semibold">Certificación{label?' '+label:''} · Emitida</p><p className="text-xs text-neutral-600 break-words">{d.numero || manifest.numero} · {new Date(d.createdAt).toLocaleString('es-AR')}</p><p className="text-sm break-words">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p></div><div className="self-start sm:shrink-0 sm:self-center"><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {downloadLabel}{training?' CAP':''}</Button></div></li>;
+   })}</ul>}
   </>}
   {canRelease&&canEdit&&recovery.ready&&!recovery.command&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button variant={manifest.estado==='TRATADO'&&unresolved===0?'outline':'primary'} onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0||checks.isError||findingProblems.length>0} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
   {operator&&findingProblems.length>0&&<div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3"><p>Revisá los informes antes de certificar los hallazgos:</p><ul className="list-disc pl-5">{findingProblems.map(problem=><li key={problem}>{problem}</li>)}</ul></div>}

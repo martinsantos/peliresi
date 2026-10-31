@@ -71,6 +71,12 @@ test('certificate recovery explains the receipt when the document list is availa
   const text = JSON.stringify(step);
   for (const phrase of ['Comprobar resultado', 'se muestran allí una sola vez', 'el recibo conserva esos datos', 'Continuar con certificados', 'retira la copia local']) assert.ok(text.includes(phrase), phrase);
 });
+test('certificate guide distinguishes issued documents from types without a document', () => {
+  const guide = guides.find((g: any) => g.id === 'certificados-operador-partes');
+  const step = guide.steps.find((s: any) => s.title === 'Operador: abrir el mismo manifiesto');
+  const text = JSON.stringify(step);
+  for (const phrase of ['Cada documento emitido aparece una sola vez', 'Los tipos que todavía no tienen documento muestran su estado', 'el parcial figura como no emitido']) assert.ok(text.includes(phrase), phrase);
+});
 test('fleet GPS explains a stale capture and does not promise a server capture time', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'transporte-cargas-simultaneas'));
   assert.match(text, /SITREP confirmó una ubicación anterior/);

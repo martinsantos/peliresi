@@ -14,6 +14,43 @@ vi.mock('../../components/ui/SignaturePad',()=>({SignaturePad:({onConfirm}:any)=
 beforeEach(()=>{vi.clearAllMocks();mocks.gate=null;mocks.rows.clear();mocks.impersonated=false;mocks.restricted=false;mocks.user={id:'o',rol:'OPERADOR',actorId:'o',training:false};});
 const m:any={id:'m',numero:'M',estado:'TRATADO',operadorId:'o',tratamientoMetodo:'Tratamiento registrado',residuos:[{id:'r',cantidadRecibida:10,unidad:'kg',tipoResiduo:{codigo:'Y1'}}]};
 function show(){const q=new QueryClient({defaultOptions:{queries:{retry:false}}});return render(<MemoryRouter><QueryClientProvider client={q}><TrainingCertificates manifest={m}/></QueryClientProvider></MemoryRouter>);}
+it('shows each emitted certificate once while keeping the remaining type visible',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[{id:'p',numero:'M-P01',createdAt:'2026-10-21T10:00:00Z',documento:{tipo:'PARCIAL',cantidades:[{residuoId:'r',cantidad:4,corriente:'Y1',unidad:'kg'}]}}],emisionHabilitada:true,adendasSinResolver:0}});
+ show();await screen.findByRole('button',{name:'Descargar parcial 1'});
+ const status=screen.getByRole('group',{name:'Estado de certificaciones'});
+ expect(within(status).getByText('Final total')).toBeVisible();
+ expect(within(status).queryByText('Parcial')).toBeNull();
+ const documents=screen.getByRole('list',{name:'Certificaciones emitidas'});
+ expect(within(documents).getAllByText('Certificación parcial 1 · Emitida')).toHaveLength(1);
+ expect(within(documents).getByText('Y1: 4 kg')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Emitir certificación parcial'})).toBeEnabled();
+});
+it('retains both pending statuses before emission and avoids a misleading pending partial after the final',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});
+ const first=show();await screen.findByRole('button',{name:'Emitir certificación parcial'});
+ expect(within(screen.getByRole('group',{name:'Estado de certificaciones'})).getByText('Parcial')).toBeVisible();
+ expect(within(screen.getByRole('group',{name:'Estado de certificaciones'})).getByText('Final total')).toBeVisible();
+ first.unmount();mocks.user={id:'g',rol:'GENERADOR',actorId:'g',training:false};
+ mocks.get.mockResolvedValue({data:{data:[{id:'f',numero:'M-F',createdAt:'2026-10-21T10:00:00Z',documento:{tipo:'FINAL',cantidades:[]}}],emisionHabilitada:true,adendasSinResolver:0}});
+ show();await screen.findByRole('button',{name:'Descargar final'});
+ const status=screen.getByRole('group',{name:'Estado de certificaciones'});
+ expect(within(status).getByText('Parcial')).toBeVisible();expect(within(status).getByText('No emitida')).toBeVisible();
+ expect(within(status).queryByText('Pendiente del operador')).toBeNull();
+});
+it('lists issued partials and final only once with stable partial numbering and links',async()=>{
+ const document=(id:string,tipo:string)=>({id,numero:'M-'+id,createdAt:'2026-10-21T10:00:00Z',documento:{tipo,cantidades:[{residuoId:'r',cantidad:1,corriente:'Y1',unidad:'kg'}]}});
+ mocks.user={id:'g',rol:'GENERADOR',actorId:'g',training:false};
+ mocks.get.mockResolvedValue({data:{data:[document('p1','PARCIAL'),document('f','FINAL'),document('p2','PARCIAL')],emisionHabilitada:true,adendasSinResolver:0}});
+ show();await screen.findByRole('button',{name:'Descargar parcial 2'});
+ expect(screen.queryByRole('group',{name:'Estado de certificaciones'})).toBeNull();
+ const documents=screen.getByRole('list',{name:'Certificaciones emitidas'});
+ expect(within(documents).getAllByRole('listitem')).toHaveLength(3);
+ for(const [id,label] of [['p1','Certificación parcial 1 · Emitida'],['f','Certificación final total · Emitida'],['p2','Certificación parcial 2 · Emitida']]){
+  const row=documents.querySelector(`[data-certificate-id="${id}"]`)!;
+  expect(row).toHaveAttribute('id','certificado-'+id);expect(within(row as HTMLElement).getByText(label)).toBeVisible();
+ }
+ expect(screen.queryByRole('button',{name:/Emitir certificación/})).toBeNull();
+});
 it('prefills remaining partial quantities and method, retains form after a failed issue',async()=>{
  mocks.get.mockResolvedValue({data:{data:[{id:'c',createdAt:'2026-10-21T10:00:00Z',documento:{tipo:'PARCIAL',cantidades:[{residuoId:'r',cantidad:4,corriente:'Y1',unidad:'kg'}]}}],emisionHabilitada:true,adendasSinResolver:0}});
  mocks.post.mockRejectedValue({response:{data:{message:'Servicio no disponible'}}});show();
