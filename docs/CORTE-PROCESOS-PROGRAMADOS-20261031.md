@@ -1,0 +1,26 @@
+# Corte SITREP: procesos programados y datos existentes
+
+Revisión estática del código comprometido de `ce2eb1cbe1eda468482bf10bc029636f47fd3857`. No se consultó producción ni se inspeccionaron reglas, manifiestos, cuentas o cantidades reales. Por eso no sabemos si alguna condición existe en el entorno de destino ni cuántos registros podría afectar. La tabla describe lo que el código **puede** hacer; no afirma que esas acciones ya hayan ocurrido.
+
+Al iniciar el servidor, [index.ts](../backend/src/index.ts) registra los procesos programados. Los siguientes efectos pueden ocurrir después, al llegar su horario, sin que nadie pulse una acción en la interfaz. El bloqueo de correo y push evita esas entregas externas, pero no equivale a impedir escrituras de avisos o alertas internas.
+
+| Proceso | Programación del código | Posible efecto posterior |
+|---|---|---|
+| [Duración en tránsito](../backend/src/jobs/transitDuration.job.ts) | Cada cinco minutos; en producción puede ejecutarse en cada trabajador. | Si hay reglas activas con umbral de duración explícito y viajes que coinciden, puede crear alertas y avisos. El código serializa y deduplica la generación, pero eso no demuestra que no vaya a crear registros. |
+| [Seguimiento de cierre](../backend/src/jobs/seguimientoCierre.job.ts) | Diariamente a las 08:00 de Mendoza, en la instancia designada. | Si falta su regla fija, puede crearla; el esquema la declara activa por defecto. También puede resolver casos terminales y crear o actualizar alertas y avisos para manifiestos recibidos o en tratamiento. |
+| [Recordatorio de operación](../backend/src/jobs/recordatorio.job.ts) | Cada seis horas, en la instancia designada; sin zona horaria explícita en el cron. | Puede crear avisos internos para partes y representantes de operaciones próximas, con protección contra duplicados. El envío push asociado sigue sujeto a su guarda. |
+| [Recordatorio de firma](../backend/src/jobs/manifestSignatureReminder.job.ts) | Diariamente a las 08:15 de Mendoza, en la instancia designada. | Puede crear avisos internos para manifiestos no terminados al acercarse o cumplirse 30 días desde la firma. No modifica el plazo ni determina una infracción. |
+| [Catálogo de alertas](../backend/src/jobs/alertCatalogue.job.ts) | Diariamente a las 08:05 de Mendoza, en la instancia designada. | Las reglas activas aplicables pueden generar o resolver casos y crear o actualizar avisos internos. |
+| [Vencimientos](../backend/src/jobs/vencimiento.job.ts) | Diariamente a las 08:00 en la zona del servidor, en la instancia designada. | Emite eventos para habilitaciones y licencias próximas a vencer; los suscriptores y reglas aplicables pueden generar alertas o avisos. |
+| [Blockchain](../backend/src/jobs/blockchain.job.ts) | Cada minuto sólo si está habilitado y en la instancia designada. | Puede procesar registros pendientes mediante el servicio configurado. No se consultó el valor ni el estado del entorno de destino. |
+
+El [temporizador de correo](../backend/src/services/email.service.ts) no arranca cuando la política de correo está deshabilitada. Algunas operaciones pueden igualmente registrar elementos suprimidos en la cola; deshabilitar la entrega no convierte una prueba mutante en una prueba de sólo lectura.
+
+## Consecuencias para el corte
+
+1. El ensayo de despliegue y reversión debe separar el arranque de la interfaz y API de la ejecución de tareas que escriben. Un smoke no mutante no demuestra por sí solo que un cron vaya a permanecer inactivo después de terminar el smoke.
+2. La protección propuesta para la ventana de validación debe ensayarse primero en preview, incluyendo reinicios y múltiples trabajadores, sin desactivar silenciosamente las tareas de operación una vez que corresponda habilitarlas. No se cambian flags productivos en esta revisión.
+3. Las tres aprobaciones en manifiestos existentes y los efectos sobre avisos históricos permanecen desconocidos por la instrucción de no consultar datos reales. Las pruebas con registros artificiales sirven para verificar la lógica, no para cuantificar el impacto real.
+4. La regresión integrada debe identificarse por el commit exacto y distinguir pruebas de navegador, datos artificiales, sensores simulados y acceso físico a Android. Un respaldo de preview no reemplaza un respaldo del entorno de destino.
+
+Este documento no autoriza una publicación ni una consulta de datos. Se actualizará cuando exista evidencia adicional en el preview o cambie la autorización del usuario.
