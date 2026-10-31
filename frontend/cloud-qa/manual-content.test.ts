@@ -420,6 +420,17 @@ test('certificate guide distinguishes an approved finding from an explicitly tre
   assert.ok(cert.includes('Si una cantidad hallada no es válida'));
   assert.ok(cert.includes('La firma registra tu decisión'));
 });
+test('alert directory describes configured thresholds without inventing fixed deadlines or route tracking', () => {
+  const directory = read('directorio.html');
+  const section = directory.match(/<h3 id="proc-alertas">[\s\S]*?<\/section>/)?.[0];
+  assert.ok(section);
+  assert.match(section, /umbral operativo decidido por Ambiente/);
+  assert.match(section, /No hay un plazo fijo obligatorio/);
+  assert.match(section, /Simular sin enviar/);
+  assert.match(section, /no compara actualmente una ruta autorizada/);
+  assert.doesNotMatch(section, /Tiempo transcurrido mayor a 8 horas|estado por mas de 48 horas|GPS update|Temporizador semanal/);
+  assert.doesNotMatch(directory, /viajes que excedan el tiempo estimado, y manifiestos estancados/);
+});
 
 test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {
   const p = JSON.parse(read('registration-capture-provenance.json'));
