@@ -20,6 +20,7 @@ const ticket = { id: 'new-ticket', referencia: 'SOP-000001', asunto: subject, ca
   contexto: { ruta: '/soporte', ancho: 360, alto: 800 }, puedeGestionar: false, puedeAtender: false, esAutor: true,
   mensajes: [{ id: 'message', cuerpo: 'Descripción original del reporte', interno: false, autor: { id: 'owner', nombre: 'QA' }, createdAt: '2026-10-06T01:00:00Z',
     adjuntos: [{ id: 'file', nombre: filename, mime: 'image/png', bytes: 1200, sha256: 'unit-fixture' }] }], eventos: [] };
+const storedCommands = () => [...records.values()].filter(value => value && typeof value === 'object' && 'status' in value);
 beforeEach(() => {
   identity.current = { id: 'owner', nombre: 'QA', rol: 'OPERADOR' };
   records.clear(); localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
@@ -63,6 +64,21 @@ it('does not reuse a support ticket cached under another activity of the same ac
   expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument();
   release({ ...ticket, asunto: 'Reporte de la otra actividad' });
   expect(await screen.findByRole('heading', { name: 'Reporte de la otra actividad' })).toBeVisible();
+});
+it('does not show an old activity response that finishes after switching roles', async () => {
+  const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = () => <QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>;
+  let release!: (value: unknown) => void;
+  calls.get.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const view = render(tree());
+  await waitFor(() => expect(calls.get).toHaveBeenCalledTimes(1));
+  calls.get.mockResolvedValueOnce({ ...ticket, asunto: 'Ticket de la actividad actual' });
+  identity.current = { id: 'owner', nombre: 'QA', rol: 'GENERADOR' };
+  view.rerender(tree());
+  expect(await screen.findByRole('heading', { name: 'Ticket de la actividad actual' })).toBeVisible();
+  release(ticket);
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Ticket de la actividad actual' })).toBeVisible());
+  expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument();
 });
 it('distinguishes homonymous support agents and submits the selected account, not its display name', async () => {
   const agents = [{ id: 'first-agent', nombre: 'María Pérez', email: 'primera@qa.invalid' }, { id: 'second-agent', nombre: 'María Pérez', email: 'segunda@qa.invalid' }];
@@ -309,7 +325,7 @@ it('refreshes the assigned person and ticket state after a confirmed handoff wit
   await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
   await waitFor(() => expect(screen.getByText('Técnica QA', { exact: true, selector: 'dd' })).toBeVisible());
   expect(screen.getByText('En atención', { exact: true })).toBeVisible();
-  expect([...records.values()]).toEqual([expect.objectContaining({ status: 'confirmed', receipt: expect.objectContaining({ version: 2 }) })]);
+  expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed', receipt: expect.objectContaining({ version: 2 }) })]);
   expect(calls.act).toHaveBeenCalledOnce();
 });
 
@@ -325,11 +341,11 @@ it('keeps a confirmed receipt when refreshing fails and clears it only after a s
   await screen.findByText(/No pudimos actualizar el ticket/);
   expect(screen.getByText(/Pendiente de actualización/, { selector: 'span' })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
-  await waitFor(() => expect([...records.values()]).toEqual([expect.objectContaining({ status: 'confirmed' })]));
+  await waitFor(() => expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed' })]));
   expect(calls.act).toHaveBeenCalledOnce();
   calls.get.mockResolvedValue(updated);
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
-  await waitFor(() => expect(records.size).toBe(0));
+  await waitFor(() => expect(storedCommands()).toHaveLength(0));
   expect(await screen.findByText('Cerrado', { exact: true })).toBeVisible();
   expect(calls.act).toHaveBeenCalledOnce();
 });
@@ -344,10 +360,25 @@ it('does not clear a confirmed receipt when the server returns a version older t
   await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
   await screen.findByText(/No pudimos actualizar el ticket/);
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
-  await waitFor(() => expect([...records.values()]).toEqual([expect.objectContaining({ status: 'confirmed' })]));
+  await waitFor(() => expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed' })]));
   expect(calls.act).toHaveBeenCalledOnce();
   calls.get.mockResolvedValue({ ...current, estado: 'CERRADO', version: 2 });
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
-  await waitFor(() => expect(records.size).toBe(0));
+  await waitFor(() => expect(storedCommands()).toHaveLength(0));
   expect(await screen.findByText('Cerrado', { exact: true })).toBeVisible();
+});
+
+it('hides a previously visible ticket when access is denied during confirmation refresh', async () => {
+  openDetail({ autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false });
+  calls.act.mockImplementation(async () => {
+    calls.get.mockRejectedValue({ response: { status: 403 } });
+    return { id: ticket.id, version: 2, replay: false };
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar', exact: true }));
+  fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resolución antes de perder acceso.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
+  await waitFor(() => expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Reintentar ticket', exact: true })).toBeVisible();
+  expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed' })]);
+  expect(calls.act).toHaveBeenCalledOnce();
 });
