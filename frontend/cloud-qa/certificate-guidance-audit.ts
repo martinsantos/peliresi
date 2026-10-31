@@ -37,7 +37,7 @@ const backend = read('backend-reuse.json');
 assert.equal(backend.fromCommit, 'a624b232bc3ca48a2f7e8582e8051170372070ed');
 assert.equal(backend.toCommit, commit); assert.deepEqual(backend.changedBackendFiles, []);
 assert.match(read('runtime-proof.json').backend, /backend\/dist-qa-support-mail-20261031\/index\.js$/);
-const baseline = read('baseline-compiled-proof.json');
+const baselineCompiled = read('baseline-compiled-proof.json');
 const baselineDir = path.join(root, 'backend/dist-qa-actor-overview-20261031');
 const backendDir = path.join(root, 'backend/dist-qa-support-mail-20261031');
 function compiledFiles(dir: string, prefix = ''): string[] {
@@ -45,9 +45,9 @@ function compiledFiles(dir: string, prefix = ''): string[] {
     ? compiledFiles(dir, path.join(prefix, entry.name)) : entry.name.endsWith('.js') ? [path.join(prefix, entry.name)] : []).sort();
 }
 const compiled = compiledFiles(baselineDir), digest = createHash('sha256');
-assert.equal(compiled.length, baseline.currentCount);
+assert.equal(compiled.length, baselineCompiled.currentCount);
 for (const file of compiled) digest.update(file + ' ' + hash(readFileSync(path.join(baselineDir, file))) + '\n');
-assert.equal(digest.digest('hex'), baseline.compiledSha256); assert.deepEqual(compiledFiles(backendDir), compiled);
+assert.equal(digest.digest('hex'), baselineCompiled.compiledSha256); assert.deepEqual(compiledFiles(backendDir), compiled);
 const changed = compiled.filter(file => !readFileSync(path.join(baselineDir, file)).equals(readFileSync(path.join(backendDir, file))));
 assert.deepEqual(changed, ['controllers/support.controller.js', 'services/notification-mail.service.js']);
 for (const file of changed) assert.ok(readFileSync(path.join(backendDir, file)).equals(readFileSync(path.join(root, '.qa-support-mail-20261031/compiled', file))));
@@ -69,9 +69,9 @@ for (const { pid } of read('processes.json')) {
   for (const flag of [...flags, ...frontendFlags]) assert.equal(env[flag], 'true', flag);
   for (const key of externalKeys) assert.equal(env[key], '');
 }
-const baseline = read('baseline-unit.json');
-assert.equal(baseline.success, false); assert.equal(baseline.numFailedTests, 1);
-const failures = baseline.testResults.flatMap((file: { assertionResults: Array<{ status: string; failureMessages: string[] }> }) =>
+const baselineUnit = read('baseline-unit.json');
+assert.equal(baselineUnit.success, false); assert.equal(baselineUnit.numFailedTests, 1);
+const failures = baselineUnit.testResults.flatMap((file: { assertionResults: Array<{ status: string; failureMessages: string[] }> }) =>
   file.assertionResults.filter(item => item.status === 'failed').flatMap(item => item.failureMessages));
 assert.ok(failures.some((message: string) => message.includes('Publicación de certificación')));
 const unit = read('unit.json'); assert.equal(unit.success, true); assert.equal(unit.numFailedTests, 0); assert.equal(unit.numPendingTests, 0);
