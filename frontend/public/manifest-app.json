@@ -40,10 +40,10 @@
   },
   "shortcuts": [
     {
-      "name": "Panel de campo",
-      "short_name": "Campo",
-      "description": "Abrir el tablero operativo de campo",
-      "url": "/app/dashboard?source=shortcut-field",
+      "name": "Inicio",
+      "short_name": "Inicio",
+      "description": "Abrir tu inicio en SITREP",
+      "url": "/app/dashboard?source=shortcut-home",
       "icons": [
         {
           "src": "/app/icon-192.png",
@@ -66,10 +66,10 @@
       ]
     },
     {
-      "name": "Centro de control",
-      "short_name": "Control",
-      "description": "Abrir monitoreo de viajes y alertas",
-      "url": "/app/centro-control?source=shortcut-control",
+      "name": "Avisos",
+      "short_name": "Avisos",
+      "description": "Abrir tus avisos en SITREP",
+      "url": "/app/notificaciones?source=shortcut-notices",
       "icons": [
         {
           "src": "/app/icon-192.png",
