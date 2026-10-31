@@ -1,21 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { Prisma, TipoActorInspeccion } from '@prisma/client';
 import { inspectionParticipantNoticeWhere } from './inspectionExchangeNotice.service';
+import { inspectionCompanyNoticeRows } from './inspectionCompanyNotice.service';
+import { INSPECTION_AGENDA_LABELS } from '../domain/inspectionNoticeLabels';
+export { INSPECTION_AGENDA_LABELS } from '../domain/inspectionNoticeLabels';
 
-export const INSPECTION_AGENDA_LABELS = {
-  CREADA: ['Nueva inspección', 'Revisá el responsable y prepará la visita.'],
-  PROGRAMADA: ['Inspección programada', 'Revisá la fecha prevista y el responsable en la agenda.'],
-  REPROGRAMADA: ['Inspección reprogramada', 'La fecha prevista cambió. Consultá la agenda actualizada antes de la visita.'],
-  AGENDA_RETIRADA: ['Inspección sin fecha programada', 'Se retiró la fecha prevista. Administración debe definir la próxima visita.'],
-  REASIGNADA: ['Responsable de inspección actualizado', 'Consultá el responsable y la fecha vigentes en el expediente.'],
-  SUJETO_VINCULADO: ['Sujeto de inspección identificado', 'Se vinculó el sujeto del expediente. Revisá su seguimiento y el ámbito competente.'],
-  EN_CAMPO: ['Inspección en campo', 'El recorrido comenzó. El inspector asignado registra los controles y evidencias.'],
-  EN_REVISION: ['Inspección para revisar', 'El trabajo de campo está cerrado. Administración debe revisar el expediente.'],
-  NOTIFICADA: ['Inspección puesta a disposición', 'Consultá el expediente, las observaciones y el plazo de respuesta.'],
-  CANCELADA: ['Inspección cancelada', 'La visita quedó cancelada. Consultá el motivo en el expediente.'],
-  EN_TRAMITE_LEGAL: ['Expediente en trámite legal', 'Consultá el seguimiento de la derivación y la próxima actuación.'],
-  FINALIZADA: ['Inspección finalizada', 'Consultá el resultado y la trazabilidad del expediente.'],
-} as const;
 export type InspectionAgendaEvent = keyof typeof INSPECTION_AGENDA_LABELS;
 type Target = { id: string; numero: string; inspectorId: string; tipoActor: TipoActorInspeccion | null;
   generadorId?: string | null; transportistaId?: string | null; operadorId?: string | null };
@@ -43,14 +32,17 @@ export async function createInspectionAgendaNotices(tx: Prisma.TransactionClient
       for (const user of owners) recipients.set(user.id, 'participacion');
     }
   }
-  if (!recipients.size) return;
+  const companyRows = ['NOTIFICADA', 'EN_TRAMITE_LEGAL', 'FINALIZADA'].includes(input.evento)
+    ? await inspectionCompanyNoticeRows(tx, inspection, { clase: 'agenda', id: input.eventoId, autorId: input.autorId }, [...recipients.keys()]) : [];
+  if (!recipients.size && !companyRows.length) return;
   const [title, action] = INSPECTION_AGENDA_LABELS[input.evento];
-  await tx.notificacion.createMany({ skipDuplicates: true, data: [...recipients].map(([usuarioId, destino]) => ({
+  const directRows = [...recipients].map(([usuarioId, destino]) => ({
     id: createHash('sha256').update(`agenda:${input.eventoId}:${usuarioId}`).digest('hex'),
     usuarioId, tipo: 'INFO_GENERAL', titulo: `PSIP · ${title}`, mensaje: `${inspection.numero} · ${action}`,
     datos: JSON.stringify({ tipo: 'agenda_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id,
       eventoId: input.eventoId, evento: input.evento, destino, ...(destino === 'participacion' ? { tipoActor: inspection.tipoActor } : {}) }),
-  })) });
+  } as Prisma.NotificacionCreateManyInput));
+  await tx.notificacion.createMany({ skipDuplicates: true, data: [...directRows, ...companyRows] });
 }
 
 export async function recordInspectionScheduleChange(tx: Prisma.TransactionClient, inspection: Target & { fechaProgramada?: Date | null },

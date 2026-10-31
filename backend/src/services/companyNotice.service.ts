@@ -1,3 +1,5 @@
+import { withInspectionCompanyNoticeContext } from './inspectionCompanyNotice.service';
+
 export const COMPANY_NOTICE_LABELS: Record<string, [string, string]> = {
   FICHA_ACTUALIZADA: ['Ficha de actividad actualizada', 'Administración actualizó datos de la actividad. Revisá la ficha y su historial.'],
   ACTIVIDAD_DESACTIVADA: ['Actividad dada de baja', 'La actividad ya no permite nuevas operaciones. El historial y las otras actividades aprobadas se conservan.'],
@@ -90,6 +92,7 @@ async function companyContexts(db: any, events: any[]): Promise<Map<string, Comp
 /** Called only after filtering notices by their recipient. Read-only historical
  * projection: no notification or audit records are rewritten. */
 export async function withCompanyNoticeContext<T extends { datos: string | null; usuarioId?: string }>(db: any, notices: T[]): Promise<T[]> {
+  notices = await withInspectionCompanyNoticeContext(db, notices);
   const references = notices.map(n => {
     try { const d = JSON.parse(n.datos || 'null'); return d && validCompanyNotice(d) && !d.contexto ? d : null; } catch { return null; }
   });

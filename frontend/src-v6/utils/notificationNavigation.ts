@@ -63,11 +63,15 @@ export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos' |
  const fiscal = data.tipo === 'recordatorio_fiscal' && data.destino === 'representante' && !!notificationFiscalReminder(notice);
  const alertRule = representativeManifestAlert(notice.tipo, data);
  const eventual = notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && data.accesoVersion === 1;
- if ((!fiscal && !alertRule && !eventual && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
+ const inspection = notice.tipo === 'INFO_GENERAL' && ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))
+  && data.destino === 'participacion' && data.representacionVersion === 1 && id(data.inspeccionId)
+  && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor));
+ if ((!fiscal && !alertRule && !eventual && !inspection && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
  return data.accesosEmpresa.filter(a => a && id(a.empresaId) && id(a.actividadId) && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
   && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string')
   && (!fiscal || (a.rol === 'GENERADOR' && !a.establecimientoId && !a.establecimiento))
-  && (!eventual || (id(a.actorId) && !a.establecimientoId && !a.establecimiento)));
+  && (!eventual || (id(a.actorId) && !a.establecimientoId && !a.establecimiento))
+  && (!inspection || (id(a.actorId) && a.rol === data.tipoActor && !a.establecimientoId && !a.establecimiento)));
 }
 
 /** Only orientation; activity and actor are checked again on the server. */
@@ -205,7 +209,8 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
 
 export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string, companyTarget = false, personalChoice = false): string {
   const data = parseNotificationData(notificacion.datos);
-  if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
+  const companyAccess = notificationCompanyAccesses(notificacion).length > 0;
+  if (!companyTarget && companyAccess) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
   if (!companyTarget && personalChoice && isPersonalManifestNotice(notificacion) && safeId(notificacion.id)) return withBasePath('/notificaciones/' + notificacion.id, basePath);
   // An older generic ruta must not hide the specific application in this notice.
@@ -263,7 +268,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
     if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)
       || !['participacion', 'inspeccion'].includes(String(data.destino))) return withBasePath('/notificaciones', basePath);
     const role = notificationActorRole(notificacion);
-    if (role && recipientRole && role !== recipientRole && safeId(notificacion.id)) return withBasePath(`/notificaciones/${notificacion.id}`, basePath);
+    if (role && recipientRole && role !== recipientRole && !(companyTarget && companyAccess) && safeId(notificacion.id)) return withBasePath(`/notificaciones/${notificacion.id}`, basePath);
     return withBasePath(data.destino === 'participacion' ? `/requerimientos/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}${data.tipo === 'intercambio_inspeccion' ? '#intercambios' : ''}`, basePath);
   }
   const target = cataloguePath(notificacion.datos, true);

@@ -156,3 +156,35 @@ it('opens the fiscal page only in the matching full company context', () => {
  const link=screen.getByRole('link',{name:'Ver situación fiscal →'});
  expect(link).toHaveAttribute('href',fiscalTarget);fireEvent.click(link);expect(onOpen).toHaveBeenCalledOnce();
 });
+
+const requirementAccess = { empresaId:'co', actividadId:'a', rol:'GENERADOR', actorId:'g-1', razonSocial:'QA Entidad' };
+const requirementNotice:any = { id:'psip-n', tipo:'INFO_GENERAL', datos:JSON.stringify({ tipo:'intercambio_inspeccion', version:1,
+ destino:'participacion', tipoActor:'GENERADOR', representacionVersion:1, inspeccionId:'case-1', accesosEmpresa:[requirementAccess] }) };
+it.each(['', '/app'])('opens a representative requirement through a deliberate company selection on %s', prefix => {
+ expect(resolveNotificationPath(requirementNotice,prefix,'OPERADOR')).toBe(prefix+'/notificaciones/psip-n');
+ expect(resolveNotificationPath(requirementNotice,prefix,'OPERADOR',true)).toBe(prefix+'/requerimientos/case-1');
+ render(<MemoryRouter><CompanyNoticeAction notice={requirementNotice} target="/requerimientos/case-1" userId="rep" /></MemoryRouter>);
+ expect(screen.getByText('QA Entidad')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Usar Generador y abrir requerimiento'})).toBeVisible();
+ expect(mocks.get).not.toHaveBeenCalled();
+});
+it.each(['wrong-actor','site-only','wrong-user','revoked'])('does not change context when requirement access is %s', async reason => {
+ const user:any = { id:'rep', empresaContexto:{ empresaId:'co', actividadId:'a', rol:'GENERADOR', actorId:'g-1', todasSedes:true } };
+ if(reason==='wrong-actor')user.empresaContexto.actorId='g-other';
+ if(reason==='site-only')user.empresaContexto.todasSedes=false;
+ if(reason==='wrong-user')user.id='other';
+ if(reason==='revoked')mocks.get.mockRejectedValue(new Error('403'));
+ else mocks.get.mockResolvedValue({data:{data:{user}}});
+ render(<MemoryRouter><CompanyNoticeAction notice={requirementNotice} target="/requerimientos/case-1" userId="rep" /></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Usar Generador y abrir requerimiento'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Tu contexto no cambió');
+ expect(mocks.save).not.toHaveBeenCalled();
+});
+it.each([
+ { tipoActor:'OPERADOR' }, { representacionVersion:2 }, { inspeccionId:'../case' },
+ { accesosEmpresa:[{ ...requirementAccess, establecimientoId:'site' }] },
+ { accesosEmpresa:[{ ...requirementAccess, actorId:'../actor' }] },
+])('rejects malformed requirement company metadata: %j', invalid => {
+ const data = JSON.parse(requirementNotice.datos);
+ expect(notificationCompanyAccesses({ ...requirementNotice, datos:JSON.stringify({ ...data, ...invalid }) })).toEqual([]);
+});

@@ -16,6 +16,7 @@ import { isFullAccess } from '../utils/roleFilter';
 import { INSPECTION_EXCHANGE_LABELS, inspectionParticipantNoticeWhere } from './inspectionExchangeNotice.service';
 import { PARTICIPANT_VISIBLE_STATES } from './inspectionExchange.service';
 import { INSPECTION_AGENDA_LABELS } from './inspectionAgendaNotice.service';
+import { inspectionCompanyRecipientsBatch } from './inspectionCompanyNotice.service';
 import { requirementSituation } from './alertCataloguePolicy.service';
 import { EVENTUAL_NOTICE_LABELS, eventualNoticeAudience, eventualNoticeEvent } from './eventualNotice.service';
 import { matchingEventualRecipient } from './eventualNoticeContext.service';
@@ -176,7 +177,7 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
   if (family === 'inspecciones') {
     if (!notice.usuarioId || typeof data.inspeccionId !== 'string' || !data.inspeccionId) return false;
     const inspection = await prisma.inspeccion.findUnique({ where: { id: data.inspeccionId }, select: {
-      numeroActa: true, inspectorId: true, tipoActor: true, estado: true,
+      id: true, numeroActa: true, inspectorId: true, tipoActor: true, estado: true,
       generadorId: true, transportistaId: true, operadorId: true,
       generador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
     } });
@@ -188,6 +189,14 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
       && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(notice.rol)) {
       const owner = inspectionParticipantNoticeWhere(inspection);
       participant = !!owner && !!await prisma.usuario.findFirst({ where: { AND: [{ id: notice.usuarioId, activo: true }, owner] }, select: { id: true } });
+    }
+    if (!participant && data.representacionVersion === 1 && data.destino === 'participacion'
+      && data.tipoActor === inspection.tipoActor && PARTICIPANT_VISIBLE_STATES.includes(inspection.estado)
+      && Array.isArray(data.accesosEmpresa)) {
+      const current = (await inspectionCompanyRecipientsBatch(prisma, [inspection], [notice.usuarioId])).get(inspection.id) || [];
+      participant = current.some(recipient => recipient.usuarioId === notice.usuarioId && data.accesosEmpresa instanceof Array
+        && data.accesosEmpresa.some((item: any) => item && item.empresaId === recipient.access.empresaId
+          && item.actividadId === recipient.access.actividadId && item.rol === recipient.access.rol && item.actorId === recipient.access.actorId));
     }
     if (data.tipo === 'agenda_inspeccion') {
       if (!validAgendaMail(data)) return false;
@@ -264,10 +273,11 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
   if (!notice?.usuario) return false;
   const user = notice.usuario;
   if (user.email.toLowerCase() !== recipient.toLowerCase()) return false;
-  const content = notificationMailContent({ ...notice, ...user });
+  const [contextual] = await withCompanyNoticeContext(prisma, [{ ...notice, ...user }]);
+  const content = notificationMailContent(contextual);
   if (!content || !enabledFamilies().includes(content.family)) return false;
-  if (!await recipientEligible({ ...notice, ...user }, content.family)) return false;
-  return notificationSourceEligible({ ...notice, ...user }, content.family);
+  if (!await recipientEligible(contextual, content.family)) return false;
+  return notificationSourceEligible(contextual, content.family);
 }
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
@@ -449,7 +459,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"reversion_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"psip_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"reversion_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

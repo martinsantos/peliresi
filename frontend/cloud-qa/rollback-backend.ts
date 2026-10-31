@@ -97,6 +97,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-help-gps-consistency-20261030') {
     return path.join(root, 'backend/dist-qa-closure-d7d29dde/index.js');
   }
+  if (version === 'inspection-company'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-inspection-representative-20261030') {
+    return path.join(root, 'backend/dist-qa-psip-company-20261030-v2/index.js');
+  }
   if (version === '17152d81'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
     return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');

@@ -1,5 +1,8 @@
 import { ParteIntercambioInspeccion, Prisma, Rol, TipoIntercambioInspeccion } from '@prisma/client';
 import type { InspectionExchangeAccessTarget } from './inspectionExchange.service';
+import { INSPECTION_EXCHANGE_LABELS } from '../domain/inspectionNoticeLabels';
+import { inspectionCompanyNoticeRows } from './inspectionCompanyNotice.service';
+export { INSPECTION_EXCHANGE_LABELS } from '../domain/inspectionNoticeLabels';
 
 type NoticeInspection = InspectionExchangeAccessTarget & { id: string; numero: string };
 type NoticeExchange = { id: string; secuencia: number; tipo: TipoIntercambioInspeccion; parte: ParteIntercambioInspeccion; autorId: string; plazoRespuestaAt?: Date | null };
@@ -19,16 +22,6 @@ export function inspectionParticipantNoticeWhere(inspection: InspectionExchangeA
       solicitudes: { some: { estado: 'APROBADA', tipoActor: inspection.tipoActor, [field]: actorId } } },
   ] };
 }
-
-export const INSPECTION_EXCHANGE_LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
-  REQUERIMIENTO: ['Nuevo requerimiento', 'Abrí este aviso para revisar el pedido, su plazo y responder.'],
-  RESPUESTA: ['Nueva respuesta', 'Abrí el intercambio para leer la respuesta y revisar qué sigue.'],
-  DESCARGO: ['Descargo presentado', 'Revisá el descargo recibido antes de resolver.'],
-  SUBSANACION: ['Subsanación presentada', 'Revisá la documentación recibida antes de resolver.'],
-  PRONUNCIAMIENTO: ['Pronunciamiento disponible', 'Consultá el pronunciamiento de la autoridad en el expediente.'],
-  CIERRE_CONFORME: ['Cierre conforme', 'La autoridad cerró el seguimiento conforme. Consultá el fundamento en el expediente.'],
-  DERIVACION_LEGALES: ['Derivación a Legales', 'La autoridad derivó el expediente a Legales. Consultá el fundamento de la decisión.'],
-};
 
 /** Committed atomically with the exchange. Never dispatch external channels here.
  * Actor submissions go to the assigned inspector and competent administrators;
@@ -56,9 +49,11 @@ export async function createInspectionExchangeNotices(
     select: { id: true },
   });
   const ids = [...new Set(recipients.map(user => user.id))];
-  if (!ids.length) return;
+  const companyRows = participant ? await inspectionCompanyNoticeRows(tx, inspection,
+    { clase: 'intercambio', id: exchange.id, autorId: exchange.autorId }, ids) : [];
+  if (!ids.length && !companyRows.length) return;
   const [title, action] = INSPECTION_EXCHANGE_LABELS[exchange.tipo];
-  await tx.notificacion.createMany({ data: ids.map(usuarioId => ({
+  const directRows = ids.map(usuarioId => ({
     usuarioId, tipo: 'INFO_GENERAL', prioridad: 'NORMAL',
     titulo: `PSIP · ${title}`,
     mensaje: `${participant ? ({ GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' }[inspection.tipoActor!] + ' · ') : ''}${inspection.numero} · Actuación #${exchange.secuencia}. ${action}${exchange.plazoRespuestaAt ? ' Plazo para responder: ' + exchange.plazoRespuestaAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) + '.' : ''}`,
@@ -73,5 +68,6 @@ export async function createInspectionExchangeNotices(
       correoVersion: 1,
       ...(exchange.plazoRespuestaAt ? { plazoRespuestaAt: exchange.plazoRespuestaAt.toISOString() } : {}),
     }),
-  })) });
+  } as Prisma.NotificacionCreateManyInput));
+  await tx.notificacion.createMany({ data: [...directRows, ...companyRows] });
 }

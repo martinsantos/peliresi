@@ -39,6 +39,8 @@ UX241 corrigió indicaciones de Ayuda y del directorio que prometían recuperaci
 
 UX242 convierte los 18 grupos del índice lateral en controles de teclado, mantiene la búsqueda al cambiar el rol y retira de la navegación el panel móvil mientras está cerrado. La búsqueda encuentra palabras con o sin tildes y explica cuando no hay resultados. También se corrigieron instrucciones antiguas del generador que afirmaban que una sola firma aprobaba el manifiesto. Estas verificaciones son dirigidas y no certifican todo el contenido del directorio ni la experiencia con lectores de pantalla.
 
+UX243 corrige en preview la falta de avisos PSIP para personas representantes con autorización vigente de toda la actividad: pueden abrir el requerimiento desde su aviso y responder con el contexto de la entidad. El aviso deja de revelar su contenido al revocar el permiso. Nueve recorridos artificiales cubrieron los tres roles en web, web móvil y la ruta app, y se verificaron las respuestas y los avisos de cierre o derivación. No se reconstruyen avisos que nunca se generaron; un permiso limitado a una sede no habilita este acceso porque la inspección no identifica establecimiento. La app se probó en Chromium, no en Android físico.
+
 El primer intento se detuvo porque la compilación visual reutilizada no tenía activadas las propuestas operativas, aunque el backend de prueba sí. Se conservó la traza y se recompilaron ambas superficies con las opciones de QA correspondientes; las pruebas anteriores son el resultado de la repetición. Esto demuestra que las opciones de compilación y de servidor deben cotejarse en cualquier corte futuro; no acredita cómo está configurada producción.
 
 ## Qué impide declarar terminado el objetivo

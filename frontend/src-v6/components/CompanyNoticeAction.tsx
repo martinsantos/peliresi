@@ -16,7 +16,8 @@ export default function CompanyNoticeAction({ notice, target, userId, context, r
  const accesses = notificationCompanyAccesses(notice), mp = useMobilePrefix();
  const fiscal = notificationFiscalReminder(notice);
  const eventual = target.includes('/manifiestos/baja-intensidad?registro=');
- const subject = fiscal ? 'situación fiscal' : eventual ? 'eventual' : target.includes('/adendas') ? 'adenda' : target.includes('certificado=') ? 'certificado' : 'manifiesto';
+ const inspection = /^\/requerimientos\/[a-zA-Z0-9_-]+(?:[?#]|$)/.test(target);
+ const subject = fiscal ? 'situación fiscal' : eventual ? 'eventual' : inspection ? 'requerimiento' : target.includes('/adendas') ? 'adenda' : target.includes('certificado=') ? 'certificado' : 'manifiesto';
  const article = subject === 'adenda' || fiscal ? 'la' : 'el';
  const [busy, setBusy] = useState(false), [error, setError] = useState('');
  const locked = useRef(false), alive = useRef(true);
@@ -34,7 +35,7 @@ export default function CompanyNoticeAction({ notice, target, userId, context, r
    if (String(user.id) !== userId || verified?.empresaId !== selection.empresaId || verified?.actividadId !== selection.actividadId
     || (verified?.establecimientoId || '') !== (selection.establecimientoId || '') || verified?.rol !== access.rol
     || (fiscal && (!verified?.todasSedes || verified?.actorId !== fiscal.actorId))
-    || (eventual && (!verified?.todasSedes || !access.actorId || verified?.actorId !== access.actorId))) throw new Error('Contexto incompatible');
+    || ((eventual || inspection) && (!verified?.todasSedes || !access.actorId || verified?.actorId !== access.actorId))) throw new Error('Contexto incompatible');
    saveCompanyContext(userId, selection); clearOfflineSession();
    const destination = fiscal ? '/notificaciones/' + encodeURIComponent(notice.id) : target;
    window.location.replace((window.location.pathname.startsWith('/app/') ? '/app' : '') + mp(destination));

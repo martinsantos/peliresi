@@ -330,6 +330,9 @@ test('actor inspection guide does not grant access to general inspections or aut
   assert.deepEqual(Array.from(guide.audiences), ['generador', 'transportista', 'operador']);
   assert.match(JSON.stringify(guide), /No ve los borradores/);
   assert.match(JSON.stringify(guide), /no aprueba ni cierra/);
+  assert.match(JSON.stringify(guide), /autorización vigente para toda la actividad/);
+  assert.match(JSON.stringify(guide), /Una autorización limitada a una sede no habilita este acceso/);
+  assert.match(JSON.stringify(guide), /Si se revoca la autorización, el contenido deja de estar disponible/);
   assert.match(JSON.stringify(guide), /no habilita nuevas respuestas/);
   assert.match(JSON.stringify(guide), /no al módulo general de Inspecciones/);
   const proof = JSON.parse(read('psip-actor-capture-provenance.json'));
