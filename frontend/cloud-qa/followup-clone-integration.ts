@@ -5,15 +5,15 @@ import path from 'node:path';
 import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 
 await assertCloudDatabase();
-assert.equal(process.env.GITHUB_SHA, '78c75f9473ff2a0a08962af6d6d22e441675ee51');
+assert.equal(process.env.GITHUB_SHA, 'dde430161d1f6cdc374f1a7999ff339e79182b82');
 assert.equal(process.env.DISABLE_EMAILS, 'true');
 assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
-const out = '/work/sitrep/.qa-followup-clone-20261031';
+const out = '/work/sitrep/.qa-followup-clone-20261031b';
 assert.equal(process.env.QA_ARTIFACTS, out);
 const url = new URL(process.env.DATABASE_URL!);
 assert.equal(url.pathname, '/sitrep_night_qa_20260926');
 assert.equal(url.searchParams.get('schema'), 'proposal_operations_20261021');
-url.pathname = '/sitrep_followup_isolation_20261031';
+url.pathname = '/sitrep_followup_isolation_20261031b';
 process.env.DATABASE_URL = url.toString();
 const { PrismaClient } = backendRequire('@prisma/client');
 const db = new PrismaClient();
@@ -29,9 +29,9 @@ const deferred = () => {
 
 try {
   const identity = await db.$queryRawUnsafe('SELECT current_database() AS name, inet_server_port() AS port, host(inet_server_addr()) AS address');
-  assert.deepEqual(identity, [{ name: 'sitrep_followup_isolation_20261031', port: 55440, address: '127.0.0.1' }]);
-  const { ejecutarSeguimientoCierre, simularSeguimientoCierre } = backendRequire(path.join(root, 'backend/dist-qa-followup-20261031/jobs/seguimientoCierre.job.js'));
-  jobClient = backendRequire(path.join(root, 'backend/dist-qa-followup-20261031/lib/prisma.js')).default;
+  assert.deepEqual(identity, [{ name: 'sitrep_followup_isolation_20261031b', port: 55440, address: '127.0.0.1' }]);
+  const { ejecutarSeguimientoCierre, simularSeguimientoCierre } = backendRequire(path.join(root, 'backend/dist-qa-followup-v2-20261031/jobs/seguimientoCierre.job.js'));
+  jobClient = backendRequire(path.join(root, 'backend/dist-qa-followup-v2-20261031/lib/prisma.js')).default;
   const generator = await db.usuario.findUniqueOrThrow({ where: { email: 'generador@night-qa.invalid' }, include: { generador: true } });
   const operator = await db.usuario.findUniqueOrThrow({ where: { email: 'operador@night-qa.invalid' }, include: { operador: true } });
   const admin = await db.usuario.findUniqueOrThrow({ where: { email: 'admin@night-qa.invalid' } });
@@ -105,7 +105,7 @@ try {
   assert.equal(await db.notificacion.count({ where: { manifiestoId: first } }), 0);
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
-  const result = { synthetic: true, production: false, database: 'sitrep_followup_isolation_20261031',
+  const result = { synthetic: true, production: false, database: 'sitrep_followup_isolation_20261031b',
     scopedSimulation: true, terminalReconciliationScoped: true, idempotent: true,
     lockedRowRechecked: waited, laterRowProcessedAfterTimeout: secondProcessed, failureReported: true,
     emailAttempts: 0, emailsSent: 0, pushEnabled: false };

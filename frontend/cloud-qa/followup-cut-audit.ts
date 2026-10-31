@@ -9,7 +9,7 @@ import { qaBackendEntry } from './rollback-backend.ts';
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-operational-ui-current2026103114';
 assert.equal(process.env.QA_ARTIFACTS, out);
-assert.equal(process.env.GITHUB_SHA, '78c75f9473ff2a0a08962af6d6d22e441675ee51');
+assert.equal(process.env.GITHUB_SHA, 'dde430161d1f6cdc374f1a7999ff339e79182b82');
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
 const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
 const flags = ['MANIFEST_PROPOSALS_ENABLED', 'MANIFEST_EXCEPTIONAL_ENABLED', 'MANIFEST_ADDENDA_ENABLED',
@@ -58,18 +58,18 @@ for (const stage of ['before', 'after']) {
   assert.equal(network.internal, true); assert.equal(network.publishedPorts, false);
   assert.equal(network.nanoCpus, 1000000000); assert.equal(network.memoryBytes, 2147483648); assert.equal(network.memorySwapBytes, 2147483648);
 }
-const clone = JSON.parse(readFileSync('/work/sitrep/.qa-followup-clone-20261031/followup-integration.json', 'utf8'));
+const clone = JSON.parse(readFileSync('/work/sitrep/.qa-followup-clone-20261031b/followup-integration.json', 'utf8'));
 assert.equal(clone.synthetic, true); assert.equal(clone.production, false);
 for (const field of ['scopedSimulation', 'terminalReconciliationScoped', 'idempotent', 'lockedRowRechecked', 'laterRowProcessedAfterTimeout', 'failureReported']) assert.equal(clone[field], true, field);
 assert.equal(clone.emailAttempts, 0); assert.equal(clone.emailsSent, 0); assert.equal(clone.pushEnabled, false);
-const followupUnit = JSON.parse(readFileSync('/work/sitrep/.qa-followup-unit-20261031/unit.json', 'utf8'));
+const followupUnit = JSON.parse(readFileSync('/work/sitrep/.qa-followup-unit-20261031v2/unit.json', 'utf8'));
 assert.equal(followupUnit.success, true); assert.equal(followupUnit.numFailedTests, 0); assert.equal(followupUnit.numPendingTests, 0);
 const baseline = read('baseline-compiled-proof.json');
 assert.equal(baseline.commit, '971727a3641780d88add1eb9a3ae714988ec44bf');
 const buildFlags = read('build-flags.json'); assert.equal(buildFlags.candidate, process.env.GITHUB_SHA);
 for (const key of [...frontendFlags, 'VITE_ACTOR_MULTIROLE_ENABLED', 'VITE_ENTERPRISE_ENABLED']) assert.equal(buildFlags.flags[key], 'true', key);
 const backendRoot = path.join(root, 'backend/dist-qa-actor-overview-20261031');
-const currentBackendRoot = path.join(root, 'backend/dist-qa-followup-20261031');
+const currentBackendRoot = path.join(root, 'backend/dist-qa-followup-v2-20261031');
 function compiledFiles(dir: string, prefix = ''): string[] {
   return readdirSync(path.join(dir, prefix), { withFileTypes: true }).flatMap(entry => entry.isDirectory()
     ? compiledFiles(dir, path.join(prefix, entry.name)) : entry.name.endsWith('.js') ? [path.join(prefix, entry.name)] : []).sort();
@@ -84,8 +84,8 @@ assert.deepEqual(changedCompiled, ['controllers/support.controller.js', 'jobs/se
 for (const file of ['controllers/support.controller.js', 'services/notification-mail.service.js']) assert.ok(readFileSync(path.join(currentBackendRoot, file)).equals(
   readFileSync(path.join(root, '.qa-support-mail-20261031/compiled', file))));
 assert.ok(readFileSync(path.join(currentBackendRoot, 'jobs/seguimientoCierre.job.js')).equals(
-  readFileSync(path.join(root, '.qa-followup-unit-20261031/compiled/jobs/seguimientoCierre.job.js'))));
-assert.match(read('runtime-proof.json').backend, /backend\/dist-qa-followup-20261031\/index\.js$/);
+  readFileSync(path.join(root, '.qa-followup-unit-20261031v2/compiled/jobs/seguimientoCierre.job.js'))));
+assert.match(read('runtime-proof.json').backend, /backend\/dist-qa-followup-v2-20261031\/index\.js$/);
 const unitCounts: Record<string, number> = {};
 for (const [file, minimum] of [['unit-current.json', 235], ['pdf-unit-current.json', 32]] as const) {
   const report = read(file); assert.equal(report.success, true); assert.ok(report.numPassedTests >= minimum, file);

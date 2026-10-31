@@ -8,7 +8,7 @@ await assertCloudDatabase();
 const out = '/work/sitrep/.qa-operational-ui-current2026103114';
 assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'followup-cut-20261031');
-assert.equal(process.env.GITHUB_SHA, '78c75f9473ff2a0a08962af6d6d22e441675ee51');
+assert.equal(process.env.GITHUB_SHA, 'dde430161d1f6cdc374f1a7999ff339e79182b82');
 const stage = process.env.QA_SOURCE_STAGE;
 assert.ok(stage === 'before' || stage === 'after');
 const expected = JSON.parse(readFileSync(path.join(out, 'qa-digests.json'), 'utf8')) as Record<string, string>;

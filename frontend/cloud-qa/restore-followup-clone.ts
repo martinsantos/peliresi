@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 
 const host = 'openclaw-vps', container = 'sitrep-qa-training-20261018';
-const source = 'sitrep_night_qa_20260926', target = 'sitrep_followup_isolation_20261031';
+const source = 'sitrep_night_qa_20260926', target = 'sitrep_followup_isolation_20261031b';
 const directory = '/Users/santosma/Documents/SITREP-respaldo-preview-20261027';
 const archive = `${directory}/copia-ce2eb1cb-20261031/preview-base-ce2eb1cb.dump.gpg`;
 const proof = JSON.parse(readFileSync(`${directory}/copia-ce2eb1cb-20261031/restauracion-preview-ce2eb1cb.json`, 'utf8'));
@@ -32,7 +32,7 @@ const connection = ['-h', '127.0.0.1', '-p', '55440', '-U', 'qa'];
 const psql = (database: string, query: string) => docker(['psql', '--no-psqlrc', '-A', '-t', '-v', 'ON_ERROR_STOP=1', ...connection, '-d', database, '-c', query]).trim();
 assert.equal(psql(source, 'SELECT current_database(), inet_server_port(), host(inet_server_addr())'), `${source}|55440|127.0.0.1`);
 assert.equal(psql(source, `SELECT count(*) FROM pg_database WHERE datname='${target}'`), '0');
-docker(['mkdir', '-m', '700', '/work/sitrep/.qa-followup-clone-20261031']);
+docker(['mkdir', '-m', '700', '/work/sitrep/.qa-followup-clone-20261031b']);
 docker(['createdb', ...connection, target]);
 const decrypt = spawn('gpg', ['--batch', '--pinentry-mode', 'loopback', '--passphrase-file', `${directory}/clave-recuperacion.txt`, '--decrypt', archive], { stdio: ['ignore', 'pipe', 'pipe'] });
 const restore = spawn('ssh', ['-o', 'BatchMode=yes', host, ['docker', 'exec', '-i', container, 'pg_restore', '--no-owner', '--no-acl', '--exit-on-error', ...connection, '-d', target].map(quote).join(' ')], { stdio: ['pipe', 'ignore', 'pipe'] });
@@ -49,6 +49,6 @@ assert.equal(rows.length, proof.tables);
 assert.equal(createHash('sha256').update(rows.join('\n')).digest('hex'), proof.digest);
 const result = { synthetic: true, production: false, sourceBackupSha256: proof.archive_sha256, target, tables: rows.length,
   digest: proof.digest, equal: true, ownersAndAclVerified: false, networkInternal: true, publishedPorts: false };
-const write = spawnSync('ssh', ['-o', 'BatchMode=yes', host, ['docker', 'exec', '-i', container, 'sh', '-c', 'umask 077; test ! -e /work/sitrep/.qa-followup-clone-20261031/restore-proof.json; cat > /work/sitrep/.qa-followup-clone-20261031/restore-proof.json'].map(quote).join(' ')],
+const write = spawnSync('ssh', ['-o', 'BatchMode=yes', host, ['docker', 'exec', '-i', container, 'sh', '-c', 'umask 077; test ! -e /work/sitrep/.qa-followup-clone-20261031b/restore-proof.json; cat > /work/sitrep/.qa-followup-clone-20261031b/restore-proof.json'].map(quote).join(' ')],
   { input: JSON.stringify(result, null, 2), encoding: 'utf8' });
 assert.equal(write.status, 0, write.stderr); console.log(JSON.stringify(result));
