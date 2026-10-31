@@ -103,7 +103,7 @@ export function useSupportCommand(scope: SupportCommandScope) {
         saved = await confirmSupportCommand(scope, command.key, command.receipt);
       }
       if (!active()) return;
-      if (saved.status !== command.status || saved.status === 'pending') throw new Error('No pudimos guardar el resultado. Conservamos el envío; reintentá.');
+      if (saved.status !== command.status) throw new Error('No pudimos guardar el resultado. Conservamos el envío; reintentá.');
       // Cleanup can fail; keep the receipt until it succeeds, preventing a new send.
       await beforeRelease(saved);
       if (!active()) return;
