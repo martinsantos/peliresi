@@ -1,7 +1,7 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { login, prefix, readableWholeWords } from './helpers';
+import { isolatedMapTiles, login, prefix, readableWholeWords } from './helpers';
 import { assertCloudDatabase } from '../safety';
 
 const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'psip-lifecycle-fixture.json'), 'utf8'));
@@ -75,6 +75,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
         await actor.getByRole('button', { name: 'Continuar en el expediente', exact: true }).click();
         const inbox = await page.context().newPage(); inbox.on('pageerror', error => errors.push(error.message));
         try {
+          await isolatedMapTiles(inbox, info);
           await openNotice(inbox, index ? 'Subsanación presentada' : 'Descargo presentado', index ? 4 : 2);
           await expect(inbox).toHaveURL(new RegExp(`/inspecciones/${id}(?:[?#].*)?$`));
           await expect(inbox.getByTestId('inspection-next-step')).toContainText('Revisar las presentaciones recibidas');
