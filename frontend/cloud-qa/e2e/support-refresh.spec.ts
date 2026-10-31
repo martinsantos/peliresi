@@ -42,7 +42,9 @@ test('confirmed support actions refresh the ticket and survive a failed read wit
   await page.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
   await expect(page.getByText('Acción confirmada. No hace falta enviarla otra vez.', { exact: true })).toBeVisible();
   await expect(page.getByText(/No pudimos actualizar el ticket/).first()).toBeVisible();
-  await expect(page.locator('header').getByText('Pendiente de actualización', { exact: true })).toBeVisible();
+  const pendingFields = page.locator('header').getByText('Pendiente de actualización', { exact: true });
+  await expect(pendingFields).toHaveCount(2);
+  await expect(pendingFields.first()).toBeVisible(); await expect(pendingFields.last()).toBeVisible();
   continueButton = page.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
   await expect(continueButton).toBeEnabled(); await continueButton.click();
   await expect.poll(() => rejectedReads).toBeGreaterThanOrEqual(2);
