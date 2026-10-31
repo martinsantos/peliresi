@@ -26,7 +26,7 @@ test('confirmed support actions refresh the ticket and survive a failed read wit
   await page.getByRole('button', { name: 'Asignarme', exact: true }).click();
   await expect(page.getByText('Acción confirmada. No hace falta enviarla otra vez.', { exact: true })).toBeVisible();
   await expect(page.locator('dd').filter({ hasText: 'QA admin' })).toBeVisible();
-  let continueButton = page.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  let continueButton = page.getByRole('button', { name: 'Continuar', exact: true });
   await expect(continueButton).toBeEnabled(); await continueButton.click();
   await expect(continueButton).toHaveCount(0);
 
@@ -45,7 +45,12 @@ test('confirmed support actions refresh the ticket and survive a failed read wit
   const pendingFields = page.locator('header').getByText('Pendiente de actualización', { exact: true });
   await expect(pendingFields).toHaveCount(2);
   await expect(pendingFields.first()).toBeVisible(); await expect(pendingFields.last()).toBeVisible();
-  continueButton = page.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  const confirmation = page.getByRole('region', { name: 'Resultado de la acción', exact: true });
+  await expect(confirmation).toBeFocused();
+  await expect(confirmation.getByRole('alert')).toContainText('No pudimos actualizar el ticket');
+  continueButton = confirmation.getByRole('button', { name: 'Reintentar actualización', exact: true });
+  await expect(confirmation.getByRole('alert')).toBeInViewport();
+  await expect(continueButton).toBeInViewport();
   await expect(continueButton).toBeEnabled(); await continueButton.click();
   await expect.poll(() => rejectedReads).toBeGreaterThanOrEqual(2);
   await expect(page.getByText('Acción confirmada. No hace falta enviarla otra vez.', { exact: true })).toBeVisible();
@@ -58,7 +63,7 @@ test('confirmed support actions refresh the ticket and survive a failed read wit
   await expect(page.getByRole('heading', { name: subject, exact: true })).toBeVisible();
   await expect(page.getByText('Acción confirmada. No hace falta enviarla otra vez.', { exact: true })).toBeVisible();
   await expect(page.getByText('Cerrado', { exact: true }).first()).toBeVisible();
-  continueButton = page.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  continueButton = page.getByRole('button', { name: 'Continuar', exact: true });
   await expect(continueButton).toBeEnabled(); await continueButton.click();
   await expect(continueButton).toHaveCount(0);
   expect(actions).toBe(2);

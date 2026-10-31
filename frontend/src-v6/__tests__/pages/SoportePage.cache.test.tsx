@@ -199,7 +199,7 @@ it('keeps private notes and attachments separate from a public response while sw
   expect(screen.queryByText('privado.png', { exact: true })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'RESPONDER', cuerpo: 'Respuesta pública pendiente' }), [publicFile], expect.any(String)));
-  const continueButton = await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  const continueButton = await screen.findByRole('button', { name: 'Continuar', exact: true });
   await waitFor(() => expect(continueButton).toBeEnabled()); fireEvent.click(continueButton);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Nota interna', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
@@ -223,7 +223,7 @@ it('keeps a prepared public reply when a separate private note is confirmed', as
   fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Nota privada confirmada' } });
   fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
-  const continueButton = await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  const continueButton = await screen.findByRole('button', { name: 'Continuar', exact: true });
   await waitFor(() => expect(continueButton).toBeEnabled()); fireEvent.click(continueButton);
   await waitFor(() => expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Próxima respuesta pública'));
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
@@ -342,9 +342,12 @@ it('keeps a confirmed receipt when refreshing fails and clears it only after a s
   fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resuelto en la prueba.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
   await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
-  await screen.findByText(/No pudimos actualizar el ticket/);
+  await waitFor(() => expect(screen.getAllByText(/No pudimos actualizar el ticket/).length).toBeGreaterThan(0));
   expect(screen.getByText(/Pendiente de actualización/, { selector: 'span' })).toBeVisible();
-  const continueButton = screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  const result = screen.getByRole('region', { name: 'Resultado de la acción', exact: true });
+  expect(result).toHaveFocus();
+  expect(within(result).getByRole('alert')).toHaveTextContent('No pudimos actualizar el ticket');
+  const continueButton = within(result).getByRole('button', { name: 'Reintentar actualización', exact: true });
   const initialReads = calls.get.mock.calls.length;
   fireEvent.click(continueButton);
   await waitFor(() => expect(calls.get.mock.calls.length).toBeGreaterThan(initialReads));
@@ -366,8 +369,8 @@ it('does not clear a confirmed receipt when the server returns a version older t
   fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resolución de prueba.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
   await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
-  await screen.findByText(/No pudimos actualizar el ticket/);
-  const continueButton = screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  await waitFor(() => expect(screen.getAllByText(/No pudimos actualizar el ticket/).length).toBeGreaterThan(0));
+  const continueButton = within(screen.getByRole('region', { name: 'Resultado de la acción', exact: true })).getByRole('button', { name: 'Reintentar actualización', exact: true });
   const initialReads = calls.get.mock.calls.length;
   fireEvent.click(continueButton);
   await waitFor(() => expect(calls.get.mock.calls.length).toBeGreaterThan(initialReads));

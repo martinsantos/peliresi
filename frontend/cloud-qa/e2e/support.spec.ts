@@ -91,7 +91,7 @@ async function action(page: Page, label: string, text: string) {
   await page.getByRole('textbox', { name: /Mensaje o resolución|Nota interna \/ motivo/ }).fill(text);
 }
 async function continueAfterConfirmedAction(page: Page) {
-  const continueButton = page.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  const continueButton = page.getByRole('button', { name: 'Continuar', exact: true });
   await expect(continueButton).toBeVisible({ timeout: 10000 });
   await continueButton.click();
   await expect(continueButton).toBeHidden();
