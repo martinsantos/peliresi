@@ -119,13 +119,14 @@ test('el formulario de inspección sigue accesible con texto ampliado', async ({
   await readableWholeWords(dialog.getByRole('heading', { name: 'Nueva inspección' }));
   const close = dialog.getByRole('button', { name: 'Cerrar', exact: true });
   await readableFixedAction(close, dialog);
-  await readableFixedAction(dialog.getByRole('button', { name: 'Cancelar', exact: true }), dialog);
+  await readableFixedAction(dialog.getByRole('button', { name: 'Volver', exact: true }), dialog);
   await readableFixedAction(dialog.getByRole('button', { name: 'Crear expediente', exact: true }), dialog);
   const location = dialog.getByLabel('Ubicación prevista');
   const label = dialog.getByText('Ubicación prevista', { exact: true });
   await label.scrollIntoViewIfNeeded();
   await location.fill('Lugar artificial para revisión de teclado');
   await expect(location).toHaveValue('Lugar artificial para revisión de teclado');
+  await expect(dialog.getByRole('status').filter({ hasText: 'Borrador de apertura' })).toHaveCount(1);
   const fieldAndLabelVisible = () => label.evaluate(element => {
     const field = element.parentElement!.querySelector('input')!;
     const body = element.closest('.overflow-y-auto')!.getBoundingClientRect();
@@ -133,7 +134,22 @@ test('el formulario de inspección sigue accesible con texto ampliado', async ({
     return labelRect.top >= body.top - 1 && labelRect.bottom <= body.bottom + 1
       && fieldRect.top >= body.top - 1 && fieldRect.bottom <= body.bottom + 1;
   });
-  await expect.poll(fieldAndLabelVisible).toBe(true);
+  try {
+    await expect.poll(fieldAndLabelVisible).toBe(true);
+  } finally {
+    const geometry = await label.evaluate(element => {
+      const field = element.parentElement!.querySelector('input')!;
+      const body = element.closest('.overflow-y-auto') as HTMLElement;
+      const rect = (node: Element) => {
+        const box = node.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom, height: box.height };
+      };
+      return { body: rect(body), label: rect(element), field: rect(field),
+        scrollTop: body.scrollTop, scrollHeight: body.scrollHeight, clientHeight: body.clientHeight,
+        focused: document.activeElement === field };
+    });
+    writeFileSync(info.outputPath('focused-field-geometry.json'), JSON.stringify(geometry, null, 2));
+  }
   if (info.project.name === 'app') {
     await page.setViewportSize({ width: 320, height: 650 });
     await expect.poll(() => page.evaluate(() => window.visualViewport?.height)).toBe(650);
@@ -143,6 +159,10 @@ test('el formulario de inspección sigue accesible con texto ampliado', async ({
     await expect(location).toBeFocused();
   }
   await page.screenshot({ path: info.outputPath('inspeccion-texto-ampliado.png'), animations: 'disabled' });
+  await dialog.getByRole('button', { name: 'Volver', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Continuar apertura', exact: true }).click();
+  await expect(dialog.getByLabel('Ubicación prevista')).toHaveValue('Lugar artificial para revisión de teclado');
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   expect(writes).toBe(0);

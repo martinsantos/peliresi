@@ -71,6 +71,32 @@ describe('modal remains usable above the mobile keyboard', () => {
     expect(input).toHaveFocus();
   });
 
+  it.each([true, false])('reveals the focused field again after content shifts (visual viewport: %s)', async (hasViewport) => {
+    vi.stubGlobal('visualViewport', hasViewport ? new VisibleViewport() : undefined);
+    const view = (expanded: boolean) => <Modal isOpen title="Nueva inspección" onClose={vi.fn()}>
+      {expanded && <p>El borrador se guardó en este dispositivo.</p>}
+      <label htmlFor="field-reflow">Ubicación prevista</label><input id="field-reflow" />
+    </Modal>;
+    const { rerender } = render(view(false));
+    const modal = screen.getByRole('dialog'), input = within(modal).getByLabelText('Ubicación prevista');
+    const label = within(modal).getByText('Ubicación prevista');
+    const body = label.closest('.overflow-y-auto') as HTMLDivElement;
+    const box = (top: number, height: number) => ({ x: 0, y: top, top, bottom: top + height, left: 0, right: 320, width: 320, height, toJSON: () => ({}) }) as DOMRect;
+    let shift = 0;
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(box(0, 160));
+    vi.spyOn(body, 'getClientRects').mockReturnValue([box(0, 160)] as unknown as DOMRectList);
+    vi.spyOn(label, 'getBoundingClientRect').mockImplementation(() => box(8 + shift - body.scrollTop, 20));
+    vi.spyOn(label, 'getClientRects').mockImplementation(() => [box(8 + shift - body.scrollTop, 20)] as unknown as DOMRectList);
+    vi.spyOn(input, 'getBoundingClientRect').mockImplementation(() => box(40 + shift - body.scrollTop, 60));
+    input.focus();
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); });
+    expect(body.scrollTop).toBe(0);
+    shift = 100;
+    rerender(view(true));
+    await waitFor(() => expect(body.scrollTop).toBe(48));
+    expect(input).toHaveFocus();
+  });
+
   it('keeps the focused field and label visible when the visual viewport shrinks', async () => {
     const viewport = new VisibleViewport();
     vi.stubGlobal('visualViewport', viewport);

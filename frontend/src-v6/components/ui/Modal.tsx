@@ -121,13 +121,15 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
+  // A saved-draft notice or validation message can move a focused field
+  // without changing the viewport or firing another focus event.
   useLayoutEffect(() => {
-    if (!isOpen || !viewport) return;
+    if (!isOpen) return;
     const active = document.activeElement;
     if (!bodyRef.current?.contains(active)) return;
     const frame = requestAnimationFrame(() => revealFocusedField(bodyRef.current, active));
     return () => cancelAnimationFrame(frame);
-  }, [isOpen, viewport]);
+  }, [isOpen, viewport, children]);
 
   // Focus trap: Tab cycles within the modal
   useEffect(() => {
