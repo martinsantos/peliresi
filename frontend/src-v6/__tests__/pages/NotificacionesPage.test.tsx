@@ -58,6 +58,19 @@ describe('notification inbox states and interaction', () => {
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
   });
+  it.each(['', '/app'])('shows the updated requirement as current information on %s', async base => {
+    auth.user.rol = 'GENERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Estado actualizado de requerimiento',
+      mensaje: 'QA-001 · Se registró una respuesta.', datos: JSON.stringify({ familia: 'catalogo_verificable', version: 1,
+        tipo: 'requerimiento_inspeccion', estadoDetectado: 'ACTUALIZADO', inspeccionId: 'psip-1', destino: 'participacion' }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('QA-001 · Se registró una respuesta.')).toBeVisible();
+    expect(screen.queryByText(/Situación registrada al evaluar:/)).toBeNull();
+    expect(screen.queryByText('Consultar requerimiento y respuesta')).toBeNull();
+    expect(screen.getByText('Consultar requerimiento y estado →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Estado actualizado de requerimiento', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/requerimientos/psip-1');
+  });
   it.each(['', '/app'])('clarifies an older GPS notice without changing its saved text on %s', async base => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS',
       mensaje: 'Velocidad anormalmente alta detectada: 250 km/h', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } }] });

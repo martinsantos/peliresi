@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const db = vi.hoisted(() => ({ inspection: vi.fn(), exchange: vi.fn(), event: vi.fn(), intake: vi.fn(), alert: vi.fn(), notice: vi.fn(), query: vi.fn(), insert: vi.fn(), actor: vi.fn() }));
+const db = vi.hoisted(() => ({ inspection: vi.fn(), exchange: vi.fn(), event: vi.fn(), intake: vi.fn(), alert: vi.fn(), notice: vi.fn(), query: vi.fn(), insert: vi.fn(), actor: vi.fn(), alertsMany: vi.fn(), exchangesMany: vi.fn(), usersMany: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
-  inspeccion: { findUnique: db.inspection }, intercambioInspeccion: { findUnique: db.exchange },
+  inspeccion: { findUnique: db.inspection }, intercambioInspeccion: { findUnique: db.exchange, findMany: db.exchangesMany },
   eventoInspeccion: { findUnique: db.event }, antecedenteFiscalizacion: { findUnique: db.intake },
-  alertaGenerada: { findUnique: db.alert },
-  usuario: { findFirst: db.actor },
+  alertaGenerada: { findUnique: db.alert, findMany: db.alertsMany },
+  usuario: { findFirst: db.actor, findMany: db.usersMany },
   notificacion: { findUnique: db.notice }, $queryRawUnsafe: db.query, emailQueue: { createMany: db.insert },
 } }));
 import { notificationMailContent, queuedNoticeStillEligible, queueCommittedNotificationEmails, type NoticeForMail } from '../../services/notification-mail.service';
 
-const inspection = { id: 'case', estado: 'NOTIFICADA', numeroActa: 'QA-ARTIFICIAL', inspectorId: 'inspector', tipoActor: 'GENERADOR',
-  generador: { usuarioId: 'owner' }, operador: null, transportista: null };
+const inspection = { id: 'case', numero: 'QA-ARTIFICIAL', estado: 'NOTIFICADA', numeroActa: 'QA-ARTIFICIAL', inspectorId: 'inspector', tipoActor: 'GENERADOR', generadorId: 'g-1',
+  generador: { usuarioId: 'owner', activo: true }, operador: null, transportista: null };
 const metadata = { tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: 'case', intercambioId: 'exchange',
   secuencia: 1, evento: 'REQUERIMIENTO', parte: 'AUTORIDAD', destino: 'participacion' };
 const base: NoticeForMail = { id: 'notice', tipo: 'INFO_GENERAL', datos: JSON.stringify(metadata), createdAt: new Date(),
@@ -32,14 +32,17 @@ beforeEach(() => {
 describe('queued PSIP deadline reminders recheck the live requirement', () => {
   const deadline = new Date('2020-01-01T12:00:00Z');
   const facts = { familia: 'catalogo_verificable', version: 1, tipo: 'requerimiento_inspeccion', entidad: 'REQUERIMIENTO',
-    entidadId: 'exchange', inspeccionId: 'case', casoId: 'alert', vencimiento: deadline.toISOString(), destino: 'inspeccion' };
+    entidadId: 'exchange', inspeccionId: 'case', casoId: 'alert', vencimiento: deadline.toISOString(), destino: 'inspeccion', tipoActor: 'GENERADOR', actorId: 'g-1' };
   const pending = { ...exchange, destinatario: 'INSPECCIONADO', plazoRespuestaAt: deadline, respuestas: [], inspeccion: inspection };
   beforeEach(() => {
     vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'alertas');
     const notice = { ...base, usuarioId: 'inspector', esInspector: true, datos: JSON.stringify(facts) };
     db.notice.mockResolvedValue({ ...notice, usuario: notice });
     db.alert.mockResolvedValue({ estado: 'PENDIENTE', datos: JSON.stringify(facts), regla: { activa: true } });
+    db.alertsMany.mockResolvedValue([{ id: 'alert', estado: 'PENDIENTE', datos: JSON.stringify(facts), regla: { activa: true } }]);
     db.exchange.mockResolvedValue(pending);
+    db.exchangesMany.mockResolvedValue([pending]);
+    db.usersMany.mockResolvedValue([{ id: 'inspector', rol: 'GENERADOR', esInspector: true }]);
   });
   it('retains the assigned inspector but rejects a replacement before the catalogue runs again', async () => {
     expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(true);
@@ -48,15 +51,20 @@ describe('queued PSIP deadline reminders recheck the live requirement', () => {
   });
   it('rechecks an approved secondary activity before allowing its overdue reminder', async () => {
     vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
-    const data = { ...facts, destino: 'participacion', tipoActor: 'GENERADOR' };
+    const data = { ...facts, destino: 'participacion', tipoActor: 'GENERADOR', actorId: 'g-1' };
     const user = { ...base, rol: 'OPERADOR', datos: JSON.stringify(data) };
+    const current = { ...inspection, generadorId: 'g-1', generador: { usuarioId: 'owner', activo: true } };
     db.notice.mockResolvedValue({ ...user, usuario: user });
     db.alert.mockResolvedValue({ estado: 'PENDIENTE', datos: JSON.stringify(data), regla: { activa: true } });
-    db.exchange.mockResolvedValue({ ...pending, inspeccion: { ...inspection, generadorId: 'g-1' } });
+    db.alertsMany.mockResolvedValue([{ id: 'alert', estado: 'PENDIENTE', datos: JSON.stringify(data), regla: { activa: true } }]);
+    db.exchange.mockResolvedValue({ ...pending, inspeccion: current });
+    db.exchangesMany.mockResolvedValue([{ ...pending, inspeccion: current }]);
+    db.usersMany.mockResolvedValue([{ id: 'owner', generador: { id: 'g-1' } }]);
     db.actor.mockResolvedValue({ id: 'owner' });
     expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(true);
     expect(db.actor.mock.calls[0][0].where.AND[1]).toMatchObject({ generador: { is: { id: 'g-1' } } });
     db.actor.mockResolvedValue(null);
+    db.usersMany.mockResolvedValue([]);
     expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(false);
   });
   it.each([

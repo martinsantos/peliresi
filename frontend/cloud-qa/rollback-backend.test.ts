@@ -19,4 +19,10 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-company-before' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-inspection-deadline-company-20261030', QA_COMPAT_BACKEND: 'inspection-deadline-company-after' }), /backend\/dist-qa-psip-deadline-company-20261030-v3\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-company-after' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-inspection-deadline-company-20261030', QA_COMPAT_BACKEND: 'inspection-deadline-direct' }), /backend\/dist-qa-psip-deadline-company-20261030-v4\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-direct' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-inspection-deadline-company-20261030', QA_COMPAT_BACKEND: 'inspection-deadline-authority' }), /backend\/dist-qa-psip-deadline-company-20261030-v5\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-authority' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-inspection-deadline-company-20261030', QA_COMPAT_BACKEND: 'inspection-deadline-polished' }), /backend\/dist-qa-psip-deadline-company-20261030-v6\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-polished' }));
 });

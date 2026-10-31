@@ -13,7 +13,7 @@ import { formatRelativeTime } from '../../utils/formatters';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole, notificationInboxReturnState, needsPersonalManifestChoice } from '../../utils/notificationNavigation';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
-import { notificationFollowup } from '../../utils/notificationFollowup';
+import { isCurrentRequirementNotice, notificationFollowup } from '../../utils/notificationFollowup';
 import { gpsNoticeContext, gpsNoticeTitle } from '../../utils/gpsNoticeContext';
 import { notificationManifestReference } from '../../utils/notificationManifestReference';
 import type { Notificacion } from '../../types/models';
@@ -171,7 +171,7 @@ const NotificacionesPage: React.FC = () => {
                       <time dateTime={notice.createdAt} className="text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                     </span>
                     {gpsContext && <span className="mt-2 block text-sm font-medium text-neutral-700">{gpsContext}</span>}
-                    <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
+                    <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup && !isCurrentRequirementNotice(notice) ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
                     {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{otherActivity ? `Ver aviso para ${otherActivity} →` : notificationActionLabel(path, notice)}</span>}
                   </span>

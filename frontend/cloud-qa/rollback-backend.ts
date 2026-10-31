@@ -109,6 +109,18 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-inspection-deadline-company-20261030') {
     return path.join(root, 'backend/dist-qa-psip-deadline-company-20261030-v3/index.js');
   }
+  if (version === 'inspection-deadline-direct'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-inspection-deadline-company-20261030') {
+    return path.join(root, 'backend/dist-qa-psip-deadline-company-20261030-v4/index.js');
+  }
+  if (version === 'inspection-deadline-authority'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-inspection-deadline-company-20261030') {
+    return path.join(root, 'backend/dist-qa-psip-deadline-company-20261030-v5/index.js');
+  }
+  if (version === 'inspection-deadline-polished'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-inspection-deadline-company-20261030') {
+    return path.join(root, 'backend/dist-qa-psip-deadline-company-20261030-v6/index.js');
+  }
   if (version === '17152d81'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-rollback-partial-20261030') {
     return path.join(root, '.qa-rollback-partial-20261030/snapshot/backend/dist/index.js');

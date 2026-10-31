@@ -1,5 +1,6 @@
 import { withInspectionCompanyNoticeContext } from './inspectionCompanyNotice.service';
 import { withInspectionDeadlineCompanyNoticeContext } from './inspectionDeadlineCompanyNotice.service';
+import { withInspectionDeadlineDirectNoticeContext } from './inspectionDeadlineDirectNotice.service';
 
 export const COMPANY_NOTICE_LABELS: Record<string, [string, string]> = {
   FICHA_ACTUALIZADA: ['Ficha de actividad actualizada', 'Administración actualizó datos de la actividad. Revisá la ficha y su historial.'],
@@ -95,6 +96,7 @@ async function companyContexts(db: any, events: any[]): Promise<Map<string, Comp
 export async function withCompanyNoticeContext<T extends { datos: string | null; usuarioId?: string }>(db: any, notices: T[]): Promise<T[]> {
   notices = await withInspectionCompanyNoticeContext(db, notices);
   notices = await withInspectionDeadlineCompanyNoticeContext(db, notices);
+  notices = await withInspectionDeadlineDirectNoticeContext(db, notices);
   const references = notices.map(n => {
     try { const d = JSON.parse(n.datos || 'null'); return d && validCompanyNotice(d) && !d.contexto ? d : null; } catch { return null; }
   });
