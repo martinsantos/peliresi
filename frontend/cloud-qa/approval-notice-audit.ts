@@ -49,7 +49,7 @@ const generation = read('approval-generation.json');
 assert.equal(generation.synthetic, true); assert.equal(generation.production, false);
 assert.equal(generation.results.length, 6);
 assert.ok(generation.results.every((item: any) => item.partiesNotified === 3 && item.retryDidNotDuplicate));
-for (const file of ['frontend-notice-unit.json', 'backend-notice-unit.json']) {
+for (const file of ['frontend-notice-unit.json', 'backend-notice-unit-final.json']) {
   const result = read(file); assert.equal(result.success, true); assert.equal(result.numFailedTests, 0); assert.equal(result.numPendingTests, 0);
 }
 const manual = readFileSync(path.join(out, 'manual.tap'), 'utf8');
@@ -77,7 +77,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { commit, synthetic: true, production: false, browserTests: 2, generationCases: generation.results.length,
-    frontendTests: read('frontend-notice-unit.json').numPassedTests, backendTests: read('backend-notice-unit.json').numPassedTests,
+    frontendTests: read('frontend-notice-unit.json').numPassedTests, backendTests: read('backend-notice-unit-final.json').numPassedTests,
     manualTests: Number(manual.match(/# pass (\d+)/)?.[1]), capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false,
     historicalStoredTextUnchanged: true, scope: 'individual approval notice with recognized legacy metadata and exact previous wording' };
   writeFileSync(path.join(out, 'approval-notice-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
