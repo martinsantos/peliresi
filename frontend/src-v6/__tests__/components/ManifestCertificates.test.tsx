@@ -136,6 +136,7 @@ it('blocks a final until the complete approved finding is treated',async()=>{
  fireEvent.click(screen.getByText('Use QA signature'));
  expect(within(publication).queryByRole('button',{name:'Revisar corrientes halladas'})).toBeNull();
  expect(publish).toBeEnabled();
+ expect(publish).not.toHaveAttribute('aria-describedby');
  fireEvent.click(screen.getByRole('button',{name:'Firmar y publicar certificación'}));
  await screen.findByText('QA sin envío');
  expect(mocks.post.mock.calls[0][1].cantidades).toContainEqual({residuoId:finding.id,cantidad:2});
