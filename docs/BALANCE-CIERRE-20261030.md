@@ -71,6 +71,8 @@ UX254 actualiza automáticamente el ticket después de una acción confirmada y 
 
 **UX256:** `dde43016` excluye los registros artificiales del seguimiento operativo y limita la espera por bloqueo de cada manifiesto, continuando con los siguientes e informando los fallos. La prueba anterior detectó una espera superior a 15 segundos; el candidato pasó 38 pruebas unitarias y una integración con PostgreSQL artificial, incluida una fila bloqueada y la continuación de otra. También completó 37 casos de navegador, 245 pruebas de interfaz, 32 de PDF y 51 del manual; se corrigieron instrucciones sobre supresión de correos, umbrales y recordatorios. Son ensayos en preview, con GPS simulado y sin envíos reales. Una fila que siga bloqueada puede esperar hasta el siguiente barrido diario; la capacidad sostenida del destino no fue medida.
 
+**UX257:** `af64384d` evita que `GET/HEAD /api/health/live` genere analítica persistente, sin eliminar su límite por IP en memoria. La prueba con PostgreSQL artificial reprodujo tres escrituras en la versión anterior y ninguna con la corrección; `/api/health` y `/api/health/ready` siguieron creando sus contadores. Pasaron 28 pruebas dirigidas, 52 del manual y dos comprobaciones del backend real en web/app. La regresión integral de 37 recorridos sigue correspondiendo a `dde43016`; la fuente de interfaz no cambió salvo el directorio del manual. Una sonda de vida no verifica la base ni impide que otros procesos escriban.
+
 ## Qué impide declarar terminado el objetivo
 
 1. **Aprobaciones anteriores.** No se conoce el impacto de exigir tres decisiones sobre los manifiestos existentes. El usuario indicó no consultar datos reales, ni siquiera agregados; la auditoría preparada queda restringida al preview artificial.
