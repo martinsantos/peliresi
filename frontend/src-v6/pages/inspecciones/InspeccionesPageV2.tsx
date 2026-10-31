@@ -4,31 +4,29 @@ import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, File
 import { Button } from '../../components/ui/ButtonV2';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { Badge } from '../../components/ui/BadgeV2';
-import { Modal } from '../../components/ui/Modal';
 import { Card } from '../../components/ui/CardV2';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCatalogoGeneradores, useCatalogoOperadores, useCatalogoTransportistas } from '../../hooks/useCatalogos';
-import { useInspections, useInspectionMutation } from '../../hooks/useInspecciones';
+import { useInspections } from '../../hooks/useInspecciones';
 import { inspeccionService } from '../../services/inspeccion.service';
 import { readInspectionResume } from '../../services/inspectionResume';
 import type { InspectionActorType, InspectionState, InspectionType } from '../../types/inspection';
-import { inspectionActor, INSPECTION_TYPES, inspectionTypeOf, inspectionNumberExample } from '../../types/inspection';
+import { inspectionActor, INSPECTION_TYPES, inspectionTypeOf } from '../../types/inspection';
 import { downloadCsv } from '../../utils/exportCsv';
-import { INSPECTION_ACTOR_LABELS, INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionActorRoute, inspectionDate, inspectionErrorMessage, inspectionRelevantDate, isTrainingActNumber } from './inspectionPresentation';
+import { INSPECTION_ACTOR_LABELS, INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionActorRoute, inspectionDate, inspectionRelevantDate, isTrainingActNumber } from './inspectionPresentation';
 import { InspectionFollowUpSummary } from './InspectionFollowUpSummary';
-import { InspectorSelect } from './InspectorSelect';
+import { InspectionOpening } from './InspectionOpening';
 import { InspectionOperationsPanel } from './InspectionOperationsPanel';
 import { useConnectivity } from '../../hooks/useConnectivity';
 import { SpontaneousFindingPanel } from './SpontaneousFindingPanel';
 import { InspectionIntakePanel } from './InspectionIntakePanel';
 import type { InspectionIntake } from '../../types/inspectionIntake';
-import { InspectionLocationField } from './InspectionLocationField';
-import { inspectionLocationSuggestions } from './inspectionLocations';
 import { INSPECTION_PHASES, inspectionPhaseOf, isInspectionPhase, isInspectionFollowUp, type InspectionPhase } from './inspectionProcess';
 
 import { useScopedSearchParams } from '../../hooks/useScopedSearchParams';
 import { INSPECTION_FILTER_KEYS, inspectionPage, inspectionReturnState, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { supportRequestContext } from '../../utils/supportSession';
 
 const isActorType = (value: string | null): value is InspectionActorType => value === 'GENERADOR' || value === 'TRANSPORTISTA' || value === 'OPERADOR';
 
@@ -38,6 +36,7 @@ const InspeccionesPageV2: React.FC = () => {
   const mobile = location.pathname.startsWith('/mobile');
   const { currentUser, isAdmin } = useAuth();
   const owner = inspectionWorkspaceOwner(currentUser);
+  const openingOwner = owner && JSON.stringify([owner, supportRequestContext()]);
   const [searchParams, setSearchParams] = useScopedSearchParams('inspections', INSPECTION_FILTER_KEYS, owner);
   const updateFilters = (values: Record<string, string | number>) => setSearchParams(next => {
     Object.entries(values).forEach(([key, value]) => value && value !== 1 ? next.set(key, String(value)) : next.delete(key));
@@ -67,18 +66,6 @@ const InspeccionesPageV2: React.FC = () => {
   const filtersOpen = searchParams.get('filtros') === 'abiertos';
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
-  const [type, setType] = useState<InspectionActorType>(initialType || (currentUser?.rol === 'ADMIN_OPERADOR' ? 'OPERADOR' : currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? 'TRANSPORTISTA' : 'GENERADOR'));
-  const [actorId, setActorId] = useState(initialActor);
-  const [withoutActor, setWithoutActor] = useState(false);
-  const [inspectionType, setInspectionType] = useState<InspectionType>(initialType || (currentUser?.rol === 'ADMIN_OPERADOR' ? 'OPERADOR' : currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? 'TRANSPORTISTA' : 'GENERADOR'));
-  const [description, setDescription] = useState('');
-  const actorInspection = isActorType(inspectionType);
-  const availableTypes = (Object.keys(INSPECTION_TYPES) as InspectionType[]).filter((key) => !currentUser?.rol.startsWith('ADMIN_') || currentUser.rol === `ADMIN_${key}`);
-  const [assignedInspector, setAssignedInspector] = useState('');
-  const [creationId, setCreationId] = useState(() => crypto.randomUUID());
-  const [numeroActa, setNumeroActa] = useState('');
-  const [ubicacion, setUbicacion] = useState('');
-  const [fechaProgramada, setFechaProgramada] = useState('');
   const [exporting, setExporting] = useState(false);
   const [findingActorType, setFindingActorType] = useState<InspectionActorType>();
   const { isOnline } = useConnectivity({ enablePing: false, debounceMs: 0 });
@@ -87,10 +74,9 @@ const InspeccionesPageV2: React.FC = () => {
   const allowed = Boolean(isAdmin || currentUser?.esInspector || currentUser?.rol.startsWith('ADMIN_'));
   const listFilters = { estado: state || undefined, estados: phase ? INSPECTION_PHASES[phase].states : undefined, tipoInspeccion: inspectionFilter || undefined, tipoActor: typeFilter || undefined, actorId: actorFilter || undefined, search: search || undefined };
   const inspections = useInspections({ ...listFilters, page, limit: 25 });
-  const generadores = useCatalogoGeneradores((showCreate && type === 'GENERADOR') || findingActorType === 'GENERADOR' || Boolean(actorFilter && typeFilter === 'GENERADOR'));
-  const transportistas = useCatalogoTransportistas((showCreate && type === 'TRANSPORTISTA') || findingActorType === 'TRANSPORTISTA' || Boolean(actorFilter && typeFilter === 'TRANSPORTISTA'));
-  const operadores = useCatalogoOperadores((showCreate && type === 'OPERADOR') || findingActorType === 'OPERADOR' || Boolean(actorFilter && typeFilter === 'OPERADOR'));
-  const actorOptions = useMemo(() => type === 'GENERADOR' ? generadores.data || [] : type === 'TRANSPORTISTA' ? transportistas.data || [] : operadores.data || [], [type, generadores.data, transportistas.data, operadores.data]);
+  const generadores = useCatalogoGeneradores(findingActorType === 'GENERADOR' || Boolean(actorFilter && typeFilter === 'GENERADOR'));
+  const transportistas = useCatalogoTransportistas(findingActorType === 'TRANSPORTISTA' || Boolean(actorFilter && typeFilter === 'TRANSPORTISTA'));
+  const operadores = useCatalogoOperadores(findingActorType === 'OPERADOR' || Boolean(actorFilter && typeFilter === 'OPERADOR'));
   const filteredActorName = useMemo(() => {
     if (!actorFilter || !typeFilter) return '';
     const source = typeFilter === 'GENERADOR' ? generadores.data : typeFilter === 'TRANSPORTISTA' ? transportistas.data : operadores.data;
@@ -98,23 +84,8 @@ const InspeccionesPageV2: React.FC = () => {
     return String(actor?.razonSocial || actor?.nombre || 'Actor seleccionado');
   }, [actorFilter, typeFilter, generadores.data, transportistas.data, operadores.data]);
 
-  const createMutation = useInspectionMutation(async () => inspeccionService.create({ clienteId: creationId, ...(sourceIntake ? { antecedenteId: sourceIntake.id } : {}), tipoInspeccion: inspectionType, observaciones: description || undefined, tipoActor: withoutActor ? null : type, actorId: withoutActor ? null : actorId, inspectorId: assignedInspector || undefined, numeroActa: numeroActa || undefined, ubicacion: ubicacion || undefined, fechaProgramada: fechaProgramada ? new Date(fechaProgramada).toISOString() : undefined }));
-
   const createFromIntake = (item: InspectionIntake) => {
-    setSourceIntake(item); setType(item.tipoActor); setActorId(item.actorId || ''); setWithoutActor(!item.actorId);
-    setInspectionType(item.actorId ? item.tipoActor : 'ESPONTANEA'); setAssignedInspector(''); setCreationId(crypto.randomUUID());
-    setDescription(`Antecedente ${item.referencia} · ${item.actorNombre}. Evaluación pendiente; no acredita infracción.`);
-    setNumeroActa(''); setUbicacion(''); setFechaProgramada(''); setShowCreate(true);
-  };
-
-  const createInspection = async () => {
-    if (!withoutActor && !actorId) return toast.warning('Actor requerido', 'Seleccione la entidad que se inspeccionará.');
-    try {
-      const created = await createMutation.mutateAsync(undefined) as Awaited<ReturnType<typeof inspeccionService.create>>;
-      toast.success('Inspección creada', `${created.numero} · ${INSPECTION_STATE_LABELS[created.estado]}.`);
-      setCreationId(crypto.randomUUID());
-      navigate(`${mobile ? '/mobile' : ''}/inspecciones/${created.id}`);
-    } catch (error: unknown) { toast.error('No se pudo crear', inspectionErrorMessage(error, 'Revise los datos e intente nuevamente.')); }
+    setSourceIntake(item); setShowCreate(true);
   };
 
   const exportList = async () => {
@@ -150,6 +121,9 @@ const InspeccionesPageV2: React.FC = () => {
       <Button variant="outline" onClick={() => { updateFilters({ vista: '' }); setFindingRequest((value) => value + 1); }} aria-label="Denuncia / hallazgo"><span className="sm:hidden">Hallazgo</span><span className="hidden sm:inline">Denuncia / hallazgo</span></Button>
       <Button className="ml-auto" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }} aria-label="Nueva inspección">Nueva<span className="hidden sm:inline"> inspección</span></Button>
     </PageToolbar>
+    {currentUser?.id && <InspectionOpening key={openingOwner} userId={String(currentUser.id)} owner={openingOwner} role={currentUser.rol} isAdmin={Boolean(isAdmin)} mobile={mobile} online={isOnline}
+      initialType={initialType} initialActor={initialActor} returnState={returnState} open={showCreate} source={sourceIntake}
+      onOpen={() => { setSourceIntake(null); setShowCreate(true); }} onClose={() => setShowCreate(false)} />}
     <nav aria-label="Secciones de Inspecciones" className="flex border-b border-neutral-200">
       {[
         { section: '', label: 'Expedientes', Icon: ClipboardCheck },
@@ -220,35 +194,6 @@ const InspeccionesPageV2: React.FC = () => {
     <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"><p className="text-neutral-600">{inspections.isError ? rows.length ? `${rows.length} resultados anteriores · sin actualizar` : 'Listado no disponible' : `${inspections.data?.total || 0} ${offline ? 'copias locales' : 'resultados'} · página ${page} de ${totalPages}`}</p><div className="flex gap-2"><Button variant="outline" size="sm" leftIcon={<ChevronLeft size={16} />} disabled={page <= 1} onClick={() => updateFilters({ page: Math.max(1, page - 1) })}>Anterior</Button><Button variant="outline" size="sm" rightIcon={<ChevronRight size={16} />} disabled={page >= totalPages} onClick={() => updateFilters({ page: page + 1 })}>Siguiente</Button></div></div>
 
     </>}
-    <Modal isOpen={showCreate} onClose={() => { if (!createMutation.isPending) setShowCreate(false); }} title="Nueva inspección" size="lg" closeOnOverlayClick={false}
-      footer={<><Button variant="outline" disabled={createMutation.isPending} onClick={() => setShowCreate(false)}>Cancelar</Button><Button isLoading={createMutation.isPending} leftIcon={<Plus size={17} />} onClick={createInspection}>Crear expediente</Button></>}>
-      <fieldset disabled={createMutation.isPending} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-        {sourceIntake && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-950 sm:col-span-2">Origen: {sourceIntake.referencia} · {sourceIntake.actorNombre}. El antecedente se vincula al crear el expediente, sin alterar su evidencia.</p>}
-        <label className="text-sm font-semibold text-neutral-800 sm:col-span-2">Tipo de inspección
-          <select value={inspectionType} onChange={(event) => {
-            const selected = event.target.value as InspectionType;
-            setInspectionType(selected); setActorId(''); setAssignedInspector('');
-            setWithoutActor(!isActorType(selected));
-            if (isActorType(selected)) setType(selected);
-          }} className="mt-2 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 font-normal">
-            {availableTypes.map((key) => <option key={key} value={key}>{INSPECTION_TYPES[key].label} · {INSPECTION_TYPES[key].serie}</option>)}
-            <option disabled value="D">D · Reservada, pendiente de definición</option>
-          </select>
-        </label>
-        <div className="border-l-2 border-primary-600 pl-3 text-sm sm:col-span-2">
-          <span className="font-semibold text-neutral-800">Legajo automático: </span><code className="text-primary-900">{inspectionNumberExample(inspectionType)}</code>
-          <p className="mt-1 text-xs text-neutral-600">Ejemplo de formato. Al crear se asigna el siguiente correlativo de este tipo y año.</p>
-        </div>
-        {(currentUser?.rol === 'ADMIN' || !currentUser?.rol.startsWith('ADMIN_')) && <label className="flex min-h-11 items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={withoutActor} onChange={(e) => { setWithoutActor(e.target.checked); setAssignedInspector(''); }} />Responsable todavía sin identificar</label>}
-        {!withoutActor && !actorInspection && <label className="text-sm font-semibold text-neutral-800">Tipo de actor<select value={actorInspection ? inspectionType : type} onChange={(event) => { setType(event.target.value as InspectionActorType); setActorId(''); }} className="mt-2 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 font-normal disabled:bg-neutral-50">{Object.entries(INSPECTION_ACTOR_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
-        {!withoutActor && <label className={`text-sm font-semibold text-neutral-800 ${actorInspection ? 'sm:col-span-2' : ''}`}>Actor inspeccionado<select value={actorId} onChange={(event) => setActorId(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 font-normal disabled:bg-neutral-50"><option value="">Seleccionar actor…</option>{actorOptions.map((actor) => <option key={String(actor.id)} value={String(actor.id)}>{String(actor.razonSocial || actor.nombre || actor.id)}</option>)}</select></label>}
-        {(isAdmin || currentUser?.rol.startsWith('ADMIN_')) && <div className="sm:col-span-2"><InspectorSelect creating value={assignedInspector} onChange={setAssignedInspector} type={withoutActor || !actorInspection ? null : type} /></div>}
-        {!actorInspection && <label className="text-sm font-semibold text-neutral-800 sm:col-span-2">Descripción inicial<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} maxLength={10000} placeholder="Qué se va a inspeccionar o qué ocurrió. Se puede completar en campo." className="mt-2 w-full rounded-lg border border-neutral-300 p-3 text-base font-normal" /></label>}
-        <label className="min-w-0 text-sm font-semibold text-neutral-800">Fecha programada<input type="datetime-local" value={fechaProgramada} onChange={(event) => setFechaProgramada(event.target.value)} className="mt-2 h-11 w-full min-w-0 rounded-lg border border-neutral-300 px-3 font-normal" /></label>
-        <label className="text-sm font-semibold text-neutral-800">Número de acta<input value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Opcional · distinto del legajo" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>
-        <InspectionLocationField label="Ubicación prevista" value={ubicacion} onChange={setUbicacion} disabled={createMutation.isPending} placeholder="Domicilio o referencia" className="sm:col-span-2" options={inspectionLocationSuggestions(withoutActor ? undefined : actorOptions.find(actor => String(actor.id) === actorId))} />
-      </fieldset>
-    </Modal>
   </div>;
 };
 

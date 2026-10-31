@@ -286,6 +286,12 @@ test('PSIP explains the existing follow-up loop for both parties without promisi
   assert.match(content, /Leer el aviso no responde ni aprueba/);
   assert.ok(guide.steps.filter((step: any) => step.image).length >= 3);
 });
+test('PSIP explains inspection-opening recovery and its local scope', () => {
+  const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
+  const step = guide.steps.find((item: any) => item.title === 'Administración: organizar la agenda');
+  const content = JSON.stringify(step);
+  for (const text of ['Continuar apertura', 'Comprobar envío', 'referencia originales', 'no se envía automáticamente', 'Borrar los datos del navegador', 'otra pestaña', 'consulta falla']) assert.ok(content.includes(text), text);
+});
 test('PSIP screenshots are original synthetic preview captures from successful browser tests', () => {
   const proof = JSON.parse(read('psip-capture-provenance.json'));
   assert.equal(proof.synthetic, true); assert.equal(proof.productionCapture, false); assert.equal(proof.edited, false);
