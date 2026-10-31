@@ -69,6 +69,7 @@ try {
       headers: { 'Content-Type': 'application/json', Cookie: `sitrep_qa_client=127.11.50.${90 + index}` },
       body: JSON.stringify({ email, password: 'expired-qa-probe' }) });
     assert.equal(response.status, 403);
+    assert.match(JSON.stringify(await response.json()), /acceso directo de capacitaci[oó]n no est[aá] habilitado/i);
   }
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
