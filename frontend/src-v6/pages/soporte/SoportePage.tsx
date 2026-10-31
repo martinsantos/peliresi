@@ -155,7 +155,7 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
       {ticket.esAutor && <Link to={mp('/notificaciones')} className="inline-flex min-h-11 items-center gap-2 text-sm text-primary-800 hover:underline"><Bell size={16} />Las respuestas llegan a tus avisos</Link>}
       {ticket.contexto.ruta && <p className="text-sm text-neutral-600">Pantalla del reporte: <code className="[overflow-wrap:anywhere]">{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? <> · <span className="whitespace-nowrap">{ticket.contexto.ancho} × {ticket.contexto.alto}</span></> : null}</p>}
     </header>
-    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} />}
+    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} refreshFailed={automaticRefresh.isError} />}
     <section aria-label="Conversación" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <h4 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">Conversación</h4>
       <ol className="divide-y divide-neutral-200">{ticket.mensajes.map(message => <li key={message.id} className={'p-4 ' + (message.interno ? 'border-l-4 border-warning-600 bg-warning-50' : '')}>
@@ -167,7 +167,7 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
           <Button variant="outline" className="max-w-full [overflow-wrap:anywhere]" onClick={() => void download(file)} leftIcon={<Download size={16} />}>{file.nombre} · {(file.bytes / 1024).toFixed(0)} KB</Button></li>)}</ul>}
       </li>)}</ol>
     </section>
-    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} />}
+    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} refreshFailed={automaticRefresh.isError} />}
     {error && <p role="alert" className="text-error-700">{error}</p>}
     <details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Historial del ticket</summary>
       <ol className="mt-3 space-y-3 text-sm text-neutral-700"><li>Creado · {date(ticket.createdAt)}</li>{ticket.eventos.map(event => <li key={event.id}>
@@ -190,7 +190,7 @@ function ticketActions(ticket: SupportTicket) {
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   return actions;
 }
-function TicketActions({ ticket, owner, context, journal, changed, refreshing }: { ticket: SupportTicket; owner: string; context: string; journal: ReturnType<typeof useSupportCommand>; changed: (minimumVersion?: number) => Promise<void>; refreshing: boolean }) {
+function TicketActions({ ticket, owner, context, journal, changed, refreshing, refreshFailed }: { ticket: SupportTicket; owner: string; context: string; journal: ReturnType<typeof useSupportCommand>; changed: (minimumVersion?: number) => Promise<void>; refreshing: boolean; refreshFailed: boolean }) {
   const scope = { userId: owner, context, ticketId: ticket.id };
   const recovery = useSupportActionDraft(scope);
   const pending = journal.command;
@@ -221,6 +221,10 @@ function TicketActions({ ticket, owner, context, journal, changed, refreshing }:
   const [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const bodyInput = useRef<HTMLTextAreaElement>(null);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pending?.status === 'confirmed') confirmationRef.current?.focus();
+  }, [pending?.status, pending?.key]);
   const team = useQuery({ queryKey: ['soporte', owner, context, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
   const displayedTarget = pending?.input.responsableId ?? target;
   const recipient = team.data?.find(user => user.id === displayedTarget);
@@ -252,6 +256,7 @@ function TicketActions({ ticket, owner, context, journal, changed, refreshing }:
   const optionalBody = selected === 'DERIVAR' || selected === 'CLASIFICAR';
   const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
   const privateAction = selected === 'NOTA' || selected === 'DERIVAR' || selected === 'CLASIFICAR';
+  const confirmationError = pending?.status === 'confirmed' ? journal.error || (refreshFailed ? 'No pudimos actualizar el ticket. Reintentá sin volver a enviar.' : '') : '';
   return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
     <h4 className="font-semibold text-neutral-900">Atender ticket</h4>
     {recovery.ownership.status === 'blocked' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Este ticket se está editando en otra pestaña. Cerrala para continuar aquí sin reemplazar su borrador.</p><Button variant="outline" onClick={recovery.ownership.retry}>Retomar edición aquí</Button></div>}
@@ -262,7 +267,7 @@ function TicketActions({ ticket, owner, context, journal, changed, refreshing }:
     {canEdit && !pending && staleDraft && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>El ticket cambió desde que preparaste este borrador. Revisá la conversación y el estado antes de confirmar.</p><Button variant="outline" onClick={() => { setError(''); updateDraft({ version: ticket.version }); }}>Revisé la conversación</Button></div>}
     {canTake && <Button disabled={!canEdit || busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
     {!journal.ready && <p role="status">Comprobando envíos guardados… <Button variant="outline" onClick={() => void journal.reload()}>Reintentar lectura</Button></p>}
-    {pending?.status === 'confirmed' && <div role="status" className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900"><p>Acción confirmada. No hace falta enviarla otra vez.</p><Button isLoading={busy || refreshing} disabled={!canEdit || refreshing} onClick={() => void finishConfirmed()}>Actualizar conversación y continuar</Button></div>}
+    {pending?.status === 'confirmed' && <div ref={confirmationRef} role="region" aria-label="Resultado de la acción" tabIndex={-1} className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><p role="status">Acción confirmada. No hace falta enviarla otra vez.</p>{confirmationError && <p role="alert" className="text-error-700">{confirmationError}</p>}<Button isLoading={busy || refreshing} disabled={!canEdit || refreshing} onClick={() => void finishConfirmed()}>{refreshFailed ? 'Reintentar actualización' : 'Continuar'}</Button></div>}
     {pending?.status === 'rejected' && <div role="alert" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>La acción no se registró: {pending.rejection}</p><Button isLoading={busy} disabled={!canEdit} onClick={() => void finishConfirmed()}>Actualizar ticket y recuperar contenido</Button></div>}
     {pending?.status === 'pending' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Envío sin confirmar. Conservamos el contenido y los archivos en este dispositivo.</p><div className="flex flex-wrap gap-2"><Button isLoading={busy} disabled={!canEdit} onClick={() => recovery.canWrite() && void journal.retry()}>Reintentar mismo envío</Button><Button variant="outline" disabled={!canEdit || busy} onClick={() => recovery.canWrite() && void journal.recover()}>Comprobar y corregir envío</Button></div><p className="text-sm">Para corregir, primero comprobamos si ya se registró. Si no se registró, retiramos ese envío y recuperamos el contenido.</p></div>}
     {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : !recovery.ready || recovery.ownership.status !== 'owned' ? null : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
@@ -307,7 +312,7 @@ function TicketActions({ ticket, owner, context, journal, changed, refreshing }:
       </div>
       {!pending && <Button type="submit" isLoading={busy} disabled={!canEdit || staleDraft || recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{selected ? submitLabels[selected] : 'Confirmar acción'}</Button>}
     </form>}
-    {(error || journal.error) && <p role="alert" className="text-error-700">{error || journal.error}</p>}
+    {(error || journal.error) && pending?.status !== 'confirmed' && <p role="alert" className="text-error-700">{error || journal.error}</p>}
   </section>;
 }
 function TeamSettings({ owner, context }: { owner: string; context: string }) {
