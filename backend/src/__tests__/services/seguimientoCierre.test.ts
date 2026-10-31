@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ scan: vi.fn(), count: vi.fn(), current: vi.fn(), lock: vi.fn(), upsert: vi.fn(), transaction: vi.fn(), schedule: vi.fn(), rules: vi.fn(), rule: vi.fn(), adopt: vi.fn(), admin: vi.fn(), admins: vi.fn(), cases: vi.fn(), reconcile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ scan: vi.fn(), count: vi.fn(), current: vi.fn(), lock: vi.fn(), lockTimeout: vi.fn(), upsert: vi.fn(), transaction: vi.fn(), schedule: vi.fn(), rules: vi.fn(), rule: vi.fn(), adopt: vi.fn(), admin: vi.fn(), admins: vi.fn(), cases: vi.fn(), reconcile: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { manifiesto: { findMany: mocks.scan, count: mocks.count }, reglaAlerta: { findMany: mocks.rules, findUnique: mocks.rule, upsert: mocks.adopt }, usuario: { findFirst: mocks.admin }, alertaGenerada: { updateMany: mocks.reconcile }, $transaction: mocks.transaction } }));
 vi.mock('node-cron', () => ({ default: { schedule: mocks.schedule } }));
 import { ejecutarSeguimientoCierre, iniciarSeguimientoCierreJob, simularSeguimientoCierre } from '../../jobs/seguimientoCierre.job';
@@ -11,7 +11,7 @@ beforeEach(() => {
   mocks.cases.mockResolvedValue({ estado: 'PENDIENTE' }); mocks.admins.mockResolvedValue([]);
   mocks.lock.mockResolvedValue([{ id: 'qa' }]);
   mocks.current.mockResolvedValue({ id: 'qa', numero: 'QA', estado: 'RECIBIDO', fechaRecepcion: new Date('2026-10-01T12:00:00Z'), operador: { usuario: { id: 'operator', activo: true } } });
-  mocks.transaction.mockImplementation(fn => fn({ $queryRaw: mocks.lock, manifiesto: { findUnique: mocks.current }, notificacion: { upsert: mocks.upsert }, alertaGenerada: { upsert: mocks.cases }, usuario: { findMany: mocks.admins } }));
+  mocks.transaction.mockImplementation(fn => fn({ $queryRaw: mocks.lock, $executeRaw: mocks.lockTimeout, manifiesto: { findUnique: mocks.current }, notificacion: { upsert: mocks.upsert }, alertaGenerada: { upsert: mocks.cases }, usuario: { findMany: mocks.admins } }));
 });
 it('links the operator notice and administrative case without resetting case state on retry', async () => {
   await ejecutarSeguimientoCierre();
@@ -62,6 +62,12 @@ it('locks the selected manifest before rereading it and skips a row that disappe
   vi.clearAllMocks(); mocks.lock.mockResolvedValue([]);
   await ejecutarSeguimientoCierre();
   expect(mocks.current).not.toHaveBeenCalled(); expect(mocks.cases).not.toHaveBeenCalled(); expect(mocks.upsert).not.toHaveBeenCalled();
+});
+it('bounds row-lock waiting inside each transaction before selecting a manifest', async () => {
+  await ejecutarSeguimientoCierre();
+  expect(mocks.lockTimeout).toHaveBeenCalledOnce();
+  expect(mocks.lockTimeout.mock.calls[0][0].join('?')).toContain("SET LOCAL lock_timeout = '1s'");
+  expect(mocks.lockTimeout.mock.invocationCallOrder[0]).toBeLessThan(mocks.lock.mock.invocationCallOrder[0]);
 });
 it('retains the isolated training scope when explicitly simulating there', async () => {
   mocks.count.mockResolvedValue(0);
