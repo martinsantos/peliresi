@@ -144,8 +144,8 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(admin.getByRole('button', { name: 'Acción de soporte', exact: true })).toHaveCount(0);
     await screenshot(admin, info, 'visible-attention-controls');
     await admin.getByRole('button', { name: 'Asignarme', exact: true }).click();
-    await expect(admin.getByText('QA admin', { exact: true }).first()).toBeVisible();
     await continueAfterConfirmedAction(admin);
+    await expect(admin.locator('dd').filter({ hasText: 'QA admin' })).toBeVisible();
     await action(admin, 'Nota interna de soporte', 'QA diagnóstico reservado: no mostrar al reportante.');
     await expect(admin.getByText('Sólo el equipo de soporte puede leer esta nota.', { exact: true })).toBeVisible();
     await admin.getByRole('button', { name: 'Guardar nota interna', exact: true }).click();
