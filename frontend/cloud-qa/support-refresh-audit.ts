@@ -11,6 +11,10 @@ assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'support-refresh-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
 const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
+const backend = read('backend-reuse.json');
+assert.equal(backend.fromCommit, 'a624b232bc3ca48a2f7e8582e8051170372070ed');
+assert.equal(backend.toCommit, commit); assert.deepEqual(backend.changedBackendFiles, []);
+assert.match(read('runtime-proof.json').backend, /backend\/dist-qa-support-mail-20261031\/index\.js$/);
 for (const stage of ['before', 'after']) {
   const source = read(`source-${stage}.json`);
   assert.equal(source.commit, commit); assert.equal(source.files, 911);
