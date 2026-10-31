@@ -5,10 +5,10 @@ import path from 'node:path';
 import { assertCloudDatabase, assertCloudEnvironment, backendRequire, externalKeys } from './safety.ts';
 
 await assertCloudDatabase();
-const out = '/work/sitrep/.qa-support-refresh-20261031';
+const out = '/work/sitrep/.qa-support-feedback-20261031';
 const commit = 'ce2eb1cbe1eda468482bf10bc029636f47fd3857';
 assert.equal(process.env.QA_ARTIFACTS, out);
-assert.equal(process.env.QA_COMPAT_BACKEND, 'support-refresh-20261031');
+assert.equal(process.env.QA_COMPAT_BACKEND, 'support-feedback-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
 const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
 const backend = read('backend-reuse.json');
@@ -23,6 +23,9 @@ for (const stage of ['before', 'after']) {
 const browser = read('e2e.json');
 assert.equal(browser.stats.expected, 6); assert.equal(browser.stats.unexpected, 0);
 assert.equal(browser.stats.flaky, 0); assert.equal(browser.stats.skipped, 0); assert.deepEqual(browser.errors, []);
+const lifecycle = read('lifecycle.json');
+assert.equal(lifecycle.stats.expected, 2); assert.equal(lifecycle.stats.unexpected, 0);
+assert.equal(lifecycle.stats.flaky, 0); assert.equal(lifecycle.stats.skipped, 0); assert.deepEqual(lifecycle.errors, []);
 for (const { pid } of read('processes.json')) {
   const env = Object.fromEntries(readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter(Boolean)
     .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
@@ -67,7 +70,7 @@ try {
   }
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
-  const proof = { commit, synthetic: true, refreshCases: refresh.length, multiroleCases: multirole.length,
+  const proof = { commit, synthetic: true, refreshCases: refresh.length, multiroleCases: multirole.length, lifecycleCases: lifecycle.stats.expected,
     manualSha256: digest(manual), capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false };
   writeFileSync(path.join(out, 'support-refresh-audit.json'), JSON.stringify(proof, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(proof));

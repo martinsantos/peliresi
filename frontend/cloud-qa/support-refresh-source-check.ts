@@ -5,10 +5,10 @@ import path from 'node:path';
 import { assertCloudDatabase, root } from './safety.ts';
 
 await assertCloudDatabase();
-const out = '/work/sitrep/.qa-support-refresh-20261031';
+const out = '/work/sitrep/.qa-support-feedback-20261031';
 const commit = 'ce2eb1cbe1eda468482bf10bc029636f47fd3857';
 assert.equal(process.env.QA_ARTIFACTS, out);
-assert.equal(process.env.QA_COMPAT_BACKEND, 'support-refresh-20261031');
+assert.equal(process.env.QA_COMPAT_BACKEND, 'support-feedback-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
 const stage = process.env.QA_SOURCE_STAGE;
 assert.ok(stage === 'before' || stage === 'after');
