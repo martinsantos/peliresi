@@ -155,6 +155,7 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await admin.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
     await admin.getByRole('option', { name: 'QA ' + technician + ' · ' + technician + '@night-qa.invalid', exact: true }).click();
     await admin.getByRole('button', { name: 'Confirmar derivación', exact: true }).click();
+    await continueAfterConfirmedAction(admin);
     await expect(admin.locator('dd').filter({ hasText: 'QA ' + technician })).toBeVisible();
     await screenshot(admin, info, 'desk-handoff'); await admin.close();
 
@@ -163,10 +164,11 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(operator).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await action(operator, 'Solicitar respuesta al usuario', 'QA verificá si la pantalla ya muestra los datos.');
     await operator.getByRole('button', { name: 'Solicitar respuesta', exact: true }).click();
-    await expect(operator.getByText('Esperando al usuario', { exact: true })).toBeVisible();
     await continueAfterConfirmedAction(operator);
+    await expect(operator.getByText('Esperando al usuario', { exact: true })).toBeVisible();
     await action(operator, 'Cerrar con una resolución', 'QA resolución sintética: se corrigió el acceso.');
     await operator.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
+    await continueAfterConfirmedAction(operator);
     await expect(operator.getByText('Cerrado', { exact: true }).first()).toBeVisible(); await operator.close();
 
     const reporter = await asUser('operador'); await reporter.goto(prefix(info) + '/notificaciones');
@@ -181,6 +183,7 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(reporter.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);
     await action(reporter, 'Responder y reabrir', 'QA el problema persiste, solicito otra revisión.');
     await reporter.getByRole('button', { name: 'Enviar respuesta', exact: true }).click();
+    await continueAfterConfirmedAction(reporter);
     await expect(reporter.getByText('Abierto', { exact: true }).first()).toBeVisible();
     await expect(reporter.getByText(ticket.referencia, { exact: true })).toBeVisible();
     await reporter.getByText('Historial del ticket', { exact: true }).click();
@@ -226,6 +229,7 @@ test('support impersonation returns the report and the actual response to the re
   await expect(page).toHaveURL(/\/switch-user$/); await page.goto(path(info, '/' + ticket.id));
   await action(page, 'Responder', 'QA soporte respondió al usuario impersonado: el acceso fue revisado.');
   await page.getByRole('button', { name: 'Enviar respuesta', exact: true }).click();
+  await continueAfterConfirmedAction(page);
   await expect(page.getByText('QA soporte respondió al usuario impersonado: el acceso fue revisado.', { exact: true })).toBeVisible();
   const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
   try {
