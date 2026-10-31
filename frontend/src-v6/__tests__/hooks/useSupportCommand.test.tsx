@@ -94,6 +94,19 @@ it('does not clean the draft until a confirmed receipt is durably saved', async 
   expect(await loadSupportCommand(scope)).toBeNull();
   expect(mocks.act).toHaveBeenCalledOnce();
 });
+it('does not release a confirmed receipt if the activity changes while refreshing', async () => {
+  const hook = await ready(); await act(() => hook.result.current.submit(proposal()));
+  let resume!: () => void;
+  const gate = new Promise<void>(resolve => { resume = resolve; });
+  const refresh = vi.fn(async () => { await gate; });
+  let releasing!: Promise<void>;
+  act(() => { releasing = hook.result.current.release(refresh); });
+  await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  mocks.context = 'role-two';
+  await act(async () => { resume(); await releasing; });
+  expect((await loadSupportCommand(scope))?.status).toBe('confirmed');
+  expect(mocks.act).toHaveBeenCalledOnce();
+});
 it('a failed follow-up read cannot turn a confirmed action into a retry', async () => {
   const hook = await ready(); await act(() => hook.result.current.submit(proposal()));
   await act(() => hook.result.current.release(async () => { throw new Error('Read failed'); }));
