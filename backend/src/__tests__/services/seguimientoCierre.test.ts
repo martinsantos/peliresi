@@ -3,6 +3,7 @@ const mocks = vi.hoisted(() => ({ scan: vi.fn(), count: vi.fn(), current: vi.fn(
 vi.mock('../../lib/prisma', () => ({ default: { manifiesto: { findMany: mocks.scan, count: mocks.count }, reglaAlerta: { findMany: mocks.rules, findUnique: mocks.rule, upsert: mocks.adopt }, usuario: { findFirst: mocks.admin }, alertaGenerada: { updateMany: mocks.reconcile }, $transaction: mocks.transaction } }));
 vi.mock('node-cron', () => ({ default: { schedule: mocks.schedule } }));
 import { ejecutarSeguimientoCierre, iniciarSeguimientoCierreJob, simularSeguimientoCierre } from '../../jobs/seguimientoCierre.job';
+import { inTrainingSession } from '../../lib/trainingScope';
 beforeEach(() => {
   vi.clearAllMocks(); mocks.scan.mockResolvedValue([{ id: 'qa' }]);
   mocks.rule.mockResolvedValue({ id: 'seguimiento_cierre_v1' });
@@ -34,6 +35,27 @@ it('preview counts source rows without adopting a rule or writing notices/cases'
   expect(await simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z'))).toMatchObject({ total: 125, escribeDatos: false, canal: 'interno' });
   expect(mocks.scan.mock.calls[0][0]).toMatchObject({ take: 20, where: { fechaRecepcion: { lte: new Date('2026-10-01T12:00:00Z') } } });
   expect(mocks.transaction).not.toHaveBeenCalled(); expect(mocks.adopt).not.toHaveBeenCalled(); expect(mocks.cases).not.toHaveBeenCalled();
+});
+it('excludes artificial manifests from operational preview, sweep and reconciliation', async () => {
+  mocks.count.mockResolvedValue(0);
+  await simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z'));
+  expect(mocks.count.mock.calls[0][0].where).toMatchObject({ isDemoData: false });
+  expect(mocks.scan.mock.calls[0][0].where).toMatchObject({ isDemoData: false });
+  mocks.scan.mockClear();
+  await ejecutarSeguimientoCierre();
+  expect(mocks.scan.mock.calls[0][0].where).toMatchObject({ isDemoData: false });
+  expect(mocks.reconcile.mock.calls[0][0].where.manifiesto).toMatchObject({ isDemoData: false });
+});
+it('rechecks demo status before writing when a selected manifest changes', async () => {
+  mocks.current.mockResolvedValue({ id: 'qa', numero: 'QA', estado: 'RECIBIDO', isDemoData: true,
+    fechaRecepcion: new Date('2026-10-01T12:00:00Z'), operador: { usuario: { id: 'operator', activo: true } } });
+  expect(await ejecutarSeguimientoCierre()).toBe(0);
+  expect(mocks.cases).not.toHaveBeenCalled(); expect(mocks.upsert).not.toHaveBeenCalled();
+});
+it('retains the isolated training scope when explicitly simulating there', async () => {
+  mocks.count.mockResolvedValue(0);
+  await inTrainingSession(() => simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z')));
+  expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty('isDemoData');
 });
 it('adopts the existing follow-up once using an active administrator, preserving default notice identity', async () => {
   mocks.rule.mockResolvedValue(null); mocks.admin.mockResolvedValue({ id: 'admin' });
