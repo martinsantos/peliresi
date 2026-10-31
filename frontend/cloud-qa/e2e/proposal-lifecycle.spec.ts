@@ -236,7 +236,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     await publication.scrollIntoViewIfNeeded();await expect(guidance).toBeInViewport();
     await proof(op,info,'final-finding-incomplete');
     await findingAmount.fill('1');await signCertificate();await expect(publish).toBeEnabled();
-   }else if(creator==='generador'){
+   }else if(creator==='operador'){
     const findingAmount=region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true});
     const publication=region.getByRole('group',{name:'Publicación de certificación',exact:true});
     const publish=publication.getByRole('button',{name:'Firmar y publicar certificación',exact:true});
