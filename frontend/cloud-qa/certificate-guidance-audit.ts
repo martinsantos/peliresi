@@ -18,6 +18,13 @@ const prior = JSON.parse(readFileSync('/work/sitrep/.qa-operational-ui-current20
 assert.equal(prior.productCommit, 'ce2eb1cbe1eda468482bf10bc029636f47fd3857');
 assert.equal(prior.synthetic, true); assert.equal(prior.browserTests, 37);
 for (const stage of ['before', 'after']) {
+  const network = read(`network-isolation-${stage}.json`);
+  assert.deepEqual(network.networks, ['sitrep-qa-enterprise-net-20261016']);
+  assert.equal(network.internal, true); assert.equal(network.publishedPorts, false);
+  assert.equal(network.nanoCpus, 1000000000); assert.equal(network.memoryBytes, 2147483648);
+  assert.equal(network.memorySwapBytes, 2147483648);
+}
+for (const stage of ['before', 'after']) {
   const source = read(`source-${stage}.json`), qa = read(`qa-sources-${stage}.json`);
   assert.equal(source.commit, commit); assert.equal(source.stage, stage); assert.equal(source.files, 911);
   assert.deepEqual(source.missing, []); assert.deepEqual(source.different, []);
