@@ -111,7 +111,19 @@ it('a missing record after scanning is not a task', async () => {
 });
 it('storage failures propagate for the scheduler to report rather than reporting success', async () => {
   mocks.upsert.mockRejectedValueOnce(new Error('storage failure'));
-  await expect(ejecutarSeguimientoCierre()).rejects.toThrow('storage failure');
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+  try { await expect(ejecutarSeguimientoCierre()).rejects.toThrow('Seguimiento incompleto: 1'); }
+  finally { log.mockRestore(); }
+});
+it('continues after a locked or unavailable manifest and reports an incomplete sweep', async () => {
+  mocks.scan.mockResolvedValueOnce([{ id: 'first' }, { id: 'second' }]);
+  mocks.transaction.mockRejectedValueOnce(new Error('lock timeout'));
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+  try {
+    await expect(ejecutarSeguimientoCierre()).rejects.toThrow('Seguimiento incompleto: 1');
+    expect(mocks.transaction).toHaveBeenCalledTimes(2); expect(mocks.upsert).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('[SeguimientoCierre] No se pudo evaluar un manifiesto', 'first', expect.any(Error));
+  } finally { log.mockRestore(); }
 });
 it('a future reception time does not invent a negative elapsed time', async () => {
   await ejecutarSeguimientoCierre(new Date('2026-09-01T12:00:00Z'));

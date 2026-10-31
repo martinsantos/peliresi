@@ -47,7 +47,7 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
     data: { estado: 'RESUELTA', notas: 'El manifiesto alcanzó un estado terminal; conciliación automática.', fechaResolucion: now, resueltaPor: null } });
   if (!rules.length) return 0;
   let cursor: string | undefined;
-  let checked = 0;
+  let checked = 0, failures = 0;
   for (;;) {
     const batch = await prisma.manifiesto.findMany({
       where: { ...manifestScope, estado: { in: ['RECIBIDO', 'EN_TRATAMIENTO'] } },
@@ -55,7 +55,7 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
     for (const row of batch) {
-      await prisma.$transaction(async tx => {
+      try { await prisma.$transaction(async tx => {
         // Serialize the last state/demo check with concurrent workflow changes.
         const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM manifiestos WHERE id = ${row.id} FOR UPDATE`;
         if (!locked.length) return;
@@ -95,11 +95,15 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
             checked++;
           }
         }
-      });
+      }); } catch (error) {
+        failures++;
+        console.error('[SeguimientoCierre] No se pudo evaluar un manifiesto', row.id, error);
+      }
     }
     if (batch.length < 100) break;
     cursor = batch[batch.length - 1].id;
   }
+  if (failures) throw new Error(`Seguimiento incompleto: ${failures} manifiesto(s) no evaluados`);
   return checked;
 }
 
