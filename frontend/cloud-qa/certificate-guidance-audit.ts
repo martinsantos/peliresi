@@ -75,6 +75,13 @@ assert.ok(manualCount >= 49); assert.equal(Number(manual.match(/# pass (\d+)/)?.
 const browser = read('manifest-complete.json');
 assert.equal(browser.stats.expected, 2); assert.equal(browser.stats.unexpected, 0);
 assert.equal(browser.stats.skipped, 0); assert.equal(browser.stats.flaky, 0); assert.deepEqual(browser.errors, []);
+const psipBrowser = read('psip-lifecycle-current.json');
+assert.equal(psipBrowser.stats.expected, 6); assert.equal(psipBrowser.stats.unexpected, 0);
+assert.equal(psipBrowser.stats.skipped, 0); assert.equal(psipBrowser.stats.flaky, 0); assert.deepEqual(psipBrowser.errors, []);
+const psip = read('psip-lifecycle-audit.json');
+assert.equal(psip.checks.length, 6);
+assert.ok(psip.checks.every((item: { exchanges: number; attachmentVerified: boolean; noticesVerified: boolean; unrelatedActorDenied: boolean }) =>
+  item.exchanges === 5 && item.attachmentVerified && item.noticesVerified && item.unrelatedActorDenied));
 const receipts = read('receipts-verified.json'); assert.equal(receipts.results.length, 2);
 assert.ok(receipts.results.every((r: { original: string; rectification: string; treatedFinding: string }) =>
   r.original === 'OBSERVADA' && r.rectification === 'APROBADA' && r.treatedFinding === 'Y12 1 kg'));
@@ -111,7 +118,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, previousIntegratedCommit: prior.productCommit,
-    previousIntegratedBrowserTests: prior.browserTests, browserTests: 2, unitTests: unit.numPassedTests,
+    previousIntegratedBrowserTests: prior.browserTests, certificateBrowserTests: 2, inspectionBrowserTests: 6, unitTests: unit.numPassedTests,
     manualTests: manualCount, manualSha256: hash(help), baselineReproduced: true, consoleFiles: consoleFiles.length,
     expectedBlockedRequests: expectedHttp.length, unexpectedConsoleEvents: unexpected.length,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false };
