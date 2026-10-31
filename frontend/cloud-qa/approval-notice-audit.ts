@@ -16,6 +16,10 @@ const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'ut
 const source = read('source-comparison.json');
 assert.equal(source.commit, commit); assert.ok(source.files > 1600);
 assert.deepEqual(source.missing, []); assert.deepEqual(source.mismatch, []);
+const after = read('source-comparison-after.json');
+assert.equal(after.commit, commit); assert.deepEqual(after.missing, []);
+assert.equal(after.correctedTestCommit, 'd9e7b215'); assert.equal(after.correctedTestMatchesCommit, true);
+assert.deepEqual(after.mismatch.map((item: { path: string }) => item.path), ['backend/src/__tests__/services/notification-mail.test.ts']);
 const backend = read('backend-source-proof.json');
 assert.equal(backend.commit, commit); assert.equal(backend.mismatches, 0);
 assert.equal(backend.uncommittedGpsIncluded, false); assert.equal(backend.controllerSource, 'committed');
@@ -36,15 +40,15 @@ for (const { pid } of processes) {
   assert.equal(env.DISABLE_EMAILS, 'true'); assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
   for (const key of externalKeys) assert.equal(env[key], '', key);
 }
-const browser = read('approval-notice-browser.json');
+const browser = read('approval-notice-browser-final.json');
 assert.equal(browser.stats.expected, 2); assert.equal(browser.stats.unexpected, 0);
 assert.equal(browser.stats.skipped, 0); assert.equal(browser.stats.flaky, 0); assert.deepEqual(browser.errors, []);
-const proofDir = path.join(out, 'approval-notice-browser');
+const proofDir = path.join(out, 'approval-notice-browser-final');
 const proofs = readdirSync(proofDir, { withFileTypes: true }).filter(entry => entry.isDirectory())
   .map(entry => path.join(proofDir, entry.name, 'approval-notice-proof.json')).filter(existsSync)
   .map(file => JSON.parse(readFileSync(file, 'utf8')));
 assert.deepEqual(proofs.map(item => item.surface).sort(), ['app', 'web-desktop']);
-for (const proof of proofs) for (const field of ['synthetic', 'historicalRecordUnchanged', 'live', 'bell', 'inbox', 'detail', 'mailRenderedWithoutSending', 'mailLinkToOwnedNotice']) assert.equal(proof[field], true, field);
+for (const proof of proofs) for (const field of ['synthetic', 'historicalRecordUnchanged', 'live', 'bell', 'inbox', 'detail', 'mailRenderedWithoutSending', 'mailLinkToOwnedNotice', 'mailLogosFromLocalAssets']) assert.equal(proof[field], true, field);
 const generation = read('approval-generation.json');
 assert.equal(generation.synthetic, true); assert.equal(generation.production, false);
 assert.equal(generation.results.length, 6);

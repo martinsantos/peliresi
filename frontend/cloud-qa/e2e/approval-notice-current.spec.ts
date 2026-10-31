@@ -64,15 +64,20 @@ test('an older approval stays accurate in the live notice, bell, inbox, detail a
     const email = await page.context().newPage();
     try {
       if (info.project.name === 'app') await email.setViewportSize({ width: 320, height: 700 });
-      await email.route('**/*', route => route.abort());
+      await email.route('**/*', route => {
+        const name = new URL(route.request().url()).pathname.slice(1);
+        return ['mendoza-marca-horizontal-transparente.png', 'mail-sitrep-rotonda.png'].includes(name)
+          ? route.fulfill({ path: path.join(process.env.QA_WEB_BUILD!, name), contentType: 'image/png' }) : route.abort();
+      });
       await email.setContent(mail.html);
       await expect(email.getByText(/Consultá el estado actual de las aprobaciones/)).toBeVisible();
+      await expect.poll(() => email.locator('img').evaluateAll(images => images.length === 2 && images.every(image => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
       await email.screenshot({ path: info.outputPath('correo-renderizado.png'), animations: 'disabled', scale: 'css' });
     } finally { await email.close(); }
     expect(await db.emailQueue.count({ where: { intentos: { gt: 0 } } })).toBe(0);
     expect(await db.emailQueue.count({ where: { sentAt: { not: null } } })).toBe(0);
     writeFileSync(info.outputPath('approval-notice-proof.json'), JSON.stringify({ surface: info.project.name,
       synthetic: true, production: false, historicalRecordUnchanged: true, live: true, bell: true, inbox: true,
-      detail: true, mailRenderedWithoutSending: true, mailLinkToOwnedNotice: true }, null, 2), { flag: 'wx', mode: 0o600 });
+      detail: true, mailRenderedWithoutSending: true, mailLinkToOwnedNotice: true, mailLogosFromLocalAssets: true }, null, 2), { flag: 'wx', mode: 0o600 });
   } finally { await db.$disconnect(); }
 });
