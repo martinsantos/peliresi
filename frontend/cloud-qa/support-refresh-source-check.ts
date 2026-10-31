@@ -6,7 +6,7 @@ import { assertCloudDatabase, root } from './safety.ts';
 
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-support-refresh-20261031';
-const commit = '9abdeed312d8338372765bd9816b1e1b14ec2f4d';
+const commit = 'd121a481d5aae6e5990be8aebea7f80cdf2f990a';
 assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'support-refresh-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
