@@ -64,3 +64,50 @@ test('confirmed support actions refresh the ticket and survive a failed read wit
   await writeFile(info.outputPath('proof.json'), JSON.stringify({ surface: info.project.name, ticketId: ticket.id,
     actions, rejectedReads, confirmedAfterReopen: true, noDuplicate: true }, null, 2));
 });
+
+test('a multi-role account keeps its support reply drafts separate across activity changes', async ({ page }, info) => {
+  test.setTimeout(150000);
+  await assertCloudDatabase();
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await login(page, info, 'multirol-' + info.project.name);
+  await page.goto(prefix(info) + '/mi-perfil');
+  const generatorInUse = page.getByRole('button', { name: 'Generador · En uso', exact: true });
+  const operatorInUse = page.getByRole('button', { name: 'Operador · En uso', exact: true });
+  await expect(generatorInUse.or(operatorInUse)).toBeVisible();
+  const first = await generatorInUse.isVisible() ? 'Generador' : 'Operador';
+  const second = first === 'Generador' ? 'Operador' : 'Generador';
+  await page.goto(prefix(info) + '/soporte');
+  await page.getByRole('region', { name: 'Soporte de SITREP', exact: true }).getByRole('button', { name: 'Reportar problema', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+  const subject = 'QA soporte multirol ' + info.project.name;
+  await dialog.getByLabel('Asunto', { exact: true }).fill(subject);
+  await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA sintético: conservar respuestas por actividad.');
+  const created = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+  const result = await created; expect(result.status()).toBe(201);
+  const ticket = (await result.json()).data as { id: string };
+  const reply = page.getByRole('textbox', { name: 'Mensaje o resolución', exact: true });
+  await reply.fill('QA borrador de ' + first); await reply.blur();
+  await expect(page.getByText('Borrador guardado en este dispositivo. Todavía no se envió.', { exact: true })).toBeVisible();
+
+  await page.goto(prefix(info) + '/mi-perfil');
+  await page.getByRole('button', { name: 'Usar ' + second, exact: true }).click();
+  await expect(page.getByRole('button', { name: second + ' · En uso', exact: true })).toBeDisabled();
+  await page.goto(prefix(info) + '/soporte/' + ticket.id);
+  await expect(page.getByRole('heading', { name: subject, exact: true })).toBeVisible();
+  await expect(reply).toHaveValue('');
+  await reply.fill('QA borrador de ' + second); await reply.blur();
+  await expect(page.getByText('Borrador guardado en este dispositivo. Todavía no se envió.', { exact: true })).toBeVisible();
+
+  await page.goto(prefix(info) + '/mi-perfil');
+  await page.getByRole('button', { name: 'Usar ' + first, exact: true }).click();
+  await expect(page.getByRole('button', { name: first + ' · En uso', exact: true })).toBeDisabled();
+  await page.goto(prefix(info) + '/soporte/' + ticket.id);
+  await expect(reply).toHaveValue('QA borrador de ' + first);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: info.outputPath('multirole-draft-recovered.png'), animations: 'disabled' });
+  await writeFile(info.outputPath('multirole-proof.json'), JSON.stringify({ surface: info.project.name, ticketId: ticket.id,
+    first, second, separated: true, replySent: false }, null, 2));
+});
