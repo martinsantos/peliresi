@@ -1,12 +1,14 @@
 import cron from 'node-cron';
 import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
+import { isTrainingSession } from '../lib/trainingScope';
 import { FOLLOWUP_RULE_ID, FOLLOWUP_CONDITION, followupDays, validateFollowupRule } from '../services/alertFollowupPolicy.service';
 
 /** Read-only preview. Counts every matching manifest; keeps only twenty sample rows. */
 export async function simularSeguimientoCierre(diasRecepcion: number, now = new Date()) {
   followupDays(JSON.stringify({ tipo: 'seguimiento_cierre', diasRecepcion: { gte: diasRecepcion } }));
-  const where = { estado: { in: ['RECIBIDO', 'EN_TRATAMIENTO'] as ('RECIBIDO' | 'EN_TRATAMIENTO')[] },
+  const where = { ...(isTrainingSession() ? {} : { isDemoData: false }),
+    estado: { in: ['RECIBIDO', 'EN_TRATAMIENTO'] as ('RECIBIDO' | 'EN_TRATAMIENTO')[] },
     operador: { usuario: { activo: true } },
     ...(diasRecepcion > 0 ? { fechaRecepcion: { lte: new Date(now.getTime() - diasRecepcion * 86400000) } } : {}) };
   const [total, ejemplos] = await Promise.all([
@@ -18,6 +20,8 @@ export async function simularSeguimientoCierre(diasRecepcion: number, now = new 
 
 /** Internal follow-up, not a late/legal classification. Never invokes a delivery provider. */
 export async function ejecutarSeguimientoCierre(now = new Date()): Promise<number> {
+  const operationalOnly = !isTrainingSession();
+  const manifestScope = operationalOnly ? { isDemoData: false } : {};
   // Adopt the already enabled operational follow-up into the repository once.
   // No startup scan, migration or external provider. Subsequent sweeps respect its switch.
   const existing = await prisma.reglaAlerta.findUnique({ where: { id: FOLLOWUP_RULE_ID } });
@@ -39,14 +43,14 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
     });
   // Closing the source resolves its open operational cases, without deleting their history.
   await prisma.alertaGenerada.updateMany({ where: { reglaId: { in: rules.map(rule => rule.id) },
-    estado: { in: ['PENDIENTE', 'EN_REVISION'] }, manifiesto: { estado: { in: ['TRATADO', 'CANCELADO'] } } },
+    estado: { in: ['PENDIENTE', 'EN_REVISION'] }, manifiesto: { ...manifestScope, estado: { in: ['TRATADO', 'CANCELADO'] } } },
     data: { estado: 'RESUELTA', notas: 'El manifiesto alcanzó un estado terminal; conciliación automática.', fechaResolucion: now, resueltaPor: null } });
   if (!rules.length) return 0;
   let cursor: string | undefined;
   let checked = 0;
   for (;;) {
     const batch = await prisma.manifiesto.findMany({
-      where: { estado: { in: ['RECIBIDO', 'EN_TRATAMIENTO'] } },
+      where: { ...manifestScope, estado: { in: ['RECIBIDO', 'EN_TRATAMIENTO'] } },
       select: { id: true }, orderBy: { id: 'asc' }, take: 100,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
@@ -56,7 +60,7 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
         // a workflow can still change concurrently after this read.
         const m = await tx.manifiesto.findUnique({ where: { id: row.id },
           include: { operador: { include: { usuario: true } } } });
-        if (!m || !['RECIBIDO', 'EN_TRATAMIENTO'].includes(m.estado) || !m.operador?.usuario.activo) return;
+        if (!m || (operationalOnly && m.isDemoData) || !['RECIBIDO', 'EN_TRATAMIENTO'].includes(m.estado) || !m.operador?.usuario.activo) return;
         const userId = m.operador.usuario.id;
         const received = m.fechaRecepcion;
         const days = received && received.getTime() <= now.getTime() ? Math.floor((now.getTime() - received.getTime()) / 86400000) : null;

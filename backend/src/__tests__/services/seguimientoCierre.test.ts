@@ -57,6 +57,13 @@ it('retains the isolated training scope when explicitly simulating there', async
   await inTrainingSession(() => simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z')));
   expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty('isDemoData');
 });
+it('keeps artificial manifests available inside an explicit isolated training scope', async () => {
+  mocks.current.mockResolvedValue({ id: 'qa', numero: 'QA', estado: 'RECIBIDO', isDemoData: true,
+    fechaRecepcion: new Date('2026-10-01T12:00:00Z'), operador: { usuario: { id: 'operator', activo: true } } });
+  expect(await inTrainingSession(() => ejecutarSeguimientoCierre())).toBe(1);
+  expect(mocks.scan.mock.calls[0][0].where).not.toHaveProperty('isDemoData');
+  expect(mocks.reconcile.mock.calls[0][0].where.manifiesto).not.toHaveProperty('isDemoData');
+});
 it('adopts the existing follow-up once using an active administrator, preserving default notice identity', async () => {
   mocks.rule.mockResolvedValue(null); mocks.admin.mockResolvedValue({ id: 'admin' });
   await ejecutarSeguimientoCierre(); expect(mocks.adopt.mock.calls[0][0]).toMatchObject({ where: { id: 'seguimiento_cierre_v1' }, update: {}, create: { creadoPorId: 'admin', destinatarios: '["OPERADOR"]' } });
