@@ -74,8 +74,9 @@ assert.equal(baseline.success, false); assert.equal(baseline.numFailedTests, 1);
 const failures = baseline.testResults.flatMap((file: { assertionResults: Array<{ status: string; failureMessages: string[] }> }) =>
   file.assertionResults.filter(item => item.status === 'failed').flatMap(item => item.failureMessages));
 assert.ok(failures.some((message: string) => message.includes('Publicación de certificación')));
-const unit = read('unit.json'); assert.equal(unit.success, true); assert.equal(unit.numFailedTests, 0);
+const unit = read('unit.json'); assert.equal(unit.success, true); assert.equal(unit.numFailedTests, 0); assert.equal(unit.numPendingTests, 0);
 assert.ok(unit.numPassedTests >= 20);
+const preflight = read('preflight-checks.json'); assert.equal(preflight.types, true); assert.equal(preflight.lint, true);
 const manual = readFileSync(path.join(out, 'manual.tap'), 'utf8');
 const manualCount = Number(manual.match(/# tests (\d+)/)?.[1]);
 assert.ok(manualCount >= 49); assert.equal(Number(manual.match(/# pass (\d+)/)?.[1]), manualCount); assert.match(manual, /# fail 0\b/);
