@@ -1,12 +1,21 @@
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render as renderWithTestingLibrary, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactElement } from 'react';
 import InspeccionesPage from '../../pages/inspecciones/InspeccionesPageV2';
 import { saveInspectionResume } from '../../services/inspectionResume';
 import type { Inspection } from '../../types/inspection';
 
 const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn() }));
+const originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+const clients: QueryClient[] = [];
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  clients.push(client);
+  return renderWithTestingLibrary(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 vi.mock('../../hooks/useInspectionOperations', () => ({ useInspectionOperations: () => ({ data: undefined, isLoading: false, isError: false }) }));
 vi.mock('../../pages/inspecciones/InspectionIntakePanel', () => ({
   InspectionIntakePanel: () => <section aria-label="Antecedentes para inspección">Administración evalúa</section>,
@@ -39,7 +48,23 @@ function NavigationProbe() {
 describe('InspeccionesPage', () => {
   beforeEach(() => {
     localStorage.clear(); sessionStorage.clear();
+    const payload = btoa(JSON.stringify({ id: 'admin-1', rol: 'ADMIN' })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    localStorage.setItem('sitrep_access_token', `fixture.${payload}.signature`);
+    const held = new Set<string>();
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: {
+      request: async (name: string, _options: LockOptions, callback: LockGrantedCallback<unknown>) => {
+        if (held.has(name)) return callback(null);
+        held.add(name);
+        try { return await callback({ name, mode: 'exclusive' } as Lock); } finally { held.delete(name); }
+      },
+    } });
     mocks.useInspections.mockReturnValue({ data: { items: [], total: 0 }, isLoading: false, isError: false, refetch: mocks.refetch });
+  });
+  afterEach(() => {
+    cleanup();
+    for (const client of clients.splice(0)) client.clear();
+    if (originalLocks) Object.defineProperty(navigator, 'locks', originalLocks);
+    else Reflect.deleteProperty(navigator, 'locks');
   });
 
   it.each(['/inspecciones', '/mobile/inspecciones'])('keeps antecedents within Inspecciones and restores the filtered list at %s', (path) => {
@@ -101,7 +126,7 @@ describe('InspeccionesPage', () => {
     expect(mocks.useInspections).toHaveBeenLastCalledWith(expect.objectContaining({ estados: ['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'], estado: undefined }));
   });
 
-  it('shows the empty state and opens the actor-aware creation form', () => {
+  it('shows the empty state and opens the actor-aware creation form', async () => {
     render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: 'Inspecciones' })).toBeInTheDocument();
@@ -109,7 +134,7 @@ describe('InspeccionesPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /nueva inspección/i }));
     expect(screen.getByRole('dialog', { name: 'Nueva inspección' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Generador de prueba' })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Generador de prueba' })).toBeInTheDocument();
   });
 
   it('does not present a failed request as an empty registry', () => {
@@ -121,10 +146,10 @@ describe('InspeccionesPage', () => {
     expect(mocks.refetch).toHaveBeenCalledOnce();
   });
 
-  it('offers the selected generator real, registered and legal addresses without choosing for the inspector', () => {
+  it('offers the selected generator real, registered and legal addresses without choosing for the inspector', async () => {
     render(<MemoryRouter><InspeccionesPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
-    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
+    fireEvent.change(await screen.findByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
     const location = screen.getByLabelText('Ubicación prevista');
     expect(location).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Usar domicilio declarado: Registro 100' })).toBeInTheDocument();
@@ -133,10 +158,10 @@ describe('InspeccionesPage', () => {
     expect(location).toHaveValue('Planta 200, Las Heras');
   });
 
-  it('keeps the written location when the inspected actor changes and drops stale suggestions', () => {
+  it('keeps the written location when the inspected actor changes and drops stale suggestions', async () => {
     render(<MemoryRouter><InspeccionesPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
-    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
+    fireEvent.change(await screen.findByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
     fireEvent.change(screen.getByLabelText('Ubicación prevista'), { target: { value: 'Portón norte constatado' } });
     fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-2' } });
     expect(screen.getByLabelText('Ubicación prevista')).toHaveValue('Portón norte constatado');
@@ -144,20 +169,20 @@ describe('InspeccionesPage', () => {
     expect(screen.getByRole('button', { name: 'Usar domicilio declarado: Otro 400' })).toBeInTheDocument();
   });
 
-  it('does not offer a previously selected actor address for an unidentified finding', () => {
+  it('does not offer a previously selected actor address for an unidentified finding', async () => {
     render(<MemoryRouter><InspeccionesPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
-    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
+    fireEvent.change(await screen.findByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
     expect(screen.getByRole('group', { name: 'Direcciones declaradas' })).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Responsable todavía sin identificar'));
     expect(screen.queryByRole('group', { name: 'Direcciones declaradas' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Ubicación prevista')).toHaveValue('');
   });
 
-  it('separates inspection classification from the responsible actor and explains the official number', () => {
+  it('separates inspection classification from the responsible actor and explains the official number', async () => {
     render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
-    const type = screen.getByLabelText('Tipo de inspección');
+    const type = await screen.findByLabelText('Tipo de inspección');
     expect(screen.getByRole('option', { name: /Petróleo · PRP/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Aire · ARP/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Espontánea.*IRP/ })).toBeInTheDocument();
