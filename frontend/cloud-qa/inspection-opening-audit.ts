@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { assertCloudDatabase, assertCloudEnvironment, backendRequire, externalKeys } from './safety.ts';
+import { assertCloudDatabase, assertCloudEnvironment, backendRequire, externalKeys, root } from './safety.ts';
 
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-inspection-opening-20261031';
@@ -20,7 +20,16 @@ for (const proc of read('processes.json')) {
   assert.equal(new URL(env.DATABASE_URL).searchParams.get('schema'), 'proposal_operations_20261021');
   assert.equal(env.TRAINING_DATABASE_URL, ''); assert.equal(env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z');
   assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
+  assert.equal(env.EMAIL_NOTIFICATION_FAMILIES, ''); assert.equal(env.EMAIL_EXTERNAL_ALERTS_ENABLED, 'false');
   for (const key of externalKeys) assert.equal(env[key], '');
+}
+const { TRAINING_LOGINS } = backendRequire(path.join(root, 'backend/dist-qa-actor-overview-20261031/lib/trainingDirectLogin.js'));
+for (const { email } of TRAINING_LOGINS) {
+  assert.match(email, /@capacitacion\.invalid$/);
+  const response = await fetch('http://127.0.0.1:4177/api/auth/login', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: 'sitrep_qa_client=127.11.89.97' },
+    body: JSON.stringify({ email, password: 'expired-qa-probe' }) });
+  assert.equal(response.status, 403);
 }
 const browser = path.join(out, `browser-${run}`);
 const dirs = readdirSync(browser, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => path.join(browser, entry.name));

@@ -181,9 +181,12 @@ test('a 404 after creation stays uncertain and cannot be discarded as a rejectio
     const upstream = await route.fetch(); expect(upstream.status()).toBe(201); createdId = (await upstream.json()).data.id;
     await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'QA lectura posterior fallida' }) });
   }, { times: 1 });
+  const first = page.waitForResponse(response => response.url().endsWith('/api/inspecciones') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Crear expediente', exact: true }).click();
+  expect((await first).status()).toBe(404);
   const dialog = page.getByRole('dialog', { name: 'Nueva inspección' });
   await expect(dialog).toContainText('Envío sin confirmar');
+  await expect(dialog).toContainText('No pudimos confirmar si se creó');
   await expect(dialog.getByRole('button', { name: 'Corregir datos', exact: true })).toHaveCount(0);
   const replay = page.waitForResponse(response => response.url().endsWith('/api/inspecciones') && response.request().method() === 'POST');
   await dialog.getByRole('button', { name: 'Comprobar envío', exact: true }).click();
@@ -233,33 +236,69 @@ test('an explicit first rejection permits correction and a new opening', async (
   expect(response.request().postDataJSON().observaciones).toBe('QA descripción corregida');
 });
 
-test('a session change before dispatch cannot create an inspection under the wrong account', async ({ page }, info) => {
+test('a session change before the click cannot dispatch the old account opening', async ({ page }, info) => {
   test.skip(process.env.QA_OPENING_RUN === 'before');
   await login(page, info, 'inspector');
   await page.goto(`${prefix(info)}/inspecciones`);
   await page.getByRole('button', { name: 'Nueva inspección', exact: true }).click();
   await page.getByRole('combobox', { name: 'Tipo de inspección', exact: true }).selectOption('ESPONTANEA');
-  await page.getByLabel('Descripción inicial').fill('QA cambio de sesión antes del envío');
+  await page.getByLabel('Descripción inicial').fill('QA cambio previo de sesión');
   let sent = 0;
   page.on('request', request => { if (request.url().endsWith('/api/inspecciones') && request.method() === 'POST') sent++; });
+  await page.evaluate(() => {
+    window.addEventListener('click', () => localStorage.removeItem('sitrep_access_token'), { once: true, capture: true });
+  });
+  await page.getByRole('button', { name: 'Crear expediente', exact: true }).click();
+  await page.waitForTimeout(300);
+  expect(sent).toBe(0);
+  expect(await page.evaluate(() => Object.keys(localStorage).some(key => {
+    if (!key.startsWith('sitrep:inspection-opening:v1:')) return false;
+    try { return Boolean(JSON.parse(localStorage.getItem(key) || '{}').command); } catch { return true; }
+  }))).toBe(false);
+  await expect(page.getByLabel('Descripción inicial')).toHaveValue('QA cambio previo de sesión');
+});
+
+test('a session change after dispatch keeps the request bound to the original account', async ({ page }, info) => {
+  test.skip(process.env.QA_OPENING_RUN === 'before');
+  await login(page, info, 'inspector');
+  await page.goto(`${prefix(info)}/inspecciones`);
+  await page.getByRole('button', { name: 'Nueva inspección', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Tipo de inspección', exact: true }).selectOption('ESPONTANEA');
+  await page.getByLabel('Descripción inicial').fill('QA cambio de sesión durante el envío');
+  let sent = 0;
+  const originalToken = await page.evaluate(() => localStorage.getItem('sitrep_access_token'));
+  expect(originalToken).toBeTruthy();
+  let matchedOriginal = false;
+  page.on('request', request => {
+    if (request.url().endsWith('/api/inspecciones') && request.method() === 'POST') {
+      sent++;
+      if (sent === 1) matchedOriginal = request.headers().authorization === `Bearer ${originalToken}`;
+    }
+  });
   await page.evaluate(() => {
     (window as any).__qaOpeningToken = localStorage.getItem('sitrep_access_token');
     window.addEventListener('click', () => localStorage.removeItem('sitrep_access_token'), { once: true });
   });
+  const firstResponse = page.waitForResponse(result => result.url().endsWith('/api/inspecciones') && result.request().method() === 'POST');
   await page.getByRole('button', { name: 'Crear expediente', exact: true }).click();
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(key => {
     if (!key.startsWith('sitrep:inspection-opening:v1:')) return false;
     try { const draft = JSON.parse(localStorage.getItem(key) || '{}'); return draft.command?.status === 'pending' && draft.command.attempts === 1; } catch { return false; }
   }))).toBe(true);
-  await page.waitForTimeout(300); // Let the queued mutation run after the click handler.
-  expect(sent).toBe(0);
+  const first = await firstResponse;
+  expect(first.status()).toBe(201);
+  const originalId = (await first.json()).data.id;
+  expect(sent).toBe(1);
+  expect(matchedOriginal).toBe(true);
   await page.evaluate(() => localStorage.setItem('sitrep_access_token', (window as any).__qaOpeningToken));
   await page.reload();
   await page.getByRole('button', { name: 'Continuar apertura', exact: true }).click();
   const response = page.waitForResponse(result => result.url().endsWith('/api/inspecciones') && result.request().method() === 'POST');
   await page.getByRole('button', { name: 'Comprobar envío', exact: true }).click();
-  expect((await response).status()).toBe(201);
-  expect(sent).toBe(1);
+  const replay = await response;
+  expect(replay.status()).toBe(201);
+  expect((await replay.json()).data.id).toBe(originalId);
+  expect(sent).toBe(2);
 });
 
 test('reconnection never sends the opening without a new user action', async ({ page }, info) => {
@@ -273,7 +312,7 @@ test('reconnection never sends the opening without a new user action', async ({ 
   page.on('request', request => { if (request.url().endsWith('/api/inspecciones') && request.method() === 'POST') sent++; });
   await page.context().setOffline(true);
   const dialog = page.getByRole('dialog', { name: 'Nueva inspección' });
-  await expect(dialog).toContainText('No se enviará automáticamente');
+  await expect(dialog).toContainText('no se enviará automáticamente');
   await expect(dialog.getByRole('button', { name: 'Crear expediente', exact: true })).toBeDisabled();
   await page.context().setOffline(false);
   await expect(dialog.getByRole('button', { name: 'Crear expediente', exact: true })).toBeEnabled();
