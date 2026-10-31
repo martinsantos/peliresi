@@ -215,18 +215,25 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
    }
    if(kind==='FINAL'){
     const decision=region.getByLabel('Tratamiento de Y12 (kg)',{exact:true});
-    const publish=region.getByRole('button',{name:'Firmar y publicar certificación',exact:true});
+    const publication=region.getByRole('group',{name:'Publicación de certificación',exact:true});
+    const publish=publication.getByRole('button',{name:'Firmar y publicar certificación',exact:true});
     await decision.selectOption('no');await signCertificate();await expect(publish).toBeDisabled();
-    await expect(region).toContainText('completá el tratamiento de cada corriente hallada');
+    await publication.scrollIntoViewIfNeeded();
+    const guidance=publication.getByText(/completá el tratamiento de cada corriente hallada/);
+    await expect(guidance).toBeVisible();await expect(guidance).toBeInViewport();
+    const review=publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true});
+    await expect(review).toBeInViewport();await review.click();await expect(decision).toBeFocused();
     await decision.selectOption('si');
     const findingAmount=region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true});
-    await findingAmount.fill('0.5');await signCertificate();await expect(publish).toBeDisabled();
+    await findingAmount.fill('0.5');await signCertificate();await expect(publish).toBeDisabled();await publication.scrollIntoViewIfNeeded();
+    await expect(guidance).toBeInViewport();await review.click();await expect(findingAmount).toBeFocused();
     const firma=await region.getByAltText('Firma del operador').getAttribute('src');
     const rejected=await op.evaluate(async ({id,residuoId,firma})=>{
      const response=await fetch('/api/manifiestos/'+id+'/certificados',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('sitrep_access_token')},body:JSON.stringify({id:crypto.randomUUID(),tipo:'FINAL',firma,metodo:'QA ESTABILIZACION',nota:'QA sin emitir',cantidades:[{residuoId,cantidad:22},{residuoId:'hallazgo:Y12:kg',cantidad:0.5}]})});
      return {status:response.status,body:await response.json()};
     },{id:m.id,residuoId:m.residuos[0].id,firma});
     expect(rejected.status).toBe(409);expect(rejected.body.message).toContain('completá el tratamiento');
+    await publication.scrollIntoViewIfNeeded();await expect(guidance).toBeInViewport();
     await proof(op,info,'final-finding-incomplete');
     await findingAmount.fill('1');await signCertificate();await expect(publish).toBeEnabled();
    }else await signCertificate();
