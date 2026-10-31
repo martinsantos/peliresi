@@ -236,6 +236,15 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     await publication.scrollIntoViewIfNeeded();await expect(guidance).toBeInViewport();
     await proof(op,info,'final-finding-incomplete');
     await findingAmount.fill('1');await signCertificate();await expect(publish).toBeEnabled();
+   }else if(creator==='generador'){
+    const findingAmount=region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true});
+    const publication=region.getByRole('group',{name:'Publicación de certificación',exact:true});
+    const publish=publication.getByRole('button',{name:'Firmar y publicar certificación',exact:true});
+    await findingAmount.fill('2');await signCertificate();await expect(publish).toBeDisabled();
+    await publication.scrollIntoViewIfNeeded();
+    await expect(publication.getByText(/mayores que cero/)).toBeInViewport();
+    await publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true}).click();
+    await expect(findingAmount).toBeFocused();await findingAmount.fill('');await signCertificate();await expect(publish).toBeEnabled();
    }else await signCertificate();
    const record=await post(op,'/'+m.id+'/certificados',()=>region.getByRole('button',{name:'Firmar y publicar certificación',exact:true}).click(),201);
    const label=kind==='PARCIAL'?'Descargar parcial 1':'Descargar final';expect(await downloadHash(op,label)).toBe(record.pdfSha256);
