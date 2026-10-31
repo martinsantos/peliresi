@@ -5,7 +5,7 @@ import { INSPECTION_AGENDA_LABELS, INSPECTION_EXCHANGE_LABELS } from '../domain/
 import { isTrainingSession } from '../lib/trainingScope';
 import { PARTICIPANT_VISIBLE_STATES } from './inspectionExchange.service';
 
-type InspectionRef = { id: string; tipoActor: TipoActorInspeccion | null; generadorId?: string | null;
+export type InspectionRef = { id: string; tipoActor: TipoActorInspeccion | null; generadorId?: string | null;
   transportistaId?: string | null; operadorId?: string | null };
 type Access = { empresaId: string; actividadId: string; rol: TipoActorInspeccion; razonSocial: string; actorId: string; autorizacionId: string };
 type Recipient = { usuarioId: string; access: Access };

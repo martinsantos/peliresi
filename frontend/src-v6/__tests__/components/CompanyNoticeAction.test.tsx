@@ -188,3 +188,13 @@ it.each([
  const data = JSON.parse(requirementNotice.datos);
  expect(notificationCompanyAccesses({ ...requirementNotice, datos:JSON.stringify({ ...data, ...invalid }) })).toEqual([]);
 });
+
+it.each(['', '/app'])('opens an overdue requirement in the verified company activity on %s', prefix => {
+ const n:any={...requirementNotice,datos:JSON.stringify({familia:'catalogo_verificable',tipo:'requerimiento_inspeccion',version:1,
+  destino:'participacion',tipoActor:'GENERADOR',representacionVersion:1,inspeccionId:'case-1',accesosEmpresa:[requirementAccess]})};
+ expect(notificationCompanyAccesses(n)).toEqual([requirementAccess]);
+ expect(resolveNotificationPath(n,prefix,'OPERADOR')).toBe(prefix+'/notificaciones/psip-n');
+ expect(resolveNotificationPath(n,prefix,'OPERADOR',true)).toBe(prefix+'/requerimientos/case-1');
+ render(<MemoryRouter><CompanyNoticeAction notice={n} target="/requerimientos/case-1" userId="rep" /></MemoryRouter>);
+ expect(screen.getByRole('button',{name:'Usar Generador y abrir requerimiento'})).toBeVisible();
+});

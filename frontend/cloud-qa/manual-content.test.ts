@@ -333,6 +333,8 @@ test('actor inspection guide does not grant access to general inspections or aut
   assert.match(JSON.stringify(guide), /autorización vigente para toda la actividad/);
   assert.match(JSON.stringify(guide), /Una autorización limitada a una sede no habilita este acceso/);
   assert.match(JSON.stringify(guide), /Si se revoca la autorización, el contenido deja de estar disponible/);
+  assert.match(JSON.stringify(guide), /la autoridad habilitó una regla de requerimientos vencidos/);
+  assert.match(JSON.stringify(guide), /ese aviso de representación indica que debe consultarse el estado actual/);
   assert.match(JSON.stringify(guide), /no habilita nuevas respuestas/);
   assert.match(JSON.stringify(guide), /no al módulo general de Inspecciones/);
   const proof = JSON.parse(read('psip-actor-capture-provenance.json'));

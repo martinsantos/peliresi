@@ -63,7 +63,8 @@ export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos' |
  const fiscal = data.tipo === 'recordatorio_fiscal' && data.destino === 'representante' && !!notificationFiscalReminder(notice);
  const alertRule = representativeManifestAlert(notice.tipo, data);
  const eventual = notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && data.accesoVersion === 1;
- const inspection = notice.tipo === 'INFO_GENERAL' && ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))
+ const inspection = notice.tipo === 'INFO_GENERAL' && (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))
+  || (data.familia === 'catalogo_verificable' && data.tipo === 'requerimiento_inspeccion'))
   && data.destino === 'participacion' && data.representacionVersion === 1 && id(data.inspeccionId)
   && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor));
  if ((!fiscal && !alertRule && !eventual && !inspection && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
@@ -125,7 +126,8 @@ export function notificationActorRole(notice: Notificacion): 'GENERADOR' | 'TRAN
   const receipt = notificationActorReceipt(notice);
   if (receipt) return receipt.role;
   if (notificationFiscalReminder(notice)) return 'GENERADOR';
-  return ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1
+  return (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))
+    || (data.familia === 'catalogo_verificable' && data.tipo === 'requerimiento_inspeccion')) && data.version === 1
     && data.destino === 'participacion' && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))
     ? data.tipoActor as 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' : null;
 }
@@ -171,7 +173,8 @@ export function refreshInspectionNotification(notificacion: Notificacion, queryC
   if (typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {
     void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
   }
-  if (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1) {
+  if ((['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))
+    || (data.familia === 'catalogo_verificable' && data.tipo === 'requerimiento_inspeccion')) && data.version === 1) {
     void queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
   }
 }
@@ -272,7 +275,11 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
     return withBasePath(data.destino === 'participacion' ? `/requerimientos/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}${data.tipo === 'intercambio_inspeccion' ? '#intercambios' : ''}`, basePath);
   }
   const target = cataloguePath(notificacion.datos, true);
-  if (data.familia === 'catalogo_verificable') return withBasePath(target || '/notificaciones', basePath);
+  if (data.familia === 'catalogo_verificable') {
+    const role = notificationActorRole(notificacion);
+    if (role && recipientRole && role !== recipientRole && !(companyTarget && companyAccess) && safeId(notificacion.id)) return withBasePath(`/notificaciones/${notificacion.id}`, basePath);
+    return withBasePath(target || '/notificaciones', basePath);
+  }
   const explicitPath = typeof data.url === 'string'
     ? data.url
     : typeof data.ruta === 'string'

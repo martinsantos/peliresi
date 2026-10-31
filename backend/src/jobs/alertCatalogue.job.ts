@@ -4,6 +4,8 @@ import { Prisma, Rol, type ReglaAlerta } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { catalogueCondition, validateCatalogueRule, requirementSituation, expirySituation, expiryHorizonEnd, formatDocumentExpiry, CATALOGUE_MARKER, type CatalogueCondition, type ExpiryEntity } from '../services/alertCataloguePolicy.service';
 import { exchangePartyForUser } from '../services/inspectionExchange.service';
+import { inspectionDeadlineCompanyNoticeRows } from '../services/inspectionDeadlineCompanyNotice.service';
+import type { InspectionRef } from '../services/inspectionCompanyNotice.service';
 
 const requirementInclude = {
   respuestas: { select: { tipo: true, parte: true } },
@@ -149,6 +151,18 @@ export async function ejecutarCatalogo(now = new Date()): Promise<number> {
           datos: JSON.stringify({ ...facts, casoId: id, reglaId: rule.id, evaluadoAt: now.toISOString(), destino: facts.inspeccionId ? (participant ? 'participacion' : 'inspeccion') : (participant ? 'perfil' : 'actor') }) };
         await tx.notificacion.upsert({ where: { id: noticeId }, create: { id: noticeId, ...data }, update: data });
         updated++;
+      }
+      if (facts.tipo === 'requerimiento_inspeccion' && roles.includes('INSPECCIONADO') && facts.inspeccionId && facts.actorId
+        && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(facts.tipoActor || '')) {
+        const role = facts.tipoActor as NonNullable<InspectionRef['tipoActor']>;
+        const inspection: InspectionRef = { id: facts.inspeccionId, tipoActor: role,
+          ...(role === 'GENERADOR' ? { generadorId: facts.actorId } : role === 'TRANSPORTISTA' ? { transportistaId: facts.actorId } : { operadorId: facts.actorId }) };
+        const representatives = await inspectionDeadlineCompanyNoticeRows(tx, inspection, id, [...ids]);
+        for (const row of representatives) {
+          const { id: noticeId, ...data } = row;
+          await tx.notificacion.upsert({ where: { id: noticeId }, create: row, update: data });
+          updated++;
+        }
       }
     }); });
   }

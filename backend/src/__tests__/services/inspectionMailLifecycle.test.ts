@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const db = vi.hoisted(() => ({ inspection: vi.fn(), exchange: vi.fn(), event: vi.fn(), intake: vi.fn(), alert: vi.fn(), notice: vi.fn(), query: vi.fn(), insert: vi.fn() }));
+const db = vi.hoisted(() => ({ inspection: vi.fn(), exchange: vi.fn(), event: vi.fn(), intake: vi.fn(), alert: vi.fn(), notice: vi.fn(), query: vi.fn(), insert: vi.fn(), actor: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   inspeccion: { findUnique: db.inspection }, intercambioInspeccion: { findUnique: db.exchange },
   eventoInspeccion: { findUnique: db.event }, antecedenteFiscalizacion: { findUnique: db.intake },
   alertaGenerada: { findUnique: db.alert },
+  usuario: { findFirst: db.actor },
   notificacion: { findUnique: db.notice }, $queryRawUnsafe: db.query, emailQueue: { createMany: db.insert },
 } }));
 import { notificationMailContent, queuedNoticeStillEligible, queueCommittedNotificationEmails, type NoticeForMail } from '../../services/notification-mail.service';
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   // Only the pure queue is enabled in this mocked process. No delivery/provider is imported.
   vi.stubEnv('DISABLE_EMAILS', 'false'); vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'inspecciones');
+  vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'false');
   vi.stubEnv('EMAIL_DELIVERY_NOT_BEFORE', new Date(Date.now() - 60_000).toISOString());
   db.inspection.mockResolvedValue(inspection); db.exchange.mockResolvedValue(exchange);
   db.query.mockResolvedValue([base]); db.insert.mockResolvedValue({ count: 1 });
@@ -42,6 +44,19 @@ describe('queued PSIP deadline reminders recheck the live requirement', () => {
   it('retains the assigned inspector but rejects a replacement before the catalogue runs again', async () => {
     expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(true);
     db.exchange.mockResolvedValue({ ...pending, inspeccion: { ...inspection, inspectorId: 'replacement' } });
+    expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(false);
+  });
+  it('rechecks an approved secondary activity before allowing its overdue reminder', async () => {
+    vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
+    const data = { ...facts, destino: 'participacion', tipoActor: 'GENERADOR' };
+    const user = { ...base, rol: 'OPERADOR', datos: JSON.stringify(data) };
+    db.notice.mockResolvedValue({ ...user, usuario: user });
+    db.alert.mockResolvedValue({ estado: 'PENDIENTE', datos: JSON.stringify(data), regla: { activa: true } });
+    db.exchange.mockResolvedValue({ ...pending, inspeccion: { ...inspection, generadorId: 'g-1' } });
+    db.actor.mockResolvedValue({ id: 'owner' });
+    expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(true);
+    expect(db.actor.mock.calls[0][0].where.AND[1]).toMatchObject({ generador: { is: { id: 'g-1' } } });
+    db.actor.mockResolvedValue(null);
     expect(await queuedNoticeStillEligible('notification:notice', base.email)).toBe(false);
   });
   it.each([

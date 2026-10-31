@@ -158,12 +158,26 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
       if (!original || original.tipo !== data.tipo || original.entidadId !== data.entidadId || original.inspeccionId !== data.inspeccionId || original.vencimiento !== data.vencimiento) return false;
       const requirement = await prisma.intercambioInspeccion.findUnique({ where: { id: data.entidadId }, include: {
         respuestas: { select: { tipo: true, parte: true } },
-        inspeccion: { select: { inspectorId: true, tipoActor: true, estado: true,
+        inspeccion: { select: { id: true, inspectorId: true, tipoActor: true, estado: true, generadorId: true, transportistaId: true, operadorId: true,
           generador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } } } },
       } });
       if (!requirement || requirement.inspeccionId !== data.inspeccionId || requirement.plazoRespuestaAt?.toISOString() !== data.vencimiento || requirementSituation(requirement, new Date()) !== 'PENDIENTE') return false;
       const audience = inspectionAudience(notice, requirement.inspeccion);
-      return data.destino === 'inspeccion' ? audience.authority : data.destino === 'participacion' && audience.participant;
+      let participant = audience.participant;
+      if (!participant && process.env.ACTOR_MULTIROLE_ENABLED === 'true' && data.destino === 'participacion'
+        && data.tipoActor === requirement.inspeccion.tipoActor && PARTICIPANT_VISIBLE_STATES.includes(requirement.inspeccion.estado)
+        && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(notice.rol)) {
+        const owner = inspectionParticipantNoticeWhere(requirement.inspeccion);
+        participant = !!owner && !!await prisma.usuario.findFirst({ where: { AND: [{ id: notice.usuarioId, activo: true }, owner] }, select: { id: true } });
+      }
+      if (!participant && data.destino === 'participacion' && data.representacionVersion === 1
+        && data.tipoActor === requirement.inspeccion.tipoActor && Array.isArray(data.accesosEmpresa)) {
+        const current = (await inspectionCompanyRecipientsBatch(prisma, [requirement.inspeccion], [notice.usuarioId])).get(requirement.inspeccion.id) || [];
+        participant = current.some(recipient => data.accesosEmpresa instanceof Array && data.accesosEmpresa.some((access: any) => access
+          && access.empresaId === recipient.access.empresaId && access.actividadId === recipient.access.actividadId
+          && access.rol === recipient.access.rol && access.actorId === recipient.access.actorId));
+      }
+      return data.destino === 'inspeccion' ? audience.authority : data.destino === 'participacion' && participant;
     }
     return true;
   }
@@ -419,6 +433,8 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : data.tipo === 'recordatorio_operacion' && data.version === 1 ? data.modalidad === 'IN_SITU'
       ? ['Tratamiento en origen previsto', 'Revisá las aprobaciones y coordiná el inicio. No hay retiro, traslado ni GPS.']
       : ['Retiro previsto', 'Revisá las aprobaciones y coordiná con las partes. El viaje comienza al confirmar el retiro.']
+    : data.familia === 'catalogo_verificable' && data.tipo === 'requerimiento_inspeccion' && data.version === 1
+      ? ['Requerimiento vencido sin respuesta', 'El plazo registrado venció y no hay una respuesta vinculada. Abrí el aviso para revisar el requerimiento y su estado actual.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
     : data.tipo === 'manifiesto_eventual' && validEventualMail(data) ? EVENTUAL_NOTICE_LABELS[String(data.evento) as keyof typeof EVENTUAL_NOTICE_LABELS]
     : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
@@ -459,7 +475,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"psip_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"reversion_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"psip_empresa"%' OR n.datos LIKE '%"psip_vencimiento_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"reversion_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;
