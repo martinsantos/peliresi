@@ -416,6 +416,8 @@ test('certificate guide distinguishes an approved finding from an explicitly tre
   assert.ok(cert.includes('sólo si efectivamente la trataste'));
   assert.ok(cert.includes('completá el tratamiento e indicá el total efectivamente tratado'));
   assert.ok(cert.includes('la certificación final queda bloqueada hasta completar su tratamiento'));
+  assert.ok(cert.includes('Revisar corrientes halladas junto al botón de publicación'));
+  assert.ok(cert.includes('Si una cantidad hallada no es válida'));
   assert.ok(cert.includes('La firma registra tu decisión'));
 });
 
