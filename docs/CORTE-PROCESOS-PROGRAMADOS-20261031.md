@@ -16,6 +16,8 @@ Al iniciar el servidor, [index.ts](../backend/src/index.ts) registra los proceso
 
 El [temporizador de correo](../backend/src/services/email.service.ts) no arranca cuando la política de correo está deshabilitada. Algunas operaciones pueden igualmente registrar elementos suprimidos en la cola; deshabilitar la entrega no convierte una prueba mutante en una prueba de sólo lectura.
 
+En la regresión aislada actual se exige `NODE_ENV=test`, `NODE_APP_INSTANCE=qa` y blockchain deshabilitado. Con esas condiciones las guardas de instancia no registran estos cron; las funciones ensayadas directamente en pruebas sintéticas no demuestran que su ejecución programada o su configuración en el destino sean correctas.
+
 ## Consecuencias para el corte
 
 1. El ensayo de despliegue y reversión debe separar el arranque de la interfaz y API de la ejecución de tareas que escriben. Un smoke no mutante no demuestra por sí solo que un cron vaya a permanecer inactivo después de terminar el smoke.
