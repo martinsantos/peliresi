@@ -1766,20 +1766,20 @@ Una misma entidad puede solicitar actividades como generador, transportista y op
 <section id="mod-emails" data-role="admin">
 <h3>3.13 Sistema de Emails y Alertas</h3>
 <div class="section-intro">
-SITREP utiliza una <strong>cola de emails en base de datos</strong> que garantiza que ningun email se pierda, permite reintentos automaticos y agrupa las alertas en resúmenes periodicos (digests) para no saturar los buzones de los destinatarios.
+SITREP registra la preparación y el estado de los correos en una <strong>cola</strong>. El envío depende de la configuración del ambiente y de la elegibilidad del destinatario; las alertas internas pueden existir aunque correo y push estén deshabilitados.
 </div>
 
 <h4>3.13.1 Tipos de Email</h4>
 <table>
 <thead><tr><th>Tipo</th><th>Ejemplos</th><th>Comportamiento</th></tr></thead>
 <tbody>
-<tr><td><strong>Transaccional</strong></td><td>Verificacion de cuenta, reset de password, cuenta aprobada, solicitud observada</td><td>Se intenta enviar inmediatamente. Si falla, queda en cola para reintento automatico (hasta 3 intentos).</td></tr>
-<tr><td><strong>Alerta</strong></td><td>Cambios de estado de manifiestos, incidentes, anomalias GPS, tiempo excesivo</td><td>Se acumulan y se envian como un <strong>resumen (digest)</strong> cada hora agrupado por destinatario. Un solo email con todas las alertas del periodo.</td></tr>
+<tr><td><strong>Transaccional</strong></td><td>Verificacion de cuenta, reset de password, cuenta aprobada, solicitud observada</td><td>Si el canal está habilitado y el destinatario es elegible, se intenta enviar; sólo los fallos anteriores a la aceptación que permiten un reintento seguro se reintentan automáticamente.</td></tr>
+<tr><td><strong>Alerta</strong></td><td>Cambios de estado de manifiestos, incidentes, anomalias GPS, tiempo excesivo</td><td>Cuando la familia y el canal están habilitados, las alertas elegibles pueden agruparse por destinatario y hora en un <strong>resumen (digest)</strong>.</td></tr>
 </tbody>
 </table>
 
 <h4>3.13.2 Digests de Alertas</h4>
-<p>En vez de enviar un email por cada evento, el sistema agrupa las alertas del mismo destinatario dentro de la misma hora y envia un solo email resumen:</p>
+<p>Cuando el envío está habilitado, las alertas elegibles del mismo destinatario pueden agruparse dentro de la misma hora:</p>
 <div class="info-box">
 <strong>Ejemplo de digest:</strong><br>
 Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
@@ -1790,7 +1790,7 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 </div>
 
 <h4>3.13.3 Rate Limits</h4>
-<p>Para proteger contra saturacion de buzones:</p>
+<p>Para proteger contra saturacion de buzones, estos son los valores predeterminados configurables:</p>
 <table>
 <thead><tr><th>Tipo</th><th>Limite por destinatario por dia</th></tr></thead>
 <tbody>
@@ -1798,7 +1798,7 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 <tr><td>Digest de alertas</td><td>6 emails/dia</td></tr>
 </tbody>
 </table>
-<p>Los emails que excedan el limite quedan con estado <code>SUPRIMIDO</code> en la base de datos para auditoria.</p>
+<p>Los correos que excedan el límite pueden quedar <code>SUPRIMIDO</code> para auditoría; también se suprimen por otras razones, como un canal deshabilitado o un destinatario no elegible.</p>
 
 <h4>3.13.4 Panel Admin — Cola de Emails</h4>
 <p>Los administradores pueden ver el estado de la cola de emails en <code>GET /api/admin/email-queue</code> con filtros por estado, destinatario y fecha. Esto permite:</p>
@@ -1813,19 +1813,19 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 <table>
 <thead><tr><th>Estado</th><th>Descripcion</th></tr></thead>
 <tbody>
-<tr><td><code>PENDIENTE</code></td><td>Transaccional esperando envio inmediato</td></tr>
+<tr><td><code>PENDIENTE</code></td><td>Solicitud registrada; el detalle indica si está lista o si un intento incierto requiere revisión.</td></tr>
 <tr><td><code>DIGEST_PENDIENTE</code></td><td>Alerta esperando agrupacion en digest</td></tr>
-<tr><td><code>ENVIADO</code></td><td>Enviado exitosamente via SMTP</td></tr>
-<tr><td><code>FALLIDO</code></td><td>Error de envio, se reintentara automaticamente</td></tr>
-<tr><td><code>SUPRIMIDO</code></td><td>Rate limit excedido o max reintentos alcanzados</td></tr>
+<tr><td><code>ENVIADO</code></td><td>Registró aceptación por SMTP, no entrega ni lectura.</td></tr>
+<tr><td><code>FALLIDO</code></td><td>Fallo para el que el sistema puede programar un reintento seguro, dentro de los límites configurados.</td></tr>
+<tr><td><code>SUPRIMIDO</code></td><td>Correo no enviable por la política vigente; el detalle registra el motivo.</td></tr>
 </tbody>
 </table>
 
 <h4>3.13.6 Kill Switch</h4>
-<p>La variable de entorno <code>DISABLE_EMAILS=true</code> suprime todos los envios SMTP pero sigue encolando emails en la base de datos. Util para mantenimiento o migraciones. Al desactivar el switch, los emails pendientes se procesan en el proximo ciclo de flush (cada 5 minutos).</p>
+<p><code>DISABLE_EMAILS=true</code> impide envíos SMTP. Los correos suprimidos no se reactivan automáticamente. Si luego se autoriza el canal, se requiere una fecha de activación explícita y sólo se procesan mensajes elegibles dentro de la ventana permitida; los intentos de resultado incierto requieren revisión.</p>
 
 <h4>3.13.7 Canales de Contacto por Usuario</h4>
-<p>Cada usuario puede configurar sus canales de notificacion preferidos desde <strong>Configuracion &rarr; Notificaciones</strong> en su perfil. Las notificaciones se envian automaticamente por los canales activos cada vez que ocurre un evento relevante (manifiesto firmado, retiro asignado, incidente, etc.).</p>
+<p>Las preferencias del usuario no activan por sí solas canales deshabilitados en el ambiente. Consultá la campana para los avisos internos correspondientes a tu rol.</p>
 
 <div class="cu-screenshot">
   <a href="screenshots/desktop/38_configuracion_notificaciones_email.png" target="_blank">
@@ -1839,27 +1839,27 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 <tbody>
 <tr>
   <td><strong>Email</strong></td>
-  <td>Activo</td>
+  <td>Según habilitación</td>
   <td>Toggle "Recibir alertas por email" en Configuracion &rarr; Notificaciones. Usa el email registrado del usuario.</td>
   <td>Todos los roles. Emails via cola con digest (no satura buzones).</td>
 </tr>
 <tr>
   <td><strong>In-App</strong></td>
   <td>Activo (siempre)</td>
-  <td>Automatico. Las notificaciones aparecen en el icono de campana y en la pagina /alertas.</td>
+  <td>Los avisos correspondientes aparecen en la campana y en la página de Avisos.</td>
   <td>Todos los roles. Sin configuracion necesaria.</td>
 </tr>
 <tr>
   <td><strong>WhatsApp</strong></td>
-  <td>Proximamente</td>
-  <td>Toggle "Recibir alertas por WhatsApp" + ingresar numero de telefono con codigo de pais (+54 261...).</td>
-  <td>Requiere integracion con WhatsApp Business API. La configuracion ya esta lista en el sistema.</td>
+  <td>No disponible</td>
+  <td>No se ofrece activación. Una preferencia antigua puede desactivarse.</td>
+  <td>Requiere una integración externa.</td>
 </tr>
 <tr>
   <td><strong>Telegram</strong></td>
-  <td>Proximamente</td>
-  <td>Toggle "Recibir alertas por Telegram" + ingresar Chat ID de Telegram (obtenido via @userinfobot).</td>
-  <td>Requiere crear un Bot de Telegram con @BotFather. La configuracion ya esta lista en el sistema.</td>
+  <td>No disponible</td>
+  <td>No se ofrece activación. Una preferencia antigua puede desactivarse.</td>
+  <td>Requiere una integración externa.</td>
 </tr>
 </tbody>
 </table>
@@ -1875,23 +1875,16 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 <ol>
 <li>Hacer clic en <strong>Configuracion</strong> en el menu lateral izquierdo.</li>
 <li>Seleccionar la pestana <strong>Notificaciones</strong>.</li>
-<li>Activar o desactivar cada canal con el toggle correspondiente.</li>
-<li>Para WhatsApp: ingresar el numero de telefono y presionar "Guardar".</li>
-<li>Para Telegram: ingresar el Chat ID y presionar "Guardar".</li>
+<li>Revisar la preferencia de correo disponible; su envío también depende de la habilitación del ambiente.</li>
+<li>Si aparece una preferencia antigua de WhatsApp o Telegram, podés desactivarla.</li>
 </ol>
 
 <div class="info-box">
-<strong>Nota:</strong> Todos los usuarios (ADMIN, Generador, Transportista, Operador) reciben notificaciones in-app automaticamente. El email es opcional y se activa por usuario. WhatsApp y Telegram estaran disponibles cuando se integren las APIs externas correspondientes.
+<strong>Nota:</strong> Los avisos internos dependen del evento y de los permisos. Correo y push requieren habilitación del ambiente además de las preferencias que correspondan. WhatsApp y Telegram requieren integraciones externas.
 </div>
 
 <h4>3.13.8 Notificaciones con Ubicacion (Link a Mapa)</h4>
-<p>Cuando un manifiesto es firmado (APROBADO), el <strong>transportista</strong> recibe una notificacion que incluye:</p>
-<ul>
-<li>Fecha estimada de retiro</li>
-<li>Direccion del generador (punto de retiro)</li>
-<li>Link <strong>"Ver ubicacion"</strong> que abre Google Maps (en mobile, abre la app nativa)</li>
-</ul>
-<p>El link usa las coordenadas GPS del generador: <code>https://maps.google.com/?q=lat,lng</code></p>
+<p>En un recordatorio de retiro fijo, el aviso del transportista vinculado puede incluir un enlace de mapa si el establecimiento de origen tiene coordenadas válidas. La fecha prevista no confirma por sí sola el retiro.</p>
 
 <div class="cu-screenshot">
   <a href="screenshots/desktop/39_mi_perfil.png" target="_blank">
@@ -1901,12 +1894,8 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 </div>
 
 <h4>3.13.9 Recordatorios Automaticos</h4>
-<p>El sistema ejecuta un job automatico cada 6 horas que detecta manifiestos con retiro programado en las proximas 24 horas y envia recordatorios:</p>
-<ul>
-<li><strong>Al transportista:</strong> "Recordatorio: retiro manana MAN-XXX" con link a mapa y direccion del generador.</li>
-<li><strong>Al generador:</strong> "Recordatorio: el transportista [nombre] retirara manana".</li>
-</ul>
-<p>Los recordatorios se envian una sola vez por manifiesto (deduplicacion automatica).</p>
+<p>Mientras el proceso programado está activo, cada seis horas evalúa manifiestos aprobados cuya fecha prevista cae dentro de su ventana de 24 horas. Puede registrar un aviso interno para las tres partes activas y representantes autorizados; la deduplicación considera manifiesto, modalidad, fecha y persona.</p>
+<p>En tratamiento en origen, el recordatorio se refiere al inicio previsto: es sin retiro, traslado ni GPS. Los canales externos siguen sujetos a su habilitación; leer el aviso no aprueba ni inicia el manifiesto.</p>
 </section>
 
 <!-- ============================================================ -->
