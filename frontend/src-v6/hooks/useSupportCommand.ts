@@ -93,8 +93,19 @@ export function useSupportCommand(scope: SupportCommandScope) {
     if (inFlight.current || !active() || !command || command.status === 'pending') return;
     inFlight.current = true; generation.current += 1; setBusy(true); setError('');
     try {
+      // Verify the durable record before cleaning any draft. The server can
+      // have confirmed while the local confirmation write failed. Persist
+      // that acknowledgement again without retransmitting the action.
+      let saved = await loadSupportCommand(scope);
+      if (!active()) return;
+      if (!saved || saved.key !== command.key) throw new Error('El envío guardado cambió. Conservamos el resultado; reintentá.');
+      if (saved.status === 'pending' && command.status === 'confirmed' && command.receipt) {
+        saved = await confirmSupportCommand(scope, command.key, command.receipt);
+      }
+      if (!active()) return;
+      if (saved.status !== command.status || saved.status === 'pending') throw new Error('No pudimos guardar el resultado. Conservamos el envío; reintentá.');
       // Cleanup can fail; keep the receipt until it succeeds, preventing a new send.
-      await beforeRelease(command);
+      await beforeRelease(saved);
       if (!active()) return;
       await releaseSupportCommand(scope, command.key);
       if (active()) setCommand(null);

@@ -79,6 +79,21 @@ it('retains confirmation when saving the receipt fails and safely replays after 
   const reopened = await ready(); expect(reopened.result.current.command?.status).toBe('pending');
   await act(() => reopened.result.current.retry()); expect(mocks.act.mock.calls[1]).toEqual(mocks.act.mock.calls[0]);
 });
+it('does not clean the draft until a confirmed receipt is durably saved', async () => {
+  const hook = await ready();
+  mocks.act.mockImplementationOnce(async () => { mocks.failWrite = true; return receipt; });
+  await act(() => hook.result.current.submit(proposal()));
+  const cleanup = vi.fn().mockResolvedValue(undefined);
+  await act(() => hook.result.current.release(cleanup));
+  expect(cleanup).not.toHaveBeenCalled();
+  expect((await loadSupportCommand(scope))?.status).toBe('pending');
+  expect(hook.result.current.command?.status).toBe('confirmed');
+  mocks.failWrite = false;
+  await act(() => hook.result.current.release(cleanup));
+  expect(cleanup).toHaveBeenCalledOnce();
+  expect(await loadSupportCommand(scope)).toBeNull();
+  expect(mocks.act).toHaveBeenCalledOnce();
+});
 it('a failed follow-up read cannot turn a confirmed action into a retry', async () => {
   const hook = await ready(); await act(() => hook.result.current.submit(proposal()));
   await act(() => hook.result.current.release(async () => { throw new Error('Read failed'); }));

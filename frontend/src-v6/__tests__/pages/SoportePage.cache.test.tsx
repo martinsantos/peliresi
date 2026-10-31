@@ -184,6 +184,7 @@ it('offers assignment and direct routing for unassigned staff without opening re
 
 it('keeps private notes and attachments separate from a public response while switching actions', async () => {
   openDetail();
+  calls.act.mockImplementation(async () => { calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, version: 2 }); return { id: ticket.id, version: 2, replay: false }; });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
   fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Respuesta pública pendiente' } });
   const publicFile = new File(['public'], 'publico.png', { type: 'image/png' });
@@ -198,7 +199,8 @@ it('keeps private notes and attachments separate from a public response while sw
   expect(screen.queryByText('privado.png', { exact: true })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'RESPONDER', cuerpo: 'Respuesta pública pendiente' }), [publicFile], expect.any(String)));
-  fireEvent.click(await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  const continueButton = await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  await waitFor(() => expect(continueButton).toBeEnabled()); fireEvent.click(continueButton);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Nota interna', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
   expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('Diagnóstico privado pendiente');
@@ -216,11 +218,13 @@ it.each(['Derivar', 'Pedir respuesta', 'Cerrar', 'Clasificar'])('does not carry 
 });
 it('keeps a prepared public reply when a separate private note is confirmed', async () => {
   openDetail(); fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Próxima respuesta pública' } });
+  calls.act.mockImplementation(async () => { calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, version: 2 }); return { id: ticket.id, version: 2, replay: false }; });
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
   fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Nota privada confirmada' } });
   fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
-  fireEvent.click(await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  const continueButton = await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  await waitFor(() => expect(continueButton).toBeEnabled()); fireEvent.click(continueButton);
   await waitFor(() => expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Próxima respuesta pública'));
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
   expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('');
