@@ -161,7 +161,10 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(operator.getByText('Cerrado', { exact: true }).first()).toBeVisible(); await operator.close();
 
     const reporter = await asUser('operador'); await reporter.goto(prefix(info) + '/notificaciones');
-    await reporter.getByRole('button', { name: 'Abrir aviso: Actualización de soporte', exact: true }).first().click();
+    const requested = reporter.getByRole('button', { name: 'Abrir aviso: Se solicitó una respuesta', exact: true }).filter({ hasText: ticket.referencia });
+    const closed = reporter.getByRole('button', { name: 'Abrir aviso: Ticket cerrado', exact: true }).filter({ hasText: ticket.referencia });
+    await expect(requested).toBeVisible(); await expect(closed).toBeVisible();
+    await closed.click();
     await expect(reporter).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await expect(reporter.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toHaveCount(0);
     await expect(reporter.getByText('QA motivo privado para el nuevo responsable.', { exact: true })).toHaveCount(0);
@@ -175,6 +178,10 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(reporter.getByText(/CERRAR · Cerrado/)).toBeVisible();
     await reporter.getByText('Historial del ticket', { exact: true }).click();
     await expect(reporter.getByText(/CERRAR · Cerrado/)).not.toBeVisible();
+    const attending = await asUser(technician); await attending.goto(prefix(info) + '/notificaciones');
+    await attending.getByRole('button', { name: 'Abrir aviso: Ticket reabierto', exact: true }).filter({ hasText: ticket.referencia }).click();
+    await expect(attending).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
+    await expect(attending.getByText('QA el problema persiste, solicito otra revisión.', { exact: true })).toBeVisible();
     await screenshot(reporter, info, 'reporter-reopened'); expect(errors).toEqual([]);
   } catch (error) {
     if (!activePage.isClosed()) { await nativeState(activePage, info).catch(() => {}); await screenshot(activePage, info, 'failed-step').catch(() => {}); }
@@ -214,7 +221,7 @@ test('support impersonation returns the report and the actual response to the re
   const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
   try {
     const recipient = await context.newPage(); await login(recipient, info, who); await recipient.goto(prefix(info) + '/notificaciones');
-    await recipient.getByRole('button', { name: 'Abrir aviso: Actualización de soporte', exact: true }).first().click();
+    await recipient.getByRole('button', { name: 'Abrir aviso: Nueva respuesta en el ticket', exact: true }).filter({ hasText: ticket.referencia }).click();
     await expect(recipient).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await expect(recipient.getByText('QA soporte respondió al usuario impersonado: el acceso fue revisado.', { exact: true })).toBeVisible();
     await expect(recipient.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);

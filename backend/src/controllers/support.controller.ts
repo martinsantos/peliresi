@@ -39,14 +39,24 @@ function inputBody(req: AuthRequest) {
 function checkHash(old: { huella: string }, fingerprint: string) {
   if (old.huella !== fingerprint) throw new AppError('La clave de envío ya se usó para otro contenido', 409);
 }
-async function notices(db: Db, ticket: { id: string; numero: number }, recipients: string[], actorId: string, title: string, evento = 'ACTUALIZACION') {
+async function notices(db: Db, ticket: { id: string; numero: number }, recipients: string[], actorId: string, title: string, evento = 'ACTUALIZACION', message = 'Consultá el ticket en Soporte.') {
   const ids = Array.from(new Set(recipients)).filter(id => id !== actorId);
   if (!ids.length) return;
   // Deliberately direct durable in-app writes. No dispatcher, SMTP, push or jobs.
   await db.notificacion.createMany({ data: ids.map(usuarioId => ({ usuarioId, tipo: 'INFO_GENERAL', titulo: title,
-    mensaje: supportNumber(ticket.numero) + ' · Consultá el ticket en Soporte.',
+    mensaje: supportNumber(ticket.numero) + ' · ' + message,
     datos: JSON.stringify({ tipo: 'soporte', evento, interno: evento === 'NOTA' || evento === 'CLASIFICAR', ticketId: ticket.id, ruta: '/soporte/' + ticket.id }), prioridad: 'NORMAL' })) });
 }
+const supportNoticeCopy = {
+  RESPONDER: ['Nueva respuesta en el ticket', 'Abrí el ticket para leer la respuesta.'],
+  NOTA: ['Nueva nota interna de soporte', 'Abrí el ticket para consultar la nota.'],
+  TOMAR: ['Ticket con responsable asignado', 'Abrí el ticket para seguir su atención.'],
+  DERIVAR: ['Ticket derivado a tu atención', 'Abrí el ticket para continuar su atención.'],
+  ESPERAR: ['Se solicitó una respuesta', 'Revisá el ticket para continuar su atención.'],
+  CERRAR: ['Ticket cerrado', 'Abrí el ticket para consultar la resolución.'],
+  REABRIR: ['Ticket reabierto', 'Abrí el ticket para continuar su atención.'],
+  CLASIFICAR: ['Clasificación del ticket actualizada', 'Abrí el ticket para consultar la clasificación.'],
+} as const;
 async function team(db: Db = prisma) {
   // Directory is staff-only. Keep the public ticket/author projection unchanged.
   return db.usuario.findMany({ where: { activo: true, OR: [{ rol: 'ADMIN' }, { agenteSoporte: { habilitado: true } }] }, select: { ...userSelect, email: true }, orderBy: { nombre: 'asc' } });
@@ -295,7 +305,11 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
           ...(input.accion === 'DERIVAR' ? { desde: ticket.responsable?.nombre || 'Sin asignar', hacia: (await db.usuario.findUnique({ where: { id: responsableId! }, select: userSelect }))?.nombre || 'Responsable' } : {}) } } });
       const recipients = internal ? [responsableId].filter((id): id is string => !!id) : [ticket.autorId, responsableId].filter((id): id is string => !!id);
       if (own && !responsableId && !internal) recipients.push(...(await team(db)).map(user => user.id));
-      await notices(db, ticket, recipients, req.user.id, input.accion === 'DERIVAR' ? 'Ticket derivado a tu atención' : 'Actualización de soporte', input.accion);
+      // A response by the author to a closed ticket also reopens it. Describe
+      // the resulting state in both the bell and any future email template.
+      const noticeEvent = input.accion === 'RESPONDER' && own && ticket.estado === 'CERRADO' ? 'REABRIR' : input.accion;
+      const [noticeTitle, noticeMessage] = supportNoticeCopy[noticeEvent];
+      await notices(db, ticket, recipients, req.user.id, noticeTitle, noticeEvent, noticeMessage);
       return { id: ticket.id, version: updated.version, replay: false };
     });
     committed = !result.replay;

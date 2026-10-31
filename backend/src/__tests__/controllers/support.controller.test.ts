@@ -116,6 +116,43 @@ describe('support identity, visibility and transactional workflow', () => {
     expect(next).not.toHaveBeenCalled(); expect(mocks.createEvent).toHaveBeenCalledTimes(1);
     expect(mocks.createNotices.mock.calls[0][0].data).toEqual([expect.objectContaining({ usuarioId: 'owner', tipo: 'INFO_GENERAL' })]);
   });
+  it.each([
+    ['RESPONDER', 'EN_CURSO', 'Nueva respuesta en el ticket'],
+    ['TOMAR', 'EN_CURSO', 'Ticket con responsable asignado'],
+    ['ESPERAR', 'EN_CURSO', 'Se solicitó una respuesta'],
+    ['CERRAR', 'EN_CURSO', 'Ticket cerrado'],
+    ['REABRIR', 'CERRADO', 'Ticket reabierto'],
+  ])('describes %s to the reporter without exposing the private message', async (accion, estado, titulo) => {
+    mocks.ticket.mockResolvedValue({ ...ticket, estado });
+    const next = vi.fn();
+    await accionarTicket(request({ accion, version: 2, cuerpo: 'Contenido privado de prueba' }, { ...user, id: 'agent', rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const [notice] = mocks.createNotices.mock.calls[0][0].data;
+    expect(notice).toMatchObject({ usuarioId: 'owner', titulo });
+    expect(notice.mensaje).toContain('SOP-000001');
+    expect(notice.mensaje).not.toContain('Contenido privado');
+    expect(JSON.parse(notice.datos)).toMatchObject({ tipo: 'soporte', evento: accion, interno: false, ticketId: 'ticket', ruta: '/soporte/ticket' });
+  });
+  it('reports reopening when the author replies to a closed ticket', async () => {
+    mocks.ticket.mockResolvedValue({ ...ticket, estado: 'CERRADO' });
+    const next = vi.fn();
+    await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'El problema continúa.' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const [notice] = mocks.createNotices.mock.calls[0][0].data;
+    expect(notice).toMatchObject({ usuarioId: 'agent', titulo: 'Ticket reabierto' });
+    expect(JSON.parse(notice.datos)).toMatchObject({ evento: 'REABRIR', ticketId: 'ticket' });
+    expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ accion: 'RESPONDER' }) }));
+  });
+  it('limits a notice about a private note to the assigned support agent', async () => {
+    const next = vi.fn();
+    await accionarTicket(request({ accion: 'NOTA', version: 2, cuerpo: 'Diagnóstico interno reservado.' }, { ...user, id: 'admin', rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const notices = mocks.createNotices.mock.calls[0][0].data;
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({ usuarioId: 'agent', titulo: 'Nueva nota interna de soporte' });
+    expect(JSON.parse(notices[0].datos)).toMatchObject({ evento: 'NOTA', interno: true });
+    expect(notices[0].mensaje).not.toContain('Diagnóstico interno');
+  });
   it('checks uncertain sends only under the current owner', async () => {
     const res = response(); await comprobarEnvioTicket(request() as never, res as never, vi.fn());
     expect(mocks.ticket).toHaveBeenCalledWith({ where: { autorId_clienteId: { autorId: 'owner', clienteId: 'creation123' } } });
