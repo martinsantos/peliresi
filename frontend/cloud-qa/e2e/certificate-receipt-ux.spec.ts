@@ -75,7 +75,7 @@ test('manual shows the current certificate recovery guidance and preview capture
  const step=page.locator('.guide-step').filter({has:page.getByRole('heading',{name:'Recuperar una emisión al cerrar web o app',exact:true})});
  await expect(step).toBeVisible();await expect(step).toContainText('el recibo conserva esos datos');
  const image=step.locator('img');await image.scrollIntoViewIfNeeded();
- await expect(image).toHaveAttribute('src',/certificate-recovery-compact-20261030\.png/);
+ await expect(image).toHaveAttribute('src',/certificate-recovery-list-20261030\.png/);
  await expect.poll(()=>image.evaluate((element:HTMLImageElement)=>element.naturalWidth)).toBeGreaterThan(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
  await page.screenshot({path:info.outputPath('manual.png'),animations:'disabled'});

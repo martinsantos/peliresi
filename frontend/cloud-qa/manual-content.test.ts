@@ -77,6 +77,15 @@ test('certificate guide distinguishes issued documents from types without a docu
   const text = JSON.stringify(step);
   for (const phrase of ['Cada documento emitido aparece una sola vez', 'Los tipos que todavía no tienen documento muestran su estado', 'el parcial figura como no emitido']) assert.ok(text.includes(phrase), phrase);
 });
+test('certificate layout captures are unedited evidence from the artificial preview', () => {
+  const provenance = JSON.parse(read('certificate-layout-provenance.json'));
+  assert.equal(provenance.synthetic,true);assert.equal(provenance.productionCapture,false);assert.equal(provenance.edited,false);
+  const active = read('help-data.js') + read('directorio.html');
+  for (const file of provenance.files) {
+    assert.ok(active.includes(file.file.replace('screenshots/','')) || active.includes(file.file));
+    assert.equal(createHash('sha256').update(readFileSync(new URL(file.file,root))).digest('hex'),file.sha256);
+  }
+});
 test('fleet GPS explains a stale capture and does not promise a server capture time', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'transporte-cargas-simultaneas'));
   assert.match(text, /SITREP confirmó una ubicación anterior/);
