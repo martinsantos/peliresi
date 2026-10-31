@@ -280,3 +280,58 @@ it('a confirmed support decision invalidates the pending count', async () => {
  fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
  await waitFor(() => expect(query.getQueryState(['attention', 'current', 'support'])?.isInvalidated).toBe(true));
 });
+
+it('refreshes the assigned person and ticket state after a confirmed handoff without releasing the receipt', async () => {
+  const current = { ...ticket, autorId: 'customer', responsableId: 'owner', responsable: { id: 'owner', nombre: 'QA' }, puedeGestionar: true, puedeAtender: true, esAutor: false };
+  const updated = { ...current, responsableId: 'second-agent', responsable: { id: 'second-agent', nombre: 'Técnica QA' }, estado: 'EN_CURSO', version: 2 };
+  openDetail(current);
+  calls.act.mockImplementation(async () => { calls.get.mockResolvedValue(updated); return { id: ticket.id, version: 2, replay: false }; });
+  fireEvent.click(await screen.findByRole('button', { name: 'Derivar', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Nuevo responsable', exact: true }));
+  fireEvent.click(await screen.findByRole('option', { name: 'Técnica QA · tecnica@qa.invalid', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar derivación', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  await waitFor(() => expect(screen.getByText('Técnica QA', { exact: true, selector: 'dd' })).toBeVisible());
+  expect(screen.getByText('En atención', { exact: true })).toBeVisible();
+  expect([...records.values()]).toEqual([expect.objectContaining({ status: 'confirmed', receipt: expect.objectContaining({ version: 2 }) })]);
+  expect(calls.act).toHaveBeenCalledOnce();
+});
+
+it('keeps a confirmed receipt when refreshing fails and clears it only after a successful read', async () => {
+  const current = { ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false };
+  const updated = { ...current, estado: 'CERRADO', version: 2 };
+  openDetail(current);
+  calls.act.mockImplementation(async () => { calls.get.mockRejectedValue(new Error('Sin conexión')); return { id: ticket.id, version: 2, replay: false }; });
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar', exact: true }));
+  fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resuelto en la prueba.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  await screen.findByText(/No pudimos actualizar el ticket/);
+  expect(screen.getByText(/Pendiente de actualización/, { selector: 'span' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  await waitFor(() => expect([...records.values()]).toEqual([expect.objectContaining({ status: 'confirmed' })]));
+  expect(calls.act).toHaveBeenCalledOnce();
+  calls.get.mockResolvedValue(updated);
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  await waitFor(() => expect(records.size).toBe(0));
+  expect(await screen.findByText('Cerrado', { exact: true })).toBeVisible();
+  expect(calls.act).toHaveBeenCalledOnce();
+});
+
+it('does not clear a confirmed receipt when the server returns a version older than that receipt', async () => {
+  const current = { ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false };
+  openDetail(current);
+  calls.act.mockResolvedValue({ id: ticket.id, version: 2, replay: false });
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar', exact: true }));
+  fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resolución de prueba.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  await screen.findByText(/No pudimos actualizar el ticket/);
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  await waitFor(() => expect([...records.values()]).toEqual([expect.objectContaining({ status: 'confirmed' })]));
+  expect(calls.act).toHaveBeenCalledOnce();
+  calls.get.mockResolvedValue({ ...current, estado: 'CERRADO', version: 2 });
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  await waitFor(() => expect(records.size).toBe(0));
+  expect(await screen.findByText('Cerrado', { exact: true })).toBeVisible();
+});
