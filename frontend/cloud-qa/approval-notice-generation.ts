@@ -38,7 +38,8 @@ try {
         assert.match(notice.usuario.email, /@night-qa\.invalid$/);
         assert.match(notice.mensaje, /Consultá el estado actual de las aprobaciones\.$/);
         assert.doesNotMatch(notice.mensaje, /qué aprobaciones faltan/);
-        assert.equal(JSON.parse(notice.datos).fase, phase);
+        const data = JSON.parse(notice.datos);
+        assert.equal(data.fase, phase); assert.equal(data.partesRequeridas, 3); assert.equal(data.modalidad, modalidad);
       }
       const repeated = await db.$transaction((tx: any) => notifyManifestParties(tx, manifest, phase, users[index].id, role));
       assert.deepEqual(repeated, []);
