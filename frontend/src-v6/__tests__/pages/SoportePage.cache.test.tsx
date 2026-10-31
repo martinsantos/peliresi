@@ -4,10 +4,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
 const records = vi.hoisted(() => new Map<string, unknown>());
+const identity = vi.hoisted(() => ({ current: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
 vi.mock('../../services/supportCommandStore', () => ({ readSupportCommandRecord: async (key: string) => records.get(key) || null, updateSupportCommandRecord: async (key: string, update: (value: unknown) => unknown) => { const next = update(records.get(key) || null); if (next) records.set(key, next); else records.delete(key); return next; } }));
 const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn(), recoverAction: vi.fn() }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: identity.current }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
 vi.mock('../../services/support.service', () => ({ supportService: calls, supportError: () => 'Error de prueba' }));
 import SoportePage from '../../pages/soporte/SoportePage';
@@ -20,6 +21,7 @@ const ticket = { id: 'new-ticket', referencia: 'SOP-000001', asunto: subject, ca
   mensajes: [{ id: 'message', cuerpo: 'Descripción original del reporte', interno: false, autor: { id: 'owner', nombre: 'QA' }, createdAt: '2026-10-06T01:00:00Z',
     adjuntos: [{ id: 'file', nombre: filename, mime: 'image/png', bytes: 1200, sha256: 'unit-fixture' }] }], eventos: [] };
 beforeEach(() => {
+  identity.current = { id: 'owner', nombre: 'QA', rol: 'OPERADOR' };
   records.clear(); localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
   vi.clearAllMocks(); calls.access.mockResolvedValue({ puedeGestionar: false, puedeConfigurar: false });
   calls.list.mockResolvedValue({ items: [], total: 0, page: 1, totalPages: 0 }); calls.get.mockResolvedValue(ticket);
@@ -47,6 +49,20 @@ it('refreshes the real owned list after a confirmed create even when its cache w
   const row = screen.getByRole('link', { name: new RegExp(subject) }); expect(row).toHaveAttribute('href', '/soporte/new-ticket');
   await waitFor(() => expect(calls.list.mock.calls.length).toBeGreaterThan(1));
   expect(calls.create).toHaveBeenCalledOnce();
+});
+it('does not reuse a support ticket cached under another activity of the same account', async () => {
+  const query = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 300000 } } });
+  const tree = () => <QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>;
+  const view = render(tree());
+  await screen.findByRole('heading', { name: subject });
+  let release!: (value: unknown) => void;
+  calls.get.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  identity.current = { id: 'owner', nombre: 'QA', rol: 'GENERADOR' };
+  view.rerender(tree());
+  await waitFor(() => expect(calls.get).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument();
+  release({ ...ticket, asunto: 'Reporte de la otra actividad' });
+  expect(await screen.findByRole('heading', { name: 'Reporte de la otra actividad' })).toBeVisible();
 });
 it('distinguishes homonymous support agents and submits the selected account, not its display name', async () => {
   const agents = [{ id: 'first-agent', nombre: 'María Pérez', email: 'primera@qa.invalid' }, { id: 'second-agent', nombre: 'María Pérez', email: 'segunda@qa.invalid' }];
