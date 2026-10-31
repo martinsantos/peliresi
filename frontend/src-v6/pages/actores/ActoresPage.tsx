@@ -26,8 +26,6 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
-  Check,
-  Funnel,
   Trash2,
   Download,
   FileDown,
@@ -120,23 +118,15 @@ export const ActoresPage: React.FC = () => {
   const totalPages = data?.pagination.pages ?? 0;
   const displayCount = (count: number) => data && !isError && !isLoading ? count : '—';
 
-  const summaries = [
-    { label: 'Generadores', tipo: 'generador', count: displayCount(generadoresCount), route: '/admin/actores/generadores', Icon: Factory,
-      surface: 'bg-purple-50 border-purple-200 hover:border-purple-300 active:bg-purple-100', symbol: 'bg-purple-100 text-purple-600', ink: 'text-purple-900', caption: 'text-purple-700' },
-    { label: 'Transportistas', tipo: 'transportista', count: displayCount(transportistasCount), route: '/admin/actores/transportistas', Icon: Truck,
-      surface: 'bg-orange-50 border-orange-200 hover:border-orange-300 active:bg-orange-100', symbol: 'bg-orange-100 text-orange-600', ink: 'text-orange-900', caption: 'text-orange-700' },
-    { label: 'Operadores', tipo: 'operador', count: displayCount(operadoresCount), route: '/admin/actores/operadores', Icon: FlaskConical,
-      surface: 'bg-blue-50 border-blue-200 hover:border-blue-300 active:bg-blue-100', symbol: 'bg-blue-100 text-blue-600', ink: 'text-blue-900', caption: 'text-blue-700' },
-    { label: 'Total', tipo: null, count: displayCount(totalCount), route: null, Icon: Users,
-      surface: 'bg-neutral-50 border-neutral-200', symbol: 'bg-neutral-100 text-neutral-600', ink: 'text-neutral-900', caption: 'text-neutral-700' },
-  ];
-
   const tabCounts = {
     todos: displayCount(totalCount),
     generador: displayCount(generadoresCount),
     transportista: displayCount(transportistasCount),
     operador: displayCount(operadoresCount),
   };
+  const selectedDirectory = activeTab === 'generador' ? { label:'Generadores', path:'/admin/actores/generadores' }
+    : activeTab === 'transportista' ? { label:'Transportistas', path:'/admin/actores/transportistas' }
+    : activeTab === 'operador' ? { label:'Operadores', path:'/admin/actores/operadores' } : null;
 
   const verDetalle = (actor: any) => {
     setActorSeleccionado(actor);
@@ -313,19 +303,19 @@ export const ActoresPage: React.FC = () => {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">
               <TabList>
                 <Tab id="todos">
-                  Todos
+                  Todos{' '}
                   <Badge variant="soft" color="neutral" className="ml-2">{tabCounts.todos}</Badge>
                 </Tab>
                 <Tab id="generador">
-                  Generadores
+                  Generadores{' '}
                   <Badge variant="soft" color="purple" className="ml-2">{tabCounts.generador}</Badge>
                 </Tab>
                 <Tab id="transportista">
-                  Transportistas
+                  Transportistas{' '}
                   <Badge variant="soft" color="warning" className="ml-2">{tabCounts.transportista}</Badge>
                 </Tab>
                 <Tab id="operador">
-                  Operadores
+                  Operadores{' '}
                   <Badge variant="soft" color="success" className="ml-2">{tabCounts.operador}</Badge>
                 </Tab>
               </TabList>
@@ -398,6 +388,9 @@ export const ActoresPage: React.FC = () => {
                   <>{serverTotal} {serverTotal === 1 ? 'resultado' : 'resultados'}{activeTab !== 'todos' || busqueda.trim() || filtroEstado !== 'todos' ? ' con los filtros actuales' : ' en el padrón'}</>
                 )}
               </p>
+              {selectedDirectory && canManageActor(activeTab) && <Link to={mp(selectedDirectory.path)} className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary-800 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                Abrir padrón de {selectedDirectory.label}<ChevronRight size={16} aria-hidden="true" />
+              </Link>}
             </div>
           </div>
           <RecordListToolbar title="Actores" newLabel="Nuevo Actor" onNew={allowedActorTypes.length ? () => {
@@ -407,34 +400,6 @@ export const ActoresPage: React.FC = () => {
             { label: 'PDF de esta página', icon: <FileDown size={16} />, onClick: handleExportPdf, disabled: isLoading || isError || !actoresPaginados.length },
             { label: 'Imprimir esta página', icon: <Printer size={16} />, onClick: () => window.print(), disabled: isLoading || isError || !actoresPaginados.length },
           ]} />
-        </div>
-
-        {/* Stats Cards */}
-        {(busqueda.trim() || filtroEstado !== 'todos') && <p className="text-sm text-neutral-600">Coincidencias por tipo para la búsqueda y el estado elegidos.</p>}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-          {summaries.map(({ label, tipo, count, route, Icon, surface, symbol, ink, caption }) => {
-            const navigates = Boolean(route && canManageActor(tipo!));
-            const ActionIcon = navigates ? ChevronRight : activeTab === tipo ? Check : Funnel;
-            const card = (
-              <Card key={label} padding="none" className={`h-full min-w-0 ${surface} ${route ? 'hover:shadow-md transition-colors' : ''}`}>
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                    <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${symbol}`}><Icon size={20} aria-hidden="true" /></div>
-                    <p data-actor-summary-value className={`min-w-0 flex-1 text-lg sm:text-2xl font-bold break-words ${ink}`}>{count}</p>
-                    {route && <ActionIcon size={16} className={`shrink-0 ${caption}`} aria-hidden="true" />}
-                  </div>
-                  <p data-actor-summary-label className={`mt-1 text-xs sm:text-sm leading-5 whitespace-normal break-normal ${caption}`}>{label}</p>
-                </CardContent>
-              </Card>
-            );
-            return route && navigates ? (
-              <Link key={label} to={mp(route)} aria-label={`${label} ${count}`} className="block min-w-0 rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">{card}</Link>
-            ) : tipo ? (
-              <button key={label} type="button" aria-label={`${label} ${count}`} aria-pressed={activeTab === tipo}
-                onClick={() => { setActiveTab(tipo); setCurrentPage(1); }}
-                className="block min-w-0 rounded-[12px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">{card}</button>
-            ) : card;
-          })}
         </div>
 
         {/* Table or Grid */}
@@ -450,7 +415,7 @@ export const ActoresPage: React.FC = () => {
         ) : vistaMode === 'list' ? (
           <>
             {/* Mobile card view */}
-            <div className="md:hidden space-y-3">
+            <div className="md:hidden space-y-2">
               {actoresPaginados.length === 0 ? (
                 <div className="py-12 text-center">
                   <Users className="mx-auto text-neutral-300 mb-3" size={40} />
@@ -468,7 +433,7 @@ export const ActoresPage: React.FC = () => {
                     <button
                       type="button"
                       aria-label={`Vista rápida de ${actor.razonSocial}`}
-                      className="w-full rounded-[12px] p-4 text-left transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700"
+                      className="w-full rounded-[12px] p-3 text-left transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700"
                       onClick={() => verDetalle(actor)}
                     >
                       <div className="flex items-start gap-3">
@@ -484,20 +449,6 @@ export const ActoresPage: React.FC = () => {
                               {isActivo ? 'Activo' : 'Inactivo'}
                             </Badge>
                           </div>
-                          {(actor.email || actor.telefono) && (
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-neutral-500">
-                              {actor.email && (
-                                <span className="flex min-w-0 items-start gap-1 break-all">
-                                  <Mail size={12} className="shrink-0 mt-0.5" /> {actor.email}
-                                </span>
-                              )}
-                              {actor.telefono && (
-                                <span className="flex items-center gap-1 shrink-0">
-                                  <Phone size={12} /> {actor.telefono}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                         <ChevronRight size={16} className="text-neutral-300 shrink-0 mt-2" />
                       </div>

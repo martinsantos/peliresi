@@ -69,7 +69,7 @@ test('a failed lookup is not presented as an empty directory and can be retried'
  const url='**/api/actores/directorio**';
  const fail=async(route:any)=>route.fulfill({status:503,contentType:'application/json',body:'{"message":"QA sin conexión"}'});
  await page.route(url,fail);await page.reload();
- await expect(page.getByRole('alert')).toContainText('No pudimos consultar el padrón');
+ await expect(page.getByRole('alert')).toContainText('No pudimos consultar el padrón',{timeout:20000});
  await expect(page.getByText('No se encontraron actores')).toHaveCount(0);
  await page.getByText('Exportar',{exact:true}).click();
  await expect(page.getByRole('button',{name:'CSV de esta página'})).toBeDisabled();

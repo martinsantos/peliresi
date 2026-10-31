@@ -10,7 +10,7 @@ const qa = vi.hoisted(() => ({
   get: vi.fn(), mutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   user: { rol: 'ADMIN', esInspector: false, actorId: 'qa-own' },
   generadores: [] as Array<{ id: string; razonSocial: string; cuit: string }>,
-  transportistas: [] as Array<{ id: string; razonSocial: string; cuit: string }>,
+  transportistas: [] as Array<{ id: string; razonSocial: string; cuit: string; email?: string }>,
   operadores: [] as Array<{ id: string; razonSocial: string; cuit: string }>,
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: qa.user, isRestricted: false }) }));
@@ -70,7 +70,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 describe('Actor workspaces retain readable native navigation', () => {
   it('keeps the entire mobile actor identity above wrapping status badges and opens a native consultation button', () => {
     qa.user.rol = 'TRANSPORTISTA';
-    qa.transportistas = [{ id: 'qa-own', razonSocial: 'QA Transporte 1', cuit: '99-10000001-0' }];
+    qa.transportistas = [{ id: 'qa-own', razonSocial: 'QA Transporte 1', cuit: '99-10000001-0', email:'qa@night-qa.invalid' }];
     render(<MemoryRouter initialEntries={['/actores']}><ActoresPage /></MemoryRouter>);
     const consult = screen.getAllByRole('button', { name: 'Vista rápida de QA Transporte 1', exact: true })[0];
     expect(consult).toHaveClass('w-full', 'text-left', 'focus-visible:outline-2');
@@ -80,31 +80,27 @@ describe('Actor workspaces retain readable native navigation', () => {
     const status = within(consult).getByText('Activo', { exact: true });
     expect(status.parentElement).toHaveClass('flex-wrap');
     expect(status.parentElement?.parentElement).toBe(identity.parentElement);
+    expect(within(consult).queryByText('qa@night-qa.invalid')).toBeNull();
     fireEvent.click(consult);
-    expect(screen.getByRole('dialog', { name: 'Detalle del Actor', exact: true })).toBeVisible();
+    expect(within(screen.getByRole('dialog', { name: 'Detalle del Actor', exact: true })).getByText('qa@night-qa.invalid')).toBeVisible();
   });
   it.each([
     ['Generadores', 'generadores', '33'], ['Transportistas', 'transportistas', '4'], ['Operadores', 'operadores', '5'],
-  ])('%s is a native app link with the real API total and complete caption', (label, route, count) => {
+  ])('%s shows its filtered total once and opens its specific directory', (label, route, count) => {
     render(<MemoryRouter basename="/app" initialEntries={['/app/admin/actores']}><ActoresPage /></MemoryRouter>);
-    const caption = screen.getByText(label, { exact: true, selector: 'p' });
-    expect(caption).toHaveClass('whitespace-normal', 'break-normal');
-    expect(caption).not.toHaveClass('break-words');
-    expect(caption).toHaveAttribute('data-actor-summary-label');
-    const card = cardFor(caption);
-    expect(card).toHaveClass('p-0');
-    const link = screen.getByRole('link', { name: new RegExp(label) });
+    const tab = screen.getByRole('tab', { name: `${label} ${count}` });
+    fireEvent.click(tab);
+    const link = screen.getByRole('link', { name: `Abrir padrón de ${label}` });
     expect(link).toHaveAttribute('href', `/app/admin/actores/${route}`);
-    expect(link).toHaveTextContent(count);
     expect(link.className).toContain('focus-visible:');
+    expect(screen.queryByText(label, { exact:true, selector:'p' })).toBeNull();
   });
 
-  it('preserves the existing mobile route prefix and the total is not a false button', () => {
+  it('preserves the existing mobile route prefix and the total is a functional tab', () => {
     render(<MemoryRouter initialEntries={['/mobile/admin/actores']}><ActoresPage /></MemoryRouter>);
-    expect(screen.getByRole('link', { name: /Generadores/ })).toHaveAttribute('href', '/mobile/admin/actores/generadores');
-    const total = screen.getByText('Total', { exact: true });
-    expect(cardFor(total)).toHaveTextContent('42');
-    expect(total.closest('a,button,[role="button"]')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Todos 42' })).toHaveAttribute('aria-selected','true');
+    fireEvent.click(screen.getByRole('tab', { name: 'Generadores 33' }));
+    expect(screen.getByRole('link', { name: 'Abrir padrón de Generadores' })).toHaveAttribute('href', '/mobile/admin/actores/generadores');
   });
 });
 
@@ -116,12 +112,10 @@ describe('Actor overview offers only actions that the existing API permits', () 
       const { container } = render(<MemoryRouter initialEntries={['/actores']}><ActoresPage /></MemoryRouter>);
       expect(screen.queryByRole('button', { name: 'Nuevo Actor', exact: true })).not.toBeInTheDocument();
       expect(container.querySelector('svg[class*="lucide-trash"]')).toBeNull();
-      expect(screen.getByRole('button', { name: 'Generadores 33', exact: true })).toHaveAttribute('aria-pressed', 'false');
-      expect(screen.getByRole('button', { name: 'Generadores 33', exact: true }).querySelector('svg.lucide-funnel')).not.toBeNull();
-      expect(screen.getByRole('button', { name: 'Generadores 33', exact: true }).querySelector('svg.lucide-chevron-right')).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: 'Generadores 33', exact: true }));
-      expect(screen.getByRole('button', { name: 'Generadores 33', exact: true })).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByRole('button', { name: 'Generadores 33', exact: true }).querySelector('svg.lucide-check')).not.toBeNull();
+      expect(screen.getByRole('tab', { name: 'Generadores 33', exact: true })).toHaveAttribute('aria-selected', 'false');
+      fireEvent.click(screen.getByRole('tab', { name: 'Generadores 33', exact: true }));
+      expect(screen.getByRole('tab', { name: 'Generadores 33', exact: true })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByRole('link', { name: 'Abrir padrón de Generadores' })).toBeNull();
     },
   );
 
