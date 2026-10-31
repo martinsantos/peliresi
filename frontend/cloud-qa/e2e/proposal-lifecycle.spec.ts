@@ -222,7 +222,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     const guidance=publication.getByText(/completá el tratamiento de cada corriente hallada/);
     await expect(guidance).toBeVisible();await expect(guidance).toBeInViewport();
     const review=publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true});
-    await expect(review).toBeInViewport();await review.click();await expect(decision).toBeFocused();
+    await expect(review).toBeInViewport();await review.focus();await op.keyboard.press('Enter');await expect(decision).toBeFocused();
     await decision.selectOption('si');
     const findingAmount=region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true});
     await findingAmount.fill('0.5');await signCertificate();await expect(publish).toBeDisabled();await publication.scrollIntoViewIfNeeded();
@@ -243,6 +243,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     await findingAmount.fill('2');await signCertificate();await expect(publish).toBeDisabled();
     await publication.scrollIntoViewIfNeeded();
     await expect(publication.getByText(/mayores que cero/)).toBeInViewport();
+    await proof(op,info,'partial-finding-incomplete');
     await publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true}).click();
     await expect(findingAmount).toBeFocused();await findingAmount.fill('');await signCertificate();await expect(publish).toBeEnabled();
    }else await signCertificate();

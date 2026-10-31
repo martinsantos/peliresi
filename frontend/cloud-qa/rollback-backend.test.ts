@@ -53,4 +53,6 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'support-feedback-20261031' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026103112', QA_COMPAT_BACKEND: 'closure-ce2eb1cb' }), /backend\/dist-qa-support-mail-20261031\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'closure-ce2eb1cb' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026103113', QA_COMPAT_BACKEND: 'certificate-guidance-20261031' }), /backend\/dist-qa-support-mail-20261031\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'certificate-guidance-20261031' }));
 });
