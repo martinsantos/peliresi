@@ -152,6 +152,34 @@ it('explains and blocks the final when a finding has not been treated',async()=>
  expect(screen.getByText(/completá el tratamiento de cada corriente hallada/)).toBeVisible();
  expect(mocks.post).not.toHaveBeenCalled();
 });
+it('returns to the first incomplete finding when other findings are already complete',async()=>{
+ const findings=[{id:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',observado:2,adendas:[]},{id:'hallazgo:Y8:kg',corriente:'Y8',unidad:'kg',observado:1,adendas:[]}];
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:findings}});show();
+ fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación final total'}));
+ fireEvent.change(screen.getByLabelText('Tratamiento de Y12 (kg)'),{target:{value:'si'}});
+ fireEvent.change(screen.getByLabelText('Cantidad tratada Y12 (kg)'),{target:{value:'2'}});
+ fireEvent.change(screen.getByLabelText('Tratamiento de Y8 (kg)'),{target:{value:'no'}});
+ fireEvent.click(screen.getByText('Use QA signature'));
+ fireEvent.click(screen.getByRole('button',{name:'Revisar corrientes halladas'}));
+ expect(screen.getByLabelText('Tratamiento de Y8 (kg)')).toHaveFocus();
+ expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeDisabled();
+});
+it('keeps a partial finding optional and rejects quantities beyond what was observed',async()=>{
+ const finding={id:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',observado:2,adendas:[]};
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[finding]}});show();
+ fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación parcial'}));
+ fireEvent.click(screen.getByText('Use QA signature'));
+ const publish=screen.getByRole('button',{name:'Firmar y publicar certificación'});
+ expect(publish).toBeEnabled();
+ fireEvent.change(screen.getByLabelText('Cantidad tratada Y12 (kg)'),{target:{value:'3'}});
+ fireEvent.click(screen.getByText('Use QA signature'));expect(publish).toBeDisabled();
+ expect(publish).toHaveAccessibleDescription(/mayores que cero/);
+ fireEvent.click(screen.getByRole('button',{name:'Revisar corrientes halladas'}));
+ expect(screen.getByLabelText('Cantidad tratada Y12 (kg)')).toHaveFocus();
+ fireEvent.change(screen.getByLabelText('Cantidad tratada Y12 (kg)'),{target:{value:'1'}});
+ fireEvent.click(screen.getByText('Use QA signature'));expect(publish).toBeEnabled();
+ expect(screen.queryByRole('button',{name:'Revisar corrientes halladas'})).toBeNull();
+});
 it('blocks final certification when approved finding reports conflict',async()=>{
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[],problemasHallazgos:['Los informes discrepan.']}});
  show();

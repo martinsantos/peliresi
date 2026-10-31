@@ -5,7 +5,7 @@ import { Award, FileCheck2, LockKeyhole, Download } from 'lucide-react';
 import { CardHeader } from '../../../components/ui/CardV2';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMobilePrefix } from '../../../hooks/useMobilePrefix';
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useEffect,useId,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {api} from '../../../services/api';
 import {useAuth} from '../../../contexts/AuthContext';
@@ -41,6 +41,7 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
    ? ['Una cantidad ya certificada supera lo observado en la adenda actual; revisá los parciales y las rectificaciones.'] : [];
  const findingProblems=[...(query.data?.findingProblems||[]),...priorFindingProblems];
  const findingVersion=JSON.stringify(findings);
+ const findingsRef=useRef<HTMLFieldSetElement>(null),findingGuidanceId=useId();
  const previousFindingVersion=useRef(findingVersion);
  useEffect(()=>{if(previousFindingVersion.current!==findingVersion){previousFindingVersion.current=findingVersion;setSignature('');}},[findingVersion]);
  const lock=useRef(false),request=useRef<{id:string;body:string}|null>(null);
@@ -61,13 +62,19 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
  const currentResidues=manifest.residuos||[];
  const staleQuantities=!!kind&&(Object.keys(amounts).some(id=>!currentResidues.some(row=>row.id===id)&&!findings.some(row=>row.id===id))||kind==='FINAL'&&currentResidues.some(row=>String(row.cantidadRecibida??'')!==amounts[row.id]));
  const alreadyCertified=(id:string)=>query.data?.documents.filter(d=>d.documento.tipo==='PARCIAL').flatMap(d=>d.documento.cantidades).filter(row=>row.residuoId===id).reduce((n,row)=>n+row.cantidad,0)??0;
- const validFindings=findings.every(f=>{
+ const invalidFindingIndex=findings.findIndex(f=>{
   const value=amounts[f.id]||'',previous=alreadyCertified(f.id);
-  if(kind==='PARCIAL'&&!value)return true;
-  if(kind==='FINAL'&&value==='NO_TRATADO')return false;
+  if(kind==='PARCIAL'&&!value)return false;
+  if(kind==='FINAL'&&value==='NO_TRATADO')return true;
   const amount=Number(value);
-  return !!value&&value!=='SI'&&Number.isFinite(amount)&&amount>0&&(kind==='PARCIAL'?amount+previous<=f.observado+1e-9:amount+1e-9>=previous&&Math.abs(amount-f.observado)<=1e-9);
+  return !(!!value&&value!=='SI'&&Number.isFinite(amount)&&amount>0&&(kind==='PARCIAL'?amount+previous<=f.observado+1e-9:amount+1e-9>=previous&&Math.abs(amount-f.observado)<=1e-9));
  });
+ const validFindings=invalidFindingIndex===-1;
+ function focusInvalidFinding(){
+  const row=findingsRef.current?.querySelectorAll<HTMLElement>('[data-finding-row]')[invalidFindingIndex];
+  const field=row?.querySelector<HTMLInputElement>('input:not(:disabled)')||row?.querySelector<HTMLSelectElement>('select:not(:disabled)');
+  field?.scrollIntoView?.({block:'center'});field?.focus({preventScroll:true});
+ }
  function refreshQuantities(){setAmounts(Object.fromEntries([...currentResidues.map(row=>[row.id,kind==='FINAL'?String(row.cantidadRecibida??''):amounts[row.id]||'']),...findings.map(row=>[row.id,amounts[row.id]||''])]));}
  const final=query.data?.documents.some(d=>d.documento.tipo==='FINAL');
  const documents=query.data?.documents||[];
@@ -130,13 +137,13 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
   {kind&&canEdit&&!recovery.command&&staleQuantities&&<div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 space-y-2"><p>El pesaje o los residuos cambiaron desde este borrador. Revisá y actualizá las cantidades antes de firmar; conservamos método y observaciones.</p><Button variant="outline" onClick={refreshQuantities}>Actualizar cantidades del borrador</Button></div>}
   {kind&&canEdit&&!collapsed&&!recovery.command&&<form onSubmit={release} className="max-w-[960px] space-y-3 border-t pt-3"><fieldset disabled={busy||recovery.busy} className="min-w-0 space-y-3"><h3 className="font-semibold">{kind==='PARCIAL'?'Cantidad efectivamente tratada en este parcial':'Total tratado: incluye los parciales previos'}</h3>
    {(manifest.residuos||[]).map(r=><Input key={r.id} label={`Cantidad a certificar ${r.tipoResiduo?.codigo||r.id} (${r.unidad})`} type="number" min="0.001" step="any" required={kind==='FINAL'} disabled={kind==='FINAL'} value={amounts[r.id]||''} onChange={e=>setAmounts({...amounts,[r.id]:e.target.value})} helperText={`Pesaje recibido: ${r.cantidadRecibida??'pendiente'} ${r.unidad}. En un parcial, dejá vacío lo que no se certifica.`}/>)}
-   {findings.length>0&&<fieldset className="space-y-3 rounded-lg border border-neutral-200 p-3">
+   {findings.length>0&&<fieldset ref={findingsRef} className="space-y-3 rounded-lg border border-neutral-200 p-3">
     <legend className="px-1 font-semibold">Corrientes halladas en adendas aprobadas</legend>
-    <p className="text-sm text-neutral-700">Un hallazgo aprobado registra lo observado; sólo certificá lo que efectivamente trataste. La declaración original no cambia.</p>
+    <p className="text-sm text-neutral-700">Un hallazgo aprobado registra lo observado; sólo certificá lo que efectivamente trataste. La declaración original no cambia. La final requiere el total observado, incluidos los parciales previos.</p>
     {findings.map(f=>{
      const value=amounts[f.id]||'',previous=alreadyCertified(f.id);
      const choice=!value?'':value==='NO_TRATADO'?'no':'si';
-     return <div key={f.id} className="space-y-2 border-t border-neutral-200 pt-3">
+     return <div key={f.id} data-finding-row="" className="space-y-2 border-t border-neutral-200 pt-3">
       <p className="font-medium">{f.corriente} · observado {f.observado} {f.unidad}{previous>0&&` · ya certificado ${previous} ${f.unidad}`}</p>
       {kind==='FINAL'&&<label className="block text-sm font-medium">¿Se trató {f.corriente}?
        <select aria-label={`Tratamiento de ${f.corriente} (${f.unidad})`} className="mt-1 min-h-11 w-full rounded-lg border border-neutral-300 bg-white px-3" value={choice} onChange={e=>setAmounts({...amounts,[f.id]:e.target.value==='no'?'NO_TRATADO':e.target.value==='si'?(previous?String(previous):'SI'):''})}>
@@ -146,12 +153,14 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
       {(kind==='PARCIAL'||choice==='si')&&<Input label={`Cantidad tratada ${f.corriente} (${f.unidad})`} type="number" min="0.001" max={f.observado} step="any" required={kind==='FINAL'} value={value==='SI'||value==='NO_TRATADO'?'':value} onChange={e=>setAmounts({...amounts,[f.id]:e.target.value||(kind==='FINAL'?'SI':'')})} helperText={kind==='FINAL'?'Incluí los parciales previos.':'Dejá vacío si no se trata en este parcial.'}/>}
      </div>;
     })}
-    {!validFindings&&kind==='FINAL'&&<p className="text-sm text-neutral-700">Para emitir el final, completá el tratamiento de cada corriente hallada e indicá el total observado, incluidos los parciales previos.</p>}
    </fieldset>}
    <p className="text-sm">Datos del manifiesto y pesaje ya incorporados. Revisá el método registrado y firmá.</p><Input label="Método de tratamiento certificado" required maxLength={200} value={method} onChange={e=>setMethod(e.target.value)}/>
    <Input label="Observaciones del certificado (opcional)" maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/>
    <p className="font-medium">Firma del operador</p>{signature?<div><img className="max-h-28" src={signature} alt="Firma del operador"/><Button type="button" variant="outline" onClick={()=>setSignature('')}>Volver a firmar</Button></div>:<SignaturePad onConfirm={setSignature}/>}
-   <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy||recovery.busy||!recovery.ready||!signature||staleQuantities||!validFindings||!canRelease||(findingProblems.length>0&&(kind==='FINAL'||findings.some(f=>!!amounts[f.id])))||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError))}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>{if(training)setCapKind(null);else setCollapsed(true);}}>{training?'Cancelar':'Cerrar formulario'}</Button></div>
+   <div role="group" aria-label="Publicación de certificación" className="space-y-2">
+    {!validFindings&&<div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700"><p id={findingGuidanceId} role="status">{kind==='FINAL'?'Para emitir el final, completá el tratamiento de cada corriente hallada e indicá el total observado, incluidos los parciales previos.':'Revisá las cantidades halladas: deben ser mayores que cero y no superar lo observado al sumarlas a parciales anteriores.'}</p><Button type="button" variant="ghost" onClick={focusInvalidFinding}>Revisar corrientes halladas</Button></div>}
+    <div className="flex flex-wrap gap-2"><Button type="submit" aria-describedby={!validFindings?findingGuidanceId:undefined} disabled={busy||recovery.busy||!recovery.ready||!signature||staleQuantities||!validFindings||!canRelease||(findingProblems.length>0&&(kind==='FINAL'||findings.some(f=>!!amounts[f.id])))||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError))}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>{if(training)setCapKind(null);else setCollapsed(true);}}>{training?'Cancelar':'Cerrar formulario'}</Button></div>
+   </div>
   </fieldset></form>}
   {operator&&!training&&!recovery.ready&&<p role="status">Comprobando solicitudes guardadas… <Button variant="outline" onClick={()=>void recovery.reload()}>Reintentar copia local</Button></p>}
   {recovery.command&&<div className={receiptInList?'flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-3':'rounded-lg border border-primary-200 bg-primary-50 p-3 space-y-3'} aria-label="Recuperación de certificación">
