@@ -23,6 +23,15 @@ beforeEach(()=>{
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
 });
 describe('three independently authenticated parties',()=>{
+ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('individual %s approval notice asks for the current status rather than asserting a missing approval',async role=>{
+  await notifyManifestParties(mock.tx,mock.manifest,'aprobacion-'+role,users[role as keyof typeof users].id,role);
+  const notices=mock.tx.notificacion.createMany.mock.calls[0][0].data;
+  expect(notices).toHaveLength(3);
+  for(const notice of notices){
+   expect(notice.mensaje).toContain('Consultá el estado actual de las aprobaciones.');
+   expect(notice.mensaje).not.toContain('qué aprobaciones faltan');
+  }
+ });
  it('records the mode and required parties in origin coordination notices',async()=>{
   mock.manifest.modalidad='IN_SITU';
   await notifyManifestParties(mock.tx,mock.manifest,'iniciada','uo');

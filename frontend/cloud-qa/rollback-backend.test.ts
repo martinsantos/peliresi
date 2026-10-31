@@ -25,4 +25,8 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-authority' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-inspection-deadline-company-20261030', QA_COMPAT_BACKEND: 'inspection-deadline-polished' }), /backend\/dist-qa-psip-deadline-company-20261030-v6\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'inspection-deadline-polished' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026103090', QA_COMPAT_BACKEND: 'closure-52b3bec4' }), /backend\/dist-qa-closure-52b3bec4\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'closure-52b3bec4' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-approval-notice-20261030', QA_COMPAT_BACKEND: 'approval-notice-fix' }), /backend\/dist-qa-approval-notice-20261030\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'approval-notice-fix' }));
 });

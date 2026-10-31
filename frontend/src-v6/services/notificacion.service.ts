@@ -5,6 +5,7 @@
 import api from './api';
 import type { Notificacion } from '../types/models';
 import type { NotificacionFilters, PaginatedData } from '../types/api';
+import { notificationMessage } from '../utils/notificationMessage';
 
 export const notificacionService = {
   async list(filters?: NotificacionFilters): Promise<PaginatedData<Notificacion> & { noLeidas: number }> {
@@ -13,7 +14,10 @@ export const notificacionService = {
     const raw = data.data;
     const noLeidas = raw.noLeidas ?? 0;
     return {
-      items: raw.notificaciones || [],
+      items: (raw.notificaciones || []).map((notice: Notificacion) => {
+        const mensaje = notificationMessage(notice);
+        return mensaje === notice.mensaje ? notice : { ...notice, mensaje };
+      }),
       total: raw.total ?? raw.notificaciones?.length ?? 0,
       noLeidas,
       page: raw.pagina ?? page,

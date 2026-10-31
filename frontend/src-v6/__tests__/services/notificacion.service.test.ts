@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { notificacionService } from '../../services/notificacion.service';
+import { notificationMessage } from '../../utils/notificationMessage';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock('../../services/api', () => ({ default: api }));
@@ -23,5 +24,24 @@ describe('notification pagination and real counts', () => {
   it('does not turn a failed unread-count request into a reassuring zero', async () => {
     api.get.mockRejectedValue(new Error('offline'));
     await expect(notificacionService.getNoLeidas()).rejects.toMatchObject({ message: 'offline' });
+  });
+
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('presents a historical %s approval without claiming others are still missing', async role => {
+    const original = { id: 'approval', mensaje: 'QA-123. Revisá qué aprobaciones faltan.',
+      datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: `aprobacion-${role}` }) };
+    api.get.mockResolvedValue({ data: { data: { notificaciones: [original] } } });
+    const result = await notificacionService.list();
+    expect(result.items[0].mensaje).toBe('QA-123. Consultá el estado actual de las aprobaciones.');
+    expect(original.mensaje).toBe('QA-123. Revisá qué aprobaciones faltan.');
+    expect(notificationMessage(original)).toBe(result.items[0].mensaje);
+  });
+
+  it('leaves unrelated, unknown-version and malformed notices intact', () => {
+    const mensaje = 'QA-123. Revisá qué aprobaciones faltan.';
+    for (const datos of [null, '{', JSON.stringify({ tipo: 'otra', version: 1, fase: 'aprobacion-OPERADOR' }),
+      JSON.stringify({ tipo: 'propuesta_partes', version: 2, fase: 'aprobacion-OPERADOR' }),
+      JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: 'aprobada' })]) {
+      expect(notificationMessage({ mensaje, datos })).toBe(mensaje);
+    }
   });
 });

@@ -148,6 +148,14 @@ describe('committed notice mail relay', () => {
     expect(approved().subject).not.toContain('tres partes');
     expect(mocks.insert).not.toHaveBeenCalled();
   });
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('renders an individual %s approval as an event without claiming pending approvals', role => {
+    const content = notificationMailContent({ ...notice, tipo: 'INFO_GENERAL', manifiestoId: 'manifest',
+      datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: `aprobacion-${role}` }) })!;
+    expect(mailText(content.html)).toContain('Consultá el estado actual de las aprobaciones');
+    expect(mailText(content.html)).not.toContain('qué aprobaciones faltan');
+    expect(content.html).toContain('/notificaciones/qa-notice');
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['certificado_manifiesto','propuesta_partes','adenda_manifiesto'])('revalidates representative %s access before any future delivery, including revocation', async tipo => {
     const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa' };
     const n = { ...notice, id: 'company-cert', usuarioId: 'representative', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',

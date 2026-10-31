@@ -614,3 +614,10 @@ test('notice links explain verified personal activities and preserve historical 
   assert.match(text, /enlace anterior/);
   assert.match(text, /sin perder la adenda solicitada/);
 });
+
+test('an individual approval notice is an event and the current state is in the manifest', () => {
+  const guide = guides.find((g: any) => g.id === 'manifiestos-tres-partes');
+  const text = guide.steps.find((s: any) => s.title === 'Revisar y decidir desde cada rol').body.join(' ');
+  assert.match(text, /El aviso registra una decisión/);
+  assert.match(text, /abrí el manifiesto para consultar las aprobaciones y el próximo paso actuales/);
+});

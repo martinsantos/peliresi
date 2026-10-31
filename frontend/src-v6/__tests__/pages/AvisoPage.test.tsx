@@ -44,6 +44,14 @@ it.each(['', '/app'])('keeps the original GPS notice and explains its temporal u
  expect(screen.getByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
  expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
 });
+it.each(['', '/app'])('presents a historical individual approval without inventing pending approvals on %s', prefix => {
+ state.query.data = { ...state.query.data, tipo:'INFO_GENERAL', titulo:'Transporte aprobó su participación',
+  mensaje:'QA-001. Revisá qué aprobaciones faltan.',
+  datos:JSON.stringify({tipo:'propuesta_partes',version:1,fase:'aprobacion-TRANSPORTISTA'}) };
+ show(prefix);
+ expect(screen.getByText('QA-001. Consultá el estado actual de las aprobaciones.')).toBeVisible();
+ expect(state.query.data.mensaje).toBe('QA-001. Revisá qué aprobaciones faltan.');
+});
 it.each(['', '/app'])('shows the complete result without a link to itself in %s', prefix => {
  show(prefix); expect(screen.getByText(/QA empresa · Período 2027/)).toBeVisible();
  expect(screen.queryByRole('link', { name: 'Ver aviso y resultado →' })).toBeNull();

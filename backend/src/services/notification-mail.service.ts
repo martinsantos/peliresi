@@ -440,7 +440,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
     : data.tipo === 'agenda_inspeccion' && validAgendaMail(data) ? INSPECTION_AGENDA_LABELS[String(data.evento) as keyof typeof INSPECTION_AGENDA_LABELS]
     : data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
-    : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Revisá qué aprobaciones faltan para iniciar la coordinación.']
+    : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Consultá el estado actual de las aprobaciones y el próximo paso en el manifiesto.']
     : data.tipo === 'ADENDA_POST_FACTO' ? ['Nueva corriente en adenda para la autoridad', 'Se registró una aprobación individual sobre una corriente nueva. Revisá el informe y su seguimiento; no modifica habilitaciones ni acredita unanimidad.']
     : data.tipo === 'estado_manifiesto' && data.estado === 'EN_TRATAMIENTO' ? ['Tratamiento iniciado', 'El operador inició el tratamiento. Consultá el manifiesto y las acciones disponibles.']
     : data.tipo === 'estado_manifiesto' && data.estado === 'CANCELADO' ? ['Manifiesto cancelado', 'Consultá el motivo y el historial del manifiesto.']
