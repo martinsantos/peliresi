@@ -52,6 +52,14 @@ function inspectionAudience(notice: NoticeForMail, inspection: InspectionMailSco
 export async function notificationSourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   const data = JSON.parse(notice.datos || '{}');
   if (data.tipo === 'recordatorio_operacion' && (!notice.manifiestoId || !notice.usuarioId)) return false;
+  if (family === 'soporte') {
+    if (!notice.activo || !notice.usuarioId || typeof data.ticketId !== 'string' || !data.ticketId) return false;
+    const ticket = await prisma.ticketSoporte.findUnique({ where: { id: data.ticketId }, select: { autorId: true } });
+    if (!ticket) return false;
+    if (ticket.autorId === notice.usuarioId || notice.rol === 'ADMIN') return true;
+    const agent = await prisma.agenteSoporte.findUnique({ where: { usuarioId: notice.usuarioId }, select: { habilitado: true } });
+    return agent?.habilitado === true;
+  }
   if (family === 'representacion') return process.env.ENTERPRISE_ENABLED === 'true' && companyNoticeEligible(prisma, notice.usuarioId, data);
   if (family === 'manifiestos' && data.tipo === 'manifiesto_eventual') {
     if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED') || !validEventualMail(data) || !notice.usuarioId) return false;

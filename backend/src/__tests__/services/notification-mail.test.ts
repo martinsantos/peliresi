@@ -1,9 +1,9 @@
 const renewalRecipients = vi.hoisted(() => vi.fn());
 vi.mock('../../services/renewalCompanyRecipients.service', () => ({ renewalCompanyRecipients: renewalRecipients }));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), user: vi.fn(), exchange: vi.fn(), companyRecipients: vi.fn(), certificate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), user: vi.fn(), exchange: vi.fn(), companyRecipients: vi.fn(), certificate: vi.fn(), supportTicket: vi.fn(), supportAgent: vi.fn() }));
 vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: mocks.companyRecipients }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application, findMany: mocks.applicationContexts }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account, findUnique: mocks.user }, intercambioInspeccion: { findUnique: mocks.exchange }, certificadoManifiesto: { findFirst: mocks.certificate } } }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application, findMany: mocks.applicationContexts }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account, findUnique: mocks.user }, intercambioInspeccion: { findUnique: mocks.exchange }, certificadoManifiesto: { findFirst: mocks.certificate }, ticketSoporte: { findUnique: mocks.supportTicket }, agenteSoporte: { findUnique: mocks.supportAgent } } }));
 import { notificationMailContent, notificationSourceEligible, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
@@ -280,6 +280,41 @@ describe('committed notice mail relay', () => {
   it('uses a safe fallback for unknown events and excludes internal support notices', () => {
     expect(notificationMailContent({ ...notice, tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"__proto__"}' })?.subject).toBe('[SITREP] Actualización en tu ticket de soporte');
     expect(notificationMailContent({ ...notice, tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"NOTA","interno":true}' })).toBeNull();
+  });
+  it.each([
+    ['owner', 'GENERADOR', null, true],
+    ['administrator', 'ADMIN', null, true],
+    ['agent', 'OPERADOR', true, true],
+    ['revoked', 'OPERADOR', false, false],
+    ['unrelated', 'OPERADOR', null, false],
+  ])('rechecks support access for %s', async (usuarioId, rol, enabled, expected) => {
+    mocks.supportTicket.mockResolvedValue({ autorId: 'owner' });
+    mocks.supportAgent.mockResolvedValue(enabled === null ? null : { habilitado: enabled });
+    const support = { ...notice, usuarioId, rol, tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"CERRAR"}' };
+    expect(await notificationSourceEligible(support, 'soporte')).toBe(expected);
+  });
+  it('suppresses support mail if the ticket or recipient is no longer available', async () => {
+    const support = { ...notice, usuarioId: 'owner', tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"CERRAR"}' };
+    mocks.supportTicket.mockResolvedValue(null);
+    expect(await notificationSourceEligible(support, 'soporte')).toBe(false);
+    expect(await notificationSourceEligible({ ...support, rol: 'ADMIN' }, 'soporte')).toBe(false);
+    mocks.supportTicket.mockResolvedValue({ autorId: 'owner' });
+    expect(await notificationSourceEligible({ ...support, activo: false }, 'soporte')).toBe(false);
+    expect(await notificationSourceEligible({ ...support, usuarioId: undefined }, 'soporte')).toBe(false);
+    expect(await notificationSourceEligible({ ...support, datos: '{"tipo":"soporte"}' }, 'soporte')).toBe(false);
+  });
+  it('rechecks a support agent before queueing and again before a later delivery', async () => {
+    const support = { ...notice, usuarioId: 'agent', rol: 'OPERADOR', tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"DERIVAR"}' };
+    mocks.query.mockResolvedValue([support]); mocks.supportTicket.mockResolvedValue({ autorId: 'owner' });
+    mocks.supportAgent.mockResolvedValue({ habilitado: true });
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0].estado).toBe('PENDIENTE');
+    mocks.notice.mockResolvedValue({ ...support, usuario: support });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', support.email)).toBe(true);
+    mocks.supportAgent.mockResolvedValue({ habilitado: false });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', support.email)).toBe(false);
+    mocks.supportTicket.mockResolvedValue(null);
+    expect(await queuedNoticeStillEligible('notification:qa-notice', support.email)).toBe(false);
   });
   it('includes actionable closure follow-up and rechecks its case and manifest', async () => {
     vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'alertas');
