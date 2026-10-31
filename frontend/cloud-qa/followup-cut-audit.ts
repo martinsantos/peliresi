@@ -68,6 +68,8 @@ const baseline = read('baseline-compiled-proof.json');
 assert.equal(baseline.commit, '971727a3641780d88add1eb9a3ae714988ec44bf');
 const buildFlags = read('build-flags.json'); assert.equal(buildFlags.candidate, process.env.GITHUB_SHA);
 for (const key of [...frontendFlags, 'VITE_ACTOR_MULTIROLE_ENABLED', 'VITE_ENTERPRISE_ENABLED']) assert.equal(buildFlags.flags[key], 'true', key);
+const preflight = read('preflight-checks.json');
+assert.equal(preflight.types, true); assert.equal(preflight.lintErrors, 0); assert.equal(preflight.lintExistingWarnings, 7);
 const backendRoot = path.join(root, 'backend/dist-qa-actor-overview-20261031');
 const currentBackendRoot = path.join(root, 'backend/dist-qa-followup-v2-20261031');
 function compiledFiles(dir: string, prefix = ''): string[] {
