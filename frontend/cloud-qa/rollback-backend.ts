@@ -113,6 +113,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-inspection-opening-20261031') {
     return path.join(root, 'backend/dist-qa-actor-overview-20261031/index.js');
   }
+  if (version === 'pwa-continuity'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-pwa-continuity-20261031') {
+    return path.join(root, 'backend/dist-qa-actor-overview-20261031/index.js');
+  }
   if (version === 'certificate-receipt-ux'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-certificate-receipt-ux-20261030') {
     return path.join(root, 'backend/dist-qa-closure-d7d29dde/index.js');

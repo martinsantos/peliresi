@@ -92,7 +92,14 @@ describe('authenticated redirect destination', () => {
         '/inspecciones/INS-QR-123?origen=qr&vista=trazabilidad#evento-9',
       );
     });
-    expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123');
+    expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123', { deferWelcome: true });
+  });
+
+  it('does not defer the welcome for an ordinary dashboard login', async () => {
+    renderLogin('/dashboard');
+    await submitLogin();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/dashboard'));
+    expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123', { deferWelcome: false });
   });
 
   it('preserves the assigned inspection for a designated inspector with an actor base role', async () => {

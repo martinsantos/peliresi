@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '../../utils/api-error';
 import { MendozaBrand } from '../../components/MendozaBrand';
 import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
 import { BrandSpinner } from '../../components/ui/LoadingState';
+import { SWUpdateBanner } from '../../components/SWUpdateBanner';
 import { postLoginDestination, safeLocalRedirect } from '../../utils/authRedirect';
 import './institutional.css';
 
@@ -56,6 +57,9 @@ const LoginPage: React.FC = () => {
   return (
     <div className={`institutional institutional-login ${isPwaBuild ? 'is-pwa' : ''}`}>
     <div className="w-full max-w-md animate-fade-in-up">
+      <SWUpdateBanner className="mb-4 rounded-xl" localBlockReason={email || password || loading
+        ? 'Terminá de ingresar o borrá los datos antes de actualizar.'
+        : undefined} />
       {/* Header — Gobierno de Mendoza + SITREP */}
       <div className="text-center mb-4 md:mb-6">
         <div className="login-brand-lockup">

@@ -28,6 +28,15 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('updating guidance explains work in other tabs and storage limits', () => {
+  const guide = guides.find((item: any) => item.id === 'actualizar-sin-perder-contexto');
+  const text = JSON.stringify(guide);
+  assert.match(text, /cambios de cada pestaña antes de actualizar/);
+  assert.match(text, /La contraseña no se guarda como borrador/);
+  assert.match(text, /navegador, que puede eliminar copias/);
+  assert.match(text, /Una pantalla nunca cargada puede necesitar conexión/);
+  assert.doesNotMatch(text, /Web y app reutilizan los archivos versionados de pantallas que ya guardaron/);
+});
 test('the actor overview explains global filtering, recovery and page-only exports', () => {
   const guide=guides.find((g:any)=>g.id==='padrones-administrativos');
   const step=guide.steps.find((s:any)=>s.title==='Consultar Actores en conjunto');

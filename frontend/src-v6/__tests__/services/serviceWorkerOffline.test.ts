@@ -36,15 +36,16 @@ function workerHarness(app = false) {
   };
   const source = readFileSync(`public/${app ? 'sw-app.js' : 'sw.js'}`, 'utf8').replaceAll('__SW_VERSION__', 'test');
   const skipWaiting = vi.fn();
+  const matchClients = vi.fn().mockResolvedValue([]);
   vm.runInNewContext(source, {
-    self: { location: { origin }, addEventListener: (name: string, listener: (event: WorkerEvent) => void) => listeners.set(name, listener), clients: { claim: vi.fn() }, skipWaiting },
+    self: { location: { origin }, addEventListener: (name: string, listener: (event: WorkerEvent) => void) => listeners.set(name, listener), clients: { claim: vi.fn(), matchAll: matchClients }, skipWaiting },
     caches, fetch, URL, Response, console: { log: vi.fn(), warn: vi.fn() },
     importScripts: vi.fn(),
   });
   const precacheName = app ? 'sitrep-app-test' : /const CACHE_NAME = '([^']+)'/.exec(source)![1];
   const runtimeName = app ? 'sitrep-app-runtime-test' : /const RUNTIME_CACHE = '([^']+)'/.exec(source)![1];
   return {
-    fetch, caches, stores, cacheFor, precacheName, runtimeName, skipWaiting,
+    fetch, caches, stores, cacheFor, precacheName, runtimeName, skipWaiting, matchClients,
     async install() {
       let work: Promise<unknown> | undefined;
       listeners.get('install')!({ request: {} as WorkerRequest, respondWith: () => undefined, waitUntil: pending => { work = pending; } });
@@ -199,4 +200,109 @@ it('a public PWA navigation cannot overwrite the saved application shell', async
   worker.fetch.mockResolvedValue(html('PUBLIC PAGE'));
   expect(await (await worker.request('/app/public/notice.html'))?.text()).toBe('PUBLIC PAGE');
   expect(await (await worker.cacheFor(worker.precacheName).match('/app/index.html'))?.text()).toBe('APP SHELL');
+});
+
+it('keeps an installed app shell when the network serves a newer release', async () => {
+  const worker = workerHarness(true);
+  await worker.cacheFor(worker.precacheName).put('/app/index.html', html('INSTALLED SHELL'));
+  worker.fetch.mockResolvedValue(html('NEW RELEASE SHELL'));
+  expect(await (await worker.request('/app/'))?.text()).toBe('INSTALLED SHELL');
+  expect(await (await worker.cacheFor(worker.precacheName).match('/app/index.html'))?.text()).toBe('INSTALLED SHELL');
+  expect(worker.fetch).toHaveBeenCalledOnce();
+});
+
+it('passes a server error through instead of disguising it as the saved app', async () => {
+  const worker = workerHarness(true);
+  await worker.cacheFor(worker.precacheName).put('/app/index.html', html('INSTALLED SHELL'));
+  worker.fetch.mockResolvedValue(new Response('Maintenance', { status: 503 }));
+  const response = await worker.request('/app/inspecciones');
+  expect(response?.status).toBe(503);
+  expect(await response?.text()).toBe('Maintenance');
+});
+
+it('lets the installed router resolve a missing app route without changing its shell', async () => {
+  const worker = workerHarness(true);
+  await worker.cacheFor(worker.precacheName).put('/app/index.html', html('INSTALLED SHELL'));
+  worker.fetch.mockResolvedValue(new Response('Not found', { status: 404 }));
+  expect(await (await worker.request('/app/inspecciones'))?.text()).toBe('INSTALLED SHELL');
+});
+
+it('keeps exact old app assets usable while another app window stays open', async () => {
+  const worker = workerHarness(true);
+  const oldUrl = '/app/assets/Inspection-OldVer12.js';
+  await worker.cacheFor('sitrep-app-runtime-old').put(oldUrl, new Response('old exact module', { headers: { 'Content-Type': 'application/javascript' } }));
+  worker.cacheFor('sitrep-app-old');
+  worker.matchClients.mockResolvedValue([{ url: origin + '/app/dashboard' }]);
+  await worker.activate();
+  expect(worker.stores.has('sitrep-app-old')).toBe(true);
+  expect(worker.stores.has('sitrep-app-runtime-old')).toBe(true);
+  expect(await (await worker.request(oldUrl, 'cors'))?.text()).toBe('old exact module');
+  expect(worker.fetch).not.toHaveBeenCalled();
+  expect((await worker.request('/app/assets/Inspection-NewVer12.js', 'cors'))?.status).toBe(408);
+});
+
+it('keeps exact old web assets usable while another web window stays open', async () => {
+  const worker = workerHarness(false);
+  const oldUrl = '/assets/Inspection-OldVer12.js';
+  await worker.cacheFor('runtime-cache-old').put(oldUrl, new Response('old exact web module', { headers: { 'Content-Type': 'application/javascript' } }));
+  worker.cacheFor('trazabilidad-rrpp-old');
+  worker.matchClients.mockResolvedValue([{ url: origin + '/manifiestos' }]);
+  await worker.activate();
+  expect(worker.stores.has('trazabilidad-rrpp-old')).toBe(true);
+  expect(worker.stores.has('runtime-cache-old')).toBe(true);
+  expect(await (await worker.request(oldUrl, 'cors'))?.text()).toBe('old exact web module');
+  expect(worker.fetch).not.toHaveBeenCalled();
+  expect((await worker.request('/assets/Inspection-NewVer12.js', 'cors'))?.status).toBe(408);
+});
+
+it('does not recover a web asset from an app cache', async () => {
+  const worker = workerHarness(false);
+  const url = '/assets/Inspection-OldVer12.js';
+  await worker.cacheFor('sitrep-app-runtime-old').put(url, new Response('wrong scope', { headers: { 'Content-Type': 'application/javascript' } }));
+  await worker.cacheFor('runtime-cache-old').put(url, html('not a script'));
+  expect((await worker.request(url, 'cors'))?.status).toBe(408);
+});
+
+it('does not recover an app asset from a web cache or from invalid cached HTML', async () => {
+  const worker = workerHarness(true);
+  const url = '/app/assets/Inspection-OldVer12.js';
+  await worker.cacheFor('runtime-cache-old').put(url, new Response('wrong scope', { headers: { 'Content-Type': 'application/javascript' } }));
+  await worker.cacheFor('sitrep-app-runtime-old').put(url, html('not a script'));
+  expect((await worker.request(url, 'cors'))?.status).toBe(408);
+});
+
+it('retains old app caches if the browser cannot enumerate open windows', async () => {
+  const worker = workerHarness(true);
+  worker.cacheFor('sitrep-app-old');
+  worker.matchClients.mockRejectedValue(new Error('clients unavailable'));
+  await worker.activate();
+  expect(worker.stores.has('sitrep-app-old')).toBe(true);
+});
+
+it('retains old web caches if the browser cannot enumerate open windows', async () => {
+  const worker = workerHarness(false);
+  worker.cacheFor('runtime-cache-old');
+  worker.matchClients.mockRejectedValue(new Error('clients unavailable'));
+  await worker.activate();
+  expect(worker.stores.has('runtime-cache-old')).toBe(true);
+});
+
+it('can retire old app caches when only web windows remain', async () => {
+  const worker = workerHarness(true);
+  worker.cacheFor('sitrep-app-old');
+  worker.cacheFor('trazabilidad-rrpp-old');
+  worker.matchClients.mockResolvedValue([{ url: origin + '/dashboard' }]);
+  await worker.activate();
+  expect(worker.stores.has('sitrep-app-old')).toBe(false);
+  expect(worker.stores.has('trazabilidad-rrpp-old')).toBe(true);
+});
+
+it('can retire old web caches when only app windows remain', async () => {
+  const worker = workerHarness(false);
+  worker.cacheFor('runtime-cache-old');
+  worker.cacheFor('sitrep-app-old');
+  worker.matchClients.mockResolvedValue([{ url: origin + '/app/dashboard' }]);
+  await worker.activate();
+  expect(worker.stores.has('runtime-cache-old')).toBe(false);
+  expect(worker.stores.has('sitrep-app-old')).toBe(true);
 });

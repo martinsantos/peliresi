@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v178';
-const RUNTIME_CACHE = 'runtime-cache-v121';
+const CACHE_NAME = 'trazabilidad-rrpp-v179';
+const RUNTIME_CACHE = 'runtime-cache-v122';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -23,6 +23,20 @@ function isCacheableAsset(request, response) {
     if (/\.m?js$/i.test(pathname)) return /(?:java|ecma)script/i.test(contentType);
     if (/\.css$/i.test(pathname)) return /text\/css/i.test(contentType);
     return !pathname.startsWith('/assets/') || !/text\/html/i.test(contentType);
+}
+
+// A web tab that has not reloaded may still need the exact hashed asset from
+// its earlier release after another tab accepts a worker update.
+async function matchWebReleaseAsset(request) {
+    const runtime = await caches.open(RUNTIME_CACHE);
+    const own = await runtime.match(request) || await (await caches.open(CACHE_NAME)).match(request);
+    if (isCacheableAsset(request, own)) return own;
+    for (const name of await caches.keys()) {
+        if (!(name.startsWith('trazabilidad-rrpp-') || name.startsWith('runtime-cache-'))
+            || name === CACHE_NAME || name === RUNTIME_CACHE) continue;
+        const previous = await (await caches.open(name)).match(request);
+        if (isCacheableAsset(request, previous)) return previous;
+    }
 }
 
 const offlineResponse = () => new Response('<html><body><h1>Offline</h1><p>Sin conexion. Intente de nuevo.</p></body></html>', {
@@ -50,7 +64,16 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (event) => {
     console.log('[SW] Activando', CACHE_NAME);
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            const hasWebClient = clients.some((client) => {
+                try {
+                    const url = new URL(client.url);
+                    return url.origin === self.location.origin && !/^\/app(\/|$)/.test(url.pathname);
+                } catch { return true; }
+            });
+            if (hasWebClient) return [];
+            return caches.keys();
+        }).catch(() => []).then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
             return Promise.all(
                 cacheNames
@@ -112,7 +135,7 @@ self.addEventListener('fetch', (event) => {
     if (/^\/assets\/.*-[a-zA-Z0-9_-]{8}\./.test(url.pathname)) {
         event.respondWith(
             caches.open(RUNTIME_CACHE).then(async (cache) => {
-                const cached = await cache.match(request) || await (await caches.open(CACHE_NAME)).match(request);
+                const cached = await matchWebReleaseAsset(request);
                 if (isCacheableAsset(request, cached)) return cached;
                 try {
                     const response = await fetch(request);

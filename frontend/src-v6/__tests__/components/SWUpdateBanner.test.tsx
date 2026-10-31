@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SWUpdateBanner } from '../../components/SWUpdateBanner';
 
@@ -11,6 +11,29 @@ afterEach(() => {
 });
 
 describe('app update while an inspection is open', () => {
+  it('does not replace a screen with unfinished local input', async () => {
+    const postMessage = vi.fn();
+    const registration = { waiting: { postMessage }, installing: null, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { controller: {}, ready: Promise.resolve(registration), addEventListener: vi.fn(), removeEventListener: vi.fn() } });
+    render(<SWUpdateBanner localBlockReason="Terminá de ingresar o borrá los datos antes de actualizar." />);
+    fireEvent.click(await screen.findByRole('button', { name: /Nueva versión disponible/ }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Terminá de ingresar');
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+
+  it('observes a worker that was already installing before the banner mounted', async () => {
+    let state: ServiceWorkerState = 'installing';
+    const worker = new EventTarget();
+    Object.defineProperty(worker, 'state', { get: () => state });
+    const registration = { waiting: null, installing: worker, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { controller: {}, ready: Promise.resolve(registration), addEventListener: vi.fn(), removeEventListener: vi.fn() } });
+    render(<SWUpdateBanner />);
+    await act(async () => { await Promise.resolve(); });
+    state = 'installed';
+    act(() => worker.dispatchEvent(new Event('statechange')));
+    expect(await screen.findByRole('button', { name: /Nueva versión disponible/ })).toBeInTheDocument();
+  });
+
   it('keeps the current version when the inspection reports unsent field work', async () => {
     const postMessage = vi.fn();
     const registration = { waiting: { postMessage }, addEventListener: vi.fn(), removeEventListener: vi.fn() };

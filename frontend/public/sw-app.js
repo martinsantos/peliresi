@@ -25,6 +25,18 @@ async function matchOwnCache(request) {
   return await precache.match(request) || await runtime.match(request);
 }
 
+// An older tab may still request its exact content-hashed chunk after another
+// tab activates an update. Never search other scopes or substitute a new hash.
+async function matchReleaseAsset(request) {
+  const own = await matchOwnCache(request);
+  if (isCacheableAsset(request, own)) return own;
+  for (const name of await caches.keys()) {
+    if (!name.startsWith('sitrep-app-') || name === CACHE_NAME || name === RUNTIME_CACHE) continue;
+    const previous = await (await caches.open(name)).match(request);
+    if (isCacheableAsset(request, previous)) return previous;
+  }
+}
+
 async function offlineNavigation(request, pathname) {
   const exact = await matchOwnCache(request);
   if (exact) return exact;
@@ -62,12 +74,23 @@ self.addEventListener('install', (event) => {
 });
 
 // ========================================
-// ACTIVATE — clean old caches
+// ACTIVATE — old clients can still be running a previous application build.
+// Retire its caches only when no app window remains; otherwise exact hashed
+// resources must stay available to the already-open tabs.
 // ========================================
 self.addEventListener('activate', (event) => {
   console.log(`[SW-App] Activating ${CACHE_NAME}...`);
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const hasAppClient = clients.some((client) => {
+        try {
+          const url = new URL(client.url);
+          return url.origin === self.location.origin && (url.pathname === '/app' || url.pathname.startsWith('/app/'));
+        } catch { return true; }
+      });
+      if (hasAppClient) return [];
+      return caches.keys();
+    }).catch(() => []).then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => name.startsWith('sitrep-app-') && name !== CACHE_NAME && name !== RUNTIME_CACHE)
@@ -100,24 +123,24 @@ self.addEventListener('fetch', (event) => {
   if (/^\/(?:app\/)?api(\/|$)/.test(url.pathname)) return;
 
   // --- Navigation requests (SPA) ---
-  // Network-first, fallback to cached index.html (React SPA shell), then offline.html
+  // Keep the shell paired with this worker until the waiting version is
+  // explicitly activated. Do not overwrite it with a later release's HTML.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then(async (response) => {
-          // Only canonical entry documents may update the SPA shell. A manual,
-          // download or public HTML page must never replace it.
-          if (response.ok && !response.redirected && /text\/html/i.test(response.headers.get('Content-Type') || '')
-            && ['/app/', '/app/index.html', '/app/app.html'].includes(url.pathname)) {
-            const cache = await caches.open(CACHE_NAME);
-            await cache.put('/app/index.html', response.clone()).catch(() => {});
-          }
-          if (response.ok || !isSpaNavigation(url.pathname)) return response;
-          // Non-OK (404, 500): fall back to cached SPA shell so React Router handles the route
-          return matchOwnCache('/app/index.html')
-            .then((cached) => cached || response);
-        })
-        .catch(() => offlineNavigation(request, url.pathname))
+      (async () => {
+        const spa = isSpaNavigation(url.pathname);
+        const cached = spa ? await matchOwnCache('/app/index.html') : null;
+        const shell = cached?.ok && /text\/html/i.test(cached.headers.get('Content-Type') || '') ? cached : null;
+        try {
+          const response = await fetch(request);
+          const spaHtml = response.ok && !response.redirected
+            && /text\/html/i.test(response.headers.get('Content-Type') || '');
+          if (spa && shell && (spaHtml || response.status === 404)) return shell;
+          return response;
+        } catch {
+          return shell || offlineNavigation(request, url.pathname);
+        }
+      })()
     );
     return;
   }
@@ -126,7 +149,7 @@ self.addEventListener('fetch', (event) => {
   // Cache-first: content-hashed files never change
   if (url.pathname.match(/\/assets\/.*-[a-zA-Z0-9_-]{8}\./)) {
     event.respondWith(
-      matchOwnCache(request).then((cached) => {
+      matchReleaseAsset(request).then((cached) => {
         if (isCacheableAsset(request, cached)) return cached;
         return fetch(request).then(async (response) => {
           if (isCacheableAsset(request, response)) {
