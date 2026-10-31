@@ -90,6 +90,12 @@ async function action(page: Page, label: string, text: string) {
   await page.getByRole('region', { name: 'Atender ticket', exact: true }).getByRole('button', { name: direct[label as keyof typeof direct] || label, exact: true }).click();
   await page.getByRole('textbox', { name: /Mensaje o resolución|Nota interna \/ motivo/ }).fill(text);
 }
+async function continueAfterConfirmedAction(page: Page) {
+  const continueButton = page.getByRole('button', { name: 'Actualizar conversación y continuar', exact: true });
+  await expect(continueButton).toBeVisible({ timeout: 10000 });
+  await continueButton.click();
+  await expect(continueButton).toBeHidden();
+}
 test('native support: report, take, private note, handoff, reply, close and reopen with actual notices', async ({ page, browser }, info) => {
   test.setTimeout(180000);
   const contexts: BrowserContext[] = [];
@@ -139,9 +145,11 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await screenshot(admin, info, 'visible-attention-controls');
     await admin.getByRole('button', { name: 'Asignarme', exact: true }).click();
     await expect(admin.getByText('QA admin', { exact: true }).first()).toBeVisible();
+    await continueAfterConfirmedAction(admin);
     await action(admin, 'Nota interna de soporte', 'QA diagnóstico reservado: no mostrar al reportante.');
     await expect(admin.getByText('Sólo el equipo de soporte puede leer esta nota.', { exact: true })).toBeVisible();
     await admin.getByRole('button', { name: 'Guardar nota interna', exact: true }).click();
+    await continueAfterConfirmedAction(admin);
     await expect(admin.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toBeVisible();
     await action(admin, 'Derivar a otro responsable', 'QA motivo privado para el nuevo responsable.');
     await admin.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
@@ -151,11 +159,12 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await screenshot(admin, info, 'desk-handoff'); await admin.close();
 
     const operator = await asUser(technician); await operator.goto(prefix(info) + '/notificaciones');
-    await operator.getByRole('button', { name: 'Abrir aviso: Ticket derivado a tu atención', exact: true }).first().click();
+    await operator.getByRole('button', { name: 'Abrir aviso: Ticket derivado a tu atención', exact: true }).filter({ hasText: ticket.referencia }).click();
     await expect(operator).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await action(operator, 'Solicitar respuesta al usuario', 'QA verificá si la pantalla ya muestra los datos.');
     await operator.getByRole('button', { name: 'Solicitar respuesta', exact: true }).click();
     await expect(operator.getByText('Esperando al usuario', { exact: true })).toBeVisible();
+    await continueAfterConfirmedAction(operator);
     await action(operator, 'Cerrar con una resolución', 'QA resolución sintética: se corrigió el acceso.');
     await operator.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
     await expect(operator.getByText('Cerrado', { exact: true }).first()).toBeVisible(); await operator.close();
