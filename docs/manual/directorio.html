@@ -3348,9 +3348,12 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/carga-masiva/operadores</td><td>Importar operadores desde CSV</td></tr>
 <tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/carga-masiva/plantilla/:tipo</td><td>Descargar plantilla CSV para importacion</td></tr>
 <tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/centro-control/actividad</td><td>Datos del Centro de Control por capas y periodo</td></tr>
-<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/health</td><td>Health check: verifica DB y retorna <code>{ status, db, uptime }</code></td></tr>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/health/live</td><td>La sonda de vida no comprueba la base de datos y no escribe analítica ni contadores persistentes. Tiene un límite por IP en memoria.</td></tr>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/health/ready</td><td>Comprueba la base de datos y puede actualizar un contador persistente y registrar analítica.</td></tr>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/health</td><td>Comprueba la base de datos; también puede actualizar un contador persistente y registrar analítica.</td></tr>
 </tbody>
 </table>
+<p>La sonda de vida no convierte toda la aplicación ni sus tareas programadas en modo de sólo lectura.</p>
 
 <h5>Blockchain</h5>
 <table>
