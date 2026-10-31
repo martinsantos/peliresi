@@ -28,6 +28,12 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('the actor overview explains global filtering, recovery and page-only exports', () => {
+  const guide=guides.find((g:any)=>g.id==='padrones-administrativos');
+  const step=guide.steps.find((s:any)=>s.title==='Consultar Actores en conjunto');
+  const text=JSON.stringify(step);
+  for(const phrase of ['todos los registros autorizados antes de paginar','Reintentar consulta','formulario completo','de la página actual']) assert.ok(text.includes(phrase),phrase);
+});
 test('directory accordions use native buttons with an accessible initial state', () => {
   const directory = read('directorio.html');
   const controls = directory.match(/<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible\(this\)">/g) || [];

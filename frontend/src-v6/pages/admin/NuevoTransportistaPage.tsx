@@ -272,7 +272,7 @@ const NuevoTransportistaPage: React.FC = () => {
   return (
     <div ref={validationRef} onChangeCapture={event => { if ((event.target as HTMLElement).getAttribute("aria-label") !== "Paso del registro") setFormEdited(true); }} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
       <PageToolbar label="Acciones del formulario">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : 'Volver a Transportistas'}</Button>
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : actorNavigation?.backLabel || 'Volver a Transportistas'}</Button>
         <h2 className="sr-only">{isEdit ? 'Editar transportista' : 'Nuevo transportista'}</h2>
       </PageToolbar>
 

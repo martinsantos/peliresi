@@ -17,6 +17,15 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: qa
 vi.mock('../../services/api', () => ({ default: { get: qa.get } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 vi.mock('../../hooks/useActores', () => ({
+  useActorDirectory: () => ({ data: {
+    items: [
+      ...qa.generadores.map(actor => ({ ...actor, activo: true, tipo: 'generador' })),
+      ...qa.transportistas.map(actor => ({ ...actor, activo: true, tipo: 'transportista' })),
+      ...qa.operadores.map(actor => ({ ...actor, activo: true, tipo: 'operador' })),
+    ],
+    counts: { generador: 33, transportista: 4, operador: 5 },
+    pagination: { page: 1, limit: 20, total: 42, pages: 3 },
+  }, isLoading: false, isError: false, refetch: vi.fn() }),
   useGeneradores: () => ({ data: { items: qa.generadores, total: 33, totalPages: 2 }, isLoading: false }),
   useTransportistas: () => ({ data: { items: qa.transportistas, total: 4, totalPages: 1 }, isLoading: false }),
   useOperadores: () => ({ data: { items: qa.operadores, total: 5, totalPages: 1 }, isLoading: false }),

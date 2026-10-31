@@ -6,7 +6,26 @@ import api from './api';
 import type { ActorFilters, CreateGeneradorRequest, CreateTransportistaRequest, CreateOperadorRequest, PaginatedData, AuditoriaEntry, GeneradorListData } from '../types/api';
 import type { Generador, Transportista, Operador, Vehiculo, Chofer } from '../types/models';
 
+export type ActorDirectoryType = 'generador' | 'transportista' | 'operador';
+export interface ActorDirectoryItem {
+  id: string; tipo: ActorDirectoryType; razonSocial: string; cuit: string;
+  domicilio: string; telefono: string; email: string; activo: boolean;
+}
+export interface ActorDirectoryFilters {
+  search?: string; tipo: 'todos' | ActorDirectoryType; estado: 'todos' | 'activo' | 'inactivo';
+  sortBy: 'actor' | 'tipo' | 'estado'; sortOrder: 'asc' | 'desc'; page: number; limit: number;
+}
+export interface ActorDirectoryData {
+  items: ActorDirectoryItem[];
+  counts: Record<ActorDirectoryType, number>;
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
 export const actoresService = {
+  async listDirectory(filters: ActorDirectoryFilters): Promise<ActorDirectoryData> {
+    const { data } = await api.get('/actores/directorio', { params: filters });
+    return data.data;
+  },
   // Generadores
   async listGeneradores(filters?: ActorFilters): Promise<GeneradorListData> {
     const { data } = await api.get('/actores/generadores', { params: filters });

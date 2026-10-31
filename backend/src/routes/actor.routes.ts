@@ -12,10 +12,12 @@ import { getPagosTEF, createPagoTEF, updatePagoTEF, deletePagoTEF, getDDJJ, crea
 import { getPagosTEFOperador, createPagoTEFOperador, updatePagoTEFOperador, deletePagoTEFOperador, getDDJJOperador, createDDJJOperador, updateDDJJOperador, deleteDDJJOperador } from '../controllers/operador-fiscal.controller';
 import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocumento, deleteDocumento, confirmarIdentidadPagoActor } from '../controllers/documento.controller';
 import { readActorDraft, saveActorDraft, deleteActorDraft, authorizeActorDraft, uploadActorDraft, saveActorDraftFile, readActorDraftFile, deleteActorDraftFile } from '../controllers/actorFormDraft.controller';
+import { getActorDirectory } from '../controllers/actorDirectory.controller';
 
 const router = Router();
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+router.get('/directorio', getActorDirectory);
 router.get('/borradores/:scope', readActorDraft);
 router.put('/borradores/:scope', saveActorDraft);
 router.delete('/borradores/:scope', deleteActorDraft);

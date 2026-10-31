@@ -421,7 +421,7 @@ const NuevoOperadorPage: React.FC = () => {
   return (
     <div ref={validationRef} onChangeCapture={event => { if ((event.target as HTMLElement).getAttribute("aria-label") !== "Paso del registro") setFormEdited(true); }} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       <PageToolbar label="Acciones del formulario">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : 'Volver a Operadores'}</Button>
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : actorNavigation?.backLabel || 'Volver a Operadores'}</Button>
         <h2 className="sr-only">{isEdit ? 'Editar operador' : 'Nuevo operador'}</h2>
       </PageToolbar>
 

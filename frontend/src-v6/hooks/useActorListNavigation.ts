@@ -31,12 +31,15 @@ export function useActorListNavigation() {
   return { text, number, set, open };
 }
 
-/** Creation/editing may only return to the same actor list and router surface. */
+/** Creation/editing may return to its category or the actor overview on the same surface. */
 export function actorListReturn(state: unknown, listPath: string): string {
   const value = (state as { actorReturn?: unknown } | null)?.actorReturn;
   if (typeof value !== 'string' || value.length > 6000 || /[\\\u0000-\u001f]/.test(value)) return listPath;
   try {
     const url = new URL(value, 'https://sitrep.invalid');
-    return url.origin === 'https://sitrep.invalid' && url.pathname === listPath ? listPath + url.search : listPath;
+    const match = /^(\/(?:app|mobile))?\/admin\/actores\/(?:generadores|transportistas|operadores)$/.exec(listPath);
+    const prefix = match?.[1] || '';
+    const allowed = [listPath, ...(match ? [prefix + '/admin/actores', prefix + '/actores'] : [])];
+    return url.origin === 'https://sitrep.invalid' && allowed.includes(url.pathname) ? url.pathname + url.search : listPath;
   } catch { return listPath; }
 }

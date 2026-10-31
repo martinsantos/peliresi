@@ -48,8 +48,10 @@ export function actorWorkspaceNavigation(pathname: string, user: User | null | u
     && !/\/(?:nuevo|editar|renovar)\/?$/.test(candidate.path)
     && user && canAccessMobilePath(user, candidate.path) && canUseCompanySection(user.empresaContexto, candidate.path)
     ? candidate.target : fallback;
+  const createOrigin = candidate?.path === route.listPath.slice(route.prefix.length)
+    || candidate?.path === '/admin/actores' || candidate?.path === '/actores';
   const origin = route.stage === 'list' ? route.listPath : route.stage === 'create'
-    ? (candidate?.path === route.listPath.slice(route.prefix.length) ? entry : route.listPath) : entry;
+    ? (createOrigin ? entry : route.listPath) : entry;
   let backPath = origin;
   if (route.stage === 'edit' || route.stage === 'renew') {
     const detail = localTarget(history.actorDetailReturn, route.prefix);

@@ -5,18 +5,19 @@
  * Con filtros sticky, tabs, Table component y pagination
  */
 
-import React, { useState, useMemo } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useActorListNavigation } from '../../hooks/useActorListNavigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
+import type { ActorDirectoryFilters, ActorDirectoryType } from '../../services/actores.service';
 import {
   Users,
   Factory,
   Truck,
   FlaskConical,
   Search,
-  Plus,
   ExternalLink,
   Eye,
   FileText,
@@ -28,7 +29,6 @@ import {
   Check,
   Funnel,
   Trash2,
-  ArrowLeft,
   Download,
   FileDown,
   List,
@@ -37,6 +37,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { RecordListToolbar } from '../../components/crud/RecordListToolbar';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -46,13 +47,9 @@ import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
 import { Select } from '../../components/ui/Select';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
+import { toast } from '../../components/ui/Toast';
 import {
-  useGeneradores,
-  useTransportistas,
-  useOperadores,
-  useCreateGenerador,
-  useCreateTransportista,
-  useCreateOperador,
+  useActorDirectory,
   useDeleteGenerador,
   useDeleteTransportista,
   useDeleteOperador,
@@ -64,23 +61,8 @@ const tipoConfig = {
   operador: { label: 'Operador', icon: FlaskConical, color: 'blue' },
 };
 
-const INITIAL_FORM = {
-  tipo: 'generador' as 'generador' | 'transportista' | 'operador',
-  razonSocial: '',
-  cuit: '',
-  domicilio: '',
-  telefono: '',
-  email: '',
-  password: '',
-  nombre: '',
-  numeroInscripcion: '',
-  categoria: '',
-  numeroHabilitacion: '',
-};
-
 export const ActoresPage: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const list = useActorListNavigation();
   const mp = useMobilePrefix();
   const { currentUser, isRestricted } = useAuth();
   // Mirror the existing API's category mutation roles; inspection is consultation.
@@ -91,209 +73,117 @@ export const ActoresPage: React.FC = () => {
   const openFicha = (actor: any) => {
     if (!canOpenFicha(actor)) return;
     const category = actor.tipo === 'generador' ? 'generadores' : actor.tipo === 'transportista' ? 'transportistas' : 'operadores';
-    navigate(mp(`/admin/actores/${category}/${encodeURIComponent(actor.id)}`), { state: { actorReturn: location.pathname } });
+    list.open(mp(`/admin/actores/${category}/${encodeURIComponent(actor.id)}`));
   };
-  const [activeTab, setActiveTab] = useState('todos');
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [vistaMode, setVistaMode] = useState<'grid' | 'list'>('list');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const tabParam = list.text('tipo', 'todos');
+  const activeTab: ActorDirectoryFilters['tipo'] = ['todos','generador','transportista','operador'].includes(tabParam) ? tabParam as ActorDirectoryFilters['tipo'] : 'todos';
+  const estadoParam = list.text('estado', 'todos');
+  const filtroEstado: ActorDirectoryFilters['estado'] = ['todos','activo','inactivo'].includes(estadoParam) ? estadoParam as ActorDirectoryFilters['estado'] : 'todos';
+  const sortParam = list.text('sortBy', 'actor');
+  const sortBy: ActorDirectoryFilters['sortBy'] = ['actor','tipo','estado'].includes(sortParam) ? sortParam as ActorDirectoryFilters['sortBy'] : 'actor';
+  const sortOrder: 'asc' | 'desc' = list.text('sortOrder', 'asc') === 'desc' ? 'desc' : 'asc';
+  const busqueda = list.text('q');
+  const vistaMode = list.text('vista') === 'grid' ? 'grid' : 'list';
+  const currentPage = Math.min(list.number('page', 1), 1_000_000);
+  const setActiveTab = (value: string) => list.set('tipo', value === 'todos' ? undefined : value);
+  const setBusqueda = (value: string) => list.set('q', value);
+  const setFiltroEstado = (value: string) => list.set('estado', value === 'todos' ? undefined : value);
+  const setVistaMode = (value: 'grid' | 'list') => list.set('vista', value === 'list' ? undefined : value);
+  const setCurrentPage = (value: number) => list.set('page', value === 1 ? undefined : value);
   const [actorSeleccionado, setActorSeleccionado] = useState<any>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [actorEliminar, setActorEliminar] = useState<{ id: string; tipo: string; razonSocial: string } | null>(null);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteInFlight = useRef(false);
+  const [creationType, setCreationType] = useState<ActorDirectoryType>('generador');
 
   const itemsPerPage = 20;
 
-  // Map UI sort keys → API field names
-  const ACTOR_SORT_MAP: Record<string, string> = {
-    actor: 'razonSocial',
-    estado: 'activo',
-  };
-
-  const isTodos = activeTab === 'todos';
-  const apiSortBy = sortConfig ? ACTOR_SORT_MAP[sortConfig.key] : undefined;
-  const apiSortOrder = sortConfig?.direction;
-  const genPage   = (!isTodos && activeTab === 'generador')     ? currentPage : 1;
-  const transPage = (!isTodos && activeTab === 'transportista') ? currentPage : 1;
-  const operPage  = (!isTodos && activeTab === 'operador')      ? currentPage : 1;
-
-  // API hooks
-  const { data: generadoresData, isLoading: loadingGen } = useGeneradores({
-    search: busqueda || undefined,
-    sortBy: apiSortBy,
-    sortOrder: apiSortOrder,
-    page: genPage,
-    limit: isTodos ? 100 : itemsPerPage,
-  });
-  const { data: transportistasData, isLoading: loadingTrans } = useTransportistas({
-    search: busqueda || undefined,
-    sortBy: apiSortBy,
-    sortOrder: apiSortOrder,
-    page: transPage,
-    limit: isTodos ? 100 : itemsPerPage,
-  });
-  const { data: operadoresData, isLoading: loadingOp } = useOperadores({
-    search: busqueda || undefined,
-    sortBy: apiSortBy,
-    sortOrder: apiSortOrder,
-    page: operPage,
-    limit: isTodos ? 100 : itemsPerPage,
-  });
-
-  const createGenerador = useCreateGenerador();
-  const createTransportista = useCreateTransportista();
-  const createOperador = useCreateOperador();
+  const directory = useActorDirectory({ search: busqueda.trim() || undefined, tipo: activeTab, estado: filtroEstado,
+    sortBy, sortOrder, page: currentPage, limit: itemsPerPage });
   const deleteGenerador = useDeleteGenerador();
   const deleteTransportista = useDeleteTransportista();
   const deleteOperador = useDeleteOperador();
-
-  const isLoading = loadingGen || loadingTrans || loadingOp;
-
-  // Build unified list from API data
-  const actoresData = useMemo(() => {
-    const list: any[] = [];
-    if (generadoresData?.items && Array.isArray(generadoresData.items)) {
-      generadoresData.items.forEach((g: any) => list.push({ ...g, tipo: 'generador' }));
-    }
-    if (transportistasData?.items && Array.isArray(transportistasData.items)) {
-      transportistasData.items.forEach((t: any) => list.push({ ...t, tipo: 'transportista' }));
-    }
-    if (operadoresData?.items && Array.isArray(operadoresData.items)) {
-      operadoresData.items.forEach((o: any) => list.push({ ...o, tipo: 'operador' }));
-    }
-    return list;
-  }, [generadoresData, transportistasData, operadoresData]);
-
-  const generadoresCount = generadoresData?.total ?? actoresData.filter(a => a.tipo === 'generador').length;
-  const transportistasCount = transportistasData?.total ?? actoresData.filter(a => a.tipo === 'transportista').length;
-  const operadoresCount = operadoresData?.total ?? actoresData.filter(a => a.tipo === 'operador').length;
+  const { data, isError } = directory;
+  const isLoading = directory.isLoading || directory.isFetching;
+  useEffect(() => {
+    if (data && data.pagination.page !== currentPage) setCurrentPage(data.pagination.page);
+  }, [data?.pagination.page, currentPage]);
+  const actoresPaginados = data?.items || [];
+  const generadoresCount = data?.counts.generador ?? 0;
+  const transportistasCount = data?.counts.transportista ?? 0;
+  const operadoresCount = data?.counts.operador ?? 0;
   const totalCount = generadoresCount + transportistasCount + operadoresCount;
+  const serverTotal = data?.pagination.total ?? 0;
+  const totalPages = data?.pagination.pages ?? 0;
+  const displayCount = (count: number) => data && !isError && !isLoading ? count : '—';
 
   const summaries = [
-    { label: 'Generadores', tipo: 'generador', count: generadoresCount, route: '/admin/actores/generadores', Icon: Factory,
+    { label: 'Generadores', tipo: 'generador', count: displayCount(generadoresCount), route: '/admin/actores/generadores', Icon: Factory,
       surface: 'bg-purple-50 border-purple-200 hover:border-purple-300 active:bg-purple-100', symbol: 'bg-purple-100 text-purple-600', ink: 'text-purple-900', caption: 'text-purple-700' },
-    { label: 'Transportistas', tipo: 'transportista', count: transportistasCount, route: '/admin/actores/transportistas', Icon: Truck,
+    { label: 'Transportistas', tipo: 'transportista', count: displayCount(transportistasCount), route: '/admin/actores/transportistas', Icon: Truck,
       surface: 'bg-orange-50 border-orange-200 hover:border-orange-300 active:bg-orange-100', symbol: 'bg-orange-100 text-orange-600', ink: 'text-orange-900', caption: 'text-orange-700' },
-    { label: 'Operadores', tipo: 'operador', count: operadoresCount, route: '/admin/actores/operadores', Icon: FlaskConical,
+    { label: 'Operadores', tipo: 'operador', count: displayCount(operadoresCount), route: '/admin/actores/operadores', Icon: FlaskConical,
       surface: 'bg-blue-50 border-blue-200 hover:border-blue-300 active:bg-blue-100', symbol: 'bg-blue-100 text-blue-600', ink: 'text-blue-900', caption: 'text-blue-700' },
-    { label: 'Total', tipo: null, count: totalCount, route: null, Icon: Users,
+    { label: 'Total', tipo: null, count: displayCount(totalCount), route: null, Icon: Users,
       surface: 'bg-neutral-50 border-neutral-200', symbol: 'bg-neutral-100 text-neutral-600', ink: 'text-neutral-900', caption: 'text-neutral-700' },
   ];
 
   const tabCounts = {
-    todos: totalCount,
-    generador: generadoresCount,
-    transportista: transportistasCount,
-    operador: operadoresCount,
+    todos: displayCount(totalCount),
+    generador: displayCount(generadoresCount),
+    transportista: displayCount(transportistasCount),
+    operador: displayCount(operadoresCount),
   };
-
-  // Filter by tab + estado + sort
-  const actoresFiltrados = useMemo(() => {
-    let filtered = actoresData;
-
-    if (activeTab !== 'todos') {
-      filtered = filtered.filter(a => a.tipo === activeTab);
-    }
-
-    if (filtroEstado !== 'todos') {
-      filtered = filtered.filter(a => {
-        const isActivo = a.activo !== false && a.estado !== 'inactivo';
-        return filtroEstado === 'activo' ? isActivo : !isActivo;
-      });
-    }
-
-    if (sortConfig) {
-      filtered = [...filtered].sort((a, b) => {
-        const dir = sortConfig.direction === 'asc' ? 1 : -1;
-        switch (sortConfig.key) {
-          case 'actor': return dir * (a.razonSocial || '').localeCompare(b.razonSocial || '', 'es');
-          case 'tipo': return dir * (a.tipo || '').localeCompare(b.tipo || '', 'es');
-          case 'estado': {
-            const aActivo = a.activo !== false && a.estado !== 'inactivo';
-            const bActivo = b.activo !== false && b.estado !== 'inactivo';
-            return dir * (Number(bActivo) - Number(aActivo));
-          }
-          default: return 0;
-        }
-      });
-    }
-
-    return filtered;
-  }, [actoresData, activeTab, filtroEstado, sortConfig]);
-
-  // Pagination — server-side for specific tabs, client-side for 'todos'
-  const serverTotal =
-    activeTab === 'generador'     ? (generadoresData?.total ?? 0) :
-    activeTab === 'transportista' ? (transportistasData?.total ?? 0) :
-    activeTab === 'operador'      ? (operadoresData?.total ?? 0) :
-    actoresFiltrados.length;
-
-  const totalPages = isTodos
-    ? Math.ceil(actoresFiltrados.length / itemsPerPage)
-    : Math.ceil(serverTotal / itemsPerPage);
-
-  // For specific tabs the API already returns the correct page; for 'todos' slice client-side
-  const actoresPaginados = isTodos
-    ? actoresFiltrados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-    : actoresFiltrados;
 
   const verDetalle = (actor: any) => {
     setActorSeleccionado(actor);
     setModalDetalle(true);
   };
 
-  const handleCrear = async () => {
-    if (!canManageActor(form.tipo)) return;
-    try {
-      const base = {
-        email: form.email,
-        password: form.password || 'TempPass123!',
-        nombre: form.nombre || form.razonSocial,
-        razonSocial: form.razonSocial,
-        cuit: form.cuit,
-        domicilio: form.domicilio,
-        telefono: form.telefono,
-      };
-
-      if (form.tipo === 'generador') {
-        await createGenerador.mutateAsync({ ...base, numeroInscripcion: form.numeroInscripcion, categoria: form.categoria });
-      } else if (form.tipo === 'transportista') {
-        await createTransportista.mutateAsync({ ...base, numeroHabilitacion: form.numeroHabilitacion });
-      } else {
-        await createOperador.mutateAsync({ ...base, numeroHabilitacion: form.numeroHabilitacion, categoria: form.categoria });
-      }
-      setModalCrear(false);
-      setForm(INITIAL_FORM);
-    } catch {
-      // Error handled by React Query
-    }
+  const handleCrear = () => {
+    if (!canManageActor(creationType)) return;
+    const category = creationType === 'generador' ? 'generadores' : creationType === 'transportista' ? 'transportistas' : 'operadores';
+    setModalCrear(false);
+    list.open(mp(`/admin/actores/${category}/nuevo`));
   };
 
   const handleEliminar = async () => {
-    if (!actorEliminar || !canManageActor(actorEliminar.tipo)) return;
+    if (!actorEliminar || !canManageActor(actorEliminar.tipo) || deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setDeleteError('');
     try {
       if (actorEliminar.tipo === 'generador') await deleteGenerador.mutateAsync(actorEliminar.id);
       else if (actorEliminar.tipo === 'transportista') await deleteTransportista.mutateAsync(actorEliminar.id);
       else await deleteOperador.mutateAsync(actorEliminar.id);
       setModalEliminar(false);
       setActorEliminar(null);
-    } catch {
-      // Error handled by React Query
-    }
+      void directory.refetch();
+    } catch (error: any) {
+      setDeleteError(error?.response?.data?.message || 'No se pudo eliminar. Revisá la conexión y volvé a intentar.');
+    } finally { deleteInFlight.current = false; }
   };
 
-  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const handleExportPdf = () => {
-    exportReportePDF({
+  const exportFilters = [busqueda.trim() ? `Búsqueda: ${busqueda.trim()}` : '', activeTab !== 'todos' ? `Tipo: ${activeTab}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : ''].filter(Boolean).join(', ') || 'Sin filtros';
+  const handleExportCsv = () => {
+    if (!data || isError || !actoresPaginados.length) return;
+    try {
+      downloadCsv(actoresPaginados.map(a => ({
+        'Razon Social': a.razonSocial, CUIT: a.cuit, Tipo: tipoConfig[a.tipo]?.label || a.tipo,
+        Email: a.email, Telefono: a.telefono, Domicilio: a.domicilio, Estado: a.activo ? 'Activo' : 'Inactivo',
+      })), 'actores-pagina', { titulo: 'Actores · página actual', periodo: `Página ${data.pagination.page} de ${Math.max(1, totalPages)}`, filtros: exportFilters, total: actoresPaginados.length });
+    } catch {
+      toast.error('Exportar', 'No se pudo generar el CSV de esta página.');
+    }
+  };
+  const handleExportPdf = async () => {
+    if (!data || isError || !actoresPaginados.length) return;
+    try { await exportReportePDF({
       titulo: 'Gestión de Actores',
-      subtitulo: 'Generadores, transportistas y operadores registrados',
-      periodo: `Total: ${totalCount} actores`,
+      subtitulo: `Resultados de la página actual · ${exportFilters}`,
+      periodo: `Página ${data.pagination.page} de ${Math.max(1, totalPages)} · ${serverTotal} resultados`,
       kpis: [
         { label: 'Total Actores', value: totalCount },
         { label: 'Generadores', value: generadoresCount },
@@ -302,19 +192,19 @@ export const ActoresPage: React.FC = () => {
       ],
       tabla: {
         headers: ['Razón Social', 'CUIT', 'Tipo', 'Email', 'Teléfono', 'Estado'],
-        rows: actoresFiltrados.map(a => [
+        rows: actoresPaginados.map(a => [
           a.razonSocial || '',
           a.cuit || '',
           tipoConfig[a.tipo as keyof typeof tipoConfig]?.label || a.tipo,
           a.email || '',
           a.telefono || '',
-          (a.activo !== false && a.estado !== 'inactivo') ? 'Activo' : 'Inactivo',
+          a.activo ? 'Activo' : 'Inactivo',
         ]),
       },
-    });
+    }); } catch {
+      toast.error('Exportar', 'No se pudo generar el PDF de esta página.');
+    }
   };
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   // Table columns
   const columns = [
@@ -373,7 +263,7 @@ export const ActoresPage: React.FC = () => {
       header: 'Estado',
       sortable: true,
       render: (row: any) => {
-        const isActivo = row.activo !== false && row.estado !== 'inactivo';
+        const isActivo = row.activo;
         return (
           <Badge variant="soft" color={isActivo ? 'success' : 'neutral'}>
             {isActivo ? 'Activo' : 'Inactivo'}
@@ -402,6 +292,7 @@ export const ActoresPage: React.FC = () => {
             aria-label={`Eliminar ${row.razonSocial}`}
             onClick={(e: any) => {
               e.stopPropagation();
+              setDeleteError('');
               setActorEliminar({ id: row.id, tipo: row.tipo, razonSocial: row.razonSocial });
               setModalEliminar(true);
             }}
@@ -415,8 +306,8 @@ export const ActoresPage: React.FC = () => {
 
   return (
     <>
-      {/* Filter bar — sticky */}
-      <div className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
+      {/* Los filtros se desplazan con el contenido y no tapan las filas en móvil. */}
+      <div className="bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
         <div className="p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
           <Tabs activeTab={activeTab} onChange={(t) => { setActiveTab(t); setCurrentPage(1); }}>
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">
@@ -442,14 +333,20 @@ export const ActoresPage: React.FC = () => {
               {/* Toggle Vista */}
               <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
                 <button
+                  type="button"
+                  aria-label="Vista de lista"
+                  aria-pressed={vistaMode === 'list'}
                   onClick={() => setVistaMode('list')}
-                  className={`p-2 rounded-md transition-colors ${vistaMode === 'list' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
+                  className={`min-h-11 min-w-11 p-2 rounded-md transition-colors ${vistaMode === 'list' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
                 >
                   <List size={18} />
                 </button>
                 <button
+                  type="button"
+                  aria-label="Vista de tarjetas"
+                  aria-pressed={vistaMode === 'grid'}
                   onClick={() => setVistaMode('grid')}
-                  className={`p-2 rounded-md transition-colors ${vistaMode === 'grid' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
+                  className={`min-h-11 min-w-11 p-2 rounded-md transition-colors ${vistaMode === 'grid' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
                 >
                   <Grid3X3 size={18} />
                 </button>
@@ -461,14 +358,17 @@ export const ActoresPage: React.FC = () => {
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
               <Input
+                label="Buscar actores"
                 placeholder="Buscar por razon social o CUIT..."
+                maxLength={160}
                 value={busqueda}
                 onChange={(e) => { setBusqueda(e.target.value); setCurrentPage(1); }}
                 leftIcon={<Search size={18} />}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="w-full md:w-56">
               <Select
+                label="Estado"
                 value={filtroEstado}
                 onChange={(val) => { setFiltroEstado(val); setCurrentPage(1); }}
                 options={[
@@ -476,7 +376,7 @@ export const ActoresPage: React.FC = () => {
                   { value: 'activo', label: 'Activos' },
                   { value: 'inactivo', label: 'Inactivos' },
                 ]}
-                size="sm"
+                size="base"
               />
             </div>
           </div>
@@ -488,54 +388,29 @@ export const ActoresPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
-            {isMobile && (
-              <button
-                onClick={() => navigate(-1)}
-                className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft size={20} className="text-neutral-600" />
-              </button>
-            )}
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Gestion de Actores</h2>
-              <p className="text-neutral-600 mt-1">
+              <p className="text-neutral-600" role="status">
                 {isLoading ? (
                   <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando actores...</span>
+                ) : isError || !data ? (
+                  <>No se pudo consultar el padrón.</>
                 ) : (
-                  <>{totalCount} actores registrados</>
+                  <>{serverTotal} {serverTotal === 1 ? 'resultado' : 'resultados'}{activeTab !== 'todos' || busqueda.trim() || filtroEstado !== 'todos' ? ' con los filtros actuales' : ' en el padrón'}</>
                 )}
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-            <Button
-              variant="outline"
-              leftIcon={<Download size={18} />}
-              className="hidden sm:inline-flex"
-              onClick={() => downloadCsv(actoresData.map(a => ({
-                'Razon Social': a.razonSocial,
-                CUIT: a.cuit,
-                Tipo: tipoConfig[a.tipo as keyof typeof tipoConfig]?.label || a.tipo,
-                Email: a.email,
-                Telefono: a.telefono,
-                Domicilio: a.domicilio,
-                Estado: (a.activo !== false && a.estado !== 'inactivo') ? 'Activo' : 'Inactivo',
-              })), 'actores', { titulo: 'Gestion de Actores', periodo: 'Todos los periodos', filtros: [activeTab !== 'todos' ? `Tipo: ${activeTab}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : ''].filter(Boolean).join(', ') || 'Sin filtros', total: actoresData.length })}
-            >
-              CSV
-            </Button>
-            <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
-            {allowedActorTypes.length > 0 && <Button leftIcon={<Plus size={18} />} onClick={() => {
-              setForm({ ...INITIAL_FORM, tipo: allowedActorTypes[0] });
-              setModalCrear(true);
-            }}>
-              Nuevo Actor
-            </Button>}
-          </div>
+          <RecordListToolbar title="Actores" newLabel="Nuevo Actor" onNew={allowedActorTypes.length ? () => {
+            setCreationType(allowedActorTypes[0]); setModalCrear(true);
+          } : undefined} exports={[
+            { label: 'CSV de esta página', icon: <Download size={16} />, onClick: handleExportCsv, disabled: isLoading || isError || !actoresPaginados.length },
+            { label: 'PDF de esta página', icon: <FileDown size={16} />, onClick: handleExportPdf, disabled: isLoading || isError || !actoresPaginados.length },
+            { label: 'Imprimir esta página', icon: <Printer size={16} />, onClick: () => window.print(), disabled: isLoading || isError || !actoresPaginados.length },
+          ]} />
         </div>
 
         {/* Stats Cards */}
+        {(busqueda.trim() || filtroEstado !== 'todos') && <p className="text-sm text-neutral-600">Coincidencias por tipo para la búsqueda y el estado elegidos.</p>}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           {summaries.map(({ label, tipo, count, route, Icon, surface, symbol, ink, caption }) => {
             const navigates = Boolean(route && canManageActor(tipo!));
@@ -570,6 +445,8 @@ export const ActoresPage: React.FC = () => {
               <p className="text-neutral-500">Cargando actores...</p>
             </div>
           </Card>
+        ) : isError ? (
+          <Card className="p-4"><div role="alert" className="space-y-3"><p>No pudimos consultar el padrón. Revisá la conexión y volvé a intentar.</p><Button variant="outline" onClick={() => void directory.refetch()}>Reintentar consulta</Button></div></Card>
         ) : vistaMode === 'list' ? (
           <>
             {/* Mobile card view */}
@@ -582,7 +459,7 @@ export const ActoresPage: React.FC = () => {
               ) : actoresPaginados.map((actor) => {
                 const config = tipoConfig[actor.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
                 const Icon = config.icon;
-                const isActivo = actor.activo !== false && actor.estado !== 'inactivo';
+                const isActivo = actor.activo;
                 return (
                   <Card
                     key={`m-${actor.tipo}-${actor.id}`}
@@ -635,11 +512,9 @@ export const ActoresPage: React.FC = () => {
                 data={actoresPaginados}
                 columns={columns}
                 keyExtractor={(row) => `${row.tipo}-${row.id}`}
-                selectable
-                selectedKeys={selectedRows}
-                onSelectionChange={setSelectedRows}
                 sortable={true}
-                onSort={(key, dir) => setSortConfig({ key, direction: dir })}
+                sort={{ key: sortBy, direction: sortOrder }}
+                onSort={(key, dir) => { list.set('sortBy', key === 'actor' ? undefined : key); list.set('sortOrder', dir === 'asc' ? undefined : dir); setCurrentPage(1); }}
                 onRowClick={verDetalle}
                 stickyHeader
                 emptyMessage="No se encontraron actores"
@@ -660,9 +535,9 @@ export const ActoresPage: React.FC = () => {
             {actoresPaginados.map((actor) => {
               const config = tipoConfig[actor.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
               const Icon = config.icon;
-              const isActivo = actor.activo !== false && actor.estado !== 'inactivo';
+              const isActivo = actor.activo;
               return (
-                <Card key={`${actor.tipo}-${actor.id}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => verDetalle(actor)}>
+                <Card key={`${actor.tipo}-${actor.id}`} className="transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
@@ -703,6 +578,7 @@ export const ActoresPage: React.FC = () => {
                         aria-label={`Eliminar ${actor.razonSocial}`}
                         onClick={(e: any) => {
                           e.stopPropagation();
+                          setDeleteError('');
                           setActorEliminar({ id: actor.id, tipo: actor.tipo, razonSocial: actor.razonSocial });
                           setModalEliminar(true);
                         }}
@@ -714,7 +590,7 @@ export const ActoresPage: React.FC = () => {
                 </Card>
               );
             })}
-            {actoresFiltrados.length === 0 && (
+            {actoresPaginados.length === 0 && (
               <div className="col-span-full py-12 text-center">
                 <Users className="mx-auto text-neutral-300 mb-3" size={40} />
                 <p className="text-neutral-500">No se encontraron actores</p>
@@ -802,75 +678,40 @@ export const ActoresPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* Modal crear actor */}
+      {/* El alta usa el formulario completo de cada actividad. */}
       <Modal
         isOpen={modalCrear && allowedActorTypes.length > 0}
-        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
+        onClose={() => setModalCrear(false)}
         title="Nuevo Actor"
         size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleCrear}
-              disabled={!canManageActor(form.tipo) || createGenerador.isPending || createTransportista.isPending || createOperador.isPending}
-            >
-              {(createGenerador.isPending || createTransportista.isPending || createOperador.isPending) ? 'Guardando...' : 'Crear Actor'}
-            </Button>
-          </>
-        }
+        footer={<>
+          <Button variant="outline" onClick={() => setModalCrear(false)}>Cancelar</Button>
+          <Button onClick={handleCrear} disabled={!canManageActor(creationType)}>Continuar al formulario</Button>
+        </>}
       >
         <div className="space-y-4">
+          <p>Elegí la actividad para completar su formulario de alta.</p>
           <Select
             label="Tipo de Actor"
-            value={form.tipo}
-            onChange={(val) => { if (canManageActor(val)) updateField('tipo', val); }}
+            value={creationType}
+            onChange={(value) => { if (canManageActor(value)) setCreationType(value as ActorDirectoryType); }}
             options={[
               { value: 'generador', label: 'Generador' },
               { value: 'transportista', label: 'Transportista' },
               { value: 'operador', label: 'Operador' },
             ].filter(option => canManageActor(option.value))}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
-            <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
-            <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
-          </div>
-          <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. San Martin 1234, Mendoza" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-            <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-          </div>
-          {form.tipo === 'generador' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <Input label="N. Inscripcion" value={form.numeroInscripcion} onChange={(e) => updateField('numeroInscripcion', e.target.value)} placeholder="DGFA-2024-XXXX" />
-              <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Grandes Generadores" />
-            </div>
-          )}
-          {form.tipo === 'transportista' && (
-            <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
-          )}
-          {form.tipo === 'operador' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
-              <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
-            </div>
-          )}
         </div>
       </Modal>
 
       {/* Modal confirmar eliminar */}
       <ConfirmModal
         isOpen={Boolean(modalEliminar && actorEliminar && canManageActor(actorEliminar.tipo))}
-        onClose={() => { setModalEliminar(false); setActorEliminar(null); }}
+        onClose={() => { setModalEliminar(false); setActorEliminar(null); setDeleteError(''); }}
         onConfirm={handleEliminar}
         title="Eliminar Actor"
         description={`Esta seguro que desea eliminar a "${actorEliminar?.razonSocial}"? Esta accion no se puede deshacer.`}
+        error={deleteError}
         confirmText="Eliminar"
         variant="danger"
         isLoading={deleteGenerador.isPending || deleteTransportista.isPending || deleteOperador.isPending}

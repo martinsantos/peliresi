@@ -42,4 +42,11 @@ describe('Actor directory continuity',()=>{
   it('retains an encoded search on the same list',()=>{
     expect(actorListReturn({actorReturn:'/admin/actores/operadores?q=QA%20%26%20Uno&page=2'},'/admin/actores/operadores')).toBe('/admin/actores/operadores?q=QA%20%26%20Uno&page=2');
   });
+  it.each(['','/app','/mobile'])('returns to the filtered actor overview on %s',prefix=>{
+    const overview=prefix+'/admin/actores?q=QA&page=3&estado=inactivo';
+    expect(actorListReturn({actorReturn:overview},prefix+'/admin/actores/operadores')).toBe(overview);
+    expect(actorListReturn({actorReturn:prefix+'/actores?q=QA'},prefix+'/admin/actores/generadores')).toBe(prefix+'/actores?q=QA');
+    const wrongSurface=prefix ? '/admin/actores?q=QA' : '/app/admin/actores?q=QA';
+    expect(actorListReturn({actorReturn:wrongSurface},prefix+'/admin/actores/operadores')).toBe(prefix+'/admin/actores/operadores');
+  });
 });

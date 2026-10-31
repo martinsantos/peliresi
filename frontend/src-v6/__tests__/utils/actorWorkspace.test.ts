@@ -59,6 +59,14 @@ for (const prefix of ['', '/app', '/mobile']) describe('actor workspace on ' + (
     }
     expect(actorWorkspaceNavigation(detail + '/editar', admin, { actorDetailReturn: list + '/another?tab=fiscal' })?.backPath).toBe(detail);
   });
+  it('returns from a new actor form to its authorized overview and preserved filters', () => {
+    const overview = prefix + '/admin/actores?q=QA&page=3&estado=inactivo';
+    const form = prefix + '/admin/actores/generadores/nuevo';
+    const nav = actorWorkspaceNavigation(form, admin, { actorReturn: overview })!;
+    expect(nav.backPath).toBe(overview);
+    expect(nav.backLabel).toBe('Volver a Actores');
+    expect(nav.sectionPath).toBe('/admin/actores');
+  });
   it('does not inherit an origin that belongs to a previous role or site', () => {
     const user = { id: 'qa', rol: 'GENERADOR', actorId: 'qa' } as User;
     const path = prefix + '/admin/actores/generadores/qa';

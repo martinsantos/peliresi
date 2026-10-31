@@ -8,10 +8,21 @@ import { useQueryOwner } from './useQueryOwner';
 
 import { useQuery } from '@tanstack/react-query';
 import { actoresService } from '../services/actores.service';
+import type { ActorDirectoryFilters } from '../services/actores.service';
 
 export * from './useGeneradores';
 export * from './useTransportistas';
 export * from './useOperadores';
+
+export function useActorDirectory(filters: ActorDirectoryFilters) {
+  const owner = useQueryOwner();
+  return useQuery({
+    queryKey: ['actor-directory', filters, owner] as const,
+    queryFn: () => actoresService.listDirectory(filters),
+    staleTime: 0,
+    enabled: Boolean(owner),
+  });
+}
 
 // Historial de cambios (shared across actor types)
 export function useHistorialActor(tipo: string, id: string, filters?: { anio?: number; modulo?: string; page?: number; limit?: number }) {
