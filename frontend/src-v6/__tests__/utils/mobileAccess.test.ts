@@ -22,13 +22,13 @@ function user(rol: UserRole, esInspector = false): User {
 describe('canAccessMobilePath', () => {
   it.each(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'AUDITOR'] as const)(
     'offers %s only installed-app shortcuts available to every active role', role => {
-      expect(appManifest.shortcuts.map(shortcut => shortcut.name)).toEqual(['Inicio', 'Escanear QR', 'Avisos']);
       for (const shortcut of appManifest.shortcuts) {
         const target = new URL(shortcut.url, 'https://sitrep.example.invalid');
         expect(target.origin).toBe('https://sitrep.example.invalid');
         expect(target.pathname).toMatch(/^\/app\//);
         expect(canAccessMobilePath(user(role), target.pathname)).toBe(true);
       }
+      expect(appManifest.shortcuts.map(shortcut => shortcut.name)).toEqual(['Inicio', 'Escanear QR', 'Avisos']);
     },
   );
   it.each(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] as const)('%s can open the application list and review route already granted by web/backend', role => {
