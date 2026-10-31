@@ -231,6 +231,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     const guidance=publication.getByText(/completá el tratamiento de cada corriente hallada/);
     await expect(guidance).toBeVisible();await expect(guidance).toBeInViewport();await unobscuredInContent(guidance);
     const review=publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true});
+    await expect(review).toHaveCSS('border-top-width','1px');
     await expect(review).toBeInViewport();await unobscuredInContent(review);await unobscuredInContent(publish);
     await unobscuredInContent(publication.getByRole('button',{name:'Cerrar formulario',exact:true}));
     await review.focus();await op.keyboard.press('Enter');await expect(decision).toBeFocused();
@@ -256,8 +257,10 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     const guidance=publication.getByText(/mayores que cero/);
     await expect(guidance).toBeInViewport();await unobscuredInContent(guidance);await unobscuredInContent(publish);
     await unobscuredInContent(publication.getByRole('button',{name:'Cerrar formulario',exact:true}));
+    const review=publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true});
+    await expect(review).toHaveCSS('border-top-width','1px');
     await proof(op,info,'partial-finding-incomplete');
-    await publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true}).click();
+    await review.click();
     await expect(findingAmount).toBeFocused();await findingAmount.fill('');await signCertificate();await expect(publish).toBeEnabled();
    }else await signCertificate();
    const record=await post(op,'/'+m.id+'/certificados',()=>region.getByRole('button',{name:'Firmar y publicar certificación',exact:true}).click(),201);
