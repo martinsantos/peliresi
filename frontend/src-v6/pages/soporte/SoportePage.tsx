@@ -107,7 +107,6 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
   const query = useQueryClient();
   const [error, setError] = useState('');
   const journal = useSupportCommand({ userId: owner, context, ticketId: ticket.id });
-  const [automaticRefresh, setAutomaticRefresh] = useState<'idle' | 'loading' | 'done' | 'failed'>('idle');
   const changed = useCallback(async (minimumVersion?: number) => {
     assertSupportSession(owner);
     const requestContext = supportRequestContext();
@@ -124,14 +123,17 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
   const confirmedVersion = confirmation?.receipt?.version;
   const unverified = !!confirmation && (!confirmation.receipt || confirmation.receipt.id !== ticket.id
     || !Number.isSafeInteger(confirmedVersion) || ticket.version < confirmation.receipt.version);
-  useEffect(() => {
-    if (!confirmedKey || journal.busy) return;
-    let live = true;
-    setAutomaticRefresh('loading');
-    const operation = Number.isSafeInteger(confirmedVersion) ? changed(confirmedVersion) : Promise.reject(new Error('Confirmación incompleta'));
-    void operation.then(() => { if (live) setAutomaticRefresh('done'); }, () => { if (live) setAutomaticRefresh('failed'); });
-    return () => { live = false; };
-  }, [changed, confirmedKey, confirmedVersion, journal.busy]);
+  const automaticRefresh = useQuery({
+    queryKey: ['support-confirmation-refresh', owner, context, ticket.id, confirmedKey, confirmedVersion],
+    enabled: !!confirmation && !journal.busy, retry: false, staleTime: Infinity,
+    refetchOnWindowFocus: false, refetchOnReconnect: false,
+    queryFn: async () => {
+      if (!confirmation?.receipt || confirmation.receipt.id !== ticket.id || !Number.isSafeInteger(confirmedVersion)) throw new Error('Confirmación incompleta');
+      await changed(confirmedVersion);
+      return true;
+    },
+  });
+  const refreshing = !!confirmation && (automaticRefresh.isFetching || (automaticRefresh.isPending && !automaticRefresh.isError));
   const download = async (file: { id: string; nombre: string }) => {
     try {
       assertSupportSession(owner);
@@ -142,7 +144,7 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
     } catch (failure) { setError(supportError(failure)); }
   };
   return <article className="space-y-5">
-    {unverified && <p role={automaticRefresh === 'failed' ? 'alert' : 'status'} className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900">{automaticRefresh === 'failed' ? 'No pudimos actualizar el ticket. La acción sigue confirmada; reintentá para ver sus datos actuales.' : 'Acción confirmada. Actualizando el ticket…'}</p>}
+    {unverified && <p role={automaticRefresh.isError ? 'alert' : 'status'} className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900">{automaticRefresh.isError ? 'No pudimos actualizar el ticket. La acción sigue confirmada; reintentá para ver sus datos actuales.' : 'Acción confirmada. Actualizando el ticket…'}</p>}
     <header className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2"><span className="font-mono font-semibold text-primary-800">{ticket.referencia}</span>{unverified ? <span className="text-sm text-neutral-700">Pendiente de actualización</span> : <State ticket={ticket} />}</div>
       <h3 className="break-words text-xl font-bold text-neutral-900">{ticket.asunto}</h3>
@@ -153,7 +155,7 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
       {ticket.esAutor && <Link to={mp('/notificaciones')} className="inline-flex min-h-11 items-center gap-2 text-sm text-primary-800 hover:underline"><Bell size={16} />Las respuestas llegan a tus avisos</Link>}
       {ticket.contexto.ruta && <p className="text-sm text-neutral-600">Pantalla del reporte: <code className="[overflow-wrap:anywhere]">{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? <> · <span className="whitespace-nowrap">{ticket.contexto.ancho} × {ticket.contexto.alto}</span></> : null}</p>}
     </header>
-    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={automaticRefresh === 'loading'} />}
+    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} />}
     <section aria-label="Conversación" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <h4 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">Conversación</h4>
       <ol className="divide-y divide-neutral-200">{ticket.mensajes.map(message => <li key={message.id} className={'p-4 ' + (message.interno ? 'border-l-4 border-warning-600 bg-warning-50' : '')}>
@@ -165,7 +167,7 @@ function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTick
           <Button variant="outline" className="max-w-full [overflow-wrap:anywhere]" onClick={() => void download(file)} leftIcon={<Download size={16} />}>{file.nombre} · {(file.bytes / 1024).toFixed(0)} KB</Button></li>)}</ul>}
       </li>)}</ol>
     </section>
-    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={automaticRefresh === 'loading'} />}
+    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} />}
     {error && <p role="alert" className="text-error-700">{error}</p>}
     <details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Historial del ticket</summary>
       <ol className="mt-3 space-y-3 text-sm text-neutral-700"><li>Creado · {date(ticket.createdAt)}</li>{ticket.eventos.map(event => <li key={event.id}>

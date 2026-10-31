@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supportService } from '../services/support.service';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import { claimSupportCommand, confirmSupportCommand, rejectSupportCommand, loadSupportCommand, releaseSupportCommand, supportCommandKey,
@@ -17,15 +17,15 @@ export function useSupportCommand(scope: SupportCommandScope) {
   const requestContext = useRef(supportRequestContext());
   const active = () => alive.current && supportSessionMatches(scope.userId) && !!requestContext.current && requestContext.current === supportRequestContext();
   const announce = () => channel.current?.postMessage('changed');
-  const reload = async () => {
+  const reload = useCallback(async () => {
     if (inFlight.current) return;
     const read = ++generation.current;
     try {
-      const saved = await loadSupportCommand(scope);
-      if (!active() || read !== generation.current) return;
+      const saved = await loadSupportCommand({ userId: scope.userId, context: scope.context, ticketId: scope.ticketId });
+      if (!alive.current || !supportSessionMatches(scope.userId) || !requestContext.current || requestContext.current !== supportRequestContext() || read !== generation.current) return;
       setCommand(saved); setReady(true); setError('');
-    } catch (failure) { if (active() && read === generation.current) { setReady(false); setError(message(failure)); } }
-  };
+    } catch (failure) { if (alive.current && supportSessionMatches(scope.userId) && requestContext.current && requestContext.current === supportRequestContext() && read === generation.current) { setReady(false); setError(message(failure)); } }
+  }, [scope.userId, scope.context, scope.ticketId]);
   useEffect(() => {
     alive.current = true; void reload();
     const focus = () => void reload();
@@ -35,7 +35,7 @@ export function useSupportCommand(scope: SupportCommandScope) {
     }
     window.addEventListener('focus', focus);
     return () => { alive.current = false; generation.current += 1; channel.current?.close(); channel.current = null; window.removeEventListener('focus', focus); };
-  }, [key]);
+  }, [key, reload]);
   const run = async (proposed?: SupportCommandInput) => {
     if (inFlight.current || !ready || !active()) return;
     inFlight.current = true; generation.current += 1; setBusy(true); setError('');
