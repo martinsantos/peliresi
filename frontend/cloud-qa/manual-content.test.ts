@@ -676,3 +676,13 @@ test('an individual approval notice is an event and the current state is in the 
   assert.match(text, /El aviso registra una decisión/);
   assert.match(text, /abrí el manifiesto para consultar las aprobaciones y el próximo paso actuales/);
 });
+
+test('directory describes mail suppression and scheduled operation reminders without promising delivery', () => {
+  const section = read('directorio.html').split('<section id="mod-emails"')[1].split('</section>')[0];
+  assert.match(section, /Los correos suprimidos no se reactivan automáticamente/);
+  assert.match(section, /fecha de activación explícita/);
+  assert.match(section, /aceptación por SMTP, no entrega ni lectura/);
+  assert.match(section, /tres partes activas y representantes autorizados/);
+  assert.match(section, /sin retiro, traslado ni GPS/);
+  assert.doesNotMatch(section, /garantiza que ningun email se pierda|los emails pendientes se procesan en el proximo ciclo/);
+});
