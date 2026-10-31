@@ -736,7 +736,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <ol>
 <li>Ingresar a <a href="/" data-installation-url="/">/ (esta instalación)</a> con credenciales de administrador.</li>
 <li>El <strong>Dashboard</strong> muestra KPIs principales: manifiestos activos, en transito, completados, alertas pendientes.</li>
-<li>Navegar a <strong>Centro de Control</strong> para ver el mapa de transportes activos en tiempo real.</li>
+<li>Consultar <strong>Monitor</strong> o <strong>Centro de Control</strong> para ver los viajes y la última posición recibida, con su antigüedad.</li>
 <li>Consultar <strong>Reportes</strong> con 8 pestanas de analisis (manifiestos, residuos, transporte, generadores, operadores, tratamientos, departamentos, mapa de actores).</li>
 <li>Gestionar actores desde <strong>Admin &gt; Actores</strong> (generadores, transportistas, operadores).</li>
 <li>Configurar reglas de alerta desde <strong>Alertas</strong>.</li>
@@ -746,8 +746,8 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <h4>Consejos para el Administrador</h4>
 <div class="info-card role-card-admin">
 <ul>
-<li><strong>Centro de Control como monitor principal:</strong> Mantener el Centro de Control abierto en una pantalla dedicada para supervision continua. El auto-refresco de 30 segundos mantiene los datos actualizados sin intervencion.</li>
-<li><strong>Alertas proactivas:</strong> Configurar reglas de alerta para diferencias de peso mayores al 10%, viajes que excedan el tiempo estimado, y manifiestos estancados en un estado por mas de 48 horas.</li>
+<li><strong>Supervisión de viajes:</strong> Revisar en Monitor la última posición recibida y su antigüedad. Una posición anterior no garantiza que el teléfono siga conectado ni que el vehículo continúe allí.</li>
+<li><strong>Alertas proactivas:</strong> Ambiente define y activa las condiciones y destinatarios que necesita. Un umbral operativo no establece por sí solo un plazo obligatorio ni una infracción.</li>
 <li><strong>Reportes periodicos:</strong> Utilizar el preset "Ultimos 30 dias" para generar informes mensuales. Exportar a CSV para analisis avanzado en planillas de calculo.</li>
 <li><strong>Auditoria regular:</strong> Revisar periodicamente el log de auditoria filtrando por acciones criticas (eliminacion, cambio de rol, cancelacion de manifiestos).</li>
 <li><strong>Carga masiva inicial:</strong> Al incorporar nuevos actores al sistema, utilizar la herramienta de carga masiva con la plantilla CSV descargable para evitar errores de carga manual.</li>
@@ -5274,33 +5274,17 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </ol>
 
 <h3 id="proc-alertas">10.5 Procedimiento: Configuracion de Reglas de Alerta</h3>
-<p>Guia para configurar reglas de alerta efectivas:</p>
+<p>Administración puede definir reglas y revisar sus casos y avisos internos. Las condiciones y los destinatarios dependen del tipo elegido.</p>
 <ol>
 <li>Acceder a Alertas desde el menu principal.</li>
-<li>Hacer clic en &quot;Nueva Regla de Alerta&quot;.</li>
-<li>Completar los campos de la regla:
-  <ul>
-    <li><strong>Nombre:</strong> Identificador descriptivo (ej: &quot;Diferencia de peso mayor al 10%&quot;).</li>
-    <li><strong>Evento disparador:</strong> Seleccionar el tipo de evento que activa la evaluacion.</li>
-    <li><strong>Condicion:</strong> Definir la expresion que debe cumplirse.</li>
-    <li><strong>Destinatarios:</strong> Seleccionar roles o usuarios especificos que recibiran la alerta.</li>
-  </ul>
-</li>
-<li>Activar la regla con el interruptor.</li>
-<li>Guardar. La regla comenzara a evaluarse inmediatamente.</li>
+<li>Elegir <strong>Nueva Regla</strong>, el tipo de regla y un nombre. Para una regla de evento, seleccionar además el evento y la condición.</li>
+<li>Para <strong>Duración del viaje</strong>, ingresar en <strong>Avisar a partir de (horas)</strong> el umbral operativo decidido por Ambiente. No hay un plazo fijo obligatorio definido por esta pantalla.</li>
+<li>Para seguimiento de tratamiento o cierre, requerimientos sin respuesta y vigencias documentales, completar los datos solicitados y usar <strong>Simular sin enviar</strong> para ver coincidencias sin crear casos ni avisos.</li>
+<li>Elegir los destinatarios permitidos para el actor involucrado, el inspector asignado o la administración correspondiente. Revisar <strong>Regla activa</strong> y pulsar <strong>Crear regla</strong>. La evaluación depende del evento o del horario del proceso.</li>
 </ol>
 
-<h4>Reglas de Alerta Recomendadas</h4>
-<table>
-<thead><tr><th>Regla</th><th>Evento</th><th>Condicion</th><th>Destinatarios</th></tr></thead>
-<tbody>
-<tr><td>Diferencia de peso significativa</td><td>Recepcion de manifiesto</td><td>Diferencia mayor al 10% entre declarado y recibido</td><td>ADMIN</td></tr>
-<tr><td>Viaje excede tiempo estimado</td><td>GPS update</td><td>Tiempo transcurrido mayor a 8 horas desde retiro</td><td>ADMIN, GENERADOR</td></tr>
-<tr><td>Manifiesto estancado</td><td>Temporizador diario</td><td>Manifiesto sin cambio de estado por mas de 48 horas</td><td>ADMIN</td></tr>
-<tr><td>Anomalia GPS detectada</td><td>Deteccion de anomalia</td><td>Desvio de ruta mayor a 20km o velocidad mayor a 120 km/h</td><td>ADMIN</td></tr>
-<tr><td>Habilitacion proxima a vencer</td><td>Temporizador semanal</td><td>Habilitacion de vehiculo o transportista vence en menos de 30 dias</td><td>ADMIN, TRANSPORTISTA</td></tr>
-</tbody>
-</table>
+<p>La duración se revisa al recibir GPS y aproximadamente cada cinco minutos mientras funciona el servicio; una regla que sigue cumplida puede volver a avisar después de 30 minutos. El seguimiento de tratamiento se evalúa diariamente a las 08:00 de Mendoza. Estas referencias son operativas.</p>
+<p>La opción <strong>Desvío de Ruta</strong> no compara actualmente una ruta autorizada ni se activa con el seguimiento GPS actual. Revisar las observaciones de corredor geográfico en <strong>Anomalía GPS</strong>. La entrega por correo o push depende de su configuración y habilitación; una regla no las activa por sí sola.</p>
 </section>
 
 <section id="contacto" data-role="all">
