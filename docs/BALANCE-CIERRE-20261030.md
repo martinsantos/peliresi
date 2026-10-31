@@ -67,6 +67,8 @@ UX253 distingue en la campana las respuestas, solicitudes, cierres y reaperturas
 
 UX254 actualiza automáticamente el ticket después de una acción confirmada y conserva el recibo cuando la lectura falla o devuelve una versión anterior. En ese caso oculta los datos que podrían estar desactualizados y ofrece reintentar sin repetir el envío. La caché y los borradores se separan por cuenta y actividad; si se revoca el acceso, la ficha deja de mostrar el ticket. Pasaron seis pruebas de navegador en escritorio, web móvil y app para actualización y cambio de rol, y dos recorridos adicionales de atención de soporte y avisos en escritorio y app. También pasaron 74 pruebas dirigidas, 49 de manual y resguardos, tipos y lint estricto. Se comprobó la posición del mensaje y el reintento en capturas de escritorio y móvil. Estos ensayos no sustituyen la regresión integrada, la prueba en Android ni la observación con personas.
 
+**UX255, pendiente de prueba:** durante la regresión de `ce2eb1cb` se observó que una certificación final bloqueada por un hallazgo parcialmente tratado puede dejar la explicación lejos del botón. `407cffd9` prepara una explicación junto a la publicación y un regreso al primer dato pendiente, también para cantidades inválidas en parciales. Todavía no se han ejecutado las pruebas de esa corrección; no se considera validada ni publicada.
+
 ## Qué impide declarar terminado el objetivo
 
 1. **Aprobaciones anteriores.** No se conoce el impacto de exigir tres decisiones sobre los manifiestos existentes. El usuario indicó no consultar datos reales, ni siquiera agregados; la auditoría preparada queda restringida al preview artificial.
