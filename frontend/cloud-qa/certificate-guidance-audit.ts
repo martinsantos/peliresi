@@ -82,10 +82,18 @@ const dirs = readdirSync(path.join(out, 'manifest-complete'), { withFileTypes: t
   .map(entry => path.join(out, 'manifest-complete', entry.name));
 const proofs = dirs.map(dir => path.join(dir, 'complete-lifecycle.json')).filter(existsSync).map(file => JSON.parse(readFileSync(file, 'utf8')));
 assert.deepEqual(proofs.map(proof => proof.surface).sort(), ['app', 'web-desktop']);
-for (const dir of dirs.filter(dir => existsSync(path.join(dir, 'complete-lifecycle.json')))) {
+const proofDirs = dirs.filter(dir => existsSync(path.join(dir, 'complete-lifecycle.json')));
+for (const dir of proofDirs) {
   assert.ok(existsSync(path.join(dir, 'partial-finding-incomplete.png')));
   assert.ok(existsSync(path.join(dir, 'final-finding-incomplete.png')));
 }
+const consoleFiles = proofDirs.flatMap(dir => readdirSync(dir).filter(file => /^console-\d+\.json$/.test(file)).map(file => path.join(dir, file)));
+assert.equal(consoleFiles.length, 6);
+const consoleEvents = consoleFiles.flatMap(file => JSON.parse(readFileSync(file, 'utf8')).events as Array<{ type: string; text: string }>);
+const expectedHttp = consoleEvents.filter(event => event.type === 'http-409' && /^POST \/api\/manifiestos\/[^/]+\/certificados$/.test(event.text));
+const expectedConsole = consoleEvents.filter(event => event.type === 'error' && event.text.includes('409 (Conflict)'));
+const unexpected = consoleEvents.filter(event => !expectedHttp.includes(event) && !expectedConsole.includes(event));
+assert.equal(expectedHttp.length, 2); assert.equal(expectedConsole.length, 2); assert.deepEqual(unexpected, []);
 const help = readFileSync(path.join(root, 'docs/manual/help-data.js'));
 const response = await fetch('http://127.0.0.1:4177/manual/help-data.js');
 assert.equal(response.status, 200); assert.equal(hash(Buffer.from(await response.arrayBuffer())), hash(help));
@@ -104,7 +112,8 @@ try {
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, previousIntegratedCommit: prior.productCommit,
     previousIntegratedBrowserTests: prior.browserTests, browserTests: 2, unitTests: unit.numPassedTests,
-    manualTests: manualCount, manualSha256: hash(help), baselineReproduced: true,
+    manualTests: manualCount, manualSha256: hash(help), baselineReproduced: true, consoleFiles: consoleFiles.length,
+    expectedBlockedRequests: expectedHttp.length, unexpectedConsoleEvents: unexpected.length,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false };
   writeFileSync(path.join(out, 'certificate-guidance-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(result));
