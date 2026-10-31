@@ -1,4 +1,4 @@
-import {test,expect,devices,type Page,type TestInfo} from '@playwright/test';
+import {test,expect,devices,type Locator,type Page,type TestInfo} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {login,prefix,readablePageHeading,isolatedMapTiles} from './helpers';
@@ -16,6 +16,15 @@ async function proof(page:Page,info:TestInfo,name:string){
  await expect(page.getByText('Capacitación · sin validez oficial',{exact:false})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
  await readablePageHeading(page);await page.screenshot({path:info.outputPath(name+'.png'),animations:'disabled'});
+}
+async function unobscuredInContent(target:Locator){
+ const result=await target.evaluate(element=>{
+  const main=element.closest('main'),box=element.getBoundingClientRect(),area=main?.getBoundingClientRect();
+  const hit=document.elementFromPoint((box.left+box.right)/2,(box.top+box.bottom)/2);
+  return {inside:!!area&&box.top>=area.top-1&&box.bottom<=area.bottom+1,
+   unobscured:!!hit&&(hit===element||element.contains(hit))};
+ });
+ expect(result).toEqual({inside:true,unobscured:true});
 }
 // This row was just created through the UI. Mark it artificial only after
 // verifying that every participant belongs to the isolated QA fixture.
@@ -220,9 +229,11 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     await decision.selectOption('no');await signCertificate();await expect(publish).toBeDisabled();
     await publication.scrollIntoViewIfNeeded();
     const guidance=publication.getByText(/completá el tratamiento de cada corriente hallada/);
-    await expect(guidance).toBeVisible();await expect(guidance).toBeInViewport();
+    await expect(guidance).toBeVisible();await expect(guidance).toBeInViewport();await unobscuredInContent(guidance);
     const review=publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true});
-    await expect(review).toBeInViewport();await review.focus();await op.keyboard.press('Enter');await expect(decision).toBeFocused();
+    await expect(review).toBeInViewport();await unobscuredInContent(review);await unobscuredInContent(publish);
+    await unobscuredInContent(publication.getByRole('button',{name:'Cerrar formulario',exact:true}));
+    await review.focus();await op.keyboard.press('Enter');await expect(decision).toBeFocused();
     await decision.selectOption('si');
     const findingAmount=region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true});
     await findingAmount.fill('0.5');await signCertificate();await expect(publish).toBeDisabled();await publication.scrollIntoViewIfNeeded();
@@ -242,7 +253,9 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
     const publish=publication.getByRole('button',{name:'Firmar y publicar certificación',exact:true});
     await findingAmount.fill('2');await signCertificate();await expect(publish).toBeDisabled();
     await publication.scrollIntoViewIfNeeded();
-    await expect(publication.getByText(/mayores que cero/)).toBeInViewport();
+    const guidance=publication.getByText(/mayores que cero/);
+    await expect(guidance).toBeInViewport();await unobscuredInContent(guidance);await unobscuredInContent(publish);
+    await unobscuredInContent(publication.getByRole('button',{name:'Cerrar formulario',exact:true}));
     await proof(op,info,'partial-finding-incomplete');
     await publication.getByRole('button',{name:'Revisar corrientes halladas',exact:true}).click();
     await expect(findingAmount).toBeFocused();await findingAmount.fill('');await signCertificate();await expect(publish).toBeEnabled();
