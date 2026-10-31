@@ -56,6 +56,9 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
     });
     for (const row of batch) {
       try { await prisma.$transaction(async tx => {
+        // Prisma's transaction timeout does not itself cancel a PostgreSQL lock wait.
+        // Limit this transaction's wait so a busy row cannot stall later manifests.
+        await tx.$queryRaw`SELECT set_config('lock_timeout', '1s', true)`;
         // Serialize the last state/demo check with concurrent workflow changes.
         const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM manifiestos WHERE id = ${row.id} FOR UPDATE`;
         if (!locked.length) return;
