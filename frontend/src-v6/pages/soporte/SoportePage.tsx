@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, LifeBuoy, Download, UserRoundCheck, LockKeyhole, Search, MessageSquare, ArrowRightLeft, MessageCircleQuestion, CircleCheck, RotateCcw, Tags, Bell } from 'lucide-react';
@@ -10,7 +10,7 @@ import { Select } from '../../components/ui/Select';
 import { SupportEntry } from '../../components/SupportReportDialog';
 import { supportService, supportError } from '../../services/support.service';
 import { supportStates, supportCategories, supportTypes, supportPriorities, supportFileAccept, type SupportAction, type SupportTicket, type SupportType, type SupportPriority, type SupportCategory } from '../../types/support';
-import { assertSupportSession, supportSessionMatches } from '../../utils/supportSession';
+import { assertSupportSession, supportRequestContext, SupportSessionChangedError, supportSessionMatches } from '../../utils/supportSession';
 import { SupportAudioInput } from '../../components/SupportAudioInput';
 import { SupportAudioPlayer } from '../../components/SupportAudioPlayer';
 import { useSupportCommand } from '../../hooks/useSupportCommand';
@@ -31,9 +31,10 @@ export default function SoportePage() {
   const { currentUser } = useAuth();
   const { id } = useParams();
   // A session change must not reuse another user's ticket query or draft.
-  return currentUser ? <SupportWorkspace key={inspectionWorkspaceOwner(currentUser)} owner={String(currentUser.id)} id={id} /> : null;
+  const context = inspectionWorkspaceOwner(currentUser);
+  return currentUser ? <SupportWorkspace key={context} owner={String(currentUser.id)} context={context} id={id} /> : null;
 }
-function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
+function SupportWorkspace({ owner, context, id }: { owner: string; context: string; id?: string }) {
   const mp = useMobilePrefix();
   const [scope, setScope] = useState<string | null>(null);
   const [state, setState] = useState('');
@@ -41,12 +42,14 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [triageFilters, setTriageFilters] = useState({ categoria: '', tipo: '', prioridad: '', clasificado: '' });
-  const access = useQuery({ queryKey: ['soporte', owner, 'acceso'], queryFn: supportService.access, retry: false });
+  const access = useQuery({ queryKey: ['soporte', owner, context, 'acceso'], queryFn: supportService.access, retry: false });
   const selectedScope = scope || (access.data?.puedeGestionar ? 'mesa' : 'mis');
-  const list = useQuery({ queryKey: ['soporte', owner, 'lista', selectedScope, state, appliedSearch, page, triageFilters], enabled: !id && access.isSuccess,
+  const list = useQuery({ queryKey: ['soporte', owner, context, 'lista', selectedScope, state, appliedSearch, page, triageFilters], enabled: !id && access.isSuccess,
     queryFn: () => supportService.list({ scope: selectedScope, estado: state || undefined, search: appliedSearch, page, ...triageFilters }), retry: false, refetchInterval: 30000 });
-  const detail = useQuery({ queryKey: ['soporte', owner, 'ticket', id], enabled: !!id, queryFn: () => supportService.get(id!), retry: false, refetchInterval: 30000 });
+  const detail = useQuery({ queryKey: ['soporte', owner, context, 'ticket', id], enabled: !!id, queryFn: () => supportService.get(id!), retry: false, refetchInterval: 30000 });
   const [teamOpen, setTeamOpen] = useState(false);
+  const detailStatus = (detail.error as { response?: { status?: number } } | null)?.response?.status;
+  const accessLost = [401, 403, 404].includes(detailStatus ?? 0);
   return <section aria-label="Soporte de SITREP" className="min-w-0 space-y-5 pb-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><h2 className="flex items-center gap-2 text-2xl font-bold text-neutral-900"><LifeBuoy size={24} className="shrink-0 text-primary-800" />Soporte</h2>
@@ -56,8 +59,9 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
     {access.isError && <p role="alert" className="text-error-700">{supportError(access.error)} <Button variant="outline" onClick={() => void access.refetch()}>Reintentar acceso</Button></p>}
     {id ? <>
       <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-primary-800 hover:bg-primary-50 focus-visible:outline-primary-700" to={mp('/soporte')}><ArrowLeft size={18} />Volver a tickets</Link>
-      {detail.isPending ? <p role="status">Cargando ticket…</p> : detail.isError ? <div role="alert" className="space-y-3 text-error-700"><p>{supportError(detail.error)}</p><Button variant="outline" onClick={() => void detail.refetch()}>Reintentar ticket</Button></div>
-        : <TicketDetail key={detail.data.id} ticket={detail.data} owner={owner} refresh={() => detail.refetch()} />}
+      {detail.isPending && !detail.data ? <p role="status">Cargando ticket…</p> : detail.isError && (!detail.data || accessLost) ? <div role="alert" className="space-y-3 text-error-700"><p>{supportError(detail.error)}</p><Button variant="outline" onClick={() => void detail.refetch()}>Reintentar ticket</Button></div>
+        : detail.data ? <>{detail.isError && <p role="alert" className="text-warning-800">La lectura más reciente falló. Se muestra la última consulta disponible.</p>}
+          <TicketDetail key={detail.data.id} ticket={detail.data} owner={owner} context={context} refresh={detail.refetch} /></> : null}
     </> : <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div role="group" aria-label="Vistas de soporte" className="flex flex-wrap gap-1">
@@ -66,7 +70,7 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
         </div>
         {access.data?.puedeConfigurar && <Button variant="outline" aria-expanded={teamOpen} onClick={() => setTeamOpen(value => !value)}>Equipo de soporte</Button>}
       </div>
-      {teamOpen && access.data?.puedeConfigurar && <TeamSettings owner={owner} />}
+      {teamOpen && access.data?.puedeConfigurar && <TeamSettings owner={owner} context={context} />}
       <form onSubmit={event => { event.preventDefault(); setAppliedSearch(search); setPage(1); }} className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_14rem_auto] md:items-end">
         <Input label="Buscar por número o asunto" maxLength={180} value={search} onChange={event => setSearch(event.target.value)} />
         <Select label="Estado del ticket" value={state} onChange={value => { setState(value); setPage(1); }} options={[{ value: '', label: 'Todos los estados' }, ...Object.entries(supportStates).map(([value, label]) => ({ value, label }))]} />
@@ -97,15 +101,37 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
     </>}
   </section>;
 }
-function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner: string; refresh: () => Promise<unknown> }) {
+type SupportRefresh = () => Promise<{ data: SupportTicket | undefined; isError: boolean }>;
+function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTicket; owner: string; context: string; refresh: SupportRefresh }) {
   const mp = useMobilePrefix();
   const query = useQueryClient();
   const [error, setError] = useState('');
-  const changed = async () => {
-    if (!supportSessionMatches(owner)) return;
-    await query.invalidateQueries({ queryKey: ['soporte', owner] });
-    if (supportSessionMatches(owner)) await refresh();
-  };
+  const journal = useSupportCommand({ userId: owner, context, ticketId: ticket.id });
+  const [automaticRefresh, setAutomaticRefresh] = useState<'idle' | 'loading' | 'done' | 'failed'>('idle');
+  const changed = useCallback(async (minimumVersion?: number) => {
+    assertSupportSession(owner);
+    const requestContext = supportRequestContext();
+    if (!requestContext) throw new SupportSessionChangedError();
+    await query.invalidateQueries({ queryKey: ['soporte', owner, context], refetchType: 'none' });
+    if (!supportSessionMatches(owner) || requestContext !== supportRequestContext()) throw new SupportSessionChangedError();
+    const result = await refresh();
+    if (!supportSessionMatches(owner) || requestContext !== supportRequestContext()) throw new SupportSessionChangedError();
+    if (result.isError || !result.data || result.data.id !== ticket.id) throw new Error('No pudimos actualizar el ticket. Conservamos el resultado; reintentá.');
+    if (minimumVersion !== undefined && result.data.version < minimumVersion) throw new Error('El ticket todavía no refleja la acción confirmada. Conservamos el resultado; reintentá.');
+  }, [context, owner, query, refresh, ticket.id]);
+  const confirmation = journal.command?.status === 'confirmed' ? journal.command : null;
+  const confirmedKey = confirmation?.key;
+  const confirmedVersion = confirmation?.receipt?.version;
+  const unverified = !!confirmation && (!confirmation.receipt || confirmation.receipt.id !== ticket.id
+    || !Number.isSafeInteger(confirmedVersion) || ticket.version < confirmation.receipt.version);
+  useEffect(() => {
+    if (!confirmedKey || journal.busy) return;
+    let live = true;
+    setAutomaticRefresh('loading');
+    const operation = Number.isSafeInteger(confirmedVersion) ? changed(confirmedVersion) : Promise.reject(new Error('Confirmación incompleta'));
+    void operation.then(() => { if (live) setAutomaticRefresh('done'); }, () => { if (live) setAutomaticRefresh('failed'); });
+    return () => { live = false; };
+  }, [changed, confirmedKey, confirmedVersion, journal.busy]);
   const download = async (file: { id: string; nombre: string }) => {
     try {
       assertSupportSession(owner);
@@ -116,17 +142,18 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
     } catch (failure) { setError(supportError(failure)); }
   };
   return <article className="space-y-5">
+    {unverified && <p role={automaticRefresh === 'failed' ? 'alert' : 'status'} className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900">{automaticRefresh === 'failed' ? 'No pudimos actualizar el ticket. La acción sigue confirmada; reintentá para ver sus datos actuales.' : 'Acción confirmada. Actualizando el ticket…'}</p>}
     <header className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap items-center gap-2"><span className="font-mono font-semibold text-primary-800">{ticket.referencia}</span><State ticket={ticket} /></div>
+      <div className="flex flex-wrap items-center gap-2"><span className="font-mono font-semibold text-primary-800">{ticket.referencia}</span>{unverified ? <span className="text-sm text-neutral-700">Pendiente de actualización</span> : <State ticket={ticket} />}</div>
       <h3 className="break-words text-xl font-bold text-neutral-900">{ticket.asunto}</h3>
       <dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-neutral-600">Reportado por</dt><dd className="font-medium text-neutral-900">{name(ticket.autor)}</dd></div>
-        <div><dt className="text-neutral-600">Responsable</dt><dd className="font-medium text-neutral-900">{ticket.responsable ? name(ticket.responsable) : 'Pendiente de asignación'}</dd></div></dl>
+        <div><dt className="text-neutral-600">Responsable</dt><dd className="font-medium text-neutral-900">{unverified ? 'Pendiente de actualización' : ticket.responsable ? name(ticket.responsable) : 'Pendiente de asignación'}</dd></div></dl>
       {ticket.registradoPor && <p className="text-sm text-neutral-700">Registrado por {name(ticket.registradoPor)} en nombre de {name(ticket.autor)}.</p>}
       <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-700"><Tags size={16} className="shrink-0" />{ticket.tipo ? `${supportCategories[ticket.categoria]} · ${supportTypes[ticket.tipo]} · Prioridad ${supportPriorities[ticket.prioridad]}` : 'Pendiente de triaje'}</p>
       {ticket.esAutor && <Link to={mp('/notificaciones')} className="inline-flex min-h-11 items-center gap-2 text-sm text-primary-800 hover:underline"><Bell size={16} />Las respuestas llegan a tus avisos</Link>}
       {ticket.contexto.ruta && <p className="text-sm text-neutral-600">Pantalla del reporte: <code className="[overflow-wrap:anywhere]">{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? <> · <span className="whitespace-nowrap">{ticket.contexto.ancho} × {ticket.contexto.alto}</span></> : null}</p>}
     </header>
-    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} changed={changed} />}
+    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={automaticRefresh === 'loading'} />}
     <section aria-label="Conversación" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <h4 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">Conversación</h4>
       <ol className="divide-y divide-neutral-200">{ticket.mensajes.map(message => <li key={message.id} className={'p-4 ' + (message.interno ? 'border-l-4 border-warning-600 bg-warning-50' : '')}>
@@ -138,7 +165,7 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
           <Button variant="outline" className="max-w-full [overflow-wrap:anywhere]" onClick={() => void download(file)} leftIcon={<Download size={16} />}>{file.nombre} · {(file.bytes / 1024).toFixed(0)} KB</Button></li>)}</ul>}
       </li>)}</ol>
     </section>
-    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} changed={changed} />}
+    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={automaticRefresh === 'loading'} />}
     {error && <p role="alert" className="text-error-700">{error}</p>}
     <details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Historial del ticket</summary>
       <ol className="mt-3 space-y-3 text-sm text-neutral-700"><li>Creado · {date(ticket.createdAt)}</li>{ticket.eventos.map(event => <li key={event.id}>
@@ -161,10 +188,8 @@ function ticketActions(ticket: SupportTicket) {
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   return actions;
 }
-function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owner: string; changed: () => Promise<void> }) {
-  const { currentUser } = useAuth();
-  const scope = { userId: owner, context: inspectionWorkspaceOwner(currentUser), ticketId: ticket.id };
-  const journal = useSupportCommand(scope);
+function TicketActions({ ticket, owner, context, journal, changed, refreshing }: { ticket: SupportTicket; owner: string; context: string; journal: ReturnType<typeof useSupportCommand>; changed: (minimumVersion?: number) => Promise<void>; refreshing: boolean }) {
+  const scope = { userId: owner, context, ticketId: ticket.id };
   const recovery = useSupportActionDraft(scope);
   const pending = journal.command;
   const query = useQueryClient();
@@ -194,7 +219,7 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const bodyInput = useRef<HTMLTextAreaElement>(null);
-  const team = useQuery({ queryKey: ['soporte', owner, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
+  const team = useQuery({ queryKey: ['soporte', owner, context, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
   const displayedTarget = pending?.input.responsableId ?? target;
   const recipient = team.data?.find(user => user.id === displayedTarget);
   const send = async (chosen = selected) => {
@@ -215,7 +240,8 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const finishConfirmed = () => {
     if (!recovery.canWrite()) return;
     return journal.release(async saved => {
-      await changed();
+      if (saved.status === 'confirmed' && (!saved.receipt || saved.receipt.id !== ticket.id || !Number.isSafeInteger(saved.receipt.version))) throw new Error('No pudimos verificar la confirmación. Conservamos el envío.');
+      await changed(saved.status === 'confirmed' ? saved.receipt?.version : undefined);
       await recovery.finish(saved);
       if (fileInput.current) fileInput.current.value = '';
     });
@@ -234,7 +260,7 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
     {canEdit && !pending && staleDraft && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>El ticket cambió desde que preparaste este borrador. Revisá la conversación y el estado antes de confirmar.</p><Button variant="outline" onClick={() => { setError(''); updateDraft({ version: ticket.version }); }}>Revisé la conversación</Button></div>}
     {canTake && <Button disabled={!canEdit || busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
     {!journal.ready && <p role="status">Comprobando envíos guardados… <Button variant="outline" onClick={() => void journal.reload()}>Reintentar lectura</Button></p>}
-    {pending?.status === 'confirmed' && <div role="status" className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900"><p>Acción confirmada. No hace falta enviarla otra vez.</p><Button isLoading={busy} disabled={!canEdit} onClick={() => void finishConfirmed()}>Actualizar conversación y continuar</Button></div>}
+    {pending?.status === 'confirmed' && <div role="status" className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900"><p>Acción confirmada. No hace falta enviarla otra vez.</p><Button isLoading={busy || refreshing} disabled={!canEdit || refreshing} onClick={() => void finishConfirmed()}>Actualizar conversación y continuar</Button></div>}
     {pending?.status === 'rejected' && <div role="alert" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>La acción no se registró: {pending.rejection}</p><Button isLoading={busy} disabled={!canEdit} onClick={() => void finishConfirmed()}>Actualizar ticket y recuperar contenido</Button></div>}
     {pending?.status === 'pending' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Envío sin confirmar. Conservamos el contenido y los archivos en este dispositivo.</p><div className="flex flex-wrap gap-2"><Button isLoading={busy} disabled={!canEdit} onClick={() => recovery.canWrite() && void journal.retry()}>Reintentar mismo envío</Button><Button variant="outline" disabled={!canEdit || busy} onClick={() => recovery.canWrite() && void journal.recover()}>Comprobar y corregir envío</Button></div><p className="text-sm">Para corregir, primero comprobamos si ya se registró. Si no se registró, retiramos ese envío y recuperamos el contenido.</p></div>}
     {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : !recovery.ready || recovery.ownership.status !== 'owned' ? null : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
@@ -282,12 +308,12 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
     {(error || journal.error) && <p role="alert" className="text-error-700">{error || journal.error}</p>}
   </section>;
 }
-function TeamSettings({ owner }: { owner: string }) {
+function TeamSettings({ owner, context }: { owner: string; context: string }) {
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const results = useQuery({ queryKey: ['soporte', owner, 'candidatos', applied], enabled: applied.length >= 2, queryFn: () => supportService.candidates(applied), retry: false });
+  const results = useQuery({ queryKey: ['soporte', owner, context, 'candidatos', applied], enabled: applied.length >= 2, queryFn: () => supportService.candidates(applied), retry: false });
   const change = async (id: string, enabled: boolean) => {
     if (busy) return; setBusy(true); setError('');
     try { await supportService.agent(id, enabled); await results.refetch(); } catch (failure) { setError(supportError(failure)); } finally { setBusy(false); }
