@@ -56,6 +56,9 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
     });
     for (const row of batch) {
       await prisma.$transaction(async tx => {
+        // Serialize the last state/demo check with concurrent workflow changes.
+        const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM manifiestos WHERE id = ${row.id} FOR UPDATE`;
+        if (!locked.length) return;
         // Re-read after the scan. The inbox also reconciles with current state:
         // a workflow can still change concurrently after this read.
         const m = await tx.manifiesto.findUnique({ where: { id: row.id },
