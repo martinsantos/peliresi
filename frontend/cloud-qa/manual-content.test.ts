@@ -686,3 +686,10 @@ test('directory describes mail suppression and scheduled operation reminders wit
   assert.match(section, /sin retiro, traslado ni GPS/);
   assert.doesNotMatch(section, /garantiza que ningun email se pierda|los emails pendientes se procesan en el proximo ciclo/);
 });
+
+test('directory distinguishes a non-persistent liveness probe from database health checks', () => {
+  const directory = read('directorio.html');
+  assert.match(directory, /La sonda de vida no comprueba la base de datos/);
+  assert.match(directory, /no escribe analítica ni contadores persistentes/);
+  assert.match(directory, /health\/ready[^<]*<\/td><td>[^<]*contador persistente/);
+});
