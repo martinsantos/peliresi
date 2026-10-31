@@ -56,6 +56,8 @@ it('rechecks demo status before writing when a selected manifest changes', async
 it('locks the selected manifest before rereading it and skips a row that disappeared', async () => {
   await ejecutarSeguimientoCierre();
   expect(mocks.lock).toHaveBeenCalledOnce();
+  expect(mocks.lock.mock.calls[0][0].join('?')).toContain('FOR UPDATE');
+  expect(mocks.lock.mock.calls[0][1]).toBe('qa');
   expect(mocks.lock.mock.invocationCallOrder[0]).toBeLessThan(mocks.current.mock.invocationCallOrder[0]);
   vi.clearAllMocks(); mocks.lock.mockResolvedValue([]);
   await ejecutarSeguimientoCierre();
