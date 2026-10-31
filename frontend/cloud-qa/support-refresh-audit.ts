@@ -52,7 +52,7 @@ try {
   }
   for (const proof of multirole) {
     const ticket = await db.ticketSoporte.findUniqueOrThrow({ where: { id: proof.ticketId }, select: { estado: true, autor: { select: { email: true } } } });
-    assert.match(ticket.autor.email, /^multirol-(?:web-desktop|web-responsive|app)@night-qa\.invalid$/);
+    assert.equal(ticket.autor.email, 'draft-multirole-20261024@night-qa.invalid');
     assert.equal(ticket.estado, 'ABIERTO');
     assert.equal(await db.eventoSoporte.count({ where: { ticketId: proof.ticketId, accion: 'RESPONDER' } }), 0);
   }

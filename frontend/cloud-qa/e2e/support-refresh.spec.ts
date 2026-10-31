@@ -70,7 +70,7 @@ test('a multi-role account keeps its support reply drafts separate across activi
   await assertCloudDatabase();
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await login(page, info, 'multirol-' + info.project.name);
+  await login(page, info, 'draft-multirole-20261024');
   await page.goto(prefix(info) + '/mi-perfil');
   const generatorInUse = page.getByRole('button', { name: 'Generador · En uso', exact: true });
   const operatorInUse = page.getByRole('button', { name: 'Operador · En uso', exact: true });
