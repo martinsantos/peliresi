@@ -15,7 +15,7 @@ const expected = JSON.parse(readFileSync(path.join(out, 'qa-digests.json'), 'utf
 const entries = Object.entries(expected);
 assert.ok(entries.length >= 57);
 for (const [file, digest] of entries) {
-  assert.match(file, /^(frontend\/cloud-qa\/|frontend\/src-v6\/__tests__\/|backend\/src\/__tests__\/services\/inspection)/);
+  assert.match(file, /^(frontend\/cloud-qa\/|frontend\/src-v6\/__tests__\/|backend\/src\/__tests__\/(?:services\/(?:inspection|apiAdmissionStore)|middlewares\/(?:trainingAnalytics|apiAdmission)|helpers\/admissionStore))/);
   assert.doesNotMatch(file, /(?:^|\/)\.\.(?:\/|$)/);
   assert.match(digest, /^[a-f0-9]{64}$/);
   assert.equal(createHash('sha256').update(readFileSync(path.join(root, file))).digest('hex'), digest, file);
