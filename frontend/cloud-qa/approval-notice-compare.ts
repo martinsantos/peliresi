@@ -5,9 +5,9 @@ import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
 
 await assertCloudDatabase();
-const out = '/work/sitrep/.qa-approval-notice-20261030';
-assert.equal(process.env.QA_ARTIFACTS, out); assert.equal(process.env.QA_COMPAT_BACKEND, 'approval-notice-fix');
-const fresh = '/work/sitrep/backend/dist-qa-approval-notice-20261030';
+const out = '/work/sitrep/.qa-approval-notice-short-20261030';
+assert.equal(process.env.QA_ARTIFACTS, out); assert.equal(process.env.QA_COMPAT_BACKEND, 'approval-notice-short');
+const fresh = '/work/sitrep/backend/dist-qa-approval-notice-short-20261030';
 const previous = '/work/sitrep/backend/dist-qa-closure-52b3bec4';
 function files(dir: string, prefix = ''): string[] {
   return readdirSync(path.join(dir, prefix), { withFileTypes: true }).flatMap(entry => entry.isDirectory()

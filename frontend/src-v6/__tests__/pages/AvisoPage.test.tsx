@@ -49,7 +49,7 @@ it.each(['', '/app'])('presents a historical individual approval without inventi
   mensaje:'QA-001. Revisá qué aprobaciones faltan.',
   datos:JSON.stringify({tipo:'propuesta_partes',version:1,fase:'aprobacion-TRANSPORTISTA'}) };
  show(prefix);
- expect(screen.getByText('QA-001. Consultá el estado actual de las aprobaciones.')).toBeVisible();
+ expect(screen.getByText('QA-001. Revisá las aprobaciones.')).toBeVisible();
  expect(state.query.data.mensaje).toBe('QA-001. Revisá qué aprobaciones faltan.');
 });
 it.each(['', '/app'])('shows the complete result without a link to itself in %s', prefix => {

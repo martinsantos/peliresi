@@ -33,21 +33,25 @@ test('an older approval stays accurate in the live notice, bell, inbox, detail a
     });
     await page.reload(); await initialized;
     await page.waitForTimeout(500);
-    const original = `${manifest.numero}. Revisá qué aprobaciones faltan.`;
+    const original = `${manifest.numero}. Generador: QA Generador · Transporte: QA Transporte · Operador: QA Operador. Fecha prevista: sin fecha. Revisá qué aprobaciones faltan.`;
     const notice = await db.notificacion.create({ data: {
       id: randomUUID(), usuarioId: manifest.generador.usuarioId, tipo: 'INFO_GENERAL', prioridad: 'NORMAL',
       titulo: 'Transporte aprobó su participación', mensaje: original, manifiestoId: manifest.id,
       datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: 'aprobacion-TRANSPORTISTA',
         autorId: manifest.transportista.usuarioId, url: `/manifiestos/${manifest.id}` }),
     } });
-    const expected = `${manifest.numero}. Consultá el estado actual de las aprobaciones.`;
+    const expected = original.replace('Revisá qué aprobaciones faltan.', 'Revisá las aprobaciones.');
+    const summary = `${manifest.numero} · Revisá las aprobaciones.`;
     const live = page.locator('[data-linked-notice="true"]').filter({ hasText: manifest.numero });
-    await expect(live).toContainText(expected, { timeout: 35_000 });
+    await expect(live).toContainText(summary, { timeout: 35_000 });
+    const preview = live.locator('span.line-clamp-2').filter({ hasText: summary });
+    await expect.poll(() => preview.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await nonObstructingNotices(page);
     await page.screenshot({ path: info.outputPath('aviso-en-vivo.png'), animations: 'disabled', scale: 'css' });
     await page.getByRole('button', { name: /^Notificaciones(?: \(|$)/ }).first().click();
     const bell = page.getByRole('region', { name: 'Notificaciones recientes', exact: true });
-    await expect(bell.getByRole('button').filter({ hasText: manifest.numero })).toContainText(expected);
+    await expect(bell.getByRole('button').filter({ hasText: manifest.numero }).first()).toContainText(expected);
     await page.getByRole('button', { name: 'Cerrar notificaciones', exact: true }).click();
     await page.goto(`${prefix(info)}/notificaciones`);
     const inbox = page.getByRole('list', { name: 'Avisos', exact: true }).getByRole('listitem').filter({ hasText: manifest.numero });
@@ -58,7 +62,7 @@ test('an older approval stays accurate in the live notice, bell, inbox, detail a
     const { notificationMailContent } = backendRequire(path.join(path.dirname(qaBackendEntry()), 'services/notification-mail.service.js'));
     const mail = notificationMailContent({ ...manifest.generador.usuario, ...notice, rol: 'GENERADOR' });
     expect(mail).toBeTruthy();
-    expect(mail.html).toContain('Consultá el estado actual de las aprobaciones');
+    expect(mail.html).toContain('Revisá las aprobaciones');
     expect(mail.html).not.toContain('qué aprobaciones faltan');
     expect(mail.html).toContain(`/notificaciones/${notice.id}`);
     const email = await page.context().newPage();
@@ -70,8 +74,9 @@ test('an older approval stays accurate in the live notice, bell, inbox, detail a
           ? route.fulfill({ path: path.join(process.env.QA_WEB_BUILD!, name), contentType: 'image/png' }) : route.abort();
       });
       await email.setContent(mail.html);
-      await expect(email.getByText(/Consultá el estado actual de las aprobaciones/)).toBeVisible();
+      await expect(email.getByText(/Revisá las aprobaciones/)).toBeVisible();
       await expect.poll(() => email.locator('img').evaluateAll(images => images.length === 2 && images.every(image => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+      expect(await email.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       await email.screenshot({ path: info.outputPath('correo-renderizado.png'), animations: 'disabled', scale: 'css' });
     } finally { await email.close(); }
     expect(await db.emailQueue.count({ where: { intentos: { gt: 0 } } })).toBe(0);

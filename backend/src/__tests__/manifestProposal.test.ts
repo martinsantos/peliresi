@@ -28,7 +28,7 @@ describe('three independently authenticated parties',()=>{
   const notices=mock.tx.notificacion.createMany.mock.calls[0][0].data;
   expect(notices).toHaveLength(3);
   for(const notice of notices){
-   expect(notice.mensaje).toContain('Consultá el estado actual de las aprobaciones.');
+   expect(notice.mensaje).toContain('Revisá las aprobaciones.');
    expect(notice.mensaje).not.toContain('qué aprobaciones faltan');
   }
  });

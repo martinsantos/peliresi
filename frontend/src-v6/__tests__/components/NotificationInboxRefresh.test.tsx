@@ -10,6 +10,18 @@ vi.mock('../../hooks/usePushNotifications',()=>({usePushNotifications:()=>({})})
 vi.mock('../../services/notificacion.service',()=>({notificacionService:{list:mocks.list}}));
 vi.mock('../../components/ui/Toast',()=>({toast:{add:mocks.add,remove:mocks.remove}}));
 beforeEach(() => { vi.clearAllMocks(); mocks.user={id:'g',rol:'GENERADOR'}; });
+it('summarizes an individual approval in the live banner while retaining the full inbox notice',async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});mocks.list.mockResolvedValue({items:[],noLeidas:0});
+ const view=render(<MemoryRouter><QueryClientProvider client={client}><NotificacionesPoller/></QueryClientProvider></MemoryRouter>);
+ const key=['notificaciones','poll','g',inspectionWorkspaceOwner({id:'g',rol:'GENERADOR'})];
+ await waitFor(()=>expect(client.getQueryData(key)).toBeDefined());
+ const notice={id:'approval',titulo:'Transporte aprobó su participación',mensaje:'QA-001. Generador: QA · Transporte: QA. Revisá las aprobaciones.',
+  manifiestoId:'m',manifiesto:{numero:'QA-001'},createdAt:'2026-10-24T12:01:00.000Z',prioridad:'NORMAL',
+  datos:JSON.stringify({tipo:'propuesta_partes',version:1,fase:'aprobacion-TRANSPORTISTA'})};
+ await act(async()=>{client.setQueryData(key,{items:[notice],noLeidas:1});});
+ await waitFor(()=>expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({message:'QA-001 · Revisá las aprobaciones.'})));
+ expect(notice.mensaje).toContain('Generador: QA');view.unmount();client.clear();
+});
 it('a newly received certificate refreshes an open inbox and unread badge without re-polling or marking it read',async()=>{
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  const initial={items:[{id:'existing',createdAt:'2026-10-24T12:00:00.000Z',titulo:'Aviso anterior'}],noLeidas:6};

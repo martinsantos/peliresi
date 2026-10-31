@@ -7,8 +7,8 @@ import { assertCloudDatabase, backendRequire } from './safety.ts';
 import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
-const out = '/work/sitrep/.qa-approval-notice-20261030';
-assert.equal(process.env.QA_ARTIFACTS, out); assert.equal(process.env.QA_COMPAT_BACKEND, 'approval-notice-fix');
+const out = '/work/sitrep/.qa-approval-notice-short-20261030';
+assert.equal(process.env.QA_ARTIFACTS, out); assert.equal(process.env.QA_COMPAT_BACKEND, 'approval-notice-short');
 assert.equal(process.env.DISABLE_EMAILS, 'true'); assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 const resultFile = path.join(out, 'approval-generation.json'); assert.equal(existsSync(resultFile), false);
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
@@ -36,7 +36,7 @@ try {
       for (const id of participants) assert.ok(notices.some((notice: any) => notice.usuarioId === id), `${modalidad} ${role}`);
       for (const notice of notices) {
         assert.match(notice.usuario.email, /@night-qa\.invalid$/);
-        assert.match(notice.mensaje, /Consultá el estado actual de las aprobaciones\.$/);
+        assert.match(notice.mensaje, /Revisá las aprobaciones\.$/);
         assert.doesNotMatch(notice.mensaje, /qué aprobaciones faltan/);
         const data = JSON.parse(notice.datos);
         assert.equal(data.fase, phase); assert.equal(data.partesRequeridas, 3); assert.equal(data.modalidad, modalidad);

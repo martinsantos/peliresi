@@ -7,9 +7,9 @@ import { assertCloudDatabase, assertCloudEnvironment, backendRequire, externalKe
 import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
-const out = '/work/sitrep/.qa-approval-notice-20261030';
+const out = '/work/sitrep/.qa-approval-notice-short-20261030';
 assert.equal(process.env.QA_ARTIFACTS, out);
-assert.equal(process.env.QA_COMPAT_BACKEND, 'approval-notice-fix');
+assert.equal(process.env.QA_COMPAT_BACKEND, 'approval-notice-short');
 const commit = process.env.GITHUB_SHA!;
 assert.match(commit, /^[a-f0-9]{40}$/);
 const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
@@ -17,9 +17,7 @@ const source = read('source-comparison.json');
 assert.equal(source.commit, commit); assert.ok(source.files > 1600);
 assert.deepEqual(source.missing, []); assert.deepEqual(source.mismatch, []);
 const after = read('source-comparison-after.json');
-assert.equal(after.commit, commit); assert.deepEqual(after.missing, []);
-assert.equal(after.correctedTestCommit, 'd9e7b215'); assert.equal(after.correctedTestMatchesCommit, true);
-assert.deepEqual(after.mismatch.map((item: { path: string }) => item.path), ['backend/src/__tests__/services/notification-mail.test.ts']);
+assert.equal(after.commit, commit); assert.deepEqual(after.missing, []); assert.deepEqual(after.mismatch, []);
 const backend = read('backend-source-proof.json');
 assert.equal(backend.commit, commit); assert.equal(backend.mismatches, 0);
 assert.equal(backend.uncommittedGpsIncluded, false); assert.equal(backend.controllerSource, 'committed');
@@ -33,17 +31,17 @@ for (const { pid } of processes) {
   const env = Object.fromEntries(readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter(Boolean)
     .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
   assertCloudEnvironment(env); assert.equal(env.GITHUB_SHA, commit);
-  assert.equal(env.QA_COMPAT_BACKEND, 'approval-notice-fix');
+  assert.equal(env.QA_COMPAT_BACKEND, 'approval-notice-short');
   assert.equal(env.QA_WEB_BUILD, path.join(out, 'web')); assert.equal(env.QA_APP_BUILD, path.join(out, 'app'));
   assert.equal(env.UPLOADS_DIR, path.join(out, 'uploads')); assert.equal(env.TRAINING_DATABASE_URL, '');
   assert.equal(env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z');
   assert.equal(env.DISABLE_EMAILS, 'true'); assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
   for (const key of externalKeys) assert.equal(env[key], '', key);
 }
-const browser = read('approval-notice-browser-final.json');
+const browser = read('approval-notice-browser.json');
 assert.equal(browser.stats.expected, 2); assert.equal(browser.stats.unexpected, 0);
 assert.equal(browser.stats.skipped, 0); assert.equal(browser.stats.flaky, 0); assert.deepEqual(browser.errors, []);
-const proofDir = path.join(out, 'approval-notice-browser-final');
+const proofDir = path.join(out, 'approval-notice-browser');
 const proofs = readdirSync(proofDir, { withFileTypes: true }).filter(entry => entry.isDirectory())
   .map(entry => path.join(proofDir, entry.name, 'approval-notice-proof.json')).filter(existsSync)
   .map(file => JSON.parse(readFileSync(file, 'utf8')));
@@ -53,7 +51,7 @@ const generation = read('approval-generation.json');
 assert.equal(generation.synthetic, true); assert.equal(generation.production, false);
 assert.equal(generation.results.length, 6);
 assert.ok(generation.results.every((item: any) => item.partiesNotified === 3 && item.retryDidNotDuplicate));
-for (const file of ['frontend-notice-unit.json', 'backend-notice-unit-final.json']) {
+for (const file of ['frontend-notice-unit.json', 'backend-notice-unit.json']) {
   const result = read(file); assert.equal(result.success, true); assert.equal(result.numFailedTests, 0); assert.equal(result.numPendingTests, 0);
 }
 const manual = readFileSync(path.join(out, 'manual.tap'), 'utf8');
@@ -81,7 +79,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { commit, synthetic: true, production: false, browserTests: 2, generationCases: generation.results.length,
-    frontendTests: read('frontend-notice-unit.json').numPassedTests, backendTests: read('backend-notice-unit-final.json').numPassedTests,
+    frontendTests: read('frontend-notice-unit.json').numPassedTests, backendTests: read('backend-notice-unit.json').numPassedTests,
     manualTests: Number(manual.match(/# pass (\d+)/)?.[1]), capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false,
     historicalStoredTextUnchanged: true, scope: 'individual approval notice with recognized legacy metadata and exact previous wording' };
   writeFileSync(path.join(out, 'approval-notice-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });

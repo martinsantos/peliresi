@@ -152,7 +152,7 @@ describe('committed notice mail relay', () => {
     const individual = { ...notice, rol: 'GENERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'manifest',
       datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: `aprobacion-${role}` }) };
     const content = notificationMailContent(individual)!;
-    expect(mailText(content.html)).toContain('Consultá el estado actual de las aprobaciones');
+    expect(mailText(content.html)).toContain('Revisá las aprobaciones');
     expect(mailText(content.html)).not.toContain('qué aprobaciones faltan');
     expect(content.html).toContain('/notificaciones/qa-notice');
     expect(notificationMailContent({ ...individual, rol: 'ADMIN' })!.html).toContain('/manifiestos/manifest');

@@ -9,6 +9,7 @@ import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useAuth } from '../contexts/AuthContext';
 import { inspectionWorkspaceOwner } from '../utils/inspectionWorkspace';
+import { notificationToastMessage } from '../utils/notificationMessage';
 
 // Muestra toast para notificaciones nuevas que llegan vía polling
 // (complementa el push nativo — cubre el caso en que el push no llegó)
@@ -76,7 +77,7 @@ function AuthorizedNotificationsPoller({ userId, userRole, owner, personalChoice
       toastIds.current.push(toast.add({
         type:    n.prioridad === 'ALTA' || n.prioridad === 'URGENTE' ? 'warning' : 'info',
         title:   n.titulo,
-        message: n.mensaje,
+        message: notificationToastMessage(n),
         messagePreview: true,
         duration: n.prioridad === 'URGENTE' ? 12_000 : 10_000,
         actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole, false, personalChoice), n), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole, false, personalChoice))); },

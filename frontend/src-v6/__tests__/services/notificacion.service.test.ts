@@ -31,7 +31,7 @@ describe('notification pagination and real counts', () => {
       datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: `aprobacion-${role}` }) };
     api.get.mockResolvedValue({ data: { data: { notificaciones: [original] } } });
     const result = await notificacionService.list();
-    expect(result.items[0].mensaje).toBe('QA-123. Consultá el estado actual de las aprobaciones.');
+    expect(result.items[0].mensaje).toBe('QA-123. Revisá las aprobaciones.');
     expect(original.mensaje).toBe('QA-123. Revisá qué aprobaciones faltan.');
     expect(notificationMessage(original)).toBe(result.items[0].mensaje);
   });
