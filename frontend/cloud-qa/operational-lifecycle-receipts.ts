@@ -13,7 +13,8 @@ assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 const root = process.env.QA_ARTIFACTS!;
 assert.ok(/^\/work\/sitrep\/\.qa-operational-ui-current\d+$/.test(root)
   || root === '/work/sitrep/.qa-toast-compact-fix-20261029'
-  || root === '/work/sitrep/.qa-legacy-integrity-20261030', 'Unexpected QA artifacts directory');
+  || root === '/work/sitrep/.qa-legacy-integrity-20261030'
+  || root === '/work/sitrep/.qa-incident-retry-final-20261101', 'Unexpected QA artifacts directory');
 const browser = path.join(root, 'manifest-complete');
 const proofs = readdirSync(browser, { withFileTypes: true }).filter(entry => entry.isDirectory())
   .map(entry => path.join(browser, entry.name, 'complete-lifecycle.json')).filter(existsSync)
