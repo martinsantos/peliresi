@@ -30,16 +30,21 @@ test('incident dialog keeps keyboard focus and restores it on Escape', async ({ 
     const dialog = page.getByRole('dialog', { name: 'Reportar Incidente', exact: true });
     await expect(dialog).toBeVisible();
     await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
-    const cancel = dialog.getByRole('button', { name: 'Cancelar', exact: true });
-    await cancel.focus(); await page.keyboard.press('Tab');
+    const close = dialog.getByRole('button', { name: 'Cerrar', exact: true });
+    await dialog.getByLabel('Descripción (opcional)', { exact: true }).fill('Nota que debe conservarse');
+    await dialog.getByRole('button', { name: 'Avería mecánica', exact: true }).click();
+    await close.focus(); await page.keyboard.press('Tab');
     await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
     await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(opener).toBeFocused();
+    await opener.click(); await expect(dialog.getByLabel('Descripción (opcional)', { exact: true })).toHaveValue('Nota que debe conservarse');
+    await expect(dialog.getByRole('button', { name: 'Avería mecánica', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click();
     expect(writes).toEqual([]);
     writeFileSync(info.outputPath('incident-keyboard-proof.json'), JSON.stringify({ surface: info.project.name, focusContained: true, restored: true }));
   } finally { await context.close(); }
 });
 
-test('incident form labels fields, explains a missing type and records one synthetic report', async ({ browser }, info) => {
+test('incident form preserves the report after validation and a failed request', async ({ browser }, info) => {
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-unreadable-handoff-private.json'), 'utf8'));
   const manifest = fixture.cases[info.project.name];
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
@@ -49,6 +54,15 @@ test('incident form labels fields, explains a missing type and records one synth
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => {
     if (request.method() === 'POST' && request.url().endsWith(`/api/manifiestos/${manifest.id}/incidente`)) incidents++;
+  });
+  let failOnce = true, releaseFailure: (() => void) | undefined;
+  const failureGate = new Promise<void>(resolve => { releaseFailure = resolve; });
+  await page.route(`**/api/manifiestos/${manifest.id}/incidente`, async route => {
+    if (failOnce) {
+      failOnce = false;
+      await failureGate;
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, message: 'Falla simulada de conexión' }) });
+    } else await route.continue();
   });
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
@@ -62,6 +76,7 @@ test('incident form labels fields, explains a missing type and records one synth
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
     await page.getByRole('button', { name: 'Incidente', exact: true }).click();
     const description = page.getByLabel('Descripción (opcional)', { exact: true });
+    await expect(description).toBeVisible();
     await description.fill('Avería simulada durante la prueba');
     await page.getByRole('button', { name: 'Registrar Incidente', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Reportar Incidente', exact: true });
@@ -70,11 +85,17 @@ test('incident form labels fields, explains a missing type and records one synth
     expect(incidents).toBe(0);
     const type = dialog.getByRole('button', { name: 'Avería mecánica', exact: true });
     await type.click(); await expect(type).toHaveAttribute('aria-pressed', 'true');
+    const failed = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/manifiestos/${manifest.id}/incidente`) && r.status() === 503);
+    await dialog.getByRole('button', { name: 'Registrar Incidente', exact: true }).evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+    await expect.poll(() => incidents).toBe(1); releaseFailure?.(); await failed;
+    await expect(dialog.getByRole('alert')).toContainText('Falla simulada de conexión');
+    await expect(dialog.getByRole('alert')).toContainText('revisá si el incidente ya aparece en el historial');
+    await expect(description).toHaveValue('Avería simulada durante la prueba'); await expect(type).toHaveAttribute('aria-pressed', 'true');
     const response = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/manifiestos/${manifest.id}/incidente`));
     await dialog.getByRole('button', { name: 'Registrar Incidente', exact: true }).click();
     expect((await response).status()).toBe(200); await expect(dialog).not.toBeVisible();
-    expect(incidents).toBe(1); expect(errors).toEqual([]);
+    expect(incidents).toBe(2); expect(errors).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    writeFileSync(info.outputPath('incident-record-proof.json'), JSON.stringify({ surface: info.project.name, id: manifest.id, incidents, synthetic: true }));
-  } finally { await context.close(); }
+    writeFileSync(info.outputPath('incident-record-proof.json'), JSON.stringify({ surface: info.project.name, id: manifest.id, requests: incidents, synthetic: true }));
+  } finally { releaseFailure?.(); await context.close(); }
 });
