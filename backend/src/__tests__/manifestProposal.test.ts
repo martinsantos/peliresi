@@ -126,6 +126,45 @@ describe('three independently authenticated parties',()=>{
   await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:409});
   await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
  });
+ it.each([null,'','   '])('does not offer or write another decision when a pending record already has a rejection with reason %j',async descripcion=>{
+  mock.events.push({id:'previous-rejection',tipo:'RECHAZO_PARTE',usuarioId:'ug',descripcion});
+  const {getManifestProposal}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>getManifestProposal(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data).toMatchObject({rechazo:'Rechazo registrado sin motivo disponible',puedeAprobar:null,puedeRechazar:false,puedeIniciar:false});
+  await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('rechazo')});
+  await expect(inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA',{decision:'RECHAZADA',motivo:'No acepto'})))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('rechazo')});
+  expect(mock.events).toHaveLength(2);expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();expect(mock.tx.manifiesto.update).not.toHaveBeenCalled();expect(mock.tx.notificacion.createMany).not.toHaveBeenCalled();
+ });
+ it.each(['training','operational'])('rejects a direct approval after a recorded rejection in %s',async scope=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  mock.events.push({id:'previous-rejection',tipo:'RECHAZO_PARTE',usuarioId:'ug',descripcion:null});
+  const approve=()=>approveManifestProposal(req('OPERADOR'));
+  await expect(scope==='training'?inTrainingSession(approve):inOperationalSession(approve)).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('rechazo')});
+  expect(mock.events).toHaveLength(2);expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();expect(mock.tx.manifiesto.update).not.toHaveBeenCalled();expect(mock.tx.notificacion.createMany).not.toHaveBeenCalled();
+ });
+ it('keeps a confirmed rejection retry idempotent but does not hide a conflicting pending state',async()=>{
+  const rejection=req('GENERADOR',{decision:'RECHAZADA',motivo:'No acepto'});
+  await inTrainingSession(()=>approveManifestProposal(rejection));
+  const original=mock.events.at(-1);const writes=mock.tx.eventoManifiesto.create.mock.calls.length;
+  await inTrainingSession(()=>approveManifestProposal(rejection));
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(writes);expect(mock.events.at(-1)).toBe(original);
+  mock.manifest.estado='PENDIENTE_APROBACION';
+  await expect(inTrainingSession(()=>approveManifestProposal(rejection))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('rechazo')});
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(writes);
+ });
+ it('does not treat a rejection by the same person under another role as a retry',async()=>{
+  const shared='qa-multi-role';
+  const fromGenerator={...req('GENERADOR',{decision:'RECHAZADA',motivo:'No acepto'}),user:{...users.GENERADOR,id:shared}};
+  const fromOperator={...req('OPERADOR',{decision:'RECHAZADA',motivo:'No acepto'}),user:{...users.OPERADOR,id:shared}};
+  await inTrainingSession(()=>approveManifestProposal(fromGenerator));
+  const writes=mock.tx.eventoManifiesto.create.mock.calls.length;
+  await expect(inTrainingSession(()=>approveManifestProposal(fromOperator))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('rechazo')});
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(writes);
+  expect(mock.events.filter(event=>event.tipo==='RECHAZO_PARTE')).toHaveLength(1);
+ });
  it('rejects corrupted or changed participant snapshots',async()=>{
   expect(()=>parseProposal('{}')).toThrow();expect(()=>parseProposal('null')).toThrow();mock.manifest.operadorId='other';
   await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:404});

@@ -171,3 +171,14 @@ it('preserves a readable rejected proposal when legacy rejection text is not JSO
  expect(await screen.findByText(/Propuesta rechazada: No tenemos capacidad/)).toBeVisible();
  expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();client.clear();
 });
+
+it('shows a recorded rejection with no available reason without offering a new decision',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',rechazo:'Rechazo registrado sin motivo disponible',inicio:null,puedeIniciar:false,puedeAprobar:null,puedeRechazar:false,
+  partes:[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:false}]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="previous-rejection" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByText('Propuesta detenida')).toBeVisible();
+ expect(screen.getByText(/Rechazo registrado sin motivo disponible/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
+});

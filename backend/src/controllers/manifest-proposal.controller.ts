@@ -62,10 +62,12 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
     const value = await prisma.$transaction(tx => load(tx, req.params.id));
     const role = value ? proposalRole(req.user, value.proposal) : null;
     const legacyBlocked = !!value && legacyInSituWithoutCarrier(value.proposal) && ['PENDIENTE_APROBACION','APROBADO'].includes(value.manifest.estado);
-    const unanimous = !!value && !legacyBlocked && !value.events.some(e => e.tipo === 'RECHAZO_PARTE')
+    const rejected = value?.events.find(e => e.tipo === 'RECHAZO_PARTE');
+    const rejectionDescription = rejected ? (typeof rejected.descripcion === 'string' && rejected.descripcion.trim() ? rejected.descripcion : 'Rechazo registrado sin motivo disponible') : undefined;
+    const unanimous = !!value && !legacyBlocked && !rejected
       && proposalRoles(value.proposal).every(rol => value.events.some(e => e.tipo === APPROVAL_EVENTS[rol]));
     res.json({ success: true, data: value ? {
-      version: value.proposal.version, modalidad: value.proposal.modalidad || 'FIJO', autorRol: value.proposal.autorRol, estado: value.manifest.estado, rechazo: value.events.find(e => e.tipo === 'RECHAZO_PARTE')?.descripcion,
+      version: value.proposal.version, modalidad: value.proposal.modalidad || 'FIJO', autorRol: value.proposal.autorRol, estado: value.manifest.estado, rechazo: rejectionDescription,
       partes: proposalRoles(value.proposal).map(rol => {
         const event = value.events.find(e => e.tipo === APPROVAL_EVENTS[rol]);
         return { rol, aprobada: !!event, usuarioId: event?.usuarioId, fecha: event?.createdAt };
@@ -73,8 +75,8 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
       inicio: value.events.find(e => COORDINATION_EVENTS.includes(e.tipo))?.createdAt || null,
       requiereNuevaPropuesta: legacyBlocked,
       puedeIniciar: !!role && unanimous && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
-      puedeAprobar: !legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
-      puedeRechazar: legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && !!role,
+      puedeAprobar: !rejected && !legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
+      puedeRechazar: !rejected && legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && !!role,
     } : null });
   } catch (error) { next(error); }
 }
@@ -98,9 +100,25 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
     if (reject && (!reason || reason.length > 500)) throw new AppError('Indicá un motivo de rechazo de hasta 500 caracteres', 400);
     if (rol === 'GENERADOR' && !firma && !reject) throw new AppError('El generador debe firmar su aprobación', 400);
+    const recordedRejection = value.events.some(e => e.tipo === 'RECHAZO_PARTE');
+    if (recordedRejection) {
+      // Preserve retries of already recorded decisions in a terminal state, but
+      // never append a decision when a rejected history has an inconsistent state.
+      const terminal = ['RECHAZADO', 'CANCELADO'].includes(value.manifest.estado);
+      const actorId = value.proposal[`${rol.toLowerCase()}Id` as 'generadorId' | 'transportistaId' | 'operadorId'];
+      const sameRejection = reject && value.events.some(e => {
+        if (e.tipo !== 'RECHAZO_PARTE' || e.usuarioId !== req.user.id) return false;
+        try {
+          const decision = JSON.parse(e.descripcion || '');
+          return decision?.version === 1 && decision.rol === rol && decision.actorId === actorId && decision.decision === 'RECHAZADA';
+        } catch { return false; }
+      });
+      const sameApproval = !reject && value.events.some(e => e.tipo === APPROVAL_EVENTS[rol]);
+      if (terminal && (sameRejection || sameApproval)) return value.manifest;
+      throw new AppError('La propuesta registra un rechazo. Revisá el historial y consultá a Ambiente antes de continuar.', 409);
+    }
     // Retry does not append a second approval or replace the first signature.
     if (!reject && value.events.some(e => e.tipo === APPROVAL_EVENTS[rol])) return value.manifest;
-    if (reject && value.events.some(e => e.tipo === 'RECHAZO_PARTE' && e.usuarioId === req.user.id)) return value.manifest;
     if (!reject && legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE, 409);
     if (value.manifest.estado !== 'PENDIENTE_APROBACION') throw new AppError('La propuesta ya no admite aprobaciones', 409);
     const createdAt = await proposalEventTime(tx);
