@@ -62,3 +62,20 @@ test('ruta del directorio clara y accesible al filtrar por rol', async ({ page }
     breadcrumb: getComputedStyle(document.querySelector('.section-breadcrumb')!).transitionDuration }));
   expect(motion).toEqual({ scroll: 'auto', breadcrumb: '0s' });
 });
+
+test('la ruta conserva el foco hasta que la persona sale de ella', async ({ page }, info) => {
+  await login(page, info, 'generador');
+  await page.goto('/manual/directorio.html');
+  await positionHeading(page, '#cu-sistema h3');
+  const breadcrumb = page.locator('.section-breadcrumb');
+  const link = breadcrumb.getByRole('button', { name: 'Ir a 7.5 Sistema', exact: true });
+  await expect(link).toBeVisible(); await link.focus(); await expect(link).toBeFocused();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(link).toBeFocused();
+  await expect(breadcrumb).toHaveClass(/visible/);
+  await expect(breadcrumb).toHaveAttribute('aria-hidden', 'false');
+  await link.evaluate(element => (element as HTMLElement).blur());
+  await expect(breadcrumb).not.toHaveClass(/visible/);
+  await expect(breadcrumb).toHaveAttribute('aria-hidden', 'true');
+});
