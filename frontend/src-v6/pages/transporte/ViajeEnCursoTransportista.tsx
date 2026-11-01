@@ -183,6 +183,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const deliveryInFlightRef = useRef(false);
   const gpsRetryInFlightRef = useRef(false);
   const [retryingGps, setRetryingGps] = useState(false);
+  const [retryingGpsSend, setRetryingGpsSend] = useState(false);
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
@@ -300,6 +301,16 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     finally { gpsRetryInFlightRef.current = false; setRetryingGps(false); }
   };
 
+  const handleRetryGpsSend = async () => {
+    if (gpsRetryInFlightRef.current || deliveryInFlightRef.current || isActionPending || hasHandoff || handoffUnknown
+      || viajeStatus !== 'ACTIVO' || !gps.canRetryPending) return;
+    gpsRetryInFlightRef.current = true;
+    setRetryingGpsSend(true);
+    try { await gps.retryPending(); }
+    catch { toast.error('No se pudo comprobar el envío GPS', 'Revisá la conexión y volvé a intentar.'); }
+    finally { gpsRetryInFlightRef.current = false; setRetryingGpsSend(false); }
+  };
+
   useEffect(() => {
     if (!gps.storageError && deliveryError.startsWith('Ubicaciones sin guardar.')) setDeliveryError('');
   }, [gps.storageError, deliveryError]);
@@ -349,7 +360,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         else {
           deliveryInitiatedHere.current = false;
           gps.resumeGps();
-          setDeliveryError('Ubicaciones pendientes. ' + (gps.lastSendError() || 'No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.'));
+          setDeliveryError('Ubicaciones pendientes. ' + (gps.lastSendError() || 'No se pudo confirmar el envío de las ubicaciones. Revisá la conexión y volvé a intentar.'));
         }
         return;
       }
@@ -558,7 +569,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           pendingCount={gps.pendingCount}
           lastSyncAt={gps.lastSyncAt}
           onRetry={viajeStatus === 'ACTIVO' ? handleRetryGps : undefined}
+          onRetrySend={gps.canRetryPending ? handleRetryGpsSend : undefined}
           retrying={retryingGps}
+          retryingSend={retryingGpsSend}
           retryDisabled={isActionPending}
           paused={viajeStatus === 'PAUSADO'}
           storageError={gps.storageError}

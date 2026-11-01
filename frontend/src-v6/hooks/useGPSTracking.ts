@@ -72,6 +72,8 @@ interface UseGPSTrackingReturn {
   hasStorageError: () => boolean;
   resumeGps: () => void;
   retryGps: () => Promise<void>;
+  canRetryPending: boolean;
+  retryPending: () => Promise<void>;
 }
 
 function gpsSendErrorMessage(error: unknown): string {
@@ -80,7 +82,7 @@ function gpsSendErrorMessage(error: unknown): string {
   if (status === 401) return 'No se pudo verificar tu sesión. Volvé a ingresar y retomá la sincronización.';
   if (status === 403) return 'Tu cuenta no tiene permiso para enviar ubicaciones de este viaje. Contactá a soporte.';
   if (status === 409) return 'El viaje o la ubicación cambiaron. Actualizá el manifiesto y, si persiste, contactá a soporte.';
-  return 'No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.';
+  return 'No se pudo confirmar el envío de las ubicaciones. Revisá la conexión y volvé a intentar.';
 }
 
 export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionContext, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {
@@ -290,6 +292,48 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
     };
   }, [id, leaseScope, leaseKey, releaseLease, reportSendError, clearSendError]);
   const ownsGpsLease = Boolean(leaseKey && heldLeaseKey === leaseKey);
+
+  // Retry only the durable queue while keeping the existing sensor watcher
+  // and the same cross-tab lease. A lost response must reuse the point ID.
+  const retryPending = useCallback(async () => {
+    if (!id || !owner || !leaseHeldRef.current || uploadsStoppedRef.current || deliveryConfirmedRef.current
+      || activeConditionsRef.current.estado !== EstadoManifiesto.EN_TRANSITO || activeConditionsRef.current.viajeStatus !== 'ACTIVO') return;
+    const generation = trackingGenerationRef.current;
+    const active = () => mountedRef.current && leaseHeldRef.current && !uploadsStoppedRef.current && !deliveryConfirmedRef.current
+      && trackingGenerationRef.current === generation && activeContextRef.current === context
+      && activeConditionsRef.current.estado === EstadoManifiesto.EN_TRANSITO && activeConditionsRef.current.viajeStatus === 'ACTIVO';
+    await runExclusiveGpsTask(id, async () => {
+      if (!active()) return;
+      const saved = readPendingGpsQueue(owner, id, contextOwner);
+      if (!saved.ok) {
+        storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason);
+        reportSendError(new GpsPendingError(gpsStorageErrorMessage(saved.reason))); return;
+      }
+      let pending: PendingGpsPoint[];
+      try { pending = prepareGpsPoints(owner, id, saved.points, contextOwner); }
+      catch (error) {
+        storageErrorRef.current = true; setStorageError(true);
+        setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage');
+        reportSendError(error); return;
+      }
+      if (!setPendingUpdates(pending)) { reportSendError(new GpsPendingError(gpsStorageErrorMessage('storage'))); return; }
+      while (pending.length && active()) {
+        const point = pending[0];
+        try { await sendPoint(id, point); }
+        catch (error) { if (active()) reportSendError(error); return; }
+        // A confirmed response may race with stopping the watcher; remove only
+        // that exact point and keep any later fix saved during the stop.
+        const acknowledged = acknowledgePendingUpdate(point);
+        if (!acknowledged?.ok || !acknowledged.durable) {
+          if (active()) reportSendError(new GpsPendingError(gpsStorageErrorMessage(acknowledged && !acknowledged.ok ? acknowledged.reason : 'storage')));
+          return;
+        }
+        pending = acknowledged.points;
+        if (active()) setLastSyncAt(new Date());
+      }
+      if (active() && pending.length === 0) { clearSendError(); setGpsSendStatus('ok'); }
+    });
+  }, [acknowledgePendingUpdate, clearSendError, context, contextOwner, id, owner, reportSendError, sendPoint, setPendingUpdates]);
 
   // Finish in-flight HTTP writes before changing the server trip state.
   const stopAndDrain = useCallback(async () => {
@@ -666,6 +710,9 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
     hasStorageError: () => storageErrorRef.current,
     resumeGps,
     retryGps,
+    canRetryPending: ownsGpsLease && pendingCount > 0 && !storageError && !deliveryConfirmedRef.current
+      && estado === EstadoManifiesto.EN_TRANSITO && viajeStatus === 'ACTIVO',
+    retryPending,
   };
 }
 

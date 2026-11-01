@@ -17,7 +17,9 @@ interface GpsStatusPanelProps {
   pendingCount: number;
   lastSyncAt: Date | null;
   onRetry?: () => void;
+  onRetrySend?: () => void;
   retrying?: boolean;
+  retryingSend?: boolean;
   retryDisabled?: boolean;
   paused?: boolean;
   storageError?: boolean;
@@ -36,8 +38,8 @@ const STATUS_COPY: Record<GpsDisplayStatus, { label: string; tone: string; icon:
 };
 
 function formatLastSync(lastSyncAt: Date | null) {
-  if (!lastSyncAt) return 'Sin sincronizar';
-  return `Enviado ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+  if (!lastSyncAt) return 'Confirmado';
+  return `Confirmado ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · hora de este dispositivo`;
 }
 
 export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
@@ -49,7 +51,9 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   pendingCount,
   lastSyncAt,
   onRetry,
+  onRetrySend,
   retrying = false,
+  retryingSend = false,
   retryDisabled = false,
   paused = false,
   storageError = false,
@@ -75,14 +79,21 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               {pendingCount > 0 && <Badge color="warning" variant="solid" size="sm">{pendingCount} {pendingCount === 1 ? 'pendiente' : 'pendientes'}</Badge>}
               {sendStatus === 'ok' && <Badge color="success" variant="soft" size="sm">{formatLastSync(lastSyncAt)}</Badge>}
-              {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Sin enviar</Badge>}
+              {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Sin confirmar</Badge>}
             </div>
           </div>
 
           {onRetry && (retryStorage || (!storageError && ['denied', 'unavailable', 'error', 'stale', 'unknown'].includes(status))) && (
-            <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
+            <button type="button" onClick={onRetry} disabled={retrying || retryingSend || retryDisabled}
               className="mt-3 min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
               {retrying ? 'Reintentando GPS' : retryStorage ? 'Reintentar guardado' : 'Reintentar GPS'}
+            </button>
+          )}
+
+          {onRetrySend && sendStatus === 'error' && pendingCount > 0 && !storageError && (
+            <button type="button" onClick={onRetrySend} disabled={retryingSend || retrying || retryDisabled}
+              className="mt-3 min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
+              {retryingSend ? 'Comprobando envío GPS' : 'Reintentar envío GPS'}
             </button>
           )}
 

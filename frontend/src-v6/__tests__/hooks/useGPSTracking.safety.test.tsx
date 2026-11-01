@@ -283,6 +283,48 @@ describe('GPS position provenance and cleanup', () => {
     unmount();
   });
 
+  it('keeps the next fix when a delivery stops tracking during a pending retry', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    let finish!: () => void;
+    vi.mocked(manifiestoService.actualizarUbicacion)
+      .mockRejectedValueOnce(new Error('response lost'))
+      .mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    let retry!: Promise<void>, stop!: Promise<void>;
+    act(() => { retry = result.current.retryPending(); });
+    await act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(2);
+    act(() => watchSuccess[0](position(-33, -69)));
+    act(() => { stop = result.current.stopAndDrain(); });
+    await act(async () => { finish(); await Promise.all([retry, stop]); });
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([withReference({ lat: -33, lng: -69, speed: null, heading: null })]);
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(2);
+    expect(navigator.geolocation.watchPosition).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('keeps the saved reference if the account context changes during a retry', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    let finish!: () => void;
+    vi.mocked(manifiestoService.actualizarUbicacion)
+      .mockRejectedValueOnce(new Error('response lost'))
+      .mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const { result, unmount } = renderHook(() => useGPSTracking({ ...trip, sessionContext: 'session-a' }));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const saved = JSON.parse(localStorage.getItem(key)!);
+    let retry!: Promise<void>;
+    act(() => { retry = result.current.retryPending(); });
+    await act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); });
+    session.context = 'session-b';
+    await act(async () => { finish(); await retry; });
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual(saved);
+    expect(result.current.sendError).toMatch(/cuenta o actividad cambió/i);
+    unmount();
+  });
+
   it('keeps an actionable server error visible when restoring an older queued point fails', async () => {
     const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
     localStorage.setItem(key, JSON.stringify([{ lat:-32, lng:-68, speed:null, heading:null }]));
