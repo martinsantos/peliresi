@@ -34,6 +34,7 @@ test('ruta del directorio clara y accesible al filtrar por rol', async ({ page }
   await expect.poll(() => breadcrumb.locator('.sb-sub').textContent(), { timeout: 15_000 }).toBe('7.2 Generador');
   await expect.poll(() => breadcrumb.locator('.sb-section').textContent(), { timeout: 15_000 }).toBe('7. Anexo: Casos de Uso');
   await expect(breadcrumb.getByRole('button', { name: 'Ir a 7.2 Generador', exact: true })).toBeVisible();
+  await expect.poll(() => breadcrumb.locator('.sb-sub').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   const chapter = breadcrumb.getByRole('button', { name: 'Ir a 7. Anexo: Casos de Uso', exact: true });
   await chapter.focus(); await expect(chapter).toBeFocused(); await page.keyboard.press('Space');
   await expect.poll(() => page.locator('#cu-generador h3').evaluate(element => {

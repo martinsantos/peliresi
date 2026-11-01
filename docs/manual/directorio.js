@@ -445,6 +445,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var heroBottom = heroEl ? heroEl.offsetTop + heroEl.offsetHeight : 0;
     var headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 64;
     var breadcrumbHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--breadcrumb-height')) || 32;
+    var headingLabels = new WeakMap();
 
     function setBreadcrumbVisible(visible) {
       bar.classList.toggle('visible', visible);
@@ -453,9 +454,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function headingLabel(heading) {
+      if (headingLabels.has(heading)) return headingLabels.get(heading);
       var copy = heading.cloneNode(true);
       copy.querySelectorAll('.cu-section-badge, .cu-section-count').forEach(function(badge) { badge.remove(); });
-      return (copy.textContent || '').replace(/\s+/g, ' ').trim();
+      var label = (copy.textContent || '').replace(/\s+/g, ' ').trim();
+      headingLabels.set(heading, label);
+      return label;
     }
 
     function scrollToHeading(heading) {
@@ -502,9 +506,14 @@ document.addEventListener('DOMContentLoaded', function() {
       var newH2El = null;
       var newH3El = null;
       var newCUEl = null;
+      var chapter = null;
+      var chapterIndex = -1;
 
       for (var i = 0; i < headings.length; i++) {
         var h = headings[i];
+        // A chapter heading can live in a role-filtered section. Keep its
+        // semantic place in the document even if that section is hidden.
+        if (h.tagName === 'H2') { chapter = h; chapterIndex = i; }
         if (!h.getClientRects().length) continue;
         var top = h.getBoundingClientRect().top;
         if (top <= threshold) {
@@ -514,6 +523,15 @@ document.addEventListener('DOMContentLoaded', function() {
             newH3 = '';
             newH3El = null;
           } else {
+            if (chapter) {
+              newH2 = headingLabel(chapter);
+              newH2El = chapter.getClientRects().length ? chapter : null;
+              if (!newH2El) {
+                for (var k = chapterIndex + 1; k <= i; k++) {
+                  if (headings[k].getClientRects().length) { newH2El = headings[k]; break; }
+                }
+              }
+            }
             newH3 = headingLabel(h);
             newH3El = h;
           }
@@ -540,7 +558,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      if (newH2 !== currentH2 || newH3 !== currentH3 || newCU !== currentCU) {
+      if (newH2 !== currentH2 || newH3 !== currentH3 || newCU !== currentCU
+        || newH2El !== currentH2El || newH3El !== currentH3El || newCUEl !== currentCUEl) {
         currentH2 = newH2;
         currentH3 = newH3;
         currentCU = newCU;

@@ -1097,7 +1097,7 @@ table { box-shadow: 0 0 0 1px var(--border); }
   border: 0; background: transparent; font: inherit; text-align: left;
 }
 .section-breadcrumb .sb-section { max-width: 38%; min-width: 44px; overflow: hidden; text-overflow: ellipsis; }
-.section-breadcrumb .sb-sub { max-width: 34%; min-width: 44px; }
+.section-breadcrumb .sb-sub { max-width: 55%; min-width: 44px; }
 .section-breadcrumb .sb-cu { flex: 1 1 auto; max-width: none; min-width: 44px; }
 .section-breadcrumb button:focus-visible { outline: 2px solid #087a45; outline-offset: -3px; }
 @media (prefers-reduced-motion: reduce) {
