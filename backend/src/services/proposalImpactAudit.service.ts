@@ -33,8 +33,8 @@ function cause(record: ImpactRecord, readiness: ManifestReadiness): Cause {
   if (snapshot.kind === 'mismatch') return 'PARTES_O_MODALIDAD_DISTINTAS';
   if (readiness === 'SIN_TRANSPORTE') return 'SIN_TRANSPORTE';
   if (readiness === 'RECHAZADA') return 'RECHAZO_REGISTRADO';
-  if (readiness === 'INCONSISTENTE') return snapshot.kind === 'valid'
-    && proposalApprovalEvidenceValid(snapshot.proposal, record.eventos)
+  if (readiness === 'INCONSISTENTE') return (snapshot.kind === 'legacy-in-situ'
+    || (snapshot.kind === 'valid' && proposalApprovalEvidenceValid(snapshot.proposal, record.eventos)))
     && proposalStateConflict(record, snapshot.proposal, record.eventos) ? 'ESTADO_O_COORDINACION' : 'DECISION_INVALIDA';
   if (readiness === 'FALTAN_APROBACIONES') return 'FALTAN_APROBACIONES';
   if (readiness === 'FALTA_COORDINACION') return 'FALTA_COORDINACION';

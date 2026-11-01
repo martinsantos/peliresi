@@ -36,5 +36,7 @@ describe('manifest proposal readiness', () => {
   it('keeps an old in-situ agreement without a carrier blocked', () => {
     const old = { ...proposal, version: 1, modalidad: 'IN_SITU', transportistaId: null };
     expect(manifestReadiness({ ...manifest, modalidad: 'IN_SITU', transportistaId: null }, [{ tipo: MANIFEST_PROPOSAL, descripcion: JSON.stringify(old) }, ...approvals, { tipo: 'INICIO_COORDINACION' }])).toBe('SIN_TRANSPORTE');
+    expect(manifestReadiness({ ...manifest, estado: 'PENDIENTE_APROBACION', modalidad: 'IN_SITU', transportistaId: null },
+      [{ tipo: MANIFEST_PROPOSAL, descripcion: JSON.stringify(old) }, approvals[0], approvals[2], { tipo: 'INICIO_COORDINACION' }])).toBe('INCONSISTENTE');
   });
 });

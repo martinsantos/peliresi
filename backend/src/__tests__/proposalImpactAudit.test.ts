@@ -88,6 +88,13 @@ describe('anonymous approval impact analysis', () => {
     expect(report.categoriasExcluyentes).toHaveLength(1);
     expect(report.categoriasExcluyentes[0]).toMatchObject({ estadoAprobacion: 'INCONSISTENTE', causa: 'ESTADO_O_COORDINACION', cantidad: 2 });
   });
+  it('reports a pending legacy origin with an existing start as a state conflict', () => {
+    const collector = new ProposalImpactAccumulator();
+    const old = { ...proposal, version: 1, modalidad: 'IN_SITU', transportistaId: null };
+    collector.add(record([{ ...marker(), descripcion: JSON.stringify(old) }, approvals()[0], approvals()[2], coordination()],
+      { estado: 'PENDIENTE_APROBACION', modalidad: 'IN_SITU', transportistaId: null }));
+    expect(collector.report('ARTIFICIAL').categoriasExcluyentes[0]).toMatchObject({ estadoAprobacion: 'INCONSISTENTE', causa: 'ESTADO_O_COORDINACION' });
+  });
 });
 
 describe('read-only scan contract', () => {

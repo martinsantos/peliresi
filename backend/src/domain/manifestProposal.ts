@@ -95,7 +95,7 @@ export function manifestReadiness(manifest: ProposalManifest, events: ProposalEv
   const snapshot = inspectProposal(manifest, events);
   if (snapshot.kind === 'missing') return 'SIN_PROPUESTA';
   if (!('proposal' in snapshot)) return 'INCONSISTENTE';
-  if (snapshot.kind === 'legacy-in-situ') return 'SIN_TRANSPORTE';
+  if (snapshot.kind === 'legacy-in-situ') return proposalStateConflict(manifest, snapshot.proposal, events) ? 'INCONSISTENTE' : 'SIN_TRANSPORTE';
   if (events.some(event => event.tipo === 'RECHAZO_PARTE')) return 'RECHAZADA';
   if (!proposalApprovalEvidenceValid(snapshot.proposal, events)) return 'INCONSISTENTE';
   if (proposalStateConflict(manifest, snapshot.proposal, events)) return 'INCONSISTENTE';

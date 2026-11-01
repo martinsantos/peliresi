@@ -291,6 +291,13 @@ describe('explicit coordination start',()=>{
   await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
   expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409,message:expect.stringContaining('nueva propuesta')}));
   expect(json).not.toHaveBeenCalled();expect(mock.events).toHaveLength(eventCount);
+  mock.manifest.estado='PENDIENTE_APROBACION';
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[{...mock.manifest,eventos:mock.events,residuos:[]}]);
+  const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+  next.mockClear();await inTrainingSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data.items[0]).toMatchObject({requiereRevisionPropuesta:true,requiereMiAprobacion:false,action:'Propuesta por revisar'});
+  json.mockClear();
   next.mockClear();mock.manifest.estado='RECIBIDO';
   await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
   expect(next).not.toHaveBeenCalled();expect(json.mock.calls[0][0].data.inicio).toEqual(started.createdAt);

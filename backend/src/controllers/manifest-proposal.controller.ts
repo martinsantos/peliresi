@@ -254,7 +254,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    const damaged=['invalid','mismatch','duplicate'].includes(snapshot.kind)
     || (snapshot.kind==='valid'&&!proposalApprovalEvidenceValid(snapshot.proposal,m.eventos));
    const conflictingRejection=['PENDIENTE_APROBACION','APROBADO'].includes(m.estado)&&m.eventos.some(e=>e.tipo==='RECHAZO_PARTE');
-   const conflictingState=snapshot.kind==='valid'&&proposalStateConflict(m,snapshot.proposal,m.eventos);
+   const conflictingState=!!proposal&&proposalStateConflict(m,proposal,m.eventos);
    const requiresReview=['BORRADOR','PENDIENTE_APROBACION','APROBADO'].includes(m.estado)
     && (damaged||conflictingRejection||conflictingState||(m.estado==='PENDIENTE_APROBACION'&&snapshot.kind==='missing'));
    const role=proposal?(proposalRole(req.user,proposal)||(req.user.rol==='ADMIN'?'ADMIN':null)):req.user.rol;
