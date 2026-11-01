@@ -1,8 +1,10 @@
 # SITREP · balance de cierre de la revisión
 
-**Estado: avance técnico verificable en preview; aceptación integral y publicación pendientes.** El candidato de producto `62516a08a3fe189d7d5612520d678162674f1b32` completó los 37 casos de navegador descritos abajo, repartidos en dos tandas sobre el mismo código. La corrida integrada anterior en una sola tanda corresponde a `dde430161d1f6cdc374f1a7999ff339e79182b82`. No se consultaron datos reales ni se publicó el candidato actual. El registro detallado, las reproducciones y los límites están en [REFACTOR-UX-20261025.md](REFACTOR-UX-20261025.md).
+**Estado: avance técnico verificable en preview; aceptación integral y publicación pendientes.** El candidato `80a283bb7987a1906c8857eb5b147b2054d30b68` agrega una corrección dirigida de la cola GPS. La regresión de 37 casos descrita abajo corresponde a `62516a08a3fe189d7d5612520d678162674f1b32`, en dos tandas; no se repitió completa sobre el candidato posterior. La corrida integrada anterior en una sola tanda corresponde a `dde430161d1f6cdc374f1a7999ff339e79182b82`. No se consultaron datos reales ni se publicó el candidato actual. El registro detallado, las reproducciones y los límites están en [REFACTOR-UX-20261025.md](REFACTOR-UX-20261025.md).
 
 ## Qué se comprobó en el corte actual
+
+La revisión dirigida UX264 detectó y corrigió en preview un caso de cola GPS ilegible que se interpretaba como vacía. Pasaron 116 pruebas dirigidas y dos casos de navegador en web y app, más 55 del manual y resguardos sobre el contenido de manual conservado en este candidato. El bloqueo protege la copia que todavía exista en este dispositivo; no recupera una copia borrada ni revisa otros dispositivos. Estas comprobaciones no sustituyen la regresión completa de `62516a08`, Android físico ni la observación con usuarios.
 
 Las dos tandas usaron datos artificiales, el producto real compilado para web y la ruta app, PostgreSQL privado y Chromium con un trabajador, una CPU, 2 GiB y sin swap adicional. CAP permaneció cerrado, correo/push apagados y tareas programadas pausadas; se verificaron cero intentos y envíos de correo. Las opciones operativas necesarias se activaron únicamente en los procesos y compilaciones aislados de QA.
 
