@@ -1,11 +1,9 @@
 import { expect, test, type Page, type TestInfo, type Worker } from '@playwright/test';
-import { readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { writeFileSync } from 'node:fs';
 import { assertCloudDatabase, backendRequire } from '../safety';
 import { isolatedMapTiles, login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
-const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'fixture.json'), 'utf8'));
 const { PrismaClient } = backendRequire('@prisma/client');
 
 async function activeWorker(page: Page, info: TestInfo): Promise<Worker> {
@@ -54,10 +52,10 @@ async function simulateDeviceClick(worker: Worker, rawUrl: string, app: boolean)
 for (const signedIn of [true, false]) test(`aviso simulado conserva destino ${signedIn ? 'con sesión' : 'tras ingresar'}`, async ({ page }, info) => {
   const db = new PrismaClient();
   try {
-    const account = await db.usuario.findUniqueOrThrow({ where: { id: fixture.users.generador }, select: { email: true } });
+    const account = await db.usuario.findUniqueOrThrow({ where: { email: 'generador@night-qa.invalid' }, select: { id: true, email: true } });
     expect(account.email).toBe('generador@night-qa.invalid');
     const title = `QA aviso de dispositivo ${info.project.name} ${signedIn ? 'sesión' : 'ingreso'}`;
-    const notice = await db.notificacion.create({ data: { usuarioId: fixture.users.generador, tipo: 'INFO_GENERAL',
+    const notice = await db.notificacion.create({ data: { usuarioId: account.id, tipo: 'INFO_GENERAL',
       prioridad: 'NORMAL', titulo: title, mensaje: 'QA aviso artificial; no se envió una notificación al dispositivo.' } });
     if (signedIn) await login(page, info, 'generador');
     else {
