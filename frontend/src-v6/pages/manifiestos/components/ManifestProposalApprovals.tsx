@@ -13,6 +13,7 @@ const names: Record<string, string> = { OPERADOR: 'Operador', GENERADOR: 'Genera
 import { ManifestNextStep } from '../../../components/ManifestNextStep';
 import { rejectionReason } from '../../../utils/manifestWork';
 import { PartyApprovalStatus } from '../../../components/PartyApprovalStatus';
+import { LegacyProposalRecoveryLink } from './LegacyProposalRecoveryLink';
 export function ManifestProposalApprovals({ id, onSign }: { id: string; estado?: string; onSign: () => void }) {
   const { currentUser } = useAuth(); const qc = useQueryClient();
   const [motivo,setMotivo] = useState(''),[rejecting,setRejecting]=useState(false);
@@ -45,7 +46,7 @@ export function ManifestProposalApprovals({ id, onSign }: { id: string; estado?:
     <PartyApprovalStatus partes={data.partes}/>
     </div>
     <div className="min-w-0 space-y-3">
-    {data.requiereNuevaPropuesta&&<p role="alert" className="rounded-xl bg-warning-50 p-3 text-warning-900">Esta propuesta anterior no tiene transporte aprobador. Creá una nueva propuesta con las tres partes para iniciar; el historial anterior se conserva.</p>}
+    {data.requiereNuevaPropuesta&&<div role="alert" className="rounded-xl bg-warning-50 p-3 text-warning-900"><p>Esta propuesta anterior no tiene transporte aprobador. Una cuenta habilitada debe presentar una nueva propuesta con las tres partes para iniciar; el historial anterior se conserva.</p><LegacyProposalRecoveryLink manifestId={id} /></div>}
     {['PENDIENTE_APROBACION','APROBADO'].includes(data.estado) && !data.rechazo && !data.requiereNuevaPropuesta && <ManifestNextStep work={{...data,requiereMiAprobacion:!!data.puedeAprobar}} role={currentUser.rol} showLabel={!!data.inicio || (!data.puedeAprobar && !data.puedeIniciar)}/>}
     {data.estado==='PENDIENTE_APROBACION' && !data.puedeAprobar && data.partes.some(p=>p.rol===currentUser.rol&&p.aprobada) && <p role="status" className="text-sm text-neutral-700">Tu aprobación está registrada.</p>}
     {data.puedeAprobar==='GENERADOR'?<Button fullWidth onClick={onSign}>Firmar Manifiesto</Button>:data.puedeAprobar?<Button fullWidth disabled={busy} onClick={()=>void act('approve')}>{busy?'Guardando...':`Aprobar como ${names[data.puedeAprobar].toLowerCase()}`}</Button>:null}

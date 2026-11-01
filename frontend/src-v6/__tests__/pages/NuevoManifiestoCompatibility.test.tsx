@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NuevoManifiestoPage from '../../pages/manifiestos/NuevoManifiestoPage';
 import { toast } from '../../components/ui/Toast';
@@ -57,6 +57,11 @@ function changeResidue() {
   fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 }
 
+function SourceProbe() {
+  const location = useLocation();
+  return <output data-testid="source-location">{JSON.stringify({ path: location.pathname, state: location.state })}</output>;
+}
+
 describe('manifest transport compatibility after changing residues', () => {
   afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
@@ -66,6 +71,49 @@ describe('manifest transport compatibility after changing residues', () => {
     mocks.refreshError = false;
     mocks.create.mockResolvedValue({ id: 'manifest-1', numero: 'QA-1' });
     HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('returns to the prior manifest without overwriting a recovered draft or creating a proposal', () => {
+    const first = render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);
+    choose('Generador *', /Generador QA/);
+    const key = Object.keys(localStorage).find(item => item.startsWith('sitrep:manifest-form:v1:'))!;
+    const saved = localStorage.getItem(key);
+    first.unmount();
+
+    render(<MemoryRouter initialEntries={[{ pathname: '/manifiestos/nuevo', state: {
+      manifestPreviousId: 'qa-legacy', manifestListReturn: '/manifiestos?estado=APROBADO',
+    } }]}><Routes>
+      <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+      <Route path="/manifiestos/:id" element={<SourceProbe />} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByText('Borrador recuperado')).toBeVisible();
+    expect(screen.getByText(/puede pertenecer a otro manifiesto/)).toBeVisible();
+    expect(screen.getByText(/no se copian ni se vinculan automáticamente/)).toBeVisible();
+    expect(screen.getByLabelText('Generador *')).toHaveTextContent('Generador QA');
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al manifiesto anterior' }));
+    expect(screen.getByTestId('source-location')).toHaveTextContent('"path":"/manifiestos/qa-legacy"');
+    expect(screen.getByTestId('source-location')).toHaveTextContent('"manifestListReturn":"/manifiestos?estado=APROBADO"');
+    expect(localStorage.getItem(key)).toBe(saved);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('ignores an invalid prior manifest reference rather than navigating outside the list', () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/manifiestos/nuevo', state: { manifestPreviousId: '../dashboard' } }]}><NuevoManifiestoPage /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: 'Volver al manifiesto anterior' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Volver a Manifiestos' })).toBeVisible();
+  });
+
+  it('returns inside the app basename and keeps the home origin', () => {
+    render(<MemoryRouter basename="/app" initialEntries={[{ pathname: '/app/manifiestos/nuevo', state: {
+      manifestPreviousId: 'qa-legacy', manifestHomeReturn: '/dashboard?filtro=espera',
+    } }]}><Routes>
+      <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+      <Route path="/manifiestos/:id" element={<SourceProbe />} />
+    </Routes></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al manifiesto anterior' }));
+    expect(screen.getByTestId('source-location')).toHaveTextContent('"path":"/manifiestos/qa-legacy"');
+    expect(screen.getByTestId('source-location')).toHaveTextContent('"manifestHomeReturn":"/dashboard?filtro=espera"');
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 
   it('never selects the first vehicle/driver by default', async () => {

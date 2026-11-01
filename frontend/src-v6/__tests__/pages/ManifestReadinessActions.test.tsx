@@ -1,20 +1,31 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import ManifiestoActions from '../../pages/manifiestos/components/ManifiestoActions';
 import { EstadoManifiesto, type Manifiesto } from '../../types/models';
 
 vi.mock('../../pages/manifiestos/components/ManifestProposalApprovals', () => ({ ManifestProposalApprovals: () => <div>Panel de aprobaciones</div> }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user', rol: 'GENERADOR', actorId: 'qa-actor' }, isRestricted: false }) }));
+vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
 const pending = { isPending: false };
 const marker = [{ tipo: 'PROPUESTA_PARTES_V1' }] as NonNullable<Manifiesto['eventos']>;
 const mutations = { firmar: pending, confirmarRetiro: pending, confirmarEntrega: pending, confirmarRecepcion: pending, confirmarRecepcionInSitu: pending, pesaje: pending, registrarTratamiento: pending, cerrar: pending, rechazar: pending, registrarIncidente: pending, revertir: pending };
 function mount(manifiesto: Partial<Manifiesto>, role = 'TRANSPORTISTA', isInSitu = false, isAdmin = false) {
   const noop = vi.fn(), reload = vi.fn(), action = vi.fn();
-  const view = render(<ManifiestoActions manifiesto={manifiesto} manifiestoId="qa" userRol={role} isAdmin={isAdmin} isActionPending={false} isCancelling={false} isInSitu={isInSitu} mutations={mutations}
+  const view = render(<MemoryRouter><ManifiestoActions manifiesto={manifiesto} manifiestoId="qa" userRol={role} isAdmin={isAdmin} isActionPending={false} isCancelling={false} isInSitu={isInSitu} mutations={mutations}
     onRetryApprovalCheck={reload} onCerrar={noop} onFirmar={noop} onConfirmarRetiro={action} onConfirmarEntrega={noop} onConfirmarRecepcion={noop} onConfirmarRecepcionInSitu={action}
-    onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} />);
+    onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} /></MemoryRouter>);
   return { ...view, reload, action };
 }
 describe('physical start uses the server readiness of the complete proposal', () => {
+  it('offers the separate proposal form for a historical draft without enabling the old manifest', () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
+    mount({ estado: EstadoManifiesto.BORRADOR, eventos: [] }, 'GENERADOR');
+    expect(screen.getByRole('link', { name: 'Abrir nueva propuesta' })).toHaveAttribute('href', '/manifiestos/nuevo');
+    expect(screen.getByText(/Las tres partes deben aprobar antes de iniciar/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Firmar Manifiesto' })).not.toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
   it.each(['INCONSISTENTE', 'RECHAZADA', 'FALTAN_APROBACIONES', 'FALTA_COORDINACION', undefined] as const)('blocks pickup when readiness is %s', state => {
     const { action } = mount({ estado: EstadoManifiesto.APROBADO, eventos: marker, aprobacionOperacion: state });
     const button = screen.getByRole('button', { name: 'Confirmar Retiro' });

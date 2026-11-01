@@ -46,7 +46,7 @@ describe('manual documentation stays usable and truthful', () => {
   it('distinguishes simulation, internal delivery, reading, legal decisions and unimplemented families', () => {
     const text = catalogue.steps.flatMap(step => step.body).join(' ');
     expect(catalogue.safety).toContain('datos sintéticos y no acreditan la configuración actual');
-    for (const phrase of ['No crea la regla, casos ni avisos', 'inactivas', 'no un vencimiento legal', 'no significa aceptación legal', 'hasta finalizar el 10 en Mendoza', 'nunca todo el padrón', 'No se envía correo ni push', 'no cierra un manifiesto', 'todavía no son reglas operativas']) {
+    for (const phrase of ['sin crear casos ni avisos', 'estado inicial depende de la familia elegida', 'no un vencimiento legal', 'no significa aceptación legal', 'hasta finalizar el 10 en Mendoza', 'nunca todo el padrón', 'No se envía correo ni push', 'no cierra un manifiesto', 'todavía no son reglas operativas']) {
       expect(text).toContain(phrase);
     }
   });
@@ -60,7 +60,9 @@ describe('manual documentation stays usable and truthful', () => {
       expect(createHash('sha256').update(bytes).digest('hex')).toBe(item.sha256);
       expect(bytes.readUInt32BE(16)).toBe(item.width); expect(bytes.readUInt32BE(20)).toBe(item.height);
     }
-    for (const step of catalogue.steps) {
+    const capturedSteps = catalogue.steps.filter(step => step.image);
+    expect(capturedSteps.length).toBeGreaterThan(0);
+    for (const step of capturedSteps) {
       expect(step.caption).toContain('Datos sintéticos');
       expect(step.caption).toContain('No acredita el estado actual de esta instalación');
       expect(receipt.files.some((item: { file: string }) => step.image === 'screenshots/' + item.file)).toBe(true);
@@ -114,10 +116,20 @@ it('documents explicit operational approvals separately from CAP without inventi
 it('explains eventual search, live updates and explicit conflict recovery', () => {
  const guide = data.guides.find(item => item.id === 'eventuales-aprobaciones-avisos');
  const content = JSON.stringify(guide);
- for (const text of ['Buscar eventual', 'Etapa del eventual', 'Usar versión actual', 'no envía ni aprueba', 'sin duplicarla']) expect(content).toContain(text);
+ for (const text of ['Buscar eventual', 'Etapa del eventual', 'Usar versión actual', 'no envía ni aprueba', 'se reutilizan la referencia y los datos originales', 'No edites ni descartes el envío pendiente']) expect(content).toContain(text);
  expect(guide?.safety).toContain('La referencia BI- es interna');
  expect(content).toContain('Correo y push permanecen apagados');
  expect(content).not.toContain('en este ensayo');
+});
+
+it('explains the historical recovery link and a different restored draft without suggesting that records are linked', () => {
+ for (const id of ['manifiestos-tres-partes', 'generador-crear-manifiesto']) {
+  const guide = data.guides.find(item => item.id === id)!;
+  const content = guide.steps.flatMap(step => step.body).join(' ');
+  for (const text of ['Abrir nueva propuesta', 'no copia ni vincula automáticamente', 'puede corresponder a otra operación', 'propuesta duplicada']) {
+   expect(content).toContain(text);
+  }
+ }
 });
 
 

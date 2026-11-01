@@ -17,6 +17,7 @@ import { ActionModals } from './ActionModals';
 import { ConfirmManifestClosure } from './ConfirmManifestClosure';
 import { manifestProposalsVisible } from '../../../utils/manifestFeatures';
 import { PendingIncidentNotice, type PendingIncidentNoticeProps } from '../../../components/manifiestos/PendingIncidentNotice';
+import { LegacyProposalRecoveryLink } from './LegacyProposalRecoveryLink';
 
 interface MutationState {
   isPending: boolean;
@@ -121,7 +122,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
         <CardContent>
           {legacyBlocked && <section aria-label="Aprobaciones pendientes" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
             <h3 className="font-bold">Este manifiesto necesita una nueva propuesta</h3>
-            <p className="mt-1">{proposalsVisible ? 'Creá una nueva propuesta con generador, transporte y operador.' : 'Contactá a Ambiente para habilitar una nueva propuesta con generador, transporte y operador.'} Las tres partes deben aprobar antes de iniciar; este registro se conserva.</p>
+            <p className="mt-1">{proposalsVisible ? 'Una cuenta habilitada debe presentar una nueva propuesta con generador, transporte y operador.' : 'Contactá a Ambiente para habilitar una nueva propuesta con generador, transporte y operador.'} Las tres partes deben aprobar antes de iniciar; este registro se conserva.</p>
+            {proposalsVisible && <LegacyProposalRecoveryLink manifestId={manifiestoId} />}
           </section>}
           {(pendingWithoutProposal || inconsistentProposal) && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">No se pueden comprobar las aprobaciones. Contactá a Ambiente para revisar este manifiesto; el historial se conserva y no se puede iniciar.</p>}
           {m.estado === 'APROBADO' && !m.aprobacionOperacion && !legacyBlocked && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">No se pudo verificar si están cumplidas las aprobaciones. Actualizá el manifiesto antes de continuar. {onRetryApprovalCheck && <button type="button" className="min-h-11 font-semibold underline" onClick={onRetryApprovalCheck}>Actualizar manifiesto</button>}</p>}

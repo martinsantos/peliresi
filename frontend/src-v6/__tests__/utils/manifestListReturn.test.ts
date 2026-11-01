@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { manifestListReturn, manifestWorkspaceReturn } from '../../utils/manifestListReturn';
+import { manifestListReturn, manifestWorkspaceReturn, previousManifestReturn } from '../../utils/manifestListReturn';
 
 describe('manifest list return context', () => {
   it('retains search, phase, dates, actors and sorting on the same surface', () => {
@@ -13,6 +13,15 @@ describe('manifest list return context', () => {
     }
     expect(manifestListReturn(null, '/manifiestos')).toBe('/manifiestos');
   });
+});
+
+it.each(['', '/mobile', '/app'])('only restores a same-surface previous manifest on %s', prefix => {
+  const list = prefix + '/manifiestos';
+  expect(previousManifestReturn({ manifestPreviousId: 'cm-qa_123' }, list)).toBe(list + '/cm-qa_123');
+  for (const invalid of ['', '../dashboard', 'a/b', '//other.invalid', 'a?x=1', 'a#x', 'nuevo', 'NUEVO', 'baja-intensidad', 'a'.repeat(129), 123, null]) {
+    expect(previousManifestReturn({ manifestPreviousId: invalid }, list)).toBeNull();
+  }
+  expect(previousManifestReturn(null, list)).toBeNull();
 });
 
 it.each(['','/mobile','/app'])('returns to the explicit home origin or the filtered list on %s',prefix=>{

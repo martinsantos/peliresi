@@ -22,3 +22,11 @@ export function manifestWorkspaceReturn(state: unknown, listPath: string): {path
   }
   return {path:manifestListReturn(state,listPath),label:'Manifiestos'};
 }
+
+/** A source manifest is a navigation hint, never a source of form data or
+ * authorization. Only accept a single identifier on this same surface. */
+export function previousManifestReturn(state: unknown, listPath: string): string | null {
+  const id = (state as { manifestPreviousId?: unknown } | null)?.manifestPreviousId;
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id) && !['nuevo', 'baja-intensidad'].includes(id.toLowerCase())
+    ? `${listPath}/${id}` : null;
+}

@@ -35,7 +35,7 @@ import type { CatalogoItem } from '../../types/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import { manifestDraftScope, useManifestDraft, type ManifestFormData } from '../../hooks/useManifestDraft';
-import { manifestListReturn } from '../../utils/manifestListReturn';
+import { manifestListReturn, manifestWorkspaceReturn, previousManifestReturn } from '../../utils/manifestListReturn';
 
 function ActorSummary({ actor, label }: { actor?: CatalogoItem; label: string }) {
   if (!actor) return null;
@@ -146,10 +146,15 @@ const NuevoManifiestoForm: React.FC = () => {
   const { step, form: formData } = draft.draft;
   const setStep = (value: number) => draft.update(previous => ({ ...previous, step: value }));
   const setFormData = (change: React.SetStateAction<ManifestFormData>) => draft.update(previous => ({ ...previous, form: typeof change === 'function' ? change(previous.form) : change }));
-  const returnTo = manifestListReturn(location.state, mp('/manifiestos'));
+  const listPath = mp('/manifiestos');
+  const returnTo = manifestListReturn(location.state, listPath);
+  const previousManifest = previousManifestReturn(location.state, listPath);
   const returnToList = () => {
     if (draft.error && draft.dirty && !window.confirm('No se pudo guardar el borrador en este dispositivo. Si cerrás la app, podrías perder lo cargado. ¿Salir igualmente?')) return;
-    navigate(returnTo);
+    if (previousManifest) {
+      const origin = manifestWorkspaceReturn(location.state, listPath);
+      navigate(previousManifest, { state: origin.label === 'Inicio' ? { manifestHomeReturn: origin.path } : { manifestListReturn: origin.path } });
+    } else navigate(returnTo);
   };
   const [discardDraft, setDiscardDraft] = useState(false);
   const pendingSendNotice = useRef<HTMLDivElement>(null);
@@ -444,15 +449,21 @@ const NuevoManifiestoForm: React.FC = () => {
             <Button
               variant="ghost"
               className="shrink-0"
-              aria-label="Volver a Manifiestos"
+              aria-label={previousManifest ? 'Volver al manifiesto anterior' : 'Volver a Manifiestos'}
               leftIcon={<ArrowLeft size={20} aria-hidden="true" />}
               onClick={returnToList}
             >
-              Manifiestos
+              {previousManifest ? 'Manifiesto anterior' : 'Manifiestos'}
             </Button>
           </div>
         </div>
       </header>
+
+      {previousManifest && <div role="status" className="mb-3 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900">
+        <p className="font-semibold">Nueva propuesta para revisar</p>
+        <p className="mt-1">El manifiesto anterior se conserva. Sus datos y aprobaciones no se copian ni se vinculan automáticamente; revisá que no exista otra propuesta para evitar duplicados.</p>
+        {draft.restored && <p className="mt-1">Se recuperó un borrador de este dispositivo que puede pertenecer a otro manifiesto. Revisá sus datos antes de continuar.</p>}
+      </div>}
 
       {!proposalsAvailable && <div role="status" className="mb-3 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
         <p className="font-semibold">Las propuestas de las tres partes no están habilitadas</p>

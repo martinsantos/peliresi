@@ -1,9 +1,11 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {cleanup,render,screen,waitFor,act,fireEvent} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {MemoryRouter} from 'react-router-dom';
 const mock=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}));
 vi.mock('../../services/api',()=>({api:mock}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'transport-user',rol:'TRANSPORTISTA',actorId:'transport',training:false}})}));
+vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:null})}));
 import {ManifestProposalApprovals} from '../../pages/manifiestos/components/ManifestProposalApprovals';
 afterEach(()=>{cleanup();vi.unstubAllEnvs();vi.clearAllMocks();});
 it('refreshes the parent when another party starts coordination without changing APROBADO',async()=>{
@@ -54,12 +56,13 @@ it('keeps a historical in-situ agreement without transport blocked',async()=>{
  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
  mock.get.mockResolvedValue({data:{data:{modalidad:'IN_SITU',autorRol:'GENERADOR',estado:'APROBADO',inicio:null,puedeIniciar:false,puedeAprobar:null,requiereNuevaPropuesta:true,partes:[{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:true}]}}});
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
- render(<QueryClientProvider client={client}><ManifestProposalApprovals id="in-situ" onSign={()=>{}}/></QueryClientProvider>);
+ render(<MemoryRouter><QueryClientProvider client={client}><ManifestProposalApprovals id="in-situ" onSign={()=>{}}/></QueryClientProvider></MemoryRouter>);
  expect(await screen.findByText('Propuesta anterior')).toBeVisible();
  expect(screen.getByLabelText('Generador: Aprobado')).toBeVisible();
  expect(screen.getByLabelText('Operador: Aprobado')).toBeVisible();
  expect(screen.queryByLabelText(/^Transporte:/)).not.toBeInTheDocument();
  expect(screen.getByRole('alert')).toHaveTextContent('no tiene transporte aprobador');
+ expect(screen.getByRole('link',{name:'Abrir nueva propuesta'})).toHaveAttribute('href','/manifiestos/nuevo');
  expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();
  client.clear();
 });
