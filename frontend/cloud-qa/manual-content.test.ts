@@ -201,7 +201,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   const recovery = JSON.stringify(guides.find((g: any) => g.id === 'resolver-gps'));
   assert.match(start, /la señal del dispositivo por sí sola no confirma/i);
   assert.match(start, /si la ubicación quedó sin actualizar o su hora no puede verificarse, usá Reintentar GPS/i);
-  assert.match(start, /hora indicada en Enviado/i);
+  assert.match(start, /Confirmado con la hora de este dispositivo/i);
   const delivery = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
   assert.match(delivery, /sólo se adjunta al incidente o la entrega si la lectura del dispositivo sigue siendo reciente al confirmar/i);
   assert.match(delivery, /podés continuar sin adjuntarla/i);
@@ -210,8 +210,11 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(start, /no se garantiza el seguimiento al cerrar la app/i);
   assert.match(recovery, /En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece/);
   assert.match(recovery, /desplegá «Cómo habilitar la ubicación»/);
-  assert.match(recovery, /Administración puede consultar el punto recibido desde Monitor/);
-  assert.match(recovery, /la hora indica cuándo llegó a SITREP y el punto puede ser anterior/i);
+  assert.match(recovery, /Administración puede consultar la hora de recepción registrada por SITREP en Monitor/);
+  assert.match(recovery, /el punto puede ser anterior si no había conexión/i);
+  assert.match(recovery, /Reintentar envío GPS/);
+  assert.match(recovery, /la ubicación puede haber llegado aunque se haya perdido la respuesta/i);
+  assert.match(recovery, /el sensor sigue funcionando/i);
   assert.match(recovery, /una entrega puede quedar guardada para enviarse al reconectar con la misma cuenta/i);
   assert.match(recovery, /no pudo comprobar si existe un relevo, reconectate/i);
   assert.match(recovery, /ubicaciones anteriores sin titular identificado se conservan para revisión/i);

@@ -169,7 +169,7 @@ test('sends pending GPS before handing the trip to a replacement', async ({ brow
     await page.getByLabel('Motivo del traspaso').fill('Rotura simulada de prueba');
     await page.getByRole('button', { name: 'Confirmar traspaso', exact: true }).click();
     const handoffAlert = page.getByRole('form', { name:'Registrar traspaso de carga' }).getByRole('alert');
-    await expect(handoffAlert).toHaveText('No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.');
+    await expect(handoffAlert).toHaveText('No se pudo confirmar el envío de las ubicaciones. Revisá la conexión y volvé a intentar.');
     await expect(handoffAlert).toBeVisible();
     await expect(handoffAlert).toBeFocused();
     expect(handoffs).toBe(0);
