@@ -51,6 +51,9 @@ async function simulateDeviceClick(worker: Worker, rawUrl: string, app: boolean)
 
 for (const signedIn of [true, false]) test(`aviso simulado conserva destino ${signedIn ? 'con sesión' : 'tras ingresar'}`, async ({ page }, info) => {
   const db = new PrismaClient();
+  const pageErrors: string[] = [], consoleErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text().replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[JWT omitido]')); });
   try {
     const account = await db.usuario.findUniqueOrThrow({ where: { email: 'generador@night-qa.invalid' }, select: { id: true, email: true } });
     expect(account.email).toBe('generador@night-qa.invalid');
@@ -80,10 +83,26 @@ for (const signedIn of [true, false]) test(`aviso simulado conserva destino ${si
       expect((await response).status()).toBe(200);
     }
     await expect(page).toHaveURL(target);
+    await expect(page).toHaveTitle(/SITREP/i);
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(pageErrors).toEqual([]);
     await page.screenshot({ path: info.outputPath('aviso-sintetico.png'), animations: 'disabled', scale: 'css' });
     writeFileSync(info.outputPath('proof.json'), JSON.stringify({ synthetic: true, pushSent: false, systemClick: false,
-      workerHandlerSimulated: true, navigationAwaited: result.waited, signedIn, destinationOpenedAfterSimulation: true }), { flag: 'wx', mode: 0o600 });
+      workerHandlerSimulated: true, navigationAwaited: result.waited, signedIn, destinationOpenedAfterSimulation: true, consoleErrors }), { flag: 'wx', mode: 0o600 });
   } finally { await db.$disconnect(); }
+});
+
+test('el manual distingue la campana de los avisos opcionales del dispositivo', async ({ page }, info) => {
+  await isolatedMapTiles(page, info);
+  await page.goto('/manual/directorio.html');
+  const section = page.getByRole('button', { name: 'CU-S09: Enviar Notificaciones Push', exact: true });
+  await section.scrollIntoViewIfNeeded(); await section.click();
+  await expect(section).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText(/La campana y la bandeja de Avisos muestran/)).toBeVisible();
+  await expect(page.getByText(/Durante los ensayos de preview están apagadas/)).toBeVisible();
+  await expect(page.getByText(/Si no se abre o falta conexión/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: info.outputPath('manual-notificaciones.png'), animations: 'disabled', scale: 'css' });
 });

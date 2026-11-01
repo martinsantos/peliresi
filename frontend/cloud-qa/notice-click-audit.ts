@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase, assertCloudEnvironment, backendRequire, root } from './safety.ts';
 import { qaBackendEntry } from './rollback-backend.ts';
@@ -56,16 +56,18 @@ const unit = read('unit.json'); assert.equal(unit.success, true); assert.equal(u
 assert.equal(unit.numFailedTests, 0); assert.equal(unit.numPendingTests, 0);
 const tap = readFileSync(path.join(out, 'manual-final.tap'), 'utf8');
 assert.match(tap, /# tests 54\b/); assert.match(tap, /# pass 54\b/); assert.match(tap, /# fail 0\b/);
-const browser = read('browser.json'); assert.equal(browser.stats.expected, 6); assert.equal(browser.stats.unexpected, 0);
+const browser = read('browser.json'); assert.equal(browser.stats.expected, 9); assert.equal(browser.stats.unexpected, 0);
 assert.equal(browser.stats.skipped, 0); assert.equal(browser.stats.flaky, 0); assert.deepEqual(browser.errors, []);
 const proofFiles = readdirSync(path.join(out, 'browser'), { withFileTypes: true })
-  .filter(entry => entry.isDirectory()).map(entry => path.join(out, 'browser', entry.name, 'proof.json'));
+  .filter(entry => entry.isDirectory()).map(entry => path.join(out, 'browser', entry.name, 'proof.json')).filter(existsSync);
 assert.equal(proofFiles.length, 6);
+const consoleErrors: string[] = [];
 for (const file of proofFiles) {
   const proof = JSON.parse(readFileSync(file, 'utf8'));
   assert.equal(proof.synthetic, true); assert.equal(proof.pushSent, false); assert.equal(proof.systemClick, false);
   assert.equal(proof.workerHandlerSimulated, true); assert.equal(proof.navigationAwaited, true);
   assert.equal(proof.destinationOpenedAfterSimulation, true);
+  assert.ok(Array.isArray(proof.consoleErrors)); consoleErrors.push(...proof.consoleErrors);
 }
 const update = read('update-browser.json'); assert.equal(update.stats.expected, 2); assert.equal(update.stats.unexpected, 0);
 assert.equal(update.stats.skipped, 0); assert.equal(update.stats.flaky, 0); assert.deepEqual(update.errors, []);
@@ -93,7 +95,8 @@ try {
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, production: false, previousProductCommit: previous.productCommit, frontendBuildCommit: compiled,
     previousIntegratedCommit: previous.previousIntegratedCommit, previousIntegratedBrowserTests: previous.previousIntegratedBrowserTests,
-    simulatedClickBrowserTests: 6, updateBrowserTests: 2, unitTests: 86, manualTests: 54, realPushSent: false, systemClickVerified: false,
+    simulatedClickBrowserTests: 6, manualBrowserTests: 3, updateBrowserTests: 2, unitTests: 86, manualTests: 54,
+    consoleErrors, realPushSent: false, systemClickVerified: false,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false, androidVerified: false };
   writeFileSync(path.join(out, 'notice-click-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(result));
