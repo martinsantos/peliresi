@@ -718,11 +718,11 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <Card role="dialog" aria-modal="true" aria-labelledby="confirmar-entrega-titulo" className="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="text-success-600" size={32} />
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${gps.storageError ? 'bg-error-100' : 'bg-success-100'}`}>
+                {gps.storageError ? <AlertTriangle className="text-error-600" size={32} aria-hidden="true" /> : <CheckCircle2 className="text-success-600" size={32} aria-hidden="true" />}
               </div>
               <h3 id="confirmar-entrega-titulo" className="text-xl font-bold text-neutral-900 mb-2">Confirmar Entrega?</h3>
-              <p className="text-neutral-600 text-sm mb-4">Se confirmará la entrega en {m.operador?.razonSocial || 'destino'}</p>
+              <p className="text-neutral-600 text-sm mb-4">{gps.storageError ? 'Destino: ' : 'Se confirmará la entrega en '}{m.operador?.razonSocial || 'destino'}</p>
               {gps.storageError ? <div role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900">
                 <p className="font-semibold">No se puede confirmar la entrega todavía.</p>
                 <p>{gpsStorageErrorMessage(gps.storageIssue)}</p>

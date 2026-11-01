@@ -32,6 +32,8 @@ test('a corrupt GPS queue remains available and explains why delivery is blocked
     await expect(dialog.getByRole('alert')).toContainText('No se puede confirmar la entrega todavía');
     await expect(dialog.getByRole('alert')).toContainText('contactá a soporte');
     await expect(dialog.getByText('Podés continuar', { exact: false })).toHaveCount(0);
+    await expect(dialog.getByText('Se confirmará la entrega en', { exact: false })).toHaveCount(0);
+    await expect(dialog.getByText('Destino:', { exact: false })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Sí, Confirmar Entrega', exact: true })).toBeDisabled();
     await expect(dialog.getByRole('button', { name: 'Cancelar', exact: true })).toBeEnabled();
     expect(await page.evaluate(k => localStorage.getItem(k), key)).toBe('');
