@@ -701,3 +701,12 @@ test('directory describes shared installed-app shortcuts without risking local d
   assert.match(section, /no borres datos ni desinstales para forzar el cambio/i);
   assert.match(section, /borradores locales/);
 });
+
+test('directory distinguishes the inbox from optional device notifications', () => {
+  const section = read('directorio.html').split('CU-S09: Enviar Notificaciones Push')[1].split('CU-S10:')[0];
+  assert.match(section, /campana y la bandeja de Avisos/);
+  assert.match(section, /dependen de la habilitación del sistema y del permiso del dispositivo/);
+  assert.match(section, /preview están apagadas/);
+  assert.match(section, /si no se abre o falta conexión/i);
+  assert.doesNotMatch(section, /Web Push API esta planificada para la proxima version|alertas criticas en tiempo real/);
+});
