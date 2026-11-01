@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
-import { GpsPendingError, acknowledgeGpsPoint, gpsTasksForTrip, hasVolatileGpsQueue, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
+import { GpsPendingError, acknowledgeGpsPoint, gpsStorageErrorMessage, gpsTasksForTrip, hasVolatileGpsQueue, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
 import { subscribeDeliveryConfirmed } from '../services/offlineSyncEvents';
 import { adoptParkedGpsLease, gpsLeaseClosing, parkGpsLease, rememberGpsLeaseClosing, startGpsLease, withGpsTransitionLock, type GpsLease } from '../services/gpsCoordination';
 import { EstadoManifiesto } from '../types/models';
@@ -81,15 +81,6 @@ function gpsSendErrorMessage(error: unknown): string {
   if (status === 403) return 'Tu cuenta no tiene permiso para enviar ubicaciones de este viaje. Contactá a soporte.';
   if (status === 409) return 'El viaje o la ubicación cambiaron. Actualizá el manifiesto y, si persiste, contactá a soporte.';
   return 'No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.';
-}
-
-function gpsStorageErrorMessage(issue: GpsStorageIssue): string {
-  if (issue === 'legacy') return 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.';
-  if (issue === 'unscoped') return 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.';
-  if (issue === 'context') return 'Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad o contactá a soporte.';
-  if (issue === 'invalid') return 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.';
-  if (issue === 'reference') return 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.';
-  return 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta y revisá el almacenamiento o la conexión.';
 }
 
 export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionContext, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {

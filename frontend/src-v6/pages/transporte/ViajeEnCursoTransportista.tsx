@@ -46,7 +46,7 @@ import { formatDateTime } from '../../utils/formatters';
 import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
-import { GpsPendingError, gpsContextScope } from '../../services/gpsQueue';
+import { GpsPendingError, gpsContextScope, gpsStorageErrorMessage } from '../../services/gpsQueue';
 import { getSyncQueue } from '../../services/indexeddb';
 import { subscribeDeliveryConfirmed, subscribeOfflineQueueChanged } from '../../services/offlineSyncEvents';
 import { queuedDeliveryContext } from '../../services/syncQueuePolicy';
@@ -723,14 +723,17 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               </div>
               <h3 id="confirmar-entrega-titulo" className="text-xl font-bold text-neutral-900 mb-2">Confirmar Entrega?</h3>
               <p className="text-neutral-600 text-sm mb-4">Se confirmará la entrega en {m.operador?.razonSocial || 'destino'}</p>
-              {eventLocation ? (
+              {gps.storageError ? <div role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900">
+                <p className="font-semibold">No se puede confirmar la entrega todavía.</p>
+                <p>{gpsStorageErrorMessage(gps.storageIssue)}</p>
+              </div> : eventLocation ? (
                 <p className="text-xs text-neutral-400 mb-4">
                   Se adjuntará la ubicación si sigue siendo reciente al confirmar.
                 </p>
               ) : <p className="text-xs text-neutral-600 mb-4">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
-              {deliveryError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
+              {deliveryError && !gps.storageError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
               <div className="space-y-3">
-                {deliveryError && gps.storageError && (!gps.storageIssue || gps.storageIssue === 'storage') && <Button variant="outline" fullWidth onClick={handleRetryGps} disabled={isActionPending || retryingGps}>
+                {gps.storageError && (!gps.storageIssue || gps.storageIssue === 'storage') && <Button variant="outline" fullWidth onClick={handleRetryGps} disabled={isActionPending || retryingGps}>
                   {retryingGps ? 'Reintentando guardado' : 'Reintentar guardado'}
                 </Button>}
                 <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending || gps.storageError}>

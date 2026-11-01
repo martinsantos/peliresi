@@ -5,6 +5,10 @@ import { root } from './safety.ts';
 export function qaBackendEntry(env = process.env): string {
   const version = env.QA_COMPAT_BACKEND || 'current';
   if (version === 'current') return path.join(root, 'backend/dist/index.js');
+  if (version === 'gps-empty-62516a08'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-gps-empty-20261101') {
+    return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
+  }
   if (version === 'closure-67f330a7'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026103070') {
     return path.join(root, 'backend/dist-qa-closure-67f330a7/index.js');

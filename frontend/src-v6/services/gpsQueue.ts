@@ -87,6 +87,16 @@ export async function sendIdempotentGps(api: GpsApiClient, id: string, point: Pe
 export type GpsStorageIssue = 'legacy' | 'unscoped' | 'context' | 'invalid' | 'storage' | 'reference';
 type QueueRead = { ok: true; durable: boolean; points: PendingGpsPoint[] } | { ok: false; reason: GpsStorageIssue };
 
+/** Explain the same blocking condition wherever the driver encounters it. */
+export function gpsStorageErrorMessage(issue: GpsStorageIssue | null): string {
+  if (issue === 'legacy') return 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.';
+  if (issue === 'unscoped') return 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.';
+  if (issue === 'context') return 'Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad o contactá a soporte.';
+  if (issue === 'invalid') return 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.';
+  if (issue === 'reference') return 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.';
+  return 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.';
+}
+
 /** Include the request identity (including temporary views) without storing a token. */
 export function gpsContextScope(owner: string, requestContext: string): string {
   return owner && requestContext ? JSON.stringify([owner, requestContext]) : '';
@@ -177,7 +187,9 @@ export function readPendingGpsQueue(owner: string | number, id: string, contextO
   } catch {
     return { ok: false, reason: 'storage' };
   }
-  if (!saved) return { ok: true, durable: true, points: [] };
+  // Only an absent key means there is no queue. An empty string is damaged
+  // data, not an empty list; preserve it and block transitions for review.
+  if (saved === null) return { ok: true, durable: true, points: [] };
   try {
     const parsed: unknown = JSON.parse(saved);
     if (!Array.isArray(parsed) || parsed.some(point => !point || typeof point !== 'object'

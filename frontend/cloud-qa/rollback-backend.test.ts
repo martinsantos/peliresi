@@ -4,6 +4,8 @@ import { qaBackendEntry } from './rollback-backend.ts';
 
 test('only the dedicated rehearsal can select one of the two fixed snapshots', () => {
   const dir = '/work/sitrep/.qa-rollback-partial-20261030';
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-gps-empty-20261101', QA_COMPAT_BACKEND: 'gps-empty-62516a08' }), /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'gps-empty-62516a08' }));
   assert.match(qaBackendEntry({} as NodeJS.ProcessEnv), /backend\/dist\/index\.js$/);
   assert.match(qaBackendEntry({ QA_ARTIFACTS: dir, QA_COMPAT_BACKEND: '17152d81' }), /snapshot\/backend\/dist\/index\.js$/);
   assert.match(qaBackendEntry({ QA_ARTIFACTS: dir, QA_COMPAT_BACKEND: '8fb6277e' }), /snapshot-8fb\/backend\/dist\/index\.js$/);

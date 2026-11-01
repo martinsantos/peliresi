@@ -4,7 +4,7 @@ import { Card, CardContent } from '../ui/CardV2';
 import { Badge } from '../ui/BadgeV2';
 import { AndroidPermissionGuide } from './AndroidPermissionGuide';
 import { headingToCompass, type GpsDetails, type GpsStatus } from '../../hooks/useGPSTracking';
-import type { GpsStorageIssue } from '../../services/gpsQueue';
+import { gpsStorageErrorMessage, type GpsStorageIssue } from '../../services/gpsQueue';
 
 type GpsDisplayStatus = GpsStatus | 'stale' | 'unknown';
 
@@ -55,7 +55,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   storageError = false,
   storageIssue = null,
 }) => {
-  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{storageIssue === 'legacy' ? 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'unscoped' ? 'Hay ubicaciones anteriores sin actividad identificada. Conservá este dispositivo y contactá a soporte.' : storageIssue === 'context' ? 'Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad o contactá a soporte.' : storageIssue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'reference' ? 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.' : 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.'}</p>;
+  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{gpsStorageErrorMessage(storageIssue)}</p>;
   const sendNotice = sendStatus === 'error' && sendError && !storageError && <p role="alert" data-gps-send-error className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{sendError}</p>;
   if (paused) return <div className="space-y-2"><p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>{storageNotice}{sendNotice}</div>;
   if (storageError && storageIssue && ['legacy', 'unscoped', 'context', 'invalid'].includes(storageIssue)) return <div>{storageNotice}</div>;
