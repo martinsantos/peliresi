@@ -18,6 +18,8 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'incident-retry-final' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-gps-send-ambiguity-20261101', QA_COMPAT_BACKEND: 'gps-send-ambiguity' }), /\.qa-incident-retry-final-20261101\/dist-backend\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'gps-send-ambiguity' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026110105', QA_COMPAT_BACKEND: 'closure-540ecfff' }), /\.qa-incident-retry-final-20261101\/dist-backend\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'closure-540ecfff' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026110104', QA_COMPAT_BACKEND: 'closure-f3307f3f' }), /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'closure-f3307f3f' }));
   assert.match(qaBackendEntry({} as NodeJS.ProcessEnv), /backend\/dist\/index\.js$/);
