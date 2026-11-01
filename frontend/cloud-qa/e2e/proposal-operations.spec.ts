@@ -198,8 +198,11 @@ for(const creator of roles)test('in-situ proposal: '+creator+' creates; three pa
      const reader=pages[role];await reader.goto(preferred.href);
      await expect(reader).toHaveURL(new RegExp('/(?:app/)?notificaciones/'+notice.id+'$'));
      await expect(reader.getByRole('heading',{name:'Coordinación iniciada: tratamiento en origen',exact:true})).toBeVisible();
-     const open=reader.getByRole('link',{name:/^Abrir (manifiesto|como)/});
-     await expect(open).toHaveCount(1);await open.click();
+     const open=reader.getByRole('link',{name:/^Abrir (manifiesto|como)/})
+      .or(reader.getByRole('button',{name:/^Abrir (manifiesto|como)/}));
+     // A representative can have both a company and a personal activity;
+     // verify that the first available choice reaches this manifest.
+     await expect(open.first()).toBeVisible();await open.first().click();
      await expect(reader).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
      openedFromMail.add(role);
     }
