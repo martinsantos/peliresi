@@ -490,12 +490,16 @@ document.addEventListener('DOMContentLoaded', function() {
         ticking = true;
       }
     });
+    // Do not hide a focused keyboard control while the reader scrolls away.
+    // Re-evaluate after focus actually leaves the breadcrumb.
+    bar.addEventListener('focusout', function() { requestAnimationFrame(updateBreadcrumb); });
 
     function updateBreadcrumb() {
       var scrollY = window.scrollY;
       var threshold = headerHeight + breadcrumbHeight + 20;
 
       if (scrollY < heroBottom - headerHeight) {
+        if (bar.contains(document.activeElement)) return;
         setBreadcrumbVisible(false);
         return;
       }
@@ -554,6 +558,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       if (!newH2 && !newH3) {
+        if (bar.contains(document.activeElement)) return;
         setBreadcrumbVisible(false);
         return;
       }
