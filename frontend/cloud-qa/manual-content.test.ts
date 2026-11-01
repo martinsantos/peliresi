@@ -679,6 +679,9 @@ test('an individual approval notice is an event and the current state is in the 
   const text = guide.steps.find((s: any) => s.title === 'Revisar y decidir desde cada rol').body.join(' ');
   assert.match(text, /El aviso registra una decisión/);
   assert.match(text, /abrí el manifiesto para consultar las aprobaciones y el próximo paso actuales/);
+  assert.match(text, /Actualizar aprobaciones y revisá el estado antes de intentar nuevamente/);
+  assert.match(text, /fechas se muestran en hora de Mendoza/);
+  assert.match(text, /acciones simultáneas pueden aparecer fuera de orden/);
 });
 
 test('directory describes mail suppression and scheduled operation reminders without promising delivery', () => {

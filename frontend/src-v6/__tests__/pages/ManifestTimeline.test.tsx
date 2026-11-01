@@ -26,3 +26,33 @@ it('uses the same human event labels as Monitor without exposing structured meta
   expect(container.textContent).not.toContain('CERTIFICACION_OPERADOR_V1');
   expect(container.textContent).not.toContain('{"tipo":');
 });
+
+it('explains ambiguous approval timestamps without inventing or hiding events', () => {
+  const events = [
+    { id: 'start', tipo: 'INICIO_COORDINACION', descripcion: 'Coordinación iniciada', createdAt: '2026-10-30T12:00:00.000Z' },
+    { id: 'approval', tipo: 'APROBACION_TRANSPORTISTA', descripcion: 'Aprobación registrada', createdAt: '2026-10-30T12:00:01.000Z' },
+  ] as Manifiesto['eventos'];
+  render(<ManifiestoTimeline eventos={events} manifiesto={{ eventos: events }} />);
+  expect(screen.getByRole('note')).toHaveTextContent('Las fechas de acciones simultáneas pueden aparecer fuera de orden');
+  expect(screen.getByText('Coordinación iniciada', { selector: 'p.font-semibold' })).toBeVisible();
+  expect(screen.getByText('Transporte aprobó')).toBeVisible();
+});
+
+it('does not add a warning when the recorded approvals precede coordination', () => {
+  const events = [
+    { id: 'start', tipo: 'INICIO_COORDINACION', descripcion: '', createdAt: '2026-10-30T12:00:02.000Z' },
+    { id: 'approval', tipo: 'APROBACION_TRANSPORTISTA', descripcion: '', createdAt: '2026-10-30T12:00:01.000Z' },
+  ] as Manifiesto['eventos'];
+  render(<ManifiestoTimeline eventos={events} manifiesto={{ eventos: events }} />);
+  expect(screen.queryByRole('note')).not.toBeInTheDocument();
+});
+
+it('shows recorded event times in Mendoza and handles invalid dates', () => {
+  const events = [
+    { id: 'valid', tipo: 'CREACION', descripcion: 'Creación', createdAt: '2026-10-21T01:15:00.000Z' },
+    { id: 'invalid', tipo: 'INCIDENTE', descripcion: 'Incidente', createdAt: 'invalid' },
+  ] as Manifiesto['eventos'];
+  render(<ManifiestoTimeline eventos={events} manifiesto={{ eventos: events }} />);
+  expect(screen.getByText('20/10/2026, 22:15:00 · Mendoza')).toHaveAttribute('datetime', '2026-10-21T01:15:00.000Z');
+  expect(screen.getByText('Fecha no disponible')).toBeVisible();
+});

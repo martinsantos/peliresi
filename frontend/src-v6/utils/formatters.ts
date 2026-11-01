@@ -9,6 +9,18 @@ import { ESTADO_LABELS, ROL_LABELS } from './constants';
 // DATES
 // ========================================
 
+const mendozaTimestamp = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: 'numeric', day: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+
+/** Use the same institutional timezone for persisted events and documents. */
+export function formatMendozaTimestamp(value: string | null | undefined): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? mendozaTimestamp.format(date) : null;
+}
+
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   const d = new Date(dateStr);
