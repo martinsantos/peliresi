@@ -8,7 +8,7 @@ await assertCloudDatabase();
 const out = '/work/sitrep/.qa-notification-click-20261031';
 assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'notice-click-20261031');
-assert.equal(process.env.GITHUB_SHA, '5f61be4bc3970a000392f13b72c6ed034db5341e');
+assert.equal(process.env.GITHUB_SHA, '5ab7a259be2852eba87d42fc1932e702cfa01ea7');
 const stage = process.env.QA_SOURCE_STAGE;
 assert.ok(stage === 'before' || stage === 'after');
 const expected = JSON.parse(readFileSync(path.join(out, 'qa-digests.json'), 'utf8')) as Record<string, string>;

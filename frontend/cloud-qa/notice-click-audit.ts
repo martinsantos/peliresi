@@ -7,7 +7,7 @@ import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-notification-click-20261031';
-const commit = '5f61be4bc3970a000392f13b72c6ed034db5341e';
+const commit = '5ab7a259be2852eba87d42fc1932e702cfa01ea7';
 assert.equal(process.env.QA_ARTIFACTS, out); assert.equal(process.env.QA_COMPAT_BACKEND, 'notice-click-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
 const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
@@ -84,9 +84,9 @@ for (const asset of ['directorio.html', 'directorio.css', 'directorio.js']) {
   assert.equal(response.status, 200);
   assert.equal(sha(Buffer.from(await response.arrayBuffer())), sha(readFileSync(path.join(root, 'docs/manual', asset))));
 }
-const breadcrumb = read('breadcrumb-final.json'); assert.equal(breadcrumb.stats.expected, 5); assert.equal(breadcrumb.stats.unexpected, 0);
+const breadcrumb = read('breadcrumb-final.json'); assert.equal(breadcrumb.stats.expected, 10); assert.equal(breadcrumb.stats.unexpected, 0);
 assert.equal(breadcrumb.stats.skipped, 0); assert.equal(breadcrumb.stats.flaky, 0); assert.deepEqual(breadcrumb.errors, []);
-for (const name of ['breadcrumb-baseline-badge.json', 'breadcrumb-baseline.json']) {
+for (const name of ['breadcrumb-baseline-badge.json', 'breadcrumb-baseline-parent.json', 'breadcrumb-baseline.json']) {
   const reproduction = read(name); assert.equal(reproduction.stats.unexpected, 1); assert.equal(reproduction.stats.expected, 0);
 }
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
@@ -103,7 +103,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, production: false, previousProductCommit: previous.productCommit, frontendBuildCommit: compiled,
     previousIntegratedCommit: previous.previousIntegratedCommit, previousIntegratedBrowserTests: previous.previousIntegratedBrowserTests,
-    simulatedClickBrowserTests: 6, manualBrowserTests: 3, updateBrowserTests: 2, breadcrumbBrowserTests: 5, unitTests: 86, manualTests: 55,
+    simulatedClickBrowserTests: 6, manualBrowserTests: 3, updateBrowserTests: 2, breadcrumbBrowserTests: 10, unitTests: 86, manualTests: 55,
     consoleErrors, realPushSent: false, systemClickVerified: false,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false, androidVerified: false };
   writeFileSync(path.join(out, 'notice-click-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
