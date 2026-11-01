@@ -7,7 +7,7 @@ import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-notification-click-20261031';
-const commit = '9efba0ec3eedeacacfa1da4dccbdffae923a5e42';
+const commit = '2ebc202da7f5a01fafe1455cb47e8e598afd1a1f';
 assert.equal(process.env.QA_ARTIFACTS, out); assert.equal(process.env.QA_COMPAT_BACKEND, 'notice-click-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
 const read = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
@@ -36,8 +36,12 @@ const appSource = readFileSync(path.join(root, 'frontend/public/sw-app.js'), 'ut
 const appBuild = readFileSync(path.join(out, 'app/sw-app.js'), 'utf8');
 const version = appBuild.match(/const SW_VERSION = '([0-9]{14})'/)?.[1];
 assert.ok(version); assert.equal(appBuild, appSource.replaceAll('__SW_VERSION__', version));
-const flags = read('build-flags.json'); assert.equal(flags.candidate, commit);
+const compiled = '9efba0ec3eedeacacfa1da4dccbdffae923a5e42';
+const buildReuse = read('build-reuse.json'); assert.equal(buildReuse.from, compiled); assert.equal(buildReuse.to, commit);
+assert.deepEqual(buildReuse.changedProductFiles, ['docs/manual/directorio.html']);
+const flags = read('build-flags.json'); assert.equal(flags.candidate, compiled);
 for (const value of Object.values(flags.flags)) assert.equal(value, 'true');
+assert.equal(read('runtime-proof.json').source, compiled);
 assert.equal(read('runtime-proof.json').backend, path.join(root, 'backend/dist-qa-liveness-20261031/index.js'));
 for (const { pid } of read('processes.json')) {
   const env = Object.fromEntries(readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter(Boolean)
@@ -87,7 +91,7 @@ try {
   }
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
-  const result = { productCommit: commit, synthetic: true, production: false, previousProductCommit: previous.productCommit,
+  const result = { productCommit: commit, synthetic: true, production: false, previousProductCommit: previous.productCommit, frontendBuildCommit: compiled,
     previousIntegratedCommit: previous.previousIntegratedCommit, previousIntegratedBrowserTests: previous.previousIntegratedBrowserTests,
     simulatedClickBrowserTests: 6, updateBrowserTests: 2, unitTests: 86, manualTests: 54, realPushSent: false, systemClickVerified: false,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false, androidVerified: false };
