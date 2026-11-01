@@ -79,6 +79,8 @@ UX254 actualiza automáticamente el ticket después de una acción confirmada y 
 
 **UX261:** `62516a08` agrega una pausa de arranque para los siete cron y el temporizador de correo, sin alterar su comportamiento si no se configura. En preview pasaron 55 pruebas dirigidas y cinco arranques secuenciales de API con registro de tareas interceptado: dos instancias pausadas no registraron tareas, la opción ausente o falsa conservó seis cron con blockchain apagado, y un valor inválido impidió el arranque. Se comprobó la sonda de vida y que las 128 tablas artificiales cotejadas conservaron su contenido. Esta prueba no ejecutó tareas reales ni dos workers simultáneos; la pausa sólo afecta procesos nuevos configurados de ese modo.
 
+**UX262:** sobre el mismo `62516a08` pasaron seis recorridos ordinarios completos y seis en origen, iniciados por cada rol en web y app de navegador. Se cotejaron los seis certificados ordinarios con la declaración, la rectificación y la corriente hallada tratada. Para los seis casos en origen se abrieron los enlaces preferidos de los correos generados por la versión candidata para las tres partes; también se comprobaron sus rutas alternativas web y app sin enviarlos. Las pruebas se ejecutaron con los cron pausados y cuentas artificiales. No equivalen a la regresión integrada completa, una apertura desde un cliente de correo real ni una prueba en Android físico.
+
 ## Qué impide declarar terminado el objetivo
 
 1. **Aprobaciones anteriores.** No se conoce el impacto de exigir tres decisiones sobre los manifiestos existentes. El usuario indicó no consultar datos reales, ni siquiera agregados; la auditoría preparada queda restringida al preview artificial.
