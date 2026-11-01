@@ -22,7 +22,8 @@ export function PendingIncidentNotice({ pending, storageError, checking, busy, o
     <button type="button" className="min-h-11 font-semibold underline" onClick={onRefresh}>Volver a comprobar</button>
   </div>;
   if (!pending) return null;
-  const label = pending.body.tipo === 'PAUSA' ? 'La pausa' : pending.body.tipo === 'REANUDACION' ? 'La reanudación' : 'El incidente';
+  const message = pending.body.tipo === 'PAUSA' ? 'La pausa puede estar registrada.' : pending.body.tipo === 'REANUDACION'
+    ? 'La reanudación puede estar registrada.' : 'El incidente puede estar registrado.';
   const retry = async () => {
     setError('');
     try {
@@ -33,7 +34,7 @@ export function PendingIncidentNotice({ pending, storageError, checking, busy, o
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'No pudimos comprobar el envío. Revisá la conexión e intentá nuevamente.'); }
   };
   return <div role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
-    <p className="font-semibold">{label} puede estar registrado.</p>
+    <p className="font-semibold">{message}</p>
     <p className="mt-1">Comprobá este envío antes de registrar otro. Se conserva en este dispositivo y actividad.</p>
     {error && <p role="alert" className="mt-2">{error}</p>}
     <button type="button" className="min-h-11 font-semibold underline disabled:opacity-50" disabled={busy} onClick={() => void retry()}>

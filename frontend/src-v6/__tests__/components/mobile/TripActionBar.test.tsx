@@ -57,4 +57,12 @@ describe('TripActionBar', () => {
       disabled onConfirmPickup={vi.fn()} onTogglePause={vi.fn()} onReportIncident={vi.fn()} onConfirmDelivery={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Confirmar entrega/i })).toBeDisabled();
   });
+
+  it('blocks another incident or pause while allowing a delivery to proceed', () => {
+    render(<TripActionBar estado={EstadoManifiesto.EN_TRANSITO} viajeStatus="ACTIVO" isPending={false} hasPendingSync={false}
+      incidentUnavailable onConfirmPickup={vi.fn()} onTogglePause={vi.fn()} onReportIncident={vi.fn()} onConfirmDelivery={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Pausar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Incidente/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Confirmar entrega/i })).toBeEnabled();
+  });
 });
