@@ -79,6 +79,15 @@ describe('anonymous approval impact analysis', () => {
       aprobadoSinAlgunEventoDeAprobacion: 1, pendienteConTresDecisiones: 1, borradorConMarcador: 1,
     });
   });
+  it('keeps the three-decision count and distinguishes a state conflict from an invalid decision', () => {
+    const collector = new ProposalImpactAccumulator();
+    collector.add(record([marker(), ...approvals()], { estado: 'PENDIENTE_APROBACION' }));
+    collector.add(record([marker(), ...approvals().slice(0, 2), coordination()], { estado: 'PENDIENTE_APROBACION' }));
+    const report = collector.report('ARTIFICIAL');
+    expect(report.coherenciaEstado.pendienteConTresDecisiones).toBe(1);
+    expect(report.categoriasExcluyentes).toHaveLength(1);
+    expect(report.categoriasExcluyentes[0]).toMatchObject({ estadoAprobacion: 'INCONSISTENTE', causa: 'ESTADO_O_COORDINACION', cantidad: 2 });
+  });
 });
 
 describe('read-only scan contract', () => {

@@ -41,7 +41,7 @@ export function parseProposal(description: string): Proposal {
   return p;
 }
 
-type ProposalManifest = { modalidad?: string | null; generadorId: string; transportistaId: string | null; operadorId: string; creadoPorId: string };
+type ProposalManifest = { estado?: string; modalidad?: string | null; generadorId: string; transportistaId: string | null; operadorId: string; creadoPorId: string };
 type ProposalEvent = { tipo: string; descripcion?: string | null; usuarioId?: string | null };
 export type ProposalInspection =
   | { kind: 'missing' | 'invalid' | 'mismatch' | 'duplicate' }
@@ -81,6 +81,15 @@ export function proposalApprovalEvidenceValid(proposal: Proposal, events: Propos
   }
   return true;
 }
+/** State and evidence can disagree in an older or interrupted record. Do not
+ * infer the ordering of otherwise complete historical events from timestamps. */
+export function proposalStateConflict(manifest: { estado?: string }, proposal: Proposal, events: ProposalEvent[]): boolean {
+  const roles = proposalRoles(proposal);
+  const allApproved = roles.every(role => events.some(event => event.tipo === APPROVAL_EVENTS[role]));
+  const coordinated = events.some(event => COORDINATION_EVENTS.includes(event.tipo));
+  return manifest.estado === 'PENDIENTE_APROBACION' && (coordinated || (roles.length === 3 && allApproved))
+    || manifest.estado === 'APROBADO' && coordinated && !allApproved;
+}
 /** Presentation and workflow use the same immutable proposal and recorded decisions. */
 export function manifestReadiness(manifest: ProposalManifest, events: ProposalEvent[]): ManifestReadiness {
   const snapshot = inspectProposal(manifest, events);
@@ -89,6 +98,7 @@ export function manifestReadiness(manifest: ProposalManifest, events: ProposalEv
   if (snapshot.kind === 'legacy-in-situ') return 'SIN_TRANSPORTE';
   if (events.some(event => event.tipo === 'RECHAZO_PARTE')) return 'RECHAZADA';
   if (!proposalApprovalEvidenceValid(snapshot.proposal, events)) return 'INCONSISTENTE';
+  if (proposalStateConflict(manifest, snapshot.proposal, events)) return 'INCONSISTENTE';
   if (!proposalRoles(snapshot.proposal).every(role => events.some(event => event.tipo === APPROVAL_EVENTS[role]))) return 'FALTAN_APROBACIONES';
   if (!events.some(event => COORDINATION_EVENTS.includes(event.tipo))) return 'FALTA_COORDINACION';
   return 'LISTA';

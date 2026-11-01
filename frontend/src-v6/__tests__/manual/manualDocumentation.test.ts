@@ -105,7 +105,7 @@ describe('manual documentation stays usable and truthful', () => {
 it('documents explicit operational approvals separately from CAP without inventing historical decisions',()=>{
  const guide=data.guides.find(g=>g.id==='manifiestos-tres-partes')!;
  const text=guide.steps.flatMap(s=>s.body.concat(s.expected)).join(' ');
- for(const value of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','Leer un aviso no aprueba'])expect(text).toContain(value);
+ for(const value of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','Leer un aviso no aprueba','SITREP pide revisión y bloquea nuevas decisiones'])expect(text).toContain(value);
  expect(guide.safety).toContain('CAP cerrado y correo/push apagados');
  const creator = data.guides.find(g=>g.id==='generador-crear-manifiesto')!;
  expect(creator.safety).toContain('no aprueba por ninguna parte');

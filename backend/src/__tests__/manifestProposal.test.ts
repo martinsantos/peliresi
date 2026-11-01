@@ -226,6 +226,61 @@ describe('explicit coordination start',()=>{
   await inTrainingSession(()=>approveManifestProposal(req('GENERADOR',{decision:'RECHAZADA',motivo:'No acepto'})));
   await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{} as any,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:409}));
  });
+ it.each(['training','operational'] as const)('refuses any decision or start when pending already has a coordination event in %s',async scope=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  const within=scope==='training'?inTrainingSession:inOperationalSession;
+  await within(()=>approveManifestProposal(req('OPERADOR')));
+  await within(()=>approveManifestProposal(req('GENERADOR'),signature));
+  mock.events.push({id:'premature-start',tipo:'INICIO_COORDINACION',createdAt:mock.clock});
+  const eventCount=mock.events.length,noticeCount=mock.tx.notificacion.createMany.mock.calls.length;
+  const {getManifestProposal,getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();
+  await within(()=>getManifestProposal(req('TRANSPORTISTA'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data).toMatchObject({puedeAprobar:null,puedeRechazar:false,puedeIniciar:false});
+  await expect(within(()=>approveManifestProposal(req('TRANSPORTISTA')))).rejects.toMatchObject({statusCode:409});
+  await expect(within(()=>approveManifestProposal(req('TRANSPORTISTA',{decision:'RECHAZADA',motivo:'No puedo participar'})))).rejects.toMatchObject({statusCode:409});
+  const startNext=vi.fn(),startJson=vi.fn();
+  await within(()=>startManifestCoordination(req('OPERADOR'),{json:startJson} as any,startNext));
+  expect(startNext).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));expect(startJson).not.toHaveBeenCalled();
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[{...mock.manifest,eventos:mock.events,residuos:[]}]);
+  json.mockClear();await within(()=>getTrainingTasks(req('TRANSPORTISTA'),{json} as any,next));
+  expect(json.mock.calls[0][0].data.items[0]).toMatchObject({requiereRevisionPropuesta:true,requiereMiAprobacion:false,action:'Propuesta por revisar'});
+  expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');expect(mock.events).toHaveLength(eventCount);
+  expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(noticeCount);
+ });
+ it('does not confirm an existing start on an approved record missing a decision',async()=>{
+  await inTrainingSession(()=>approveManifestProposal(req('GENERADOR'),signature));
+  await inTrainingSession(()=>approveManifestProposal(req('OPERADOR')));
+  mock.manifest.estado='APROBADO';mock.events.push({tipo:'INICIO_COORDINACION',createdAt:mock.clock});
+  const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));expect(json).not.toHaveBeenCalled();
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+ });
+ it('does not complete a pending record through a direct approval when coordination is already present',async()=>{
+  await inTrainingSession(()=>approveManifestProposal(req('GENERADOR'),signature));
+  await inTrainingSession(()=>approveManifestProposal(req('OPERADOR')));
+  mock.events.push({tipo:'INICIO_COORDINACION',createdAt:mock.clock});
+  const eventCount=mock.events.length,noticeCount=mock.tx.notificacion.createMany.mock.calls.length;
+  await expect(inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')))).rejects.toMatchObject({statusCode:409});
+  expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');expect(mock.events).toHaveLength(eventCount);
+  expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(noticeCount);
+ });
+ it('does not confirm an approval retry when all decisions exist but the state is still pending',async()=>{
+  for(const rol of ['OPERADOR','TRANSPORTISTA','GENERADOR'] as const)await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  mock.manifest.estado='PENDIENTE_APROBACION';
+  const eventCount=mock.events.length,noticeCount=mock.tx.notificacion.createMany.mock.calls.length;
+  await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:409});
+  expect(mock.events).toHaveLength(eventCount);expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(noticeCount);
+ });
+ it('preserves a valid coordination retry after a manifest has advanced',async()=>{
+  for(const rol of ['OPERADOR','TRANSPORTISTA','GENERADOR'] as const)await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  const next=vi.fn(),json=vi.fn();await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  const created=mock.events.find(e=>e.tipo==='INICIO_COORDINACION_CAP');mock.manifest.estado='EN_TRANSITO';
+  await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();expect(json.mock.calls.at(-1)[0].data.inicio).toEqual(created.createdAt);
+  expect(mock.events.filter(e=>e.tipo==='INICIO_COORDINACION_CAP')).toHaveLength(1);
+ });
 });
 
 describe('training agenda metadata',()=>{
@@ -282,6 +337,25 @@ describe('bounded searchable scheduled agenda',()=>{
   expect(json.mock.calls[0][0].data.items.map((item:any)=>item.aprobacionOperacion)).toEqual(['INCONSISTENTE','FALTA_COORDINACION']);
   expect(json.mock.calls[0][0].data.items[0]).not.toHaveProperty('eventos');
   expect(json.mock.calls[0][0].data.items[0]).not.toHaveProperty('generadorId');
+ });
+ it('marks contradictory pending and approved rows for review in the scheduled agenda',async()=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  await inOperationalSession(()=>approveManifestProposal(req('GENERADOR'),signature));
+  await inOperationalSession(()=>approveManifestProposal(req('OPERADOR')));
+  const partial=[...mock.events],start={tipo:'INICIO_COORDINACION',createdAt:mock.clock};
+  await inOperationalSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
+  const all=[...mock.events];
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[
+   {...mock.manifest,id:'premature',estado:'PENDIENTE_APROBACION',eventos:[...partial,start]},
+   {...mock.manifest,id:'pending-complete',estado:'PENDIENTE_APROBACION',eventos:all},
+   {...mock.manifest,id:'approved-missing',estado:'APROBADO',eventos:[...partial,start]},
+  ]);
+  const {getProposalAgenda}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();await inOperationalSession(()=>getProposalAgenda({...req('OPERADOR'),query:{incluirPendientes:'true'}} as any,{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(mock.tx.manifiesto.findMany.mock.calls[0][0].select.estado).toBe(true);
+  expect(json.mock.calls[0][0].data.items.map((item:any)=>item.aprobacionOperacion)).toEqual(['INCONSISTENTE','INCONSISTENTE','INCONSISTENTE']);
+  for(const item of json.mock.calls[0][0].data.items)expect(item).not.toHaveProperty('eventos');
  });
  it.each(['0','-1','1.5','100001'])('rejects invalid page %s before querying',async page=>{
   const {getProposalAgenda}=await import('../controllers/manifest-proposal.controller');const next=vi.fn();mock.tx.manifiesto.findMany=vi.fn();

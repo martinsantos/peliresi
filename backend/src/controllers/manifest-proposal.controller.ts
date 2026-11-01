@@ -11,9 +11,10 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
-import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, inspectProposal, legacyInSituWithoutCarrier, manifestReadiness, proposalApprovalEvidenceValid, proposalRole, proposalRoles, ProposalRole } from '../domain/manifestProposal';
+import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, inspectProposal, legacyInSituWithoutCarrier, manifestReadiness, proposalApprovalEvidenceValid, proposalRole, proposalRoles, proposalStateConflict, ProposalRole } from '../domain/manifestProposal';
 
 const LEGACY_IN_SITU_MESSAGE = 'Esta propuesta anterior no tiene transporte aprobador. Creá una nueva propuesta con las tres partes para iniciar.';
+const CONFLICTING_STATE_MESSAGE = 'El estado de la propuesta no coincide con las decisiones o la coordinación registradas. Contactá a Ambiente para revisarlo; el historial se conserva.';
 import { agendaQuery } from '../domain/manifestAgenda';
 
 // Under a short burst the pool can be busy with GPS and Monitor requests.
@@ -63,6 +64,7 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
     const role = value ? proposalRole(req.user, value.proposal) : null;
     const legacyBlocked = !!value && legacyInSituWithoutCarrier(value.proposal) && ['PENDIENTE_APROBACION','APROBADO'].includes(value.manifest.estado);
     const rejected = value?.events.find(e => e.tipo === 'RECHAZO_PARTE');
+    const stateConflict = !!value && proposalStateConflict(value.manifest, value.proposal, value.events);
     const rejectionDescription = rejected ? (typeof rejected.descripcion === 'string' && rejected.descripcion.trim() ? rejected.descripcion : 'Rechazo registrado sin motivo disponible') : undefined;
     const unanimous = !!value && !legacyBlocked && !rejected
       && proposalRoles(value.proposal).every(rol => value.events.some(e => e.tipo === APPROVAL_EVENTS[rol]));
@@ -74,9 +76,9 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
       }),
       inicio: value.events.find(e => COORDINATION_EVENTS.includes(e.tipo))?.createdAt || null,
       requiereNuevaPropuesta: legacyBlocked,
-      puedeIniciar: !!role && unanimous && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
-      puedeAprobar: !rejected && !legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
-      puedeRechazar: !rejected && legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && !!role,
+      puedeIniciar: !stateConflict && !!role && unanimous && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
+      puedeAprobar: !stateConflict && !rejected && !legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
+      puedeRechazar: !stateConflict && !rejected && legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && !!role,
     } : null });
   } catch (error) { next(error); }
 }
@@ -117,6 +119,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
       if (terminal && (sameRejection || sameApproval)) return value.manifest;
       throw new AppError('La propuesta registra un rechazo. Revisá el historial y consultá a Ambiente antes de continuar.', 409);
     }
+    if (proposalStateConflict(value.manifest, value.proposal, value.events)) throw new AppError(CONFLICTING_STATE_MESSAGE, 409);
     // Retry does not append a second approval or replace the first signature.
     if (!reject && value.events.some(e => e.tipo === APPROVAL_EVENTS[rol])) return value.manifest;
     if (!reject && legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE, 409);
@@ -168,6 +171,7 @@ export async function assertManifestProposalApproved(tx: Tx, id: string) {
     ? 'Este manifiesto anterior no registra las tres aprobaciones. Creá una nueva propuesta con las tres partes; el registro se conserva.'
     : 'Este manifiesto anterior no registra las tres aprobaciones. Contactá a Ambiente para habilitar una nueva propuesta con las tres partes; el registro se conserva.', 409);
   if (legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
+  if (proposalStateConflict(value.manifest, value.proposal, value.events)) throw new AppError(CONFLICTING_STATE_MESSAGE,409);
   if (value && (value.events.some(e => e.tipo === 'RECHAZO_PARTE') || !proposalRoles(value.proposal).every(role => value.events.some(e => e.tipo === APPROVAL_EVENTS[role])))) throw new AppError('Falta la aprobación de una de las partes vinculadas; no se puede comenzar', 409);
   if(value && !value.events.some(e=>COORDINATION_EVENTS.includes(e.tipo))) throw new AppError('Las partes aprobaron: falta iniciar la coordinación antes de continuar',409);
 }
@@ -186,7 +190,7 @@ export async function getProposalAgenda(req: AuthRequest, res: Response, next: N
     if(search.trim())where.numero={contains:search.trim(),mode:'insensitive'};
     applyRoleFilter(where,req.user);
     const [items,total]=await prisma.$transaction([
-      prisma.manifiesto.findMany({where,select:{id:true,numero:true,fechaEstimadaRetiro:true,modalidad:true,generadorId:true,transportistaId:true,operadorId:true,creadoPorId:true,
+      prisma.manifiesto.findMany({where,select:{id:true,numero:true,estado:true,fechaEstimadaRetiro:true,modalidad:true,generadorId:true,transportistaId:true,operadorId:true,creadoPorId:true,
         generador:{select:{razonSocial:true}},operador:{select:{razonSocial:true}},eventos:{where:{tipo:{in:[MANIFEST_PROPOSAL,...Object.values(APPROVAL_EVENTS),'RECHAZO_PARTE',...COORDINATION_EVENTS]}},select:{tipo:true,descripcion:true,usuarioId:true}}},
         orderBy:[{fechaEstimadaRetiro:'asc'},{id:'asc'}],take:50,skip:(page-1)*50}),
       prisma.manifiesto.count({where}),
@@ -209,7 +213,9 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    if(!value)throw new AppError('No es una propuesta de las partes',404);
    const rol=proposalRole(req.user,value.proposal);
    if(!rol)throw new AppError('Sólo una de las partes vinculadas puede iniciar',403);
-   const existing=value.events.find(e=>COORDINATION_EVENTS.includes(e.tipo));if(existing)return existing;
+   const existing=value.events.find(e=>COORDINATION_EVENTS.includes(e.tipo));
+   if(proposalStateConflict(value.manifest,value.proposal,value.events)||value.events.some(e=>e.tipo==='RECHAZO_PARTE'))throw new AppError(CONFLICTING_STATE_MESSAGE,409);
+   if(existing)return existing;
    if(legacyInSituWithoutCarrier(value.proposal))throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
    if(value.manifest.estado!=='APROBADO'||value.events.some(e=>e.tipo==='RECHAZO_PARTE')||!proposalRoles(value.proposal).every(role=>value.events.some(e=>e.tipo===APPROVAL_EVENTS[role])))throw new AppError('Se necesitan las aprobaciones de todas las partes vinculadas para iniciar',409);
    const preparation=value.proposal.modalidad==='IN_SITU'?'Generador y operador coordinan la recepción en origen, sin retiro ni viaje.':'Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.';
@@ -247,8 +253,9 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    const damaged=['invalid','mismatch','duplicate'].includes(snapshot.kind)
     || (snapshot.kind==='valid'&&!proposalApprovalEvidenceValid(snapshot.proposal,m.eventos));
    const conflictingRejection=['PENDIENTE_APROBACION','APROBADO'].includes(m.estado)&&m.eventos.some(e=>e.tipo==='RECHAZO_PARTE');
+   const conflictingState=snapshot.kind==='valid'&&proposalStateConflict(m,snapshot.proposal,m.eventos);
    const requiresReview=['BORRADOR','PENDIENTE_APROBACION','APROBADO'].includes(m.estado)
-    && (damaged||conflictingRejection||(m.estado==='PENDIENTE_APROBACION'&&snapshot.kind==='missing'));
+    && (damaged||conflictingRejection||conflictingState||(m.estado==='PENDIENTE_APROBACION'&&snapshot.kind==='missing'));
    const role=proposal?(proposalRole(req.user,proposal)||(req.user.rol==='ADMIN'?'ADMIN':null)):req.user.rol;
    const pesajeNoDisponible=m.estado==='RECIBIDO' && m.residuos.length===0;
    let action='',detail='';

@@ -1,7 +1,7 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
   APPROVAL_EVENTS, COORDINATION_EVENTS, MANIFEST_PROPOSAL, inspectProposal,
-  manifestReadiness, type ManifestReadiness,
+  manifestReadiness, proposalApprovalEvidenceValid, proposalRoles, proposalStateConflict, type ManifestReadiness,
 } from '../domain/manifestProposal';
 
 /** The audit reads only these pre-operation states. It does not repair records. */
@@ -15,7 +15,7 @@ export type ImpactRecord = {
 };
 type Cause = 'SIN_PROPUESTA' | 'MARCADOR_INVALIDO' | 'MARCADORES_MULTIPLES' | 'PARTES_O_MODALIDAD_DISTINTAS'
   | 'SIN_TRANSPORTE' | 'RECHAZO_REGISTRADO' | 'DECISION_INVALIDA' | 'FALTAN_APROBACIONES'
-  | 'FALTA_COORDINACION' | 'SIN_OBSERVACION_ESTRUCTURAL';
+  | 'FALTA_COORDINACION' | 'ESTADO_O_COORDINACION' | 'SIN_OBSERVACION_ESTRUCTURAL';
 type Row = { estado: State; modalidad: 'FIJO' | 'IN_SITU' | 'OTRA'; estadoAprobacion: ManifestReadiness; causa: Cause; cantidad: number };
 type TimingCounts = { listosEvaluados: number; fechaFaltante: number; decisionAnteriorAPropuesta: number;
   coordinacionAnteriorADecisiones: number; fechasIguales: number };
@@ -33,7 +33,9 @@ function cause(record: ImpactRecord, readiness: ManifestReadiness): Cause {
   if (snapshot.kind === 'mismatch') return 'PARTES_O_MODALIDAD_DISTINTAS';
   if (readiness === 'SIN_TRANSPORTE') return 'SIN_TRANSPORTE';
   if (readiness === 'RECHAZADA') return 'RECHAZO_REGISTRADO';
-  if (readiness === 'INCONSISTENTE') return 'DECISION_INVALIDA';
+  if (readiness === 'INCONSISTENTE') return snapshot.kind === 'valid'
+    && proposalApprovalEvidenceValid(snapshot.proposal, record.eventos)
+    && proposalStateConflict(record, snapshot.proposal, record.eventos) ? 'ESTADO_O_COORDINACION' : 'DECISION_INVALIDA';
   if (readiness === 'FALTAN_APROBACIONES') return 'FALTAN_APROBACIONES';
   if (readiness === 'FALTA_COORDINACION') return 'FALTA_COORDINACION';
   return 'SIN_OBSERVACION_ESTRUCTURAL';
@@ -77,7 +79,11 @@ export class ProposalImpactAccumulator {
     if (record.estado === 'APROBADO' && !Object.values(APPROVAL_EVENTS).every(type => record.eventos.some(event => event.tipo === type))) {
       this.stateChecks.aprobadoSinAlgunEventoDeAprobacion++;
     }
-    if (record.estado === 'PENDIENTE_APROBACION' && ['LISTA', 'FALTA_COORDINACION'].includes(estadoAprobacion)) {
+    const snapshot = inspectProposal(record, record.eventos);
+    if (record.estado === 'PENDIENTE_APROBACION' && snapshot.kind === 'valid'
+      && !record.eventos.some(event => event.tipo === 'RECHAZO_PARTE')
+      && proposalApprovalEvidenceValid(snapshot.proposal, record.eventos)
+      && proposalRoles(snapshot.proposal).every(role => record.eventos.some(event => event.tipo === APPROVAL_EVENTS[role]))) {
       this.stateChecks.pendienteConTresDecisiones++;
     }
     if (record.estado === 'BORRADOR' && record.eventos.some(event => event.tipo === MANIFEST_PROPOSAL)) this.stateChecks.borradorConMarcador++;

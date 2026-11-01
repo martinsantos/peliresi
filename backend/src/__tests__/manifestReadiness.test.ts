@@ -25,6 +25,14 @@ describe('manifest proposal readiness', () => {
     expect(manifestReadiness(manifest, [marker, approvals[0], wrongActor, approvals[2], { tipo: 'INICIO_COORDINACION' }])).toBe('INCONSISTENTE');
     expect(manifestReadiness(manifest, [marker, { tipo: 'FIRMA', descripcion: 'firma antigua', usuarioId: 'g' }, ...approvals.slice(1), { tipo: 'INICIO_COORDINACION' }])).toBe('INCONSISTENTE');
   });
+  it('marks coordination or unanimous decisions inconsistent with a pending state for review', () => {
+    const start = { tipo: 'INICIO_COORDINACION' };
+    expect(manifestReadiness({ ...manifest, estado: 'PENDIENTE_APROBACION' }, [marker, ...approvals.slice(0, 2), start])).toBe('INCONSISTENTE');
+    expect(manifestReadiness({ ...manifest, estado: 'PENDIENTE_APROBACION' }, [marker, ...approvals])).toBe('INCONSISTENTE');
+    expect(manifestReadiness({ ...manifest, estado: 'APROBADO' }, [marker, ...approvals.slice(0, 2), start])).toBe('INCONSISTENTE');
+    expect(manifestReadiness({ ...manifest, estado: 'PENDIENTE_APROBACION' }, [marker, ...approvals.slice(0, 2)])).toBe('FALTAN_APROBACIONES');
+    expect(manifestReadiness({ ...manifest, estado: 'APROBADO' }, [marker, ...approvals, start])).toBe('LISTA');
+  });
   it('keeps an old in-situ agreement without a carrier blocked', () => {
     const old = { ...proposal, version: 1, modalidad: 'IN_SITU', transportistaId: null };
     expect(manifestReadiness({ ...manifest, modalidad: 'IN_SITU', transportistaId: null }, [{ tipo: MANIFEST_PROPOSAL, descripcion: JSON.stringify(old) }, ...approvals, { tipo: 'INICIO_COORDINACION' }])).toBe('SIN_TRANSPORTE');
