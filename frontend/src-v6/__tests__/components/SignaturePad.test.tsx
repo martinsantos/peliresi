@@ -22,6 +22,37 @@ function open(onClear = vi.fn()) {
 const at = (clientX: number, clientY: number) => ({ touches: [{ clientX, clientY }] });
 
 describe('signature requires an actual drawn segment', () => {
+  it('keeps a stable, accessible notice area before a stroke while notices expire and arrive', () => {
+    vi.useFakeTimers();
+    act(() => { noticeIds.push(toast.add({ type: 'success', title: 'Tratamiento registrado', duration: 1000 })); });
+    const rendered = render(<><ToastContainer /><SignaturePad onConfirm={capture} /></>);
+    const area = screen.getByRole('region', { name: 'Avisos del sistema' });
+    expect(area).toHaveAttribute('data-signature-notice-reserved', 'true');
+    expect(area).toHaveClass('h-14');
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryByText('Tratamiento registrado')).not.toBeInTheDocument();
+    expect(area).toHaveClass('h-14');
+    expect(screen.getByText('Los avisos siguen disponibles en la campana.')).toBeVisible();
+    act(() => { noticeIds.push(toast.add({ type: 'warning', title: 'Aviso nuevo', message: 'Revisá el manifiesto', duration: 1000 })); });
+    expect(screen.getByText('Aviso nuevo')).toBeInTheDocument();
+    expect(area).toHaveAttribute('tabindex', '0');
+    expect(area).toHaveClass('h-14');
+    const canvas = screen.getByLabelText('Lienzo de firma');
+    fireEvent.mouseDown(canvas, { clientX: 40, clientY: 40 });
+    fireEvent.mouseMove(canvas, { clientX: 80, clientY: 60 });
+    fireEvent.mouseUp(canvas);
+    expect(screen.getByRole('button', { name: 'Usar firma' })).toBeEnabled();
+    rendered.rerender(<ToastContainer />);
+    expect(screen.getByRole('region', { name: 'Avisos del sistema' })).not.toHaveAttribute('data-signature-notice-reserved');
+    expect(screen.getByText('Aviso nuevo')).toBeInTheDocument();
+  });
+  it('releases the reserved area only after the last signature pad closes', () => {
+    const rendered = render(<><ToastContainer /><SignaturePad onConfirm={capture} /><SignaturePad onConfirm={capture} /></>);
+    rendered.rerender(<><ToastContainer /><SignaturePad onConfirm={capture} /></>);
+    expect(screen.getByRole('region', { name: 'Avisos del sistema' })).toHaveAttribute('data-signature-notice-reserved', 'true');
+    rendered.rerender(<ToastContainer />);
+    expect(screen.queryByRole('region', { name: 'Avisos del sistema' })).not.toBeInTheDocument();
+  });
   it('keeps the notice layout still during a stroke and delivers notices that arrive meanwhile', () => {
     vi.useFakeTimers();
     render(<><ToastContainer /><SignaturePad onConfirm={capture} /></>);
@@ -73,6 +104,7 @@ describe('signature requires an actual drawn segment', () => {
   });
   it('rejects a mouse down/up without drawing or serializing a blank image', () => {
     const { canvas, confirm } = open();
+    expect(canvas.parentElement?.parentElement).toHaveStyle({ maxWidth: '400px' });
     expect(confirm).toBeDisabled();
     fireEvent.mouseDown(canvas, { clientX: 40, clientY: 40 });
     fireEvent.mouseUp(canvas, { clientX: 40, clientY: 40 });

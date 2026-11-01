@@ -3,9 +3,9 @@
  * Canvas-based signature input with touch + mouse support
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { Button } from './ButtonV2';
-import { holdNoticeLayout } from './Toast';
+import { holdNoticeLayout, reserveSignatureNoticeLayout } from './Toast';
 
 interface SignaturePadProps {
   onConfirm: (dataUrl: string) => void;
@@ -26,6 +26,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasContent, setHasContent] = useState(false);
+
+  // Keep new or expiring notices from moving the canvas before a stroke starts.
+  useLayoutEffect(() => reserveSignatureNoticeLayout(), []);
 
   const getCtx = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -158,7 +161,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full flex-col gap-3" style={{ maxWidth: width }}>
       <div className="relative rounded-xl border-2 border-dashed border-neutral-300 overflow-hidden bg-white">
         <canvas
           ref={canvasRef}

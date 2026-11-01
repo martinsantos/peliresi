@@ -4,7 +4,7 @@
  * Sistema de notificaciones tipo toast
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { CheckCircle, AlertCircle, Info, X, AlertTriangle, ArrowRight } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -33,6 +33,7 @@ interface Toast {
 
 interface ToastItemProps extends Toast {
   onRemove: (id: string) => void;
+  constrained?: boolean;
 }
 
 // ========================================
@@ -43,6 +44,8 @@ let toasts: Toast[] = [];
 let visibleToasts: Toast[] = [];
 let layoutHolds = 0;
 let pendingNoticeChange = false;
+let signatureNoticeReservations = 0;
+const reservationListeners = new Set<(reserved: boolean) => void>();
 type Expiry = { remaining: number; deadline?: number; handle?: ReturnType<typeof setTimeout> };
 const expiryTimers = new Map<string, Expiry>();
 
@@ -82,6 +85,19 @@ export function holdNoticeLayout(): () => void {
     if (layoutHolds !== 0) return;
     if (pendingNoticeChange) notifyListeners();
     for (const [id, expiry] of expiryTimers) armExpiry(id, expiry);
+  };
+}
+
+/** Reserve a stable, scrollable notice area while a signature pad is open. */
+export function reserveSignatureNoticeLayout(): () => void {
+  signatureNoticeReservations += 1;
+  reservationListeners.forEach(listener => listener(true));
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    signatureNoticeReservations -= 1;
+    reservationListeners.forEach(listener => listener(signatureNoticeReservations > 0));
   };
 }
 
@@ -176,6 +192,7 @@ const ToastItem: React.FC<ToastItemProps> = ({
   onAction,
   compact,
   messagePreview,
+  constrained,
 }) => {
   // Only the unread summary uses the compact row. Full warnings/errors keep
   // their explanation and actions; never truncate critical information.
@@ -210,7 +227,7 @@ const ToastItem: React.FC<ToastItemProps> = ({
   return (
     <div
       className={cn(
-        'w-full rounded-xl border p-3 shadow-3',
+        'w-full rounded-xl border shadow-3', constrained ? 'p-1' : 'p-3',
         toastStyles[type]
       )}
       role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
@@ -249,6 +266,13 @@ function duplicatesPendingDelivery(item: Toast, syncNoticeMessage?: string): boo
 
 export const ToastContainer: React.FC<{ syncNoticeMessage?: string }> = ({ syncNoticeMessage }) => {
   const [activeToasts, setActiveToasts] = useState<Toast[]>([]);
+  const [signatureReserved, setSignatureReserved] = useState(() => signatureNoticeReservations > 0);
+
+  useLayoutEffect(() => {
+    reservationListeners.add(setSignatureReserved);
+    setSignatureReserved(signatureNoticeReservations > 0);
+    return () => { reservationListeners.delete(setSignatureReserved); };
+  }, []);
 
   useEffect(() => {
     return toast.subscribe((newToasts) => {
@@ -263,15 +287,19 @@ export const ToastContainer: React.FC<{ syncNoticeMessage?: string }> = ({ syncN
   }, [activeToasts, syncNoticeMessage]);
 
   const visible = activeToasts.filter(item => !duplicatesPendingDelivery(item, syncNoticeMessage));
-  if (visible.length === 0) return null;
+  if (visible.length === 0 && !signatureReserved) return null;
 
   // Layouts provide an outlet outside the scrollable form. Notices occupy real
   // space instead of covering case identity, tabs, maps or fixed field actions.
   return (
-    <div aria-label="Avisos del sistema" role="region" className="relative flex max-h-[30dvh] shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 py-2 sm:px-4">
+    <div aria-label="Avisos del sistema" role="region" tabIndex={signatureReserved && visible.length ? 0 : undefined}
+      data-signature-notice-reserved={signatureReserved || undefined}
+      className={cn('relative flex shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 sm:px-4',
+        signatureReserved ? 'h-14 py-0' : 'max-h-[30dvh] py-2')}>
+      {visible.length === 0 && <p className="my-auto text-sm text-neutral-600">Los avisos siguen disponibles en la campana.</p>}
       {visible.map((t) => (
-        <div key={t.id} className="pointer-events-auto">
-          <ToastItem {...t} onRemove={toast.remove} />
+        <div key={t.id} className="pointer-events-auto shrink-0">
+          <ToastItem {...t} onRemove={toast.remove} constrained={signatureReserved} />
         </div>
       ))}
     </div>
