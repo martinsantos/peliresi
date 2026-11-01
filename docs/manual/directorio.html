@@ -4730,10 +4730,9 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Push" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Push</div></div>
 
-<p><strong>Descripcion:</strong> Envio de notificaciones push nativas a dispositivos moviles via Web Push API para alertas criticas en tiempo real, sin necesidad de que la aplicacion este abierta.</p>
-<p><strong>Estado actual:</strong> Actualmente el sistema utiliza polling HTTP cada 30 segundos para detectar nuevas notificaciones. La implementacion de Web Push API esta planificada para la proxima version del sistema.</p>
-<p><strong>Plan de implementacion:</strong> Registro de suscripciones push por dispositivo, servidor de push con clave VAPID, envio selectivo por rol y urgencia, icono y badge personalizados.</p>
-<p><span class="badge badge-pending">Pendiente</span></p>
+<p>La campana y la bandeja de Avisos muestran las novedades disponibles para tu cuenta cuando usás SITREP con conexión.</p>
+<p>Las notificaciones del dispositivo dependen de la habilitación del sistema y del permiso del dispositivo. En este preview están apagadas; una notificación guardada en la campana no confirma su entrega al teléfono.</p>
+<p>Si se habilitan, al pulsar una notificación se intenta abrir el aviso en la web o la app que la recibió. Puede ser necesario ingresar nuevamente y el acceso se verifica según la cuenta y actividad vigentes. Si no se abre o falta conexión, consultá Avisos cuando vuelvas a conectarte.</p>
 </div>
 
 <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S10: Firma Digital Avanzada</button>
