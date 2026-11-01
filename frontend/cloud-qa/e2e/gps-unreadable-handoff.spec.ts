@@ -68,6 +68,7 @@ test('keeps keyboard focus inside the blocked delivery dialog and restores it on
     await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
     await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron leer las ubicaciones guardadas' }).first()).toBeVisible();
     const opener = page.getByRole('button', { name: 'Confirmar entrega', exact: true });
+    await expect(opener).toBeEnabled();
     await opener.focus(); await opener.press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Confirmar Entrega?', exact: true });
     await expect(dialog).toBeVisible();
