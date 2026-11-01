@@ -201,7 +201,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   const recovery = JSON.stringify(guides.find((g: any) => g.id === 'resolver-gps'));
   assert.match(start, /la señal del dispositivo por sí sola no confirma/i);
   assert.match(start, /si la ubicación quedó sin actualizar o su hora no puede verificarse, usá Reintentar GPS/i);
-  assert.match(start, /Confirmado con la hora de este dispositivo/i);
+  assert.match(start, /Última confirmación con la hora de este dispositivo/i);
   const delivery = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
   assert.match(delivery, /sólo se adjunta al incidente o la entrega si la lectura del dispositivo sigue siendo reciente al confirmar/i);
   assert.match(delivery, /podés continuar sin adjuntarla/i);

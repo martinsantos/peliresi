@@ -35,6 +35,14 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByRole('button', { name: 'Comprobando envío GPS', exact: true })).toBeDisabled();
   });
 
+  it('labels the confirmation using the device clock rather than a server receipt time', () => {
+    render(<GpsStatusPanel status="active" sendStatus="ok" position={[-33, -69]}
+      details={{ accuracy: 10, speed: null, heading: null, altitude: null, lastUpdate: null }}
+      pendingCount={0} lastSyncAt={new Date('2026-11-01T12:00:00Z')} />);
+    expect(screen.getByText(/Última confirmación .*hora de este dispositivo/)).toBeVisible();
+    expect(screen.queryByText(/Última recepción/)).not.toBeInTheDocument();
+  });
+
   it('shows one GPS permission status, a direct retry and optional recovery guidance', () => {
     render(
       <GpsStatusPanel

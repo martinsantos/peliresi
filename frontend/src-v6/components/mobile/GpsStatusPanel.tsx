@@ -39,7 +39,7 @@ const STATUS_COPY: Record<GpsDisplayStatus, { label: string; tone: string; icon:
 
 function formatLastSync(lastSyncAt: Date | null) {
   if (!lastSyncAt) return 'Confirmado';
-  return `Confirmado ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · hora de este dispositivo`;
+  return `Última confirmación ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · hora de este dispositivo`;
 }
 
 export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
