@@ -1,0 +1,34 @@
+import { expect, test } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { assertCloudDatabase } from '../safety';
+import { login, prefix } from './helpers';
+
+test('linked parties download visibly labelled practice PDFs', async ({ page }, info) => {
+  await assertCloudDatabase();
+  const out = '/work/sitrep/.qa-practice-pdf-20261101';
+  expect(process.env.QA_ARTIFACTS).toBe(out);
+  expect(process.env.QA_COMPAT_BACKEND).toBe('practice-pdf-cb4edebc');
+  const report = JSON.parse(readFileSync(path.join(out, 'new-certificates.json'), 'utf8'));
+  expect(report.synthetic).toBe(true);
+  const proof = report.results.find((item: { surface: string }) => item.surface === info.project.name);
+  expect(proof).toBeTruthy();
+  await login(page, info, 'generador');
+  await page.goto(prefix(info) + '/manifiestos/' + proof.id);
+  const response = page.waitForResponse(res => res.url().endsWith('/api/pdf/manifiesto/' + proof.id));
+  await page.getByRole('button', { name: 'Descargar PDF', exact: true }).click();
+  const pdf = await response; expect(pdf.status()).toBe(200);
+  const file = info.outputPath('manifiesto.pdf'); writeFileSync(file, await pdf.body());
+  const pages = execFileSync('pdftotext', ['-raw', file, '-'], { encoding: 'utf8' }).split('\f').filter(text => text.trim());
+  expect(pages.length).toBeGreaterThan(0);
+  for (const text of pages) expect(text).toContain('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL');
+  const card = page.locator('[data-certificate-id="' + proof.finalId + '"]');
+  await expect(card).toBeVisible();
+  const download = page.waitForEvent('download');
+  await card.getByRole('button', { name: 'Descargar final', exact: true }).click();
+  const stream = await (await download).createReadStream(), chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  expect(createHash('sha256').update(Buffer.concat(chunks)).digest('hex')).toBe(proof.finalSha256);
+});
