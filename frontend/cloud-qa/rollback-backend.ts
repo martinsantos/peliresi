@@ -13,6 +13,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026110103') {
     return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
   }
+  if (version === 'gps-handoff-dd6e957d'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-gps-handoff-20261101') {
+    return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
+  }
   if (version === 'closure-67f330a7'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026103070') {
     return path.join(root, 'backend/dist-qa-closure-67f330a7/index.js');

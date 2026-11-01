@@ -8,6 +8,8 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'gps-empty-62516a08' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026110103', QA_COMPAT_BACKEND: 'closure-80a283bb' }), /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'closure-80a283bb' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-gps-handoff-20261101', QA_COMPAT_BACKEND: 'gps-handoff-dd6e957d' }), /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'gps-handoff-dd6e957d' }));
   assert.match(qaBackendEntry({} as NodeJS.ProcessEnv), /backend\/dist\/index\.js$/);
   assert.match(qaBackendEntry({ QA_ARTIFACTS: dir, QA_COMPAT_BACKEND: '17152d81' }), /snapshot\/backend\/dist\/index\.js$/);
   assert.match(qaBackendEntry({ QA_ARTIFACTS: dir, QA_COMPAT_BACKEND: '8fb6277e' }), /snapshot-8fb\/backend\/dist\/index\.js$/);
