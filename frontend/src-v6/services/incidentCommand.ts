@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { AxiosResponse } from 'axios';
 import { newGpsPointId } from './gpsQueue';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import type { RegistrarIncidenteRequest } from '../types/api';
@@ -6,6 +7,9 @@ import type { RegistrarIncidenteRequest } from '../types/api';
 export type IncidentContext = { userId: string; owner: string; requestContext: string };
 export type IncidentCommand = { version: 1; referencia: string; body: RegistrarIncidenteRequest };
 export type IncidentResult = { body: RegistrarIncidenteRequest; cleaned: boolean; repeated: boolean };
+type IncidentResponse = { success?: unknown; data?: { evento?: { id?: unknown; manifiestoId?: unknown; tipo?: unknown;
+  usuarioId?: unknown; descripcion?: unknown; latitud?: unknown; longitud?: unknown };
+  idempotencia?: { version?: unknown; referencia?: unknown; repetido?: unknown } } };
 export const INCIDENT_COMMAND_CHANGED = 'sitrep:incident-command-changed';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -51,7 +55,7 @@ async function withIncidentLock<T>(id: string, context: IncidentContext, run: ()
 }
 
 async function dispatch(id: string, context: IncidentContext, command: IncidentCommand): Promise<IncidentResult> {
-  let response: Awaited<ReturnType<typeof api.post>>;
+  let response: AxiosResponse<IncidentResponse>;
   try {
     response = await api.post(`/manifiestos/${encodeURIComponent(id)}/incidente-idempotente`, { ...command.body, referencia: command.referencia });
   } catch {

@@ -6,8 +6,11 @@ import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 const calls = vi.hoisted(() => Object.fromEntries(['create', 'update', 'firmar', 'confirmarRetiro', 'confirmarEntrega', 'pesaje', 'confirmarRecepcion', 'confirmarRecepcionInSitu', 'registrarTratamiento', 'rechazar', 'registrarIncidente', 'cerrar', 'cancelar', 'revertirEstado', 'validarQR'].map(name => [name, vi.fn()])));
 const delivery = vi.hoisted(() => vi.fn());
+const incident = vi.hoisted(() => ({ submit: vi.fn(), retry: vi.fn() }));
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: calls }));
 vi.mock('../../services/deliveryCommand', () => ({ submitDelivery: delivery }));
+vi.mock('../../services/incidentCommand', () => ({ INCIDENT_COMMAND_CHANGED: 'test:incident', incidentCommandKey: () => 'test-key',
+  readIncidentCommand: () => null, submitIncidentCommand: incident.submit, retryIncidentCommand: incident.retry }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'carrier-a', rol: 'TRANSPORTISTA', actorId: 'carrier' } }) }));
 vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => 'carrier-a:transportista', supportSessionMatches: () => true }));
 let restoreLocks: () => void;
@@ -16,7 +19,7 @@ afterEach(() => { onlineManager.setOnline(true); vi.clearAllMocks(); restoreLock
 
 describe('explicit workflow submissions do not wait in an invisible offline queue', () => {
   for (const [name, hook] of Object.entries(hooks)) {
-    if (name === 'useConfirmarEntrega') continue;
+    if (name === 'useConfirmarEntrega' || name === 'useRegistrarIncidente') continue;
     it(`${name} returns a failure without pausing or retrying`, async () => {
       for (const callback of Object.values(calls)) callback.mockRejectedValue(new Error('Network Error'));
       onlineManager.setOnline(false);
@@ -30,6 +33,16 @@ describe('explicit workflow submissions do not wait in an invisible offline queu
       client.clear();
     });
   }
+});
+
+it('surfaces an uncertain incident submission without silently retrying', async () => {
+  incident.submit.mockRejectedValueOnce(new Error('No pudimos confirmar el incidente. Comprobá el envío.'));
+  onlineManager.setOnline(false);
+  const client = new QueryClient({ defaultOptions: { mutations: { retry: 3, retryDelay: 1 } } });
+  const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const { result } = renderHook(() => hooks.useRegistrarIncidente('qa'), { wrapper });
+  await expect(act(async () => result.current.mutateAsync({ id: 'qa', tipo: 'averia', descripcion: 'Prueba' }))).rejects.toThrow('Comprobá el envío');
+  expect(incident.submit).toHaveBeenCalledOnce(); expect(result.current.isPaused).toBe(false); client.clear();
 });
 
 it('returns an explicit pending result for an offline delivery saved by the delivery command', async () => {
