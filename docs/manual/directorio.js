@@ -400,20 +400,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ── v2026.6: Sticky section breadcrumb ──
   (function stickyBreadcrumb() {
-    var bar = document.createElement('div');
+    var bar = document.createElement('nav');
     bar.className = 'section-breadcrumb';
+    bar.setAttribute('aria-label', 'Ruta del directorio');
+    bar.setAttribute('aria-hidden', 'true');
 
-    var sbSection = document.createElement('span');
+    var sbSection = document.createElement('button');
+    sbSection.type = 'button';
+    sbSection.tabIndex = -1;
     sbSection.className = 'sb-section';
     var sbSep = document.createElement('span');
     sbSep.className = 'sb-sep';
+    sbSep.setAttribute('aria-hidden', 'true');
     sbSep.textContent = '\u203A'; // ›
-    var sbSub = document.createElement('span');
+    var sbSub = document.createElement('button');
+    sbSub.type = 'button';
+    sbSub.tabIndex = -1;
     sbSub.className = 'sb-sub';
     var sbSep2 = document.createElement('span');
     sbSep2.className = 'sb-sep';
+    sbSep2.setAttribute('aria-hidden', 'true');
     sbSep2.textContent = '\u203A';
-    var sbCU = document.createElement('span');
+    var sbCU = document.createElement('button');
+    sbCU.type = 'button';
+    sbCU.tabIndex = -1;
     sbCU.className = 'sb-cu';
 
     bar.appendChild(sbSection);
@@ -436,15 +446,34 @@ document.addEventListener('DOMContentLoaded', function() {
     var headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 64;
     var breadcrumbHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--breadcrumb-height')) || 32;
 
-    // Click handlers — scroll to the heading's section
+    function setBreadcrumbVisible(visible) {
+      bar.classList.toggle('visible', visible);
+      bar.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      [sbSection, sbSub, sbCU].forEach(function(button) { button.tabIndex = visible ? 0 : -1; });
+    }
+
+    function headingLabel(heading) {
+      var copy = heading.cloneNode(true);
+      copy.querySelectorAll('.cu-section-badge, .cu-section-count').forEach(function(badge) { badge.remove(); });
+      return (copy.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function scrollToHeading(heading) {
+      if (!heading) return;
+      var top = Math.max(0, window.scrollY + heading.getBoundingClientRect().top - headerHeight - breadcrumbHeight - 12);
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: top, behavior: reduced ? 'auto' : 'smooth' });
+    }
+
+    // Native buttons keep the route available to mouse, touch and keyboard.
     sbSection.addEventListener('click', function() {
-      if (currentH2El) currentH2El.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToHeading(currentH2El);
     });
     sbSub.addEventListener('click', function() {
-      if (currentH3El) currentH3El.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToHeading(currentH3El);
     });
     sbCU.addEventListener('click', function() {
-      if (currentCUEl) currentCUEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToHeading(currentCUEl);
     });
 
     var ticking = false;
@@ -463,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
       var threshold = headerHeight + breadcrumbHeight + 20;
 
       if (scrollY < heroBottom - headerHeight) {
-        bar.classList.remove('visible');
+        setBreadcrumbVisible(false);
         return;
       }
 
@@ -476,15 +505,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
       for (var i = 0; i < headings.length; i++) {
         var h = headings[i];
+        if (!h.getClientRects().length) continue;
         var top = h.getBoundingClientRect().top;
         if (top <= threshold) {
           if (h.tagName === 'H2') {
-            newH2 = h.textContent.trim();
+            newH2 = headingLabel(h);
             newH2El = h;
             newH3 = '';
             newH3El = null;
           } else {
-            newH3 = h.textContent.trim();
+            newH3 = headingLabel(h);
             newH3El = h;
           }
         }
@@ -496,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var sectionCollapsibles = currentSection.querySelectorAll('.collapsible-header');
         for (var j = 0; j < sectionCollapsibles.length; j++) {
           var c = sectionCollapsibles[j];
-          if (!c.classList.contains('open')) continue;
+          if (!c.classList.contains('open') || !c.getClientRects().length) continue;
           var cTop = c.getBoundingClientRect().top;
           if (cTop <= threshold) {
             newCU = c.textContent.trim();
@@ -506,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       if (!newH2 && !newH3) {
-        bar.classList.remove('visible');
+        setBreadcrumbVisible(false);
         return;
       }
 
@@ -518,23 +548,36 @@ document.addEventListener('DOMContentLoaded', function() {
         currentH3El = newH3El;
         currentCUEl = newCUEl;
         sbSection.textContent = currentH2;
+        sbSection.hidden = !currentH2;
+        sbSection.setAttribute('aria-label', 'Ir a ' + currentH2);
+        sbSection.title = currentH2;
         if (currentH3) {
-          sbSep.style.display = '';
+          sbSep.hidden = !currentH2;
+          sbSub.hidden = false;
           sbSub.textContent = currentH3;
+          sbSub.setAttribute('aria-label', 'Ir a ' + currentH3);
+          sbSub.title = currentH3;
         } else {
-          sbSep.style.display = 'none';
+          sbSep.hidden = true;
+          sbSub.hidden = true;
           sbSub.textContent = '';
         }
         if (currentCU) {
-          sbSep2.style.display = '';
+          sbSep2.hidden = false;
+          sbCU.hidden = false;
           sbCU.textContent = currentCU;
+          sbCU.setAttribute('aria-label', 'Ir a ' + currentCU);
+          sbCU.title = currentCU;
         } else {
-          sbSep2.style.display = 'none';
+          sbSep2.hidden = true;
+          sbCU.hidden = true;
           sbCU.textContent = '';
         }
+        [sbSection, sbSub, sbCU].forEach(function(button) { button.removeAttribute('aria-current'); });
+        (currentCU ? sbCU : currentH3 ? sbSub : sbSection).setAttribute('aria-current', 'location');
       }
 
-      bar.classList.add('visible');
+      setBreadcrumbVisible(true);
     }
   })();
 });

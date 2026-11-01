@@ -1021,7 +1021,7 @@ footer.site-footer strong{color:var(--primary-dark);}
   --border: #dce3e9;
   --header-height: 70px;
   --sidebar-width: 292px;
-  --breadcrumb-height: 34px;
+  --breadcrumb-height: 44px;
   --scroll-offset: calc(var(--header-height) + var(--breadcrumb-height) + 18px);
 }
 body { background: var(--bg); color: var(--text); line-height: 1.62; -webkit-font-smoothing: antialiased; }
@@ -1090,7 +1090,20 @@ table { box-shadow: 0 0 0 1px var(--border); }
 .training-status { background: #1b5e3c; }
 .cu-screenshot-mobile { border-color: #23314d; background: #23314d; }
 .cu-screenshot-mobile-caption { background: #23314d; }
-.section-breadcrumb { background: rgba(255,255,255,.96); backdrop-filter: none; }
+.section-breadcrumb { background: rgba(255,255,255,.96); backdrop-filter: none; font-size: .875rem; }
+.section-breadcrumb [hidden] { display: none !important; }
+.section-breadcrumb button {
+  min-width: 44px; min-height: 44px; height: 100%; margin: 0; padding: 0 4px;
+  border: 0; background: transparent; font: inherit; text-align: left;
+}
+.section-breadcrumb .sb-section { max-width: 38%; min-width: 44px; overflow: hidden; text-overflow: ellipsis; }
+.section-breadcrumb .sb-sub { max-width: 34%; min-width: 44px; }
+.section-breadcrumb .sb-cu { flex: 1 1 auto; max-width: none; min-width: 44px; }
+.section-breadcrumb button:focus-visible { outline: 2px solid #087a45; outline-offset: -3px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .section-breadcrumb { transition: none; }
+}
 .auth-wall { background: #f0f8f4; color: #101828; }
 .auth-wall .auth-logo { color: #1b5e3c; }
 .auth-wall .auth-logo span { color: #087a45; }
