@@ -176,8 +176,10 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(async () => {
           // Installation already saves the brand icons in the release cache.
-          // A first offline manifest download must not overlook that precache.
-          const cached = await matchOwnCache(request);
+          // For the mutable app manifest, prefer a successful later download;
+          // an initial offline request can still use the installed copy.
+          const latestManifest = url.pathname === '/app/manifest-app.json' ? await cache.match(request) : null;
+          const cached = isCacheableAsset(request, latestManifest) ? latestManifest : await matchOwnCache(request);
           return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
         });
     })
