@@ -15,9 +15,14 @@ async function positionHeading(page: Page, selector: string) {
 test('ruta del directorio clara y accesible al filtrar por rol', async ({ page }, info) => {
   await login(page, info, 'generador');
   await page.goto('/manual/directorio.html');
-  await positionHeading(page, '#cu-sistema h3');
   const breadcrumb = page.locator('.section-breadcrumb');
+  await expect(breadcrumb).toHaveAttribute('aria-hidden', 'true');
+  await expect(breadcrumb.locator('button')).toHaveCount(3);
+  for (const button of await breadcrumb.locator('button').all()) await expect(button).toHaveAttribute('tabindex', '-1');
+  await positionHeading(page, '#cu-sistema h3');
   await expect(breadcrumb).toHaveClass(/visible/);
+  await expect(breadcrumb).toHaveAttribute('aria-label', 'Ruta del directorio');
+  await expect(breadcrumb).toHaveAttribute('aria-hidden', 'false');
   await expect.poll(() => breadcrumb.locator('.sb-sub').textContent(), { timeout: 15_000 }).toBe('7.5 Sistema');
   const system = breadcrumb.getByRole('button', { name: 'Ir a 7.5 Sistema', exact: true });
   await expect(system).toBeVisible();
@@ -52,4 +57,8 @@ test('ruta del directorio clara y accesible al filtrar por rol', async ({ page }
   for (const control of geometry.controls) { expect(control.height).toBeGreaterThanOrEqual(44); expect(control.contained).toBe(true); }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: info.outputPath('ruta-generador.png'), animations: 'disabled', scale: 'css' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const motion = await page.evaluate(() => ({ scroll: getComputedStyle(document.documentElement).scrollBehavior,
+    breadcrumb: getComputedStyle(document.querySelector('.section-breadcrumb')!).transitionDuration }));
+  expect(motion).toEqual({ scroll: 'auto', breadcrumb: '0s' });
 });
