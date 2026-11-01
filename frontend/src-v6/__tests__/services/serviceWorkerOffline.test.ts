@@ -202,6 +202,22 @@ it('a public PWA navigation cannot overwrite the saved application shell', async
   expect(await (await worker.cacheFor(worker.precacheName).match('/app/index.html'))?.text()).toBe('APP SHELL');
 });
 
+it('uses the last downloaded app manifest offline instead of the initial precache', async () => {
+  const worker = workerHarness(true), url = '/app/manifest-app.json';
+  const json = (body: string) => new Response(body, { headers: { 'Content-Type': 'application/json' } });
+  await worker.cacheFor(worker.precacheName).put(url, json('{"version":"initial"}'));
+  worker.fetch.mockResolvedValueOnce(json('{"version":"updated"}'));
+  expect(await (await worker.request(url, 'cors'))?.json()).toEqual({ version: 'updated' });
+  worker.fetch.mockRejectedValueOnce(new TypeError('Offline'));
+  expect(await (await worker.request(url, 'cors'))?.json()).toEqual({ version: 'updated' });
+});
+
+it('uses the precached app manifest offline before its first refresh', async () => {
+  const worker = workerHarness(true), url = '/app/manifest-app.json';
+  await worker.cacheFor(worker.precacheName).put(url, new Response('{"version":"installed"}', { headers: { 'Content-Type': 'application/json' } }));
+  expect(await (await worker.request(url, 'cors'))?.json()).toEqual({ version: 'installed' });
+});
+
 it('keeps an installed app shell when the network serves a newer release', async () => {
   const worker = workerHarness(true);
   await worker.cacheFor(worker.precacheName).put('/app/index.html', html('INSTALLED SHELL'));
