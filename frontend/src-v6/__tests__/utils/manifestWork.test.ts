@@ -21,6 +21,33 @@ describe('shared operational guidance never replaces server authorization',()=>{
   it.each(['ENTREGADO','RECIBIDO','EN_TRATAMIENTO','TRATADO'])('assigns post-delivery work to operator, even for other viewers: %s',estado=>{
     for(const role of [...roles,'ADMIN'])expect(manifestWork({estado},role).responsible).toBe('Operador');
   });
+  it.each([
+    ['ENTREGADO', false, 'Comprobá la carga'],
+    ['RECIBIDO', true, 'Registrá las cantidades'],
+    ['RECIBIDO', false, 'Registrá el tratamiento'],
+    ['EN_TRATAMIENTO', false, 'Podés emitir parciales'],
+  ])('gives the operator actionable guidance for %s', (estado,pesajePendiente,expected) => {
+    expect(manifestWork({estado,pesajePendiente},'OPERADOR').detail).toContain(expected);
+  });
+  it.each([
+    ['ENTREGADO', false],
+    ['RECIBIDO', true],
+    ['RECIBIDO', false],
+    ['EN_TRATAMIENTO', false],
+  ])('explains the operator’s work to other roles in %s', (estado,pesajePendiente) => {
+    for (const role of ['GENERADOR','TRANSPORTISTA','ADMIN']) {
+      const detail = manifestWork({estado,pesajePendiente},role).detail;
+      expect(detail).toMatch(/El operador/i);
+      expect(detail).not.toMatch(/Comprobá|Registrá|Podés emitir|Cerrá/);
+    }
+  });
+  it.each(['OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'ADMIN'])('does not infer weighing or treatment when weighing data is missing for %s', role => {
+    expect(manifestWork({estado:'RECIBIDO'},role)).toMatchObject({label:'Pesaje por comprobar',responsible:'Operador',tone:'blocked'});
+    expect(manifestWork({estado:'RECIBIDO'},role).detail).toContain('Actualizá el manifiesto');
+  });
+  it('does not infer treatment from an empty waste list flagged by the agenda', () => {
+    expect(manifestWork({estado:'RECIBIDO',pesajePendiente:false,pesajeNoDisponible:true},'OPERADOR')).toMatchObject({label:'Pesaje por comprobar',tone:'blocked'});
+  });
   it('does not equate treatment closure to certificate emission',()=>{
     expect(manifestWork({estado:'TRATADO'},'GENERADOR').label).toBe('Esperando certificado final');
     expect(manifestWork({estado:'TRATADO',finalEmitido:true},'GENERADOR').tone).toBe('done');

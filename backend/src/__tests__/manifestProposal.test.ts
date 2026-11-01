@@ -329,6 +329,26 @@ describe('operational decisions and integrity',()=>{
   json.mockClear();await inOperationalSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
   expect(json.mock.calls[0][0].data.items[0]).toMatchObject({action:'Revisar aprobaciones',detail:'Falta aprobar: transporte. No se puede iniciar.'});
  });
+ it.each([
+  [[], true, false, 'Pesaje por comprobar'],
+  [[{cantidadRecibida:null}], false, true, 'Registrá el pesaje recibido'],
+  [[{cantidadRecibida:12}], false, false, 'Registrá el tratamiento'],
+ ])('reports unavailable weighing in the agenda without changing the existing pending field',async(residuos,unavailable,pending,action)=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[{...mock.manifest,estado:'RECIBIDO',eventos:mock.events,residuos}]);
+  const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();await inOperationalSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data.items[0]).toMatchObject({pesajeNoDisponible:unavailable,pesajePendiente:pending,action});
+ });
+ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'] as const)('signals unavailable weighing to %s without inventing the next operation',async role=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[{...mock.manifest,estado:'RECIBIDO',eventos:mock.events,residuos:[]}]);
+  const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();await inOperationalSession(()=>getTrainingTasks(req(role),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data.items[0]).toMatchObject({pesajeNoDisponible:true,action:'Pesaje por comprobar',detail:expect.stringContaining('No se encontraron residuos')});
+ });
  it('records three authenticated approvals and operational coordination, with integrity and idempotent notices',async()=>{
   vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
   for (const role of ['OPERADOR','GENERADOR','TRANSPORTISTA'] as const) {

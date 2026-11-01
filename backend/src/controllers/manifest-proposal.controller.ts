@@ -232,6 +232,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    const requiresReview=['BORRADOR','PENDIENTE_APROBACION','APROBADO'].includes(m.estado)
     && (damaged||conflictingRejection||(m.estado==='PENDIENTE_APROBACION'&&snapshot.kind==='missing'));
    const role=proposal?(proposalRole(req.user,proposal)||(req.user.rol==='ADMIN'?'ADMIN':null)):req.user.rol;
+   const pesajeNoDisponible=m.estado==='RECIBIDO' && m.residuos.length===0;
    let action='',detail='';
    if(m.estado==='BORRADOR'){
     action='Necesita nueva propuesta';
@@ -245,6 +246,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     detail=m.modalidad==='IN_SITU'?(started?'El operador debe confirmar la recepción en origen, sin traslado ni GPS.':'Generador, transporte u operador pueden dar inicio.'):!started?'Generador, transporte u operador pueden dar inicio.':'Generador prepara la carga; operador prepara la recepción. El viaje empieza con el retiro.';
    }else if(m.estado==='APROBADO'){action=m.modalidad==='IN_SITU'?'Recepción in situ pendiente':'Retiro pendiente';detail='Conserva el recorrido anterior, sin nuevas aprobaciones de partes.';}else if(m.estado==='EN_TRANSITO'){action=role==='TRANSPORTISTA'?'Continuá el viaje y compartí GPS':'El transporte está en viaje';detail='La entrega se confirma al llegar al destino.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='ENTREGADO'){action='Confirmá la recepción de esta carga';detail='Después registrá el peso realmente recibido.';}
+   else if(pesajeNoDisponible){action='Pesaje por comprobar';detail='No se encontraron residuos para comprobar el pesaje. Actualizá el manifiesto y, si el problema continúa, consultá a Ambiente.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='RECIBIDO'){action=m.residuos.some(r=>!r.cantidadRecibida)?'Registrá el pesaje recibido':'Registrá el tratamiento';detail='El pesaje y el tratamiento permiten emitir la certificación parcial.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action=isTrainingSession()?'Emití un parcial o cerrá el tratamiento':'Cerrá el tratamiento cuando corresponda';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
    else if(m.estado==='TRATADO'){action=role==='OPERADOR'?'Revisá y emití la certificación final total':'Esperando la certificación final del operador';detail='El operador decide cuándo firmarla y liberarla. El cierre no la emite automáticamente.';}
@@ -261,7 +263,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    }
    if(requiresReview){action='Propuesta por revisar';detail='No se pueden comprobar las aprobaciones. Contactá a Ambiente; el historial se conserva y no se puede iniciar.';}
    const requiereMiAprobacion=!legacyBlocked&&!requiresReview&&!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
-   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereNuevaPropuesta:legacyBlocked,requiereRevisionPropuesta:requiresReview,advertenciaPropuesta:damaged&&!requiresReview,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];
+   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereNuevaPropuesta:legacyBlocked,requiereRevisionPropuesta:requiresReview,advertenciaPropuesta:damaged&&!requiresReview,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),pesajeNoDisponible,certificatePending:m.estado==='TRATADO'}];
   });
   res.json({success:true,data:{items,total,page,limit:agenda.limit,counts,limited:false}});
  }catch(e){next(e);}

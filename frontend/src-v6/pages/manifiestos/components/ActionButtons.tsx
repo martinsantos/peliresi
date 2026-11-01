@@ -39,6 +39,7 @@ export interface ActionButtonsProps {
   pickupBlocked?: boolean;
   legacyDraftBlocked?: boolean;
   pesajePendiente?: boolean;
+  pesajeUnavailable?: boolean;
   isCancelling: boolean;
   mutations: {
     firmar: MutationState;
@@ -79,6 +80,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   pickupBlocked,
   legacyDraftBlocked,
   pesajePendiente = true,
+  pesajeUnavailable = false,
   isCancelling,
   mutations,
   onOpenFirmaModal,
@@ -190,7 +192,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           variant={pesajePendiente ? 'primary' : 'outline'}
           leftIcon={<Scale size={16} />}
           onClick={onOpenPesajeModal}
-          disabled={isActionPending}
+          disabled={isActionPending || pesajeUnavailable}
         >
           Registrar Pesaje
         </Button>
@@ -202,7 +204,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           variant={pesajePendiente ? 'outline' : 'primary'}
           leftIcon={<Beaker size={16} />}
           onClick={onOpenTratamientoModal}
-          disabled={isActionPending}
+          disabled={isActionPending || pesajeUnavailable}
         >
           Registrar Tratamiento
         </Button>
@@ -214,7 +216,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           variant={estado === EstadoManifiesto.EN_TRATAMIENTO ? 'primary' : 'outline'}
           leftIcon={mutations.cerrar.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
           onClick={onCerrar}
-          disabled={isActionPending}
+          disabled={isActionPending || pesajeUnavailable}
         >
           Cerrar Manifiesto
         </Button>

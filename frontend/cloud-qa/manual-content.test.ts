@@ -684,6 +684,22 @@ test('an individual approval notice is an event and the current state is in the 
   assert.match(text, /acciones simultáneas pueden aparecer fuera de orden/);
 });
 
+test('manual entry points load the current help-data version', () => {
+  const expected = createHash('sha256').update(readFileSync(new URL('help-data.js', root))).digest('hex').slice(0, 12);
+  for (const file of ['index.html', 'search.html', 'tutorial.html']) {
+    assert.ok(read(file).includes(`help-data.js?v=${expected}`), `${file} has a stale help-data version`);
+  }
+});
+
+test('weighing guide explains recovery when waste details cannot be verified', () => {
+  const guide = guides.find((g: any) => g.id === 'operador-recibir-pesar');
+  const text = guide.steps.find((s: any) => s.title === 'Registrar el pesaje').body.join(' ');
+  assert.match(text, /Pesaje por comprobar/);
+  assert.match(text, /actualizá el manifiesto/);
+  assert.match(text, /pesaje, tratamiento y cierre quedan deshabilitados/);
+  assert.match(text, /consultá a Ambiente/);
+});
+
 test('directory describes mail suppression and scheduled operation reminders without promising delivery', () => {
   const section = read('directorio.html').split('<section id="mod-emails"')[1].split('</section>')[0];
   assert.match(section, /Los correos suprimidos no se reactivan automáticamente/);

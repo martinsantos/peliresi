@@ -11,7 +11,7 @@ import { PartyApprovalStatus, type PartyApproval } from './PartyApprovalStatus';
 import { manifestWork } from '../utils/manifestWork';
 import { useScopedSearchParams } from '../hooks/useScopedSearchParams';
 const taskFilterKeys = ['pendientes', 'periodo', 'buscarPendiente', 'paginaPendientes'] as const;
-type Task={id:string;numero:string;estado:string;modalidad?:string;fechaEstimadaRetiro:string|null;partes:PartyApproval[]|null;inicio:string|null;requiereMiAprobacion:boolean;requiereNuevaPropuesta?:boolean;requiereRevisionPropuesta?:boolean;advertenciaPropuesta?:boolean;pesajePendiente:boolean;certificatePending?:boolean;detail?:string;actores?:{generador:string;transportista:string|null;operador:string}};
+type Task={id:string;numero:string;estado:string;modalidad?:string;fechaEstimadaRetiro:string|null;partes:PartyApproval[]|null;inicio:string|null;requiereMiAprobacion:boolean;requiereNuevaPropuesta?:boolean;requiereRevisionPropuesta?:boolean;advertenciaPropuesta?:boolean;pesajePendiente:boolean;pesajeNoDisponible?:boolean;certificatePending?:boolean;detail?:string;actores?:{generador:string;transportista:string|null;operador:string}};
 const roleNames: Record<string,string> = { GENERADOR:'Generador', TRANSPORTISTA:'Transporte', OPERADOR:'Operador' };
 function missingApprovals(m:Task){return ['PENDIENTE_APROBACION','APROBADO'].includes(m.estado) ? m.partes?.filter(p=>!p.aprobada).map(p=>roleNames[p.rol]||p.rol).join(', ') : '';}
 export function TrainingTaskQueue(){

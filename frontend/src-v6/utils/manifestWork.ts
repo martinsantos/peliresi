@@ -10,6 +10,7 @@ export type ManifestWork = {
   requiereNuevaPropuesta?: boolean;
   requiereRevisionPropuesta?: boolean;
   pesajePendiente?: boolean;
+  pesajeNoDisponible?: boolean;
   rechazo?: string | null;
   finalEmitido?: boolean;
 };
@@ -35,6 +36,7 @@ export function manifestWork(m: ManifestWork, role: string) {
   if (m.rechazo) return result('Propuesta detenida', 'Partes vinculadas', 'Hay una participación rechazada. Revisá el motivo antes de preparar otra propuesta.', 'blocked');
   if (m.requiereNuevaPropuesta) return result('Necesita nueva propuesta', 'Partes vinculadas', 'Creá una nueva propuesta con las tres partes; el registro anterior se conserva.', 'blocked');
   if (m.estado === 'APROBADO' && m.partes && (m.partes.length !== required.length || missing.length)) return result('Revisar aprobaciones', missing.join(', ') || 'Administración', 'No se puede iniciar hasta comprobar todas las aprobaciones.', 'blocked');
+  if (m.estado === 'RECIBIDO' && (m.pesajeNoDisponible || typeof m.pesajePendiente !== 'boolean')) return result('Pesaje por comprobar', 'Operador', 'No pudimos comprobar el pesaje. Actualizá el manifiesto y, si el problema continúa, consultá a Ambiente.', 'blocked');
   switch (m.estado) {
     case 'BORRADOR': return result('Necesita nueva propuesta', 'Partes vinculadas', 'El borrador anterior se conserva; se necesitan las tres aprobaciones antes de iniciar.', 'blocked');
     case 'PENDIENTE_APROBACION': return result(m.requiereMiAprobacion ? 'Te toca aprobar' : 'En espera', missing.join(', ') || 'Partes vinculadas', m.requiereMiAprobacion ? 'Revisá los datos antes de confirmar tu participación.' : 'Cada parte pendiente debe aprobar desde su cuenta. El retiro todavía no está habilitado.', 'pending');
@@ -42,9 +44,9 @@ export function manifestWork(m: ManifestWork, role: string) {
       if (m.partes && !m.inicio) return result('Listo para iniciar', 'Cualquiera de las partes vinculadas', inSitu ? 'Coordiná la recepción en origen con la otra parte. No hay viaje ni GPS.' : 'Iniciá la coordinación cuando acuerden la operación. Todavía no comienza el viaje.');
       return result(inSitu ? (role === 'OPERADOR' ? 'Confirmar recepción en origen' : 'Esperando recepción en origen') : role === 'TRANSPORTISTA' ? 'Confirmar retiro' : 'Preparando retiro', inSitu ? 'Operador' : 'Transporte', inSitu ? 'El operador confirma la recepción en origen. No hay viaje ni GPS.' : 'El transporte confirma el retiro cuando recibe la carga. En ese momento comienza el viaje y el GPS.');
     case 'EN_TRANSITO': return result('En viaje · GPS', 'Transporte', role === 'TRANSPORTISTA' ? 'Compartí la ubicación durante el viaje y confirmá la entrega al llegar.' : 'El transporte comparte la ubicación y confirma la entrega al llegar.');
-    case 'ENTREGADO': return result(role === 'OPERADOR' ? 'Confirmar recepción' : 'Esperando recepción', 'Operador', 'Comprobá la carga recibida. Las diferencias se documentan en una adenda con informe de hallazgo.');
-    case 'RECIBIDO': return result(role === 'OPERADOR' ? (m.pesajePendiente ? 'Registrar pesaje' : 'Registrar tratamiento') : 'En recepción', 'Operador', m.pesajePendiente ? 'Registrá las cantidades realmente recibidas antes del tratamiento.' : 'Registrá el tratamiento aplicado a los residuos recibidos.');
-    case 'EN_TRATAMIENTO': return result('En tratamiento', 'Operador', 'Podés emitir parciales de lo tratado. Cerrá el manifiesto cuando termine el tratamiento.');
+    case 'ENTREGADO': return result(role === 'OPERADOR' ? 'Confirmar recepción' : 'Esperando recepción', 'Operador', role === 'OPERADOR' ? 'Comprobá la carga recibida. Las diferencias se documentan en una adenda con informe de hallazgo.' : 'El operador comprueba la carga recibida y documenta las diferencias en una adenda con informe de hallazgo.');
+    case 'RECIBIDO': return result(role === 'OPERADOR' ? (m.pesajePendiente ? 'Registrar pesaje' : 'Registrar tratamiento') : 'En recepción', 'Operador', role === 'OPERADOR' ? (m.pesajePendiente ? 'Registrá las cantidades realmente recibidas antes del tratamiento.' : 'Registrá el tratamiento aplicado a los residuos recibidos.') : (m.pesajePendiente ? 'El operador registra las cantidades realmente recibidas antes del tratamiento.' : 'El operador registra el tratamiento aplicado a los residuos recibidos.'));
+    case 'EN_TRATAMIENTO': return result('En tratamiento', 'Operador', role === 'OPERADOR' ? 'Podés emitir parciales de lo tratado. Cerrá el manifiesto cuando termine el tratamiento.' : 'El operador puede emitir parciales de lo tratado y cerrar el manifiesto al finalizar el tratamiento.');
     case 'TRATADO': return m.finalEmitido ? result('Certificación final emitida', 'Partes vinculadas', 'El documento está disponible en Certificaciones.', 'done') : result(role === 'OPERADOR' ? 'Emitir certificación final' : 'Esperando certificado final', 'Operador', 'El cierre no emite el certificado. El operador lo firma cuando todas las adendas estén resueltas.', 'pending');
     case 'CANCELADO': return result('Manifiesto cancelado', 'Sin acción pendiente', 'Se conserva el historial de la operación.', 'done');
     case 'RECHAZADO': return result('Carga rechazada', 'Partes vinculadas', 'Revisá el motivo del rechazo y coordiná la resolución con las partes.', 'blocked');

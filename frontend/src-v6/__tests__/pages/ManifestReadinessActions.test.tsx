@@ -7,9 +7,9 @@ vi.mock('../../pages/manifiestos/components/ManifestProposalApprovals', () => ({
 const pending = { isPending: false };
 const marker = [{ tipo: 'PROPUESTA_PARTES_V1' }] as NonNullable<Manifiesto['eventos']>;
 const mutations = { firmar: pending, confirmarRetiro: pending, confirmarEntrega: pending, confirmarRecepcion: pending, confirmarRecepcionInSitu: pending, pesaje: pending, registrarTratamiento: pending, cerrar: pending, rechazar: pending, registrarIncidente: pending, revertir: pending };
-function mount(manifiesto: Partial<Manifiesto>, role = 'TRANSPORTISTA', isInSitu = false) {
+function mount(manifiesto: Partial<Manifiesto>, role = 'TRANSPORTISTA', isInSitu = false, isAdmin = false) {
   const noop = vi.fn(), reload = vi.fn(), action = vi.fn();
-  const view = render(<ManifiestoActions manifiesto={manifiesto} manifiestoId="qa" userRol={role} isAdmin={false} isActionPending={false} isCancelling={false} isInSitu={isInSitu} mutations={mutations}
+  const view = render(<ManifiestoActions manifiesto={manifiesto} manifiestoId="qa" userRol={role} isAdmin={isAdmin} isActionPending={false} isCancelling={false} isInSitu={isInSitu} mutations={mutations}
     onRetryApprovalCheck={reload} onCerrar={noop} onFirmar={noop} onConfirmarRetiro={action} onConfirmarEntrega={noop} onConfirmarRecepcion={noop} onConfirmarRecepcionInSitu={action}
     onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} />);
   return { ...view, reload, action };
@@ -35,6 +35,38 @@ describe('physical start uses the server readiness of the complete proposal', ()
     const { reload } = mount({ estado: EstadoManifiesto.APROBADO, eventos: marker });
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar manifiesto' }));
     expect(reload).toHaveBeenCalledOnce();
+  });
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'ADMIN'])('explains treatment as the operator’s work for %s', role => {
+    mount({ estado: EstadoManifiesto.EN_TRATAMIENTO }, role);
+    expect(screen.getByText('Le toca a:').parentElement).toHaveTextContent('Operador');
+    fireEvent.click(screen.getByText('Cómo continuar'));
+    expect(screen.getByText(/^El operador puede emitir parciales/)).toBeVisible();
+    expect(screen.queryByText(/^Podés emitir parciales/)).not.toBeInTheDocument();
+  });
+  it('keeps direct treatment guidance for the operator', () => {
+    mount({ estado: EstadoManifiesto.EN_TRATAMIENTO }, 'OPERADOR');
+    fireEvent.click(screen.getByText('Cómo continuar'));
+    expect(screen.getByText(/^Podés emitir parciales/)).toBeVisible();
+  });
+  it.each([undefined, []])('blocks weighing, treatment and closure until unavailable waste details are refreshed: %j', residuos => {
+    const { reload, unmount } = mount({ estado: EstadoManifiesto.RECIBIDO, residuos }, 'OPERADOR');
+    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos comprobar el pesaje');
+    expect(screen.getByText('Pesaje por comprobar')).toBeVisible();
+    for (const name of ['Registrar Pesaje', 'Registrar Tratamiento', 'Cerrar Manifiesto']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar manifiesto' }));
+    expect(reload).toHaveBeenCalledOnce();
+    unmount();
+    mount({ estado: EstadoManifiesto.RECIBIDO, residuos: [{ cantidadRecibida: 12 }] } as unknown as Partial<Manifiesto>, 'OPERADOR');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar Tratamiento' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Cerrar Manifiesto' })).toBeEnabled();
+  });
+  it('also prevents an administrator from acting while the waste details are unavailable', () => {
+    mount({ estado: EstadoManifiesto.RECIBIDO, residuos: [] }, 'ADMIN', false, true);
+    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos comprobar el pesaje');
+    for (const name of ['Registrar Pesaje', 'Registrar Tratamiento', 'Cerrar Manifiesto']) expect(screen.getByRole('button', { name })).toBeDisabled();
   });
   it('directs a pending record without a proposal to review rather than displaying a fictitious approval', () => {
     mount({ estado: EstadoManifiesto.PENDIENTE_APROBACION, eventos: [] }, 'GENERADOR');

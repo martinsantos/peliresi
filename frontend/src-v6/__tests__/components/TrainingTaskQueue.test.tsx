@@ -104,6 +104,16 @@ it('shows administrator approval tasks with actor names and the missing parties'
  client.clear();
 });
 
+it.each(['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'])('does not claim treatment is next when weighing cannot be verified for %s',async role=>{
+ mock.rol=role;mock.get.mockImplementation(async(_url,options)=>reply([{...items[1],id:'no-waste',numero:'QA-SIN-PESAJE',estado:'RECIBIDO',pesajePendiente:false,pesajeNoDisponible:true,detail:'No se encontraron residuos para comprobar el pesaje.'}],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ const row=await screen.findByRole('link',{name:/QA-SIN-PESAJE/});
+ expect(row).toHaveTextContent('Pesaje por comprobar');
+ expect(row).not.toHaveTextContent('Registrar tratamiento');
+ client.clear();
+});
+
 it('does not advertise a start in the agenda when an approval is missing despite the stored status',async()=>{
  mock.get.mockImplementation(async(_url,options)=>reply([{...items[0],estado:'APROBADO',requiereMiAprobacion:false}],options));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
