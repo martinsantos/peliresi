@@ -30,14 +30,29 @@ test('el navegador actualiza los accesos aun con el service worker anterior', as
       if (!response.ok) throw Error(`Manifest HTTP ${response.status}`);
       return (await response.json()).shortcuts.map((entry: { name: string }) => entry.name);
     });
-    expect(await shortcuts()).toContain('Centro de control');
+    const old = await shortcuts();
+    expect(old).toContain('Centro de control');
     await selectRelease(newApp);
     const expected = ['Inicio', 'Escanear QR', 'Avisos'];
     expect(await shortcuts()).toEqual(expected);
     await page.context().setOffline(true);
+    // The previous worker prefers its initial precache while it remains active.
+    expect(await shortcuts()).toEqual(old);
+    await page.context().setOffline(false);
+    await page.evaluate(async () => {
+      (window as any).__qaControllerChanges = 0;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { (window as any).__qaControllerChanges++; });
+      await (await navigator.serviceWorker.ready).update();
+    });
+    await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration('/app/'))?.waiting?.state),
+      { timeout: 45_000 }).toBe('installed');
+    await page.evaluate(async () => (await navigator.serviceWorker.getRegistration('/app/'))!.waiting!.postMessage({ type: 'SKIP_WAITING' }));
+    await expect.poll(() => page.evaluate(() => (window as any).__qaControllerChanges), { timeout: 45_000 }).toBeGreaterThan(0);
+    expect(await shortcuts()).toEqual(expected);
+    await page.context().setOffline(true);
     expect(await shortcuts()).toEqual(expected);
     await writeFile(info.outputPath('update-proof.json'), JSON.stringify({ synthetic: true, previousWorkerControlled: true,
-      newManifestOnlineAndOffline: true, androidLauncherVerified: false }));
+      oldWorkerOfflineShowsOldManifest: true, newWorkerOfflineShowsNewManifest: true, androidLauncherVerified: false }));
   } finally {
     await page.context().setOffline(false);
     await selectRelease(newApp);

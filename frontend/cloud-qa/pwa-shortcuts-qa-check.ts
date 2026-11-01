@@ -8,7 +8,7 @@ await assertCloudDatabase();
 const out = '/work/sitrep/.qa-pwa-shortcuts-20261031';
 assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'pwa-shortcuts-20261031');
-assert.equal(process.env.GITHUB_SHA, '4485d5cb52ee2ac48131221360ff068ec285e087');
+assert.equal(process.env.GITHUB_SHA, '1d391e38a9071eba7e64350c543eb8286a605049');
 const stage = process.env.QA_SOURCE_STAGE;
 assert.ok(stage === 'before' || stage === 'after');
 const expected = JSON.parse(readFileSync(path.join(out, 'qa-digests.json'), 'utf8')) as Record<string, string>;

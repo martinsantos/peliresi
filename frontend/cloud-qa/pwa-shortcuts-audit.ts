@@ -7,7 +7,7 @@ import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-pwa-shortcuts-20261031';
-const commit = '4485d5cb52ee2ac48131221360ff068ec285e087';
+const commit = '1d391e38a9071eba7e64350c543eb8286a605049';
 assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'pwa-shortcuts-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
@@ -47,8 +47,9 @@ for (const { pid } of read('processes.json')) {
   assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED, 'false'); assert.equal(env.EMAIL_NOTIFICATION_FAMILIES, '');
 }
 const unit = read('unit.json');
-assert.equal(unit.success, true); assert.equal(unit.numPassedTests, 82); assert.equal(unit.numFailedTests, 0); assert.equal(unit.numPendingTests, 0);
+assert.equal(unit.success, true); assert.equal(unit.numPassedTests, 84); assert.equal(unit.numFailedTests, 0); assert.equal(unit.numPendingTests, 0);
 const baseline = read('baseline-unit.json'); assert.equal(baseline.numFailedTests, 8);
+const workerBaseline = read('worker-baseline.json'); assert.equal(workerBaseline.numFailedTests, 1);
 const tap = readFileSync(path.join(out, 'manual-final.tap'), 'utf8');
 assert.match(tap, /# tests 53\b/); assert.match(tap, /# pass 53\b/); assert.match(tap, /# fail 0\b/);
 const browser = read('browser.json');
@@ -70,7 +71,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, production: false, previousIntegratedCommit: previous.previousIntegratedCommit,
-    previousIntegratedBrowserTests: previous.previousBrowserTests, directedBrowserTests: 9, unitTests: 82, manualTests: 53,
+    previousIntegratedBrowserTests: previous.previousBrowserTests, directedBrowserTests: 9, unitTests: 84, manualTests: 53,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false, androidLauncherVerified: false };
   writeFileSync(path.join(out, 'pwa-shortcuts-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(result));

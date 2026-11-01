@@ -6,7 +6,7 @@ import { assertCloudDatabase, root } from './safety.ts';
 
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-pwa-shortcuts-20261031';
-const commit = '4485d5cb52ee2ac48131221360ff068ec285e087';
+const commit = '1d391e38a9071eba7e64350c543eb8286a605049';
 assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'pwa-shortcuts-20261031');
 assert.equal(process.env.GITHUB_SHA, commit);
