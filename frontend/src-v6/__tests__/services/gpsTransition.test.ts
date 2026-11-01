@@ -23,6 +23,15 @@ beforeEach(() => {
 afterEach(() => { localStorage.clear(); restoreLocks(); });
 
 describe('GPS safety before a trip transition', () => {
+  it.each(['entrega', 'relevo'])('does not perform %s when the local queue is an empty corrupt string', async () => {
+    const scope = gpsContextScope('company-a', mocks.context), key = gpsQueueKey('carrier-a', id, scope);
+    localStorage.setItem(key, '');
+    const action = vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a', id, action, scope)).rejects.toThrow('No se pudieron leer');
+    expect(action).not.toHaveBeenCalled(); expect(mocks.post).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).toBe('');
+  });
+
   it('blocks a transition from another screen when this browser has a fleet point pending', async () => {
     const item={targetKey:JSON.stringify(['other-account:transportista','MANIFIESTO:'+id]),puntoId:point.puntoId,
       observedAt:Date.now(),point:{latitud:-33,longitud:-69,precision:10}};

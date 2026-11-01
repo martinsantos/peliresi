@@ -47,6 +47,22 @@ describe('GPS queue before an offline delivery', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, 'company-a'])('preserves a present but empty-string queue as invalid (scope %s)', async scope => {
+    const savedKey = gpsQueueKey('carrier-a', 'trip', scope);
+    localStorage.setItem(savedKey, '');
+    expect(readPendingGpsQueue('carrier-a', 'trip', scope)).toEqual({ ok: false, reason: 'invalid' });
+    const send = vi.fn();
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send, scope)).rejects.toThrow('No se pudieron leer');
+    expect(localStorage.getItem(savedKey)).toBe('');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('still accepts a missing queue and a valid empty array', () => {
+    expect(readPendingGpsQueue('carrier-a', 'trip')).toEqual({ ok: true, durable: true, points: [] });
+    localStorage.setItem(key, '[]');
+    expect(readPendingGpsQueue('carrier-a', 'trip')).toEqual({ ok: true, durable: true, points: [] });
+  });
+
   it('isolates two accounts and retains unowned legacy data for review', async () => {
     expect(gpsQueueKey('a_b', 'c')).not.toBe(gpsQueueKey('a', 'b_c'));
     expect(savePendingGpsQueue('carrier-a', 'trip', [first])).toBe(true);

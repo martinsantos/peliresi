@@ -16,6 +16,14 @@ it('stays out of the way when there are no saved points', () => {
   expect(screen.queryByRole('region', { name: 'Comprobar recepción de ubicaciones' })).toBeNull();
 });
 
+it('explains that an empty corrupt storage entry needs review and preserves it', () => {
+  localStorage.setItem(key, '');
+  render(<PendingGpsReceipts ownerId="carrier-a" contextOwner="transport-context" manifestId="trip" />);
+  expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron leer las ubicaciones guardadas');
+  expect(screen.queryByRole('button', { name: 'Comprobar recepción' })).toBeNull();
+  expect(localStorage.getItem(key)).toBe('');
+});
+
 it('reports confirmed and unconfirmed points while preserving the stored queue', async () => {
   const raw = JSON.stringify([point]); localStorage.setItem(key, raw);
   mock.verify.mockResolvedValue({ checked: 1, confirmed: 1, unconfirmed: 0 });
