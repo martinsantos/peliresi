@@ -98,11 +98,21 @@ test('el manual distingue la campana de los avisos opcionales del dispositivo', 
   await login(page, info, 'generador');
   await page.goto('/manual/directorio.html');
   const section = page.getByRole('button', { name: 'CU-S09: Enviar Notificaciones Push', exact: true });
-  await section.scrollIntoViewIfNeeded(); await section.click();
+  await section.scrollIntoViewIfNeeded();
+  if (await section.getAttribute('aria-expanded') === 'true') {
+    await section.click(); await expect(section).toHaveAttribute('aria-expanded', 'false');
+  }
+  await section.click();
   await expect(section).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByText(/La campana y la bandeja de Avisos muestran/)).toBeVisible();
   await expect(page.getByText(/Durante los ensayos de preview están apagadas/)).toBeVisible();
   await expect(page.getByText(/Si no se abre o falta conexión/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: info.outputPath('manual-notificaciones.png'), animations: 'disabled', scale: 'css' });
+  const parties = page.getByRole('button', { name: 'CU-S02: Enviar Notificaciones Automaticas', exact: true });
+  await parties.scrollIntoViewIfNeeded();
+  if (await parties.getAttribute('aria-expanded') === 'false') await parties.click();
+  await expect(parties).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText(/propuestas y decisiones de aprobación generan avisos para las partes vinculadas/)).toBeVisible();
+  await expect(page.getByText(/una lectura no reemplaza la aprobación/)).toBeVisible();
 });
