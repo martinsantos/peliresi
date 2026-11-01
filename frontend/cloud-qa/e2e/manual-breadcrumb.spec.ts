@@ -32,7 +32,15 @@ test('ruta del directorio clara y accesible al filtrar por rol', async ({ page }
   await expect(page.locator('#cu-operador')).toBeHidden();
   await positionHeading(page, '#cu-generador h3');
   await expect.poll(() => breadcrumb.locator('.sb-sub').textContent(), { timeout: 15_000 }).toBe('7.2 Generador');
+  await expect.poll(() => breadcrumb.locator('.sb-section').textContent(), { timeout: 15_000 }).toBe('7. Anexo: Casos de Uso');
   await expect(breadcrumb.getByRole('button', { name: 'Ir a 7.2 Generador', exact: true })).toBeVisible();
+  const chapter = breadcrumb.getByRole('button', { name: 'Ir a 7. Anexo: Casos de Uso', exact: true });
+  await chapter.focus(); await expect(chapter).toBeFocused(); await page.keyboard.press('Space');
+  await expect.poll(() => page.locator('#cu-generador h3').evaluate(element => {
+    const bar = document.querySelector('.section-breadcrumb')!.getBoundingClientRect();
+    const top = element.getBoundingClientRect().top;
+    return top >= bar.bottom - 1 && top <= bar.bottom + 80;
+  }), { timeout: 10_000 }).toBe(true);
   const geometry = await breadcrumb.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     return { inside: bounds.left >= 0 && bounds.right <= innerWidth + 1,
