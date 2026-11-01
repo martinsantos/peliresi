@@ -1,10 +1,11 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[],clock:new Date('2026-10-31T12:30:15Z')}));
-vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any)=>typeof fn==='function'?fn(mock.tx):Promise.all(fn):mock.tx[key]})}));
+const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[],clock:new Date('2026-10-31T12:30:15Z'),transactionOptions:[] as any[]}));
+vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any,options:any)=>{mock.transactionOptions.push(options);return typeof fn==='function'?fn(mock.tx):Promise.all(fn)}:mock.tx[key]})}));
 vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
 vi.mock('../services/domainEvent.service',()=>({domainEvents:{emit:vi.fn()}}));
 vi.mock('../services/blockchain.service', async importOriginal => ({...await importOriginal<typeof import('../services/blockchain.service')>(),registrarSello:vi.fn().mockResolvedValue(null)}));
 import QRCode from 'qrcode';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import {notifyManifestParties} from '../services/manifestProposal.service';
 import {inTrainingSession,inOperationalSession} from '../lib/trainingScope';
 import {canCreateManifestProposal,MANIFEST_PROPOSAL,proposalRole,proposalRoles,parseProposal} from '../domain/manifestProposal';
@@ -18,6 +19,7 @@ beforeEach(()=>{
  mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,generador:{cuit:'QA-G'},transportista:{cuit:'QA-T'},operador:{cuit:'QA-O'},residuos:[],fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
  mock.events=[{id:'marker',tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(p)}];
  mock.clock=new Date('2026-10-31T12:30:15Z');
+ mock.transactionOptions=[];
  mock.tx={$queryRaw:vi.fn(async(parts:TemplateStringsArray)=>parts.join('').includes('clock_timestamp')?[{eventTime:mock.clock}]:[]),manifiesto:{count:vi.fn(async()=>3),findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
  count:vi.fn(async()=>mock.events.length),update:vi.fn(async({where,data}:any)=>Object.assign(mock.events.find(e=>e.id===where.id),data)),
  findFirst:vi.fn(async()=>mock.events.find(e=>e.tipo===MANIFEST_PROPOSAL)),findMany:vi.fn(async(args:any)=>mock.events.filter(e=>args?.where?.tipo===MANIFEST_PROPOSAL?e.tipo===MANIFEST_PROPOSAL:e.tipo!==MANIFEST_PROPOSAL)),create:vi.fn(async({data}:any)=>{const e={...data,id:String(mock.events.length),createdAt:data.createdAt??new Date()};mock.events.push(e);return e;})},
@@ -35,6 +37,13 @@ describe('three independently authenticated parties',()=>{
  it('does not record a decision or notify if the database clock cannot be read',async()=>{
   mock.tx.$queryRaw.mockImplementation(async()=>[]);
   await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toThrow();
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();
+  expect(mock.tx.notificacion.createMany).not.toHaveBeenCalled();
+ });
+ it('allows a bounded lock wait and reports an uncertain transaction without suggesting a duplicate action',async()=>{
+  mock.tx.$queryRaw.mockRejectedValueOnce(new PrismaClientKnownRequestError('expired',{code:'P2028',clientVersion:'5.22.0'}));
+  await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:503,message:expect.stringContaining('revisá las aprobaciones')});
+  expect(mock.transactionOptions.at(-1)).toEqual({maxWait:12_000,timeout:10_000});
   expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();
   expect(mock.tx.notificacion.createMany).not.toHaveBeenCalled();
  });
@@ -155,6 +164,14 @@ describe('explicit coordination start',()=>{
   const clock=calls.findIndex((sql:string)=>sql.includes('clock_timestamp'));
   expect(clock).toBeGreaterThan(calls.findIndex((sql:string)=>sql.includes('pg_advisory_xact_lock')));
   expect(clock).toBeGreaterThan(calls.findIndex((sql:string)=>sql.includes('FOR UPDATE')));
+ });
+ it('asks the party to check coordination when the transaction result is uncertain',async()=>{
+  for(const rol of ['OPERADOR','TRANSPORTISTA','GENERADOR'] as const)await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  mock.tx.$queryRaw.mockRejectedValueOnce(new PrismaClientKnownRequestError('expired',{code:'P2028',clientVersion:'5.22.0'}));
+  const next=vi.fn(),json=vi.fn();await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:503,message:expect.stringContaining('revisá las aprobaciones')}));
+  expect(json).not.toHaveBeenCalled();
+  expect(mock.events.some(e=>e.tipo==='INICIO_COORDINACION_CAP')).toBe(false);
  });
  it('requires unanimity, preserves pickup state, and is idempotent across retries',async()=>{
   const next=vi.fn(),json=vi.fn(),res={json} as any;

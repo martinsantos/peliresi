@@ -7,6 +7,7 @@ import { Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import prisma from '../lib/prisma';
 import { isTrainingSession } from '../lib/trainingScope';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
@@ -18,9 +19,20 @@ import { agendaQuery } from '../domain/manifestAgenda';
 // Under a short burst the pool can be busy with GPS and Monitor requests.
 // Wait within the API's overall deadline rather than failing after Prisma's
 // two-second default; the per-proposal lock and idempotency rules still apply.
-const PROPOSAL_TRANSACTION_OPTIONS = { maxWait: 12_000 };
+const PROPOSAL_TRANSACTION_OPTIONS = { maxWait: 12_000, timeout: 10_000 };
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+/** A timeout can leave the client unsure of the result. Never promise that the
+ * write failed: direct the party to inspect the same proposal before retrying. */
+async function proposalTransaction<T>(action: (tx: Tx) => Promise<T>): Promise<T> {
+  try { return await prisma.$transaction(action, PROPOSAL_TRANSACTION_OPTIONS); }
+  catch (error) {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2028') {
+      throw new AppError('No pudimos confirmar la acción. Actualizá y revisá las aprobaciones antes de intentar nuevamente.', 503);
+    }
+    throw error;
+  }
+}
 /** PostgreSQL's default now() is the transaction start, which can precede a
  * concurrent action that acquired this manifest's lock first. Take the event
  * time from the database after the lock and validation, immediately before the
@@ -75,7 +87,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
   const qrCode = await QRCode.toDataURL(JSON.stringify({ id, numero: preview.numero, timestamp: new Date().toISOString() }));
   let pushIds:string[]=[];
   let genesisHash: string | undefined;
-  const result=await prisma.$transaction(async tx => {
+  const result=await proposalTransaction(async tx => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`manifest-proposal:${id}`}))::text AS "lock"`;
     await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
     const value = await load(tx, id);
@@ -118,7 +130,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     }
     pushIds=await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id,req.user.rol);
     return updated;
-  }, PROPOSAL_TRANSACTION_OPTIONS);
+  });
   scheduleCommittedManifestPush(pushIds);
   if (genesisHash) { const hash=genesisHash; setImmediate(()=>{void registrarSello(id,'GENESIS',hash).catch(()=>{});}); }
   return result;
@@ -172,7 +184,7 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
   if(!manifestProposalsEnabled())throw new AppError('Función no habilitada',404);
   await assertCanAccessManifiesto(prisma,req.user,req.params.id);
   let pushIds:string[]=[];
-  const result=await prisma.$transaction(async tx=>{
+  const result=await proposalTransaction(async tx=>{
    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`manifest-proposal:${req.params.id}`}))::text AS "lock"`;
    await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${req.params.id} FOR UPDATE`;
    const value=await load(tx,req.params.id);
@@ -188,7 +200,7 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    if (!isTrainingSession()) await updateRollingHash(tx,req.params.id,value.manifest.estado,event.createdAt,event.descripcion,event.id);
    pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id,req.user.rol);
    return event;
-  }, PROPOSAL_TRANSACTION_OPTIONS);
+  });
   scheduleCommittedManifestPush(pushIds);
   res.json({success:true,data:{inicio:result.createdAt}});
  }catch(e){next(e);}
