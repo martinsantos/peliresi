@@ -1,8 +1,10 @@
 import {test,expect,devices,type Page,type TestInfo} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import path from 'node:path';
 import {login,prefix,readablePageHeading,isolatedMapTiles} from './helpers';
 import {assertCloudDatabase,backendRequire} from '../safety';
+import {qaBackendEntry} from '../rollback-backend';
 test.beforeAll(async () => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); await assertCloudDatabase(); });
 const roles=['generador','transportista','operador'] as const;
 type Role=typeof roles[number];
@@ -171,7 +173,7 @@ for(const creator of roles)test('in-situ proposal: '+creator+' creates; three pa
    const notices=await db.notificacion.findMany({where:{manifiestoId:m.id,titulo:'Coordinación iniciada: tratamiento en origen'},
     select:{id:true,datos:true,tipo:true,usuarioId:true,manifiestoId:true,usuario:{select:{id:true,email:true,nombre:true,apellido:true,rol:true,activo:true}}}});
    expect(notices.map((notice:{usuarioId:string})=>notice.usuarioId).sort()).toEqual(await expectedProposalRecipients(db,m.id));
-   const {notificationMailContent}=backendRequire('./dist/services/notification-mail.service.js');
+   const {notificationMailContent}=backendRequire(path.join(path.dirname(qaBackendEntry()),'services/notification-mail.service.js'));
    for(const notice of notices){
     const data=JSON.parse(notice.datos);
     expect(data).toMatchObject({fase:'iniciada',modalidad:'IN_SITU',partesRequeridas:3});

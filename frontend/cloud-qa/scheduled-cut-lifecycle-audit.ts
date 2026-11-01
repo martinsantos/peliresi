@@ -11,8 +11,10 @@ assert.equal(process.env.QA_ARTIFACTS, out);
 assert.equal(process.env.QA_COMPAT_BACKEND, 'scheduled-cut-62516a08');
 assert.equal(process.env.GITHUB_SHA, '62516a08a3fe189d7d5612520d678162674f1b32');
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
+const attempt = process.env.QA_BROWSER_ATTEMPT || 'initial';
+assert.ok(['initial', 'candidate-mail'].includes(attempt));
 const read = (file: string) => JSON.parse(readFileSync(path.join(out, file), 'utf8'));
-for (const file of ['manifest-complete.json', 'proposal-e2e-initial.json']) {
+for (const file of ['manifest-complete.json', `proposal-e2e-${attempt}.json`]) {
   const report = read(file);
   assert.equal(report.stats.expected, 6, file);
   assert.equal(report.stats.unexpected, 0, file);
@@ -44,7 +46,7 @@ for (const { pid } of processes) {
 }
 const runtime = read('runtime-proof.json');
 assert.match(runtime.backend, /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
-const proofsDir = path.join(out, 'proposal-e2e-initial');
+const proofsDir = path.join(out, `proposal-e2e-${attempt}`);
 const proofs = readdirSync(proofsDir, { withFileTypes: true }).filter(entry => entry.isDirectory())
   .map(entry => path.join(proofsDir, entry.name, 'proof.json'))
   .filter(existsSync)
@@ -75,10 +77,12 @@ try {
   const emailAttempts = await db.emailQueue.count({ where: { intentos: { gt: 0 } } });
   const emailSent = await db.emailQueue.count({ where: { sentAt: { not: null } } });
   assert.equal(emailAttempts, 0); assert.equal(emailSent, 0);
-  const result = { productCommit: process.env.GITHUB_SHA, synthetic: true, production: false,
+  const result = { productCommit: process.env.GITHUB_SHA, synthetic: true, production: false, attempt,
     ordinaryBrowserCases: 6, inSituBrowserCases: 6, certificatesVerified: receipts.results.length,
     emailAttempts, emailSent, pushEnabled: false, capClosed: true,
-    scheduledJobsPaused: true, mailRendererMatchesCandidate };
-  writeFileSync(path.join(out, 'scheduled-cut-lifecycle-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
+    scheduledJobsPaused: true, olderMailRendererMatchesCandidate: mailRendererMatchesCandidate,
+    inSituMailRenderer: attempt === 'candidate-mail' ? 'candidate' : 'older-build' };
+  const name = attempt === 'initial' ? 'scheduled-cut-lifecycle-audit.json' : `scheduled-cut-lifecycle-audit-${attempt}.json`;
+  writeFileSync(path.join(out, name), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(result));
 } finally { await db.$disconnect(); }
