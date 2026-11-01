@@ -60,5 +60,5 @@ export function renderManifestPdf(m: any): Promise<Buffer> {
       }
     }
     layout.text('Representación del manifiesto al ' + date(new Date()) + '. Los anexos y certificaciones conservan su propia versión y firma.', false, 8, PDF_STYLE.muted);
-  });
+  }, undefined, m.isDemoData === true ? { notice: 'DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL' } : {});
 }

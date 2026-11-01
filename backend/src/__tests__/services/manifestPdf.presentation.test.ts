@@ -38,6 +38,20 @@ it('identifies an in-situ approving carrier without inventing a vehicle or trip'
  expect(pdf.text).not.toContain('Vehículo asignado');
  expect(pdf.text).not.toContain('Chofer asignado');
 });
+it('labels every page of an artificial manifest and leaves the original unchanged',async()=>{
+ const manifest={...fixture(true),isDemoData:true};
+ const before=JSON.stringify(manifest);
+ const pdf=inspect(await renderManifestPdf(manifest),'manifiesto-artificial');
+ expect(pdf.pages.length).toBeGreaterThan(3);
+ for(const page of pdf.pages) expect(page).toContain('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL');
+ expect(JSON.stringify(manifest)).toBe(before);
+});
+it('does not label an operational manifest as artificial',async()=>{
+ const manifest={...fixture(),isDemoData:false,observaciones:'Observación operativa'};
+ const pdf=inspect(await renderManifestPdf(manifest),'manifiesto-operativo');
+ expect(pdf.text).not.toContain('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL');
+ expect(pdf.text).toContain('Observación operativa');
+});
 it.each(['PARCIAL','FINAL'] as const)('certificate retains snapshot and integrity %s',async tipo=>{
  const data={version:1 as const,tipo,numero:'QA-CERT-'+tipo,manifiestoNumero:'QA-DISEÑO-0001',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método declarado artificial',nota:'Prueba de diseño',cantidades:[{corriente:'Y1',cantidad:21,unidad:'kg'}],parcialesPrevios:tipo==='FINAL'?['QA-CERT-PARCIAL']:[],adendas:[{id:'qa-adenda',version:1}],firmaSha256:'b'.repeat(64),artificial:true};
  const before=JSON.stringify(data),pdf=inspect(await renderManifestCertificate(data,'qa-certificate',sig),'certificado-'+tipo.toLowerCase());
@@ -63,6 +77,7 @@ it('renders 200 certified quantities across pages without clipping',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-200',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:Array.from({length:200},(_,i)=>({residuoId:`r${i}`,corriente:`Y${i+1}`,cantidad:1,unidad:'kg'})),parcialesPrevios:[],adendas:[],firmaSha256:'b'.repeat(64),artificial:true};
  const pdf=inspect(await renderManifestCertificate(data,'qa-200',sig),'certificado-200');
  expect(pdf.pages.length).toBeGreaterThan(3);
+ for(const page of pdf.pages) expect(page).toContain('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL');
  expect(pdf.text).toMatch(/Y1\s+1\s+kg/);
  expect(pdf.text).toMatch(/Y200\s+1\s+kg/);
  expect(pdf.text).toContain('Firma manuscrita del operador');

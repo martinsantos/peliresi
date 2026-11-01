@@ -4,26 +4,31 @@ import { inspectionPdfLines, drawInspectionPdfBlocks } from './inspectionPdfLayo
 
 export const PDF_STYLE = { green: '#1B5E3C', ink: '#172C24', muted: '#526359', line: '#DCE5DF', light: '#F3F7F4' };
 /** Shared page identity; no tiles, no recoloring of signed or stored documents. */
-export function documentHeader(doc: PDFKit.PDFDocument, title: string, reference: string, page: number, branding?: InspectionPdfBranding) {
+export function documentHeader(doc: PDFKit.PDFDocument, title: string, reference: string, page: number, branding?: InspectionPdfBranding, notice?: string) {
   const { x, y } = doc;
   // Footer sits outside the body. Prevent PDFKit from creating a page while drawing it.
   const bottom = doc.page.margins.bottom; doc.page.margins.bottom = 0;
   doc.save();
   drawInstitutionalMasthead(doc, branding, 44, 28);
   drawInstitutionalRule(doc, 44, 83, 507);
+  if (notice) {
+    doc.roundedRect(44, 88, 507, 17, 3).fill('#FEF3C7');
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#78350F')
+      .text(notice, 52, 92, { width: 491, lineBreak: false });
+  }
   doc.moveTo(44, 792).lineTo(551, 792).lineWidth(0.5).strokeColor(PDF_STYLE.line).stroke();
   doc.font('Helvetica').fontSize(7).fillColor(PDF_STYLE.muted).text(reference, 44, 804, { width: 430, lineBreak: false });
   doc.text('Página ' + page, 484, 804, { width: 67, align: 'right', lineBreak: false });
   doc.restore(); doc.page.margins.bottom = bottom; doc.x = x; doc.y = y;
 }
-export async function institutionalPdf(title: string, reference: string, render: (layout: DocumentLayout) => void, date = new Date()): Promise<Buffer> {
+export async function institutionalPdf(title: string, reference: string, render: (layout: DocumentLayout) => void, date = new Date(), options: { notice?: string } = {}): Promise<Buffer> {
   const branding = await loadInspectionPdfBranding();
   const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 62, left: 44, right: 44 },
     info: { Title: title + ' · ' + reference, Author: 'SITREP · Mendoza', CreationDate: date } });
   const chunks: Buffer[] = [];
   const ready = new Promise<Buffer>((resolve, reject) => { doc.on('data', b => chunks.push(b)); doc.on('error', reject); doc.on('end', () => resolve(Buffer.concat(chunks))); });
   let page = 0;
-  const header = () => { documentHeader(doc, title, reference, ++page, branding); doc.x = 44; doc.y = 110; };
+  const header = () => { documentHeader(doc, title, reference, ++page, branding, options.notice); doc.x = 44; doc.y = 110; };
   doc.on('pageAdded', header); header();
   render(new DocumentLayout(doc));
   doc.end(); return ready;
