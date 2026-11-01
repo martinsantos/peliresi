@@ -25,6 +25,20 @@ it('shows each emitted certificate once while keeping the remaining type visible
  expect(within(documents).getByText('Y1: 4 kg')).toBeVisible();
  expect(screen.getByRole('button',{name:'Emitir certificación parcial'})).toBeEnabled();
 });
+it('shows certificate issuance in Mendoza time and handles an invalid date without breaking the list',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[
+  {id:'p',numero:'M-P01',createdAt:'2026-10-21T01:15:00.000Z',documento:{tipo:'PARCIAL',cantidades:[]}},
+  {id:'f',numero:'M-F',createdAt:'invalid-date',documento:{tipo:'FINAL',cantidades:[]}},
+ ],emisionHabilitada:true,adendasSinResolver:0}});
+ show();await screen.findByRole('button',{name:'Descargar final'});
+ const valid=screen.getByText('Certificación parcial 1 · Emitida').closest('li')!;
+ expect(valid).toHaveTextContent('20/10/2026, 22:15:00 · Mendoza');
+ const time=valid.querySelector('time');expect(time).not.toBeNull();
+ expect(time).toHaveAttribute('datetime','2026-10-21T01:15:00.000Z');
+ expect(time).toHaveTextContent('20/10/2026, 22:15:00 · Mendoza');
+ const invalid=screen.getByText('Certificación final total · Emitida').closest('li')!;
+ expect(within(invalid).getByText(/Fecha de emisión no disponible/)).toBeVisible();
+});
 it('retains both pending statuses before emission and avoids a misleading pending partial after the final',async()=>{
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});
  const first=show();await screen.findByRole('button',{name:'Emitir certificación parcial'});

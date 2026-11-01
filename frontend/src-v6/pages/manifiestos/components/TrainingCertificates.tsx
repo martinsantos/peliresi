@@ -15,6 +15,11 @@ import {SignaturePad} from '../../../components/ui/SignaturePad';
 import type {Manifiesto} from '../../../types/models';
 type DocumentRow={id:string;numero?:string;pdfSha256?:string;createdAt:string;documento:{tipo:string;cantidades:{residuoId:string;cantidad:number;corriente:string;unidad:string}[]}};
 type Finding={id:string;corriente:string;unidad:string;observado:number;adendas:{id:string;version:number}[]};
+const certificateDateFormat=new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Mendoza',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+function certificateDate(value:string):string|null{
+ if(typeof value!=='string'||!value.trim())return null;
+ const date=new Date(value);return Number.isFinite(date.getTime())?certificateDateFormat.format(date):null;
+}
 export function TrainingCertificates({manifest}:{manifest:Partial<Manifiesto>}){
  const {currentUser,isRestricted}=useAuth();const {impersonationData}=useImpersonation();
  const scope=JSON.stringify([currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.actividadId,currentUser?.empresaContexto?.establecimientoId,currentUser?.training,!!isRestricted,!!impersonationData,manifest.id]);
@@ -114,7 +119,8 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
    {documentRows.length>0&&<ul aria-label="Certificaciones emitidas" className="divide-y divide-neutral-200">{documentRows.map(({document:d,partialNumber:n})=>{
     const label=d.documento.tipo==='FINAL'?'final total':n!==null?`parcial ${n}`:'';
     const downloadLabel=d.documento.tipo==='FINAL'?'final':n!==null?`parcial ${n}`:'certificado';
-    return <li key={d.id} id={`certificado-${d.id}`} data-certificate-id={d.id} className={`scroll-mt-32 flex flex-col gap-3 px-1 py-4 sm:flex-row sm:items-center sm:justify-between ${selectedCertificate===d.id?'rounded-lg bg-primary-50 ring-1 ring-primary-400':''}`}><div className="min-w-0 space-y-1"><p className="font-semibold">Certificación{label?' '+label:''} · Emitida</p><p className="text-xs text-neutral-600 break-words">{d.numero || manifest.numero} · {new Date(d.createdAt).toLocaleString('es-AR')}</p><p className="text-sm break-words">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p></div><div className="self-start sm:shrink-0 sm:self-center"><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {downloadLabel}{training?' CAP':''}</Button></div></li>;
+    const issuedAt=certificateDate(d.createdAt);
+    return <li key={d.id} id={`certificado-${d.id}`} data-certificate-id={d.id} className={`scroll-mt-32 flex flex-col gap-3 px-1 py-4 sm:flex-row sm:items-center sm:justify-between ${selectedCertificate===d.id?'rounded-lg bg-primary-50 ring-1 ring-primary-400':''}`}><div className="min-w-0 space-y-1"><p className="font-semibold">Certificación{label?' '+label:''} · Emitida</p><p className="text-xs text-neutral-600 break-words">{d.numero || manifest.numero} · {issuedAt?<time dateTime={d.createdAt}>{issuedAt} · Mendoza</time>:'Fecha de emisión no disponible'}</p><p className="text-sm break-words">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p></div><div className="self-start sm:shrink-0 sm:self-center"><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {downloadLabel}{training?' CAP':''}</Button></div></li>;
    })}</ul>}
   </>}
   {canRelease&&canEdit&&recovery.ready&&!recovery.command&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button variant={manifest.estado==='TRATADO'&&unresolved===0?'outline':'primary'} onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0||checks.isError||findingProblems.length>0} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
