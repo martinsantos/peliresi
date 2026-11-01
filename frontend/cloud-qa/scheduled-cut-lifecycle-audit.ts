@@ -12,7 +12,7 @@ assert.equal(process.env.QA_COMPAT_BACKEND, 'scheduled-cut-62516a08');
 assert.equal(process.env.GITHUB_SHA, '62516a08a3fe189d7d5612520d678162674f1b32');
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
 const attempt = process.env.QA_BROWSER_ATTEMPT || 'initial';
-assert.ok(['initial', 'candidate-mail'].includes(attempt));
+assert.ok(['initial', 'candidate-mail-v2'].includes(attempt));
 const read = (file: string) => JSON.parse(readFileSync(path.join(out, file), 'utf8'));
 for (const file of ['manifest-complete.json', `proposal-e2e-${attempt}.json`]) {
   const report = read(file);
@@ -81,7 +81,8 @@ try {
     ordinaryBrowserCases: 6, inSituBrowserCases: 6, certificatesVerified: receipts.results.length,
     emailAttempts, emailSent, pushEnabled: false, capClosed: true,
     scheduledJobsPaused: true, olderMailRendererMatchesCandidate: mailRendererMatchesCandidate,
-    inSituMailRenderer: attempt === 'candidate-mail' ? 'candidate' : 'older-build' };
+    inSituMailRenderer: attempt === 'candidate-mail-v2' ? 'candidate' : 'older-build',
+    preferredLinksOpenedByEachParty: attempt === 'candidate-mail-v2' };
   const name = attempt === 'initial' ? 'scheduled-cut-lifecycle-audit.json' : `scheduled-cut-lifecycle-audit-${attempt}.json`;
   writeFileSync(path.join(out, name), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(result));

@@ -174,14 +174,37 @@ for(const creator of roles)test('in-situ proposal: '+creator+' creates; three pa
     select:{id:true,datos:true,tipo:true,usuarioId:true,manifiestoId:true,usuario:{select:{id:true,email:true,nombre:true,apellido:true,rol:true,activo:true}}}});
    expect(notices.map((notice:{usuarioId:string})=>notice.usuarioId).sort()).toEqual(await expectedProposalRecipients(db,m.id));
    const {notificationMailContent}=backendRequire(path.join(path.dirname(qaBackendEntry()),'services/notification-mail.service.js'));
+   const openedFromMail=new Set<Role>();
    for(const notice of notices){
     const data=JSON.parse(notice.datos);
     expect(data).toMatchObject({fase:'iniciada',modalidad:'IN_SITU',partesRequeridas:3});
     const mail=notificationMailContent({...notice.usuario,...notice});
     expect(mail.subject).toContain('Coordinación en origen iniciada');expect(mail.html).toContain('No hay retiro, viaje ni GPS');
-    const destination=Array.isArray(data.accesosEmpresa)&&data.accesosEmpresa.length ? '/notificaciones/'+notice.id : '/manifiestos/'+m.id;
-    expect(mail.html).toContain(destination);
+    // Each actor opens its own notice first, so the correct activity can be
+    // chosen before reaching a manifest. Inspect URL semantics, not raw HTML:
+    // the preferred destination is encoded inside the resolver link.
+    const links=await operator.evaluate((html:string)=>{
+     const document=new DOMParser().parseFromString(html,'text/html');
+     return Object.fromEntries(['preferred','web','app'].map(key=>[key,document.querySelector(`a[data-mail-action="${key}"]`)?.getAttribute('href')]));
+    },mail.html);
+    const destination='/notificaciones/'+encodeURIComponent(notice.id);
+    const preferred=new URL(links.preferred!),web=new URL(links.web!),app=new URL(links.app!);
+    for(const link of [preferred,web,app])expect(link.origin).toBe('http://127.0.0.1:4177');
+    expect(preferred.pathname).toBe('/app/abrir');expect(preferred.searchParams.get('destino')).toBe(destination);
+    expect(web.pathname+web.search+web.hash).toBe(destination);
+    expect(app.pathname+app.search+app.hash).toBe('/app'+destination);
+    const role=roles.find(item=>notice.usuario.email===`${item}@night-qa.invalid`);
+    if(role){
+     const reader=pages[role];await reader.goto(preferred.href);
+     await expect(reader).toHaveURL(new RegExp('/(?:app/)?notificaciones/'+notice.id+'$'));
+     await expect(reader.getByRole('heading',{name:'Coordinación iniciada: tratamiento en origen',exact:true})).toBeVisible();
+     const open=reader.getByRole('link',{name:/^Abrir (manifiesto|como)/});
+     await expect(open).toHaveCount(1);await open.click();
+     await expect(reader).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+     openedFromMail.add(role);
+    }
    }
+   expect([...openedFromMail].sort()).toEqual([...roles].sort());
   }finally{await db.$disconnect();}
   for(const role of roles){
    const reader=pages[role];await reader.goto(prefix(info)+'/notificaciones');
