@@ -21,6 +21,17 @@ import { agendaQuery } from '../domain/manifestAgenda';
 const PROPOSAL_TRANSACTION_OPTIONS = { maxWait: 12_000 };
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+/** PostgreSQL's default now() is the transaction start, which can precede a
+ * concurrent action that acquired this manifest's lock first. Take the event
+ * time from the database after the lock and validation, immediately before the
+ * insert. This does not rewrite historical events or establish a total order. */
+async function proposalEventTime(tx: Tx): Promise<Date> {
+  const [row] = await tx.$queryRaw<Array<{ eventTime: Date }>>`SELECT clock_timestamp() AS "eventTime"`;
+  if (!(row?.eventTime instanceof Date) || !Number.isFinite(row.eventTime.getTime())) {
+    throw new AppError('No se pudo registrar la hora de la acción. Reintentá.', 503);
+  }
+  return row.eventTime;
+}
 async function load(tx: Tx, id: string) {
   const markers = await tx.eventoManifiesto.findMany({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } });
   if (!markers.length) return null;
@@ -80,8 +91,10 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     if (reject && value.events.some(e => e.tipo === 'RECHAZO_PARTE' && e.usuarioId === req.user.id)) return value.manifest;
     if (!reject && legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE, 409);
     if (value.manifest.estado !== 'PENDIENTE_APROBACION') throw new AppError('La propuesta ya no admite aprobaciones', 409);
+    const createdAt = await proposalEventTime(tx);
     const event = await tx.eventoManifiesto.create({ data: {
       manifiestoId: id, tipo: reject ? 'RECHAZO_PARTE' : APPROVAL_EVENTS[rol], usuarioId: req.user.id,
+      createdAt,
       descripcion: JSON.stringify({ version: 1, rol, actorId: value.proposal[`${rol.toLowerCase()}Id` as 'generadorId' | 'transportistaId' | 'operadorId'], decision: reject ? 'RECHAZADA' : 'APROBADA', ...(reject ? { motivo: reason } : {}) }),
       ...(firma ? { firmaImagen: firma.imagen, firmaSha256: firma.sha256 } : {}),
     } });
@@ -170,7 +183,8 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    if(legacyInSituWithoutCarrier(value.proposal))throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
    if(value.manifest.estado!=='APROBADO'||value.events.some(e=>e.tipo==='RECHAZO_PARTE')||!proposalRoles(value.proposal).every(role=>value.events.some(e=>e.tipo===APPROVAL_EVENTS[role])))throw new AppError('Se necesitan las aprobaciones de todas las partes vinculadas para iniciar',409);
    const preparation=value.proposal.modalidad==='IN_SITU'?'Generador y operador coordinan la recepción en origen, sin retiro ni viaje.':'Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.';
-   const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:isTrainingSession()?'INICIO_COORDINACION_CAP':'INICIO_COORDINACION',descripcion:`Coordinación iniciada por ${rol}. ${preparation}`}});
+   const createdAt=await proposalEventTime(tx);
+   const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:isTrainingSession()?'INICIO_COORDINACION_CAP':'INICIO_COORDINACION',createdAt,descripcion:`Coordinación iniciada por ${rol}. ${preparation}`}});
    if (!isTrainingSession()) await updateRollingHash(tx,req.params.id,value.manifest.estado,event.createdAt,event.descripcion,event.id);
    pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id,req.user.rol);
    return event;

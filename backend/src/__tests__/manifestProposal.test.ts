@@ -1,5 +1,5 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[]}));
+const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[],clock:new Date('2026-10-31T12:30:15Z')}));
 vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any)=>typeof fn==='function'?fn(mock.tx):Promise.all(fn):mock.tx[key]})}));
 vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
 vi.mock('../services/domainEvent.service',()=>({domainEvents:{emit:vi.fn()}}));
@@ -17,12 +17,27 @@ beforeEach(()=>{
  vi.unstubAllEnvs();vi.stubEnv('ENTERPRISE_ENABLED','false');
  mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,generador:{cuit:'QA-G'},transportista:{cuit:'QA-T'},operador:{cuit:'QA-O'},residuos:[],fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
  mock.events=[{id:'marker',tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(p)}];
- mock.tx={$queryRaw:vi.fn(),manifiesto:{count:vi.fn(async()=>3),findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
+ mock.clock=new Date('2026-10-31T12:30:15Z');
+ mock.tx={$queryRaw:vi.fn(async(parts:TemplateStringsArray)=>parts.join('').includes('clock_timestamp')?[{eventTime:mock.clock}]:[]),manifiesto:{count:vi.fn(async()=>3),findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
  count:vi.fn(async()=>mock.events.length),update:vi.fn(async({where,data}:any)=>Object.assign(mock.events.find(e=>e.id===where.id),data)),
- findFirst:vi.fn(async()=>mock.events.find(e=>e.tipo===MANIFEST_PROPOSAL)),findMany:vi.fn(async(args:any)=>mock.events.filter(e=>args?.where?.tipo===MANIFEST_PROPOSAL?e.tipo===MANIFEST_PROPOSAL:e.tipo!==MANIFEST_PROPOSAL)),create:vi.fn(async({data}:any)=>{const e={...data,id:String(mock.events.length),createdAt:new Date()};mock.events.push(e);return e;})},
+ findFirst:vi.fn(async()=>mock.events.find(e=>e.tipo===MANIFEST_PROPOSAL)),findMany:vi.fn(async(args:any)=>mock.events.filter(e=>args?.where?.tipo===MANIFEST_PROPOSAL?e.tipo===MANIFEST_PROPOSAL:e.tipo!==MANIFEST_PROPOSAL)),create:vi.fn(async({data}:any)=>{const e={...data,id:String(mock.events.length),createdAt:data.createdAt??new Date()};mock.events.push(e);return e;})},
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
 });
 describe('three independently authenticated parties',()=>{
+ it('dates each decision from the database clock after acquiring the proposal locks',async()=>{
+  await inTrainingSession(()=>approveManifestProposal(req('OPERADOR')));
+  expect(mock.events.at(-1).createdAt).toEqual(mock.clock);
+  const calls=mock.tx.$queryRaw.mock.calls.map(([parts]:[TemplateStringsArray])=>parts.join(''));
+  const clock=calls.findIndex((sql:string)=>sql.includes('clock_timestamp'));
+  expect(clock).toBeGreaterThan(calls.findIndex((sql:string)=>sql.includes('pg_advisory_xact_lock')));
+  expect(clock).toBeGreaterThan(calls.findIndex((sql:string)=>sql.includes('FOR UPDATE')));
+ });
+ it('does not record a decision or notify if the database clock cannot be read',async()=>{
+  mock.tx.$queryRaw.mockImplementation(async()=>[]);
+  await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toThrow();
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();
+  expect(mock.tx.notificacion.createMany).not.toHaveBeenCalled();
+ });
  it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('individual %s approval notice asks for the current status rather than asserting a missing approval',async role=>{
   await notifyManifestParties(mock.tx,mock.manifest,'aprobacion-'+role,users[role as keyof typeof users].id,role);
   const notices=mock.tx.notificacion.createMany.mock.calls[0][0].data;
@@ -129,6 +144,18 @@ describe('three independently authenticated parties',()=>{
 });
 
 describe('explicit coordination start',()=>{
+ it('dates coordination from the database clock after acquiring the proposal locks',async()=>{
+  for(const rol of ['OPERADOR','TRANSPORTISTA','GENERADOR'] as const)await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  mock.clock=new Date('2026-10-31T12:31:45Z');mock.tx.$queryRaw.mockClear();
+  const next=vi.fn(),json=vi.fn();await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(mock.events.find(e=>e.tipo==='INICIO_COORDINACION_CAP').createdAt).toEqual(mock.clock);
+  expect(json.mock.calls[0][0].data.inicio).toEqual(mock.clock);
+  const calls=mock.tx.$queryRaw.mock.calls.map(([parts]:[TemplateStringsArray])=>parts.join(''));
+  const clock=calls.findIndex((sql:string)=>sql.includes('clock_timestamp'));
+  expect(clock).toBeGreaterThan(calls.findIndex((sql:string)=>sql.includes('pg_advisory_xact_lock')));
+  expect(clock).toBeGreaterThan(calls.findIndex((sql:string)=>sql.includes('FOR UPDATE')));
+ });
  it('requires unanimity, preserves pickup state, and is idempotent across retries',async()=>{
   const next=vi.fn(),json=vi.fn(),res={json} as any;
   await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),res,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:409}));
