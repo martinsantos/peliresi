@@ -29,6 +29,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-incident-retry-final-20261101') {
     return path.join(root, '.qa-incident-retry-final-20261101/dist-backend/index.js');
   }
+  if (version === 'gps-send-ambiguity'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-gps-send-ambiguity-20261101') {
+    return path.join(root, '.qa-incident-retry-final-20261101/dist-backend/index.js');
+  }
   if (version === 'closure-f3307f3f'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026110104') {
     return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
