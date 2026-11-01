@@ -710,3 +710,12 @@ test('directory distinguishes the inbox from optional device notifications', () 
   assert.match(section, /si no se abre o falta conexión/i);
   assert.doesNotMatch(section, /Web Push API esta planificada para la proxima version|alertas criticas en tiempo real/);
 });
+
+test('directory describes party and representative notices without a stale single-recipient table', () => {
+  const section = read('directorio.html').split('CU-S02: Enviar Notificaciones Automaticas')[1].split('CU-S03:')[0];
+  assert.match(section, /partes vinculadas y sus representantes autorizados/);
+  assert.match(section, /una lectura no reemplaza la aprobación/);
+  assert.match(section, /otras partes y representantes autorizados/);
+  assert.match(section, /consultá el estado actual/);
+  assert.doesNotMatch(section, /<td>Aprobacion<\/td><td>Transportista asignado<\/td>/);
+});

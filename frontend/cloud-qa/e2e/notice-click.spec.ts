@@ -95,7 +95,7 @@ for (const signedIn of [true, false]) test(`aviso simulado conserva destino ${si
 });
 
 test('el manual distingue la campana de los avisos opcionales del dispositivo', async ({ page }, info) => {
-  await isolatedMapTiles(page, info);
+  await login(page, info, 'generador');
   await page.goto('/manual/directorio.html');
   const section = page.getByRole('button', { name: 'CU-S09: Enviar Notificaciones Push', exact: true });
   await section.scrollIntoViewIfNeeded(); await section.click();
