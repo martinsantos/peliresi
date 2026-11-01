@@ -8,6 +8,7 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
 import { resolveListenHost } from './config/listenHost';
+import { createScheduledTaskGate } from './config/scheduledTaskGate';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { isAuthenticated } from './middlewares/auth.middleware';
 import authRoutes from './routes/auth.routes';
@@ -251,14 +252,21 @@ app.use(errorHandler);
 domainEvents.subscribe(eventoManifiestoSubscriber);
 domainEvents.subscribe(alertaSubscriber);
 
-// Iniciar jobs cron
-iniciarVencimientoJob();
-iniciarBlockchainJob();
-iniciarRecordatorioJob();
-iniciarSeguimientoCierreJob();
-iniciarRecordatorioFirmaJob();
-iniciarAlertCatalogueJob();
-iniciarDuracionTransitoJob();
+// This startup-only gate does not prevent writes made by requests or other
+// workers. A controlled validation window must pause every worker separately.
+const scheduledTasks = createScheduledTaskGate(process.env.SITREP_PAUSE_BACKGROUND_JOBS, () => {
+  logger.warn({ scope: 'cron-and-email-queue', resumeRequiresRestart: true },
+    'Scheduled jobs and email queue timer paused at startup');
+});
+scheduledTasks.run(() => {
+  iniciarVencimientoJob();
+  iniciarBlockchainJob();
+  iniciarRecordatorioJob();
+  iniciarSeguimientoCierreJob();
+  iniciarRecordatorioFirmaJob();
+  iniciarAlertCatalogueJob();
+  iniciarDuracionTransitoJob();
+});
 
 // Iniciar el servidor
 const PORT = config.PORT;
@@ -266,7 +274,7 @@ const HOST = resolveListenHost(process.env.HOST, config.NODE_ENV);
 const onListening = () => {
   logger.info({ port: PORT }, `Server running on port ${PORT}`);
   logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
-  startEmailFlushTimer();
+  scheduledTasks.run(() => startEmailFlushTimer());
 };
 if (HOST) app.listen(PORT, HOST, onListening);
 else app.listen(PORT, onListening);
