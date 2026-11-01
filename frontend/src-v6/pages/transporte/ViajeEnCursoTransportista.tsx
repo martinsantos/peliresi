@@ -32,6 +32,7 @@ import { toast } from '../../components/ui/Toast';
 import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
 import { hasParkedGpsLease } from '../../services/gpsCoordination';
 import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
+import { PendingIncidentNotice } from '../../components/manifiestos/PendingIncidentNotice';
 import { TripActionBar } from '../../components/mobile/TripActionBar';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -58,6 +59,7 @@ import { useQueryOwner } from '../../hooks/useQueryOwner';
 import { supportRequestContext } from '../../utils/supportSession';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { gpsEventCoordinates, gpsFixFreshness } from '../../utils/gpsFreshness';
+import type { IncidentResult } from '../../services/incidentCommand';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -170,7 +172,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
   const confirmarEntrega = useConfirmarEntrega();
-  const registrarIncidente = useRegistrarIncidente();
+  const registrarIncidente = useRegistrarIncidente(id);
 
   // UI state
   const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>(() => readInitialTripStatus(syncOwner, id || ''));
@@ -386,6 +388,24 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     if (!(await gps.flushPending())) throw new GpsPendingError(gps.deliveryWasConfirmed() ? 'La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.' : gps.lastSendError() || undefined);
   };
 
+  const applyIncidentResult = (result: IncidentResult) => {
+    if (result.body.tipo === 'PAUSA' || result.body.tipo === 'REANUDACION') {
+      const status = result.body.tipo === 'PAUSA' ? 'PAUSADO' : 'ACTIVO';
+      setViajeStatus(status);
+      try { if (id && syncOwner) localStorage.setItem(tripStatusKey(syncOwner, id), status); }
+      catch { toast.info('Acción confirmada', 'No se pudo actualizar el estado en este dispositivo. Revisá el viaje al reabrir.'); }
+    } else if (result.cleaned) {
+      setShowIncidenteModal(false); setIncidenteTipo(''); setIncidenteDescripcion(''); setIncidenteError('');
+    }
+  };
+  const incidentNotice = {
+    pending: registrarIncidente.pendingIncident, storageError: registrarIncidente.incidentStorageError,
+    checking: registrarIncidente.checkingIncident, busy: registrarIncidente.isPending,
+    onRetry: () => registrarIncidente.retryIncident(), onRefresh: registrarIncidente.refreshIncident,
+    onConfirmed: applyIncidentResult,
+  };
+  const incidentUnavailable = incidentNotice.checking || !!incidentNotice.pending || !!incidentNotice.storageError;
+
   // Incident saving with description fallback + GPS coords
   const handleRegistrarIncidente = async () => {
     if (incidenteInFlightRef.current) return;
@@ -405,20 +425,18 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     };
     const descripcionFinal = incidenteDescripcion.trim() || tipoLabels[incidenteTipo] || incidenteTipo;
     try {
-      await registrarIncidente.mutateAsync({
+      const result = await registrarIncidente.mutateAsync({
         id: id!,
         tipo: incidenteTipo,
         descripcion: descripcionFinal,
         ...gpsEventCoordinates(gpsForEventRef.current),
       });
-      toast.success('Incidente registrado');
-      setShowIncidenteModal(false);
-      setIncidenteTipo('');
-      setIncidenteDescripcion('');
-      setIncidenteError('');
+      applyIncidentResult(result);
+      if (result.cleaned) toast.success('Incidente registrado');
+      else toast.info('Incidente registrado', 'No pudimos actualizar la copia local. Conservá este dispositivo y comprobá el envío.');
     } catch (err: any) {
       const reason = getApiErrorMessage(err, 'No se pudo confirmar el registro.').replace(/[.!?]+$/, '');
-      setIncidenteError(`${reason}. Antes de volver a intentar, revisá si el incidente ya aparece en el historial.`);
+      setIncidenteError(reason + '.');
     } finally {
       incidenteInFlightRef.current = false;
     }
@@ -426,24 +444,22 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   // Pause/resume persisted via backend incident events
   const handlePausar = async () => {
+    if (incidenteInFlightRef.current) return;
+    incidenteInFlightRef.current = true;
     const newStatus = viajeStatus === 'ACTIVO' ? 'PAUSADO' : 'ACTIVO';
     try {
-      await registrarIncidente.mutateAsync({
+      const result = await registrarIncidente.mutateAsync({
         id: id!,
         tipo: newStatus === 'PAUSADO' ? 'PAUSA' : 'REANUDACION',
         descripcion: newStatus === 'PAUSADO' ? 'Viaje pausado por el transportista' : 'Viaje reanudado',
         ...gpsEventCoordinates(gpsForEventRef.current),
       });
-      setViajeStatus(newStatus);
-      try {
-        if (id && syncOwner) localStorage.setItem(tripStatusKey(syncOwner, id), newStatus);
-        toast.info(newStatus === 'PAUSADO' ? 'Viaje pausado' : 'Viaje reanudado');
-      } catch {
-        toast.info('La acción se registró, pero no se pudo guardar en este dispositivo. Al reabrir, revisá el estado del viaje.');
-      }
-    } catch {
-      toast.error('No se pudo registrar la pausa');
-    }
+      applyIncidentResult(result);
+      if (result.cleaned) toast.info(newStatus === 'PAUSADO' ? 'Viaje pausado' : 'Viaje reanudado');
+      else toast.info('Acción registrada', 'No pudimos actualizar la copia local. Conservá este dispositivo y comprobá el envío.');
+    } catch (error) {
+      toast.error('No se pudo confirmar la acción', error instanceof Error ? error.message : 'Comprobá el envío antes de continuar.');
+    } finally { incidenteInFlightRef.current = false; }
   };
 
   const mapCenter = currentPosition || defaultCenter;
@@ -514,6 +530,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        {!showIncidenteModal && <PendingIncidentNotice {...incidentNotice} />}
         {showingSavedCopy && <div role="status" className="flex items-start gap-2 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
           <WifiOff size={16} className="mt-0.5 shrink-0" />
           <p><strong>Último estado guardado.</strong> Una entrega confirmada sin conexión queda en este dispositivo. SITREP verificará el estado y los permisos al reconectar. La pausa y los incidentes requieren conexión.</p>
@@ -578,6 +595,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               delegated={hasHandoff}
               isPending={isActionPending}
               connectionLimited={showingSavedCopy}
+              incidentUnavailable={incidentUnavailable}
               hasPendingSync={gps.hasPending}
               onConfirmPickup={handleConfirmarRetiro}
               onTogglePause={handlePausar}
@@ -625,6 +643,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               isPending={isActionPending}
               disabled={m.estado === EstadoManifiesto.EN_TRANSITO && handoffUnknown}
               connectionLimited={showingSavedCopy}
+              incidentUnavailable={incidentUnavailable}
               hasPendingSync={gps.hasPending}
               onConfirmPickup={handleConfirmarRetiro}
               onTogglePause={handlePausar}
@@ -759,6 +778,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       {/* Modal Incidente */}
       <Modal isOpen={showIncidenteModal} onClose={() => { setShowIncidenteModal(false); setIncidenteError(''); }}
         title="Reportar Incidente" size="sm" showCloseButton={false} closeOnOverlayClick={false} isBusy={registrarIncidente.isPending}>
+        <div className="mb-3"><PendingIncidentNotice {...incidentNotice} /></div>
         <div className="text-center mb-4">
           <div className="w-16 h-16 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="text-error-600" size={32} aria-hidden="true" />
@@ -767,7 +787,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         </div>
         <div className="space-y-3 mb-4">
           {/* Incident type buttons instead of native select */}
-          <fieldset disabled={registrarIncidente.isPending}>
+          <fieldset disabled={registrarIncidente.isPending || incidentUnavailable}>
             <legend className="block text-sm font-medium text-neutral-700 mb-2">Tipo de incidente</legend>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -798,7 +818,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
             <label htmlFor="incidente-descripcion" className="block text-sm font-medium text-neutral-700 mb-1">Descripción (opcional)</label>
             <textarea
               id="incidente-descripcion"
-              disabled={registrarIncidente.isPending}
+              disabled={registrarIncidente.isPending || incidentUnavailable}
               value={incidenteDescripcion}
               onChange={(e) => setIncidenteDescripcion(e.target.value)}
               placeholder="Describe el incidente..."
@@ -812,9 +832,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
             </p>
           ) : <p className="text-xs text-neutral-600">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
         </div>
-        {incidenteError && <p ref={incidenteErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{incidenteError}</p>}
+        {incidenteError && !incidentNotice.pending && <p ref={incidenteErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{incidenteError}</p>}
         <div className="space-y-2">
-          <Button fullWidth onClick={handleRegistrarIncidente} disabled={registrarIncidente.isPending}>
+          <Button fullWidth onClick={handleRegistrarIncidente} disabled={registrarIncidente.isPending || incidentUnavailable}>
             {registrarIncidente.isPending ? 'Registrando...' : 'Registrar Incidente'}
           </Button>
           <Button variant="outline" fullWidth onClick={() => { setShowIncidenteModal(false); setIncidenteError(''); }} disabled={registrarIncidente.isPending}>

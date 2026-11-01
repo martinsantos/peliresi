@@ -16,6 +16,7 @@ import { ActionButtons } from './ActionButtons';
 import { ActionModals } from './ActionModals';
 import { ConfirmManifestClosure } from './ConfirmManifestClosure';
 import { manifestProposalsVisible } from '../../../utils/manifestFeatures';
+import { PendingIncidentNotice, type PendingIncidentNoticeProps } from '../../../components/manifiestos/PendingIncidentNotice';
 
 interface MutationState {
   isPending: boolean;
@@ -32,6 +33,7 @@ interface ManifiestoActionsProps {
   deliveryCheckError?: boolean;
   onRetryDeliveryCheck?: () => void;
   onRetryApprovalCheck?: () => void;
+  incidentNotice?: PendingIncidentNoticeProps;
   isInSitu?: boolean;
   training?: boolean;
   mutations: {
@@ -75,6 +77,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   deliveryCheckError,
   onRetryDeliveryCheck,
   onRetryApprovalCheck,
+  incidentNotice,
   isInSitu,
   training,
   mutations,
@@ -126,6 +129,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
           {['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','CANCELADO','RECHAZADO'].includes(m.estado || '') && <div className="mb-4"><ManifestNextStep work={{estado:m.estado,modalidad:m.modalidad,pesajePendiente:m.residuos?.some(r=>!r.cantidadRecibida)}} role={userRol}/></div>}
           {deliveryPending && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Hay una entrega guardada en este dispositivo. Revisá la sincronización antes de continuar.</p>}
           {deliveryCheckError && <p role="alert" className="mb-4 rounded-lg bg-error-50 p-3 text-sm text-error-800">No pudimos revisar las entregas guardadas. <button type="button" className="font-semibold underline" onClick={onRetryDeliveryCheck}>Reintentar</button></p>}
+          {!showIncidenteModal && incidentNotice && <div className="mb-4"><PendingIncidentNotice {...incidentNotice} /></div>}
           <ActionButtons
             pesajePendiente={m.residuos?.some(r=>!r.cantidadRecibida) ?? true}
             estado={m.estado}
@@ -133,6 +137,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             userRol={userRol}
             isActionPending={isActionPending}
             deliveryUnavailable={deliveryPending || deliveryChecking || deliveryCheckError}
+            incidentUnavailable={!!incidentNotice && (incidentNotice.checking || !!incidentNotice.pending || !!incidentNotice.storageError)}
             legacyDraftBlocked={legacyBlocked}
             pickupBlocked={m.estado === 'APROBADO' && m.aprobacionOperacion !== 'LISTA'}
             isInSitu={isInSitu}
@@ -185,6 +190,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
         showTratamientoModal={showTratamientoModal}
         showRechazarModal={showRechazarModal}
         showIncidenteModal={showIncidenteModal}
+        incidentNotice={incidentNotice}
         showCancelModal={showCancelModal}
         showReversionModal={showReversionModal}
         showFirmaModal={showFirmaModal}

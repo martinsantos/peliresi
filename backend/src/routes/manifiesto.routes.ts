@@ -1,5 +1,6 @@
 import { listManifestCertificates, releaseManifestCertificate, downloadManifestCertificate, recoverManifestCertificate } from '../controllers/manifest-certificate.controller';
 import { confirmarEntregaIdempotente } from '../controllers/manifiesto-delivery.controller';
+import { registrarIncidenteIdempotente } from '../controllers/manifiesto-incident-command.controller';
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
 import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
@@ -544,6 +545,7 @@ router.post('/:id/confirmar-entrega-idempotente', hasRole('TRANSPORTISTA', 'ADMI
  *         description: Rol no autorizado
  */
 router.post('/:id/incidente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncidente);
+router.post('/:id/incidente-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncidenteIdempotente);
 
 /**
  * @openapi

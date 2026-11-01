@@ -23,6 +23,7 @@ import { toast } from '../../../components/ui/Toast';
 import { formatNumber, formatEstado } from '../../../utils/formatters';
 import type { Manifiesto } from '../../../types/models';
 import { EstadoManifiesto } from '../../../types/models';
+import { PendingIncidentNotice, type PendingIncidentNoticeProps } from '../../../components/manifiestos/PendingIncidentNotice';
 
 const METODOS_TRATAMIENTO: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'INCINERACION', label: 'Incineración', icon: <Flame size={16} className="inline" /> },
@@ -79,6 +80,7 @@ export interface ActionModalsProps {
   showTratamientoModal: boolean;
   showRechazarModal: boolean;
   showIncidenteModal: boolean;
+  incidentNotice?: PendingIncidentNoticeProps;
   showCancelModal: boolean;
   showReversionModal: boolean;
   showFirmaModal: boolean;
@@ -117,6 +119,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
   showTratamientoModal,
   showRechazarModal,
   showIncidenteModal,
+  incidentNotice,
   showCancelModal,
   showReversionModal,
   showFirmaModal,
@@ -476,7 +479,11 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       {/* Incidente Modal */}
       {showIncidenteModal && (
         <ActionDialog title="Registrar Incidente" busy={busy} onClose={onCloseIncidente}>
-            <div className="space-y-3">
+            {incidentNotice && <div className="mb-3"><PendingIncidentNotice {...incidentNotice} onConfirmed={result => {
+              incidentNotice.onConfirmed?.(result);
+              if (result.cleaned) { setIncidenteTipo(''); setIncidenteDescripcion(''); onCloseIncidente(); }
+            }} /></div>}
+            <fieldset disabled={!!incidentNotice && (incidentNotice.checking || !!incidentNotice.pending || !!incidentNotice.storageError)} className="min-w-0 space-y-3">
               <div>
                 <Select
                   label="Tipo de incidente *"
@@ -495,8 +502,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion</label>
+                <label htmlFor="manifest-incident-description" className="block text-sm font-medium text-neutral-700 mb-1">Descripción</label>
                 <textarea
+                  id="manifest-incident-description"
                   value={incidenteDescripcion}
                   onChange={(e) => setIncidenteDescripcion(e.target.value)}
                   placeholder="Describe el incidente..."
@@ -504,12 +512,12 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                   className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
                 />
               </div>
-            </div>
+            </fieldset>
             <div className="flex justify-end gap-3 mt-4">
               <Button variant="outline" onClick={onCloseIncidente} disabled={mutations.registrarIncidente.isPending}>
                 Cancelar
               </Button>
-              <Button onClick={handleIncidente} disabled={mutations.registrarIncidente.isPending}>
+              <Button onClick={handleIncidente} disabled={mutations.registrarIncidente.isPending || (!!incidentNotice && (incidentNotice.checking || !!incidentNotice.pending || !!incidentNotice.storageError))}>
                 {mutations.registrarIncidente.isPending ? 'Registrando...' : 'Registrar Incidente'}
               </Button>
             </div>

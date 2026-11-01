@@ -31,6 +31,7 @@ export interface ActionButtonsProps {
   userRol: string;
   isActionPending: boolean;
   deliveryUnavailable?: boolean;
+  incidentUnavailable?: boolean;
   isInSitu?: boolean;
   training?: boolean;
   operatorCertificates?: boolean;
@@ -70,6 +71,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   userRol,
   isActionPending,
   deliveryUnavailable,
+  incidentUnavailable,
   isInSitu,
   training,
   operatorCertificates,
@@ -152,7 +154,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           variant="outline"
           leftIcon={mutations.registrarIncidente.isPending ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} />}
           onClick={onOpenIncidenteModal}
-          disabled={isActionPending}
+          disabled={isActionPending || incidentUnavailable}
         >
           Registrar Incidente
         </Button>

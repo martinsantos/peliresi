@@ -4320,7 +4320,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El GPS esta activo.</p>
 <p><strong>Flujo de pausa:</strong> Clic en &quot;Pausar&quot;, se registra incidente tipo PAUSA con ubicacion actual, se detiene el watcher GPS, se persiste estado en localStorage.</p>
 <p><strong>Flujo de reanudacion:</strong> Clic en &quot;Reanudar&quot;, se registra incidente tipo REANUDACION, se reactiva el watcher GPS.</p>
-<p><strong>Endpoint:</strong> <code>POST /api/manifiestos/:id/incidente</code> (tipo: PAUSA o REANUDACION)</p>
+<p>Si no llega la confirmación, conservá el dispositivo y usá <strong>Comprobar envío</strong> con la misma cuenta y actividad antes de registrar otra pausa o incidente. La copia no se transfiere a otros dispositivos; si no puede verificarse, consultá a soporte.</p>
+<p><strong>Endpoint actual:</strong> <code>POST /api/manifiestos/:id/incidente-idempotente</code> con una referencia por envío. La ruta anterior sigue disponible para clientes anteriores y no ofrece esta protección.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
@@ -4333,7 +4334,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Tipos de incidente:</strong> Accidente vial, demora por trafico, desvio de ruta, problema mecanico, condicion climatica adversa, otro (texto libre).</p>
 <p><strong>Datos registrados:</strong> Tipo de incidente, descripcion textual, coordenadas GPS actuales, timestamp, usuario.</p>
 <p><strong>Nota:</strong> Registrar un incidente NO cambia el estado del manifiesto. El manifiesto permanece en EN_TRANSITO.</p>
-<p><strong>Endpoint:</strong> <code>POST /api/manifiestos/:id/incidente</code> (acepta tanto <code>tipo</code> como <code>tipoIncidente</code>)</p>
+<p>Si se pierde la respuesta, usá <strong>Comprobar envío</strong> para verificar la misma referencia desde este dispositivo, cuenta y actividad. La información se conserva antes de enviarse; borrar los datos del navegador elimina esa copia. Es necesario un navegador que permita coordinar ventanas; consultá a soporte si la copia no se puede leer o comprobar.</p>
+<p><strong>Endpoint actual:</strong> <code>POST /api/manifiestos/:id/incidente-idempotente</code>. Las versiones anteriores pueden usar <code>/incidente</code>, sin referencia de reintento.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 

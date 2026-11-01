@@ -175,7 +175,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const registrarTratamiento = useRegistrarTratamiento();
   const cerrar = useCerrarManifiesto();
   const rechazar = useRechazarManifiesto();
-  const registrarIncidente = useRegistrarIncidente();
+  const registrarIncidente = useRegistrarIncidente(id);
   const revertir = useRevertirEstado();
   const cancelar = useCancelarManifiesto();
 
@@ -317,11 +317,18 @@ const ManifiestoDetailPage: React.FC = () => {
     );
   };
 
-  const handleIncidente = (tipo: string, descripcion: string) => {
-    return handleAction(
-      () => registrarIncidente.mutateAsync({ id: id!, tipo, descripcion }),
-      'Incidente registrado exitosamente',
-    );
+  const handleIncidente = async (tipo: string, descripcion: string) => {
+    if (actionInFlightRef.current) return false;
+    actionInFlightRef.current = true;
+    try {
+      const result = await registrarIncidente.mutateAsync({ id: id!, tipo, descripcion });
+      if (result.cleaned) toast.success('Incidente registrado exitosamente');
+      else toast.info('Incidente registrado', 'No pudimos actualizar la copia local. Conservá este dispositivo y comprobá el envío.');
+      return true;
+    } catch (err: any) {
+      toast.error('No se pudo confirmar el incidente', err?.message || 'Comprobá el envío antes de registrar otro.');
+      return false;
+    } finally { actionInFlightRef.current = false; }
   };
 
   const handleCancelar = async () => {
@@ -474,6 +481,11 @@ const ManifiestoDetailPage: React.FC = () => {
         deliveryChecking={m.estado === EstadoManifiesto.EN_TRANSITO && pendingDeliveries.checking}
         deliveryCheckError={m.estado === EstadoManifiesto.EN_TRANSITO && pendingDeliveries.error}
         onRetryDeliveryCheck={pendingDeliveries.retry}
+        incidentNotice={['TRANSPORTISTA', 'ADMIN'].includes(userRol) ? {
+          pending: registrarIncidente.pendingIncident, storageError: registrarIncidente.incidentStorageError,
+          checking: registrarIncidente.checkingIncident, busy: registrarIncidente.isPending,
+          onRetry: () => registrarIncidente.retryIncident(), onRefresh: registrarIncidente.refreshIncident,
+        } : undefined}
         isInSitu={isInSitu}
         mutations={{
           firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,

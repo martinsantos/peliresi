@@ -68,7 +68,7 @@ const faqs = [
       },
       {
         q: '¿Cómo registro un incidente durante el transporte?',
-        a: 'En la pantalla de Viaje en Curso, usa el botón "Registrar Incidente". Ingresa el tipo de incidente (avería, accidente, etc.) y una descripción. El incidente queda registrado en el timeline del manifiesto sin cambiar su estado.'
+        a: 'En Viaje en curso, abrí Incidente y elegí el tipo. El registro no cambia el estado del manifiesto. Si no llega la confirmación, usá Comprobar envío desde el mismo dispositivo, cuenta y actividad antes de registrar otro; si no puede comprobarse, conservá el dispositivo y consultá a soporte.'
       }
     ]
   },

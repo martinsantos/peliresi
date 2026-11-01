@@ -205,6 +205,8 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   const delivery = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
   assert.match(delivery, /sólo se adjunta al incidente o la entrega si la lectura del dispositivo sigue siendo reciente al confirmar/i);
   assert.match(delivery, /podés continuar sin adjuntarla/i);
+  assert.match(delivery, /si no llega la confirmación de un incidente, pausa o reanudación, usá Comprobar envío/i);
+  assert.match(delivery, /la copia no se transfiere a otros dispositivos ni versiones anteriores/i);
   assert.match(start, /no se garantiza el seguimiento al cerrar la app/i);
   assert.match(recovery, /En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece/);
   assert.match(recovery, /desplegá «Cómo habilitar la ubicación»/);

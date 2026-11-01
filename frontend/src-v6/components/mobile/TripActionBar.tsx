@@ -10,6 +10,7 @@ interface TripActionBarProps {
   isPending: boolean;
   disabled?: boolean;
   connectionLimited?: boolean;
+  incidentUnavailable?: boolean;
   hasPendingSync: boolean;
   delegated?: boolean;
   onConfirmPickup: () => void;
@@ -24,6 +25,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
   isPending,
   disabled = false,
   connectionLimited = false,
+  incidentUnavailable = false,
   hasPendingSync,
   delegated = false,
   onConfirmPickup,
@@ -59,7 +61,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
         <button
           type="button"
           onClick={onTogglePause}
-          disabled={isPending || disabled || connectionLimited}
+          disabled={isPending || disabled || connectionLimited || incidentUnavailable}
           className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-warning-200 bg-warning-50 px-3 text-sm font-bold text-warning-800 disabled:opacity-50"
         >
           {viajeStatus === 'ACTIVO' ? <Pause size={18} /> : <Play size={18} />}
@@ -68,7 +70,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
         <button
           type="button"
           onClick={onReportIncident}
-          disabled={isPending || disabled || connectionLimited}
+          disabled={isPending || disabled || connectionLimited || incidentUnavailable}
           className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-error-200 bg-error-50 px-3 text-sm font-bold text-error-800 disabled:opacity-50"
         >
           <AlertTriangle size={18} />
