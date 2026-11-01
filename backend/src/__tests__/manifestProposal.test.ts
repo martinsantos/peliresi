@@ -281,6 +281,21 @@ describe('explicit coordination start',()=>{
   expect(next).not.toHaveBeenCalled();expect(json.mock.calls.at(-1)[0].data.inicio).toEqual(created.createdAt);
   expect(mock.events.filter(e=>e.tipo==='INICIO_COORDINACION_CAP')).toHaveLength(1);
  });
+ it('does not confirm a legacy two-party start before reception but preserves its historical retry after reception',async()=>{
+  const old={...p,version:1,modalidad:'IN_SITU',transportistaId:null};
+  Object.assign(mock.manifest,old,{estado:'APROBADO'});
+  const started={tipo:'INICIO_COORDINACION',createdAt:mock.clock};
+  mock.events=[{tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(old)},
+   {tipo:'FIRMA',usuarioId:'ug'}, {tipo:'APROBACION_OPERADOR',usuarioId:'uo'},started];
+  const next=vi.fn(),json=vi.fn(),eventCount=mock.events.length;
+  await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409,message:expect.stringContaining('nueva propuesta')}));
+  expect(json).not.toHaveBeenCalled();expect(mock.events).toHaveLength(eventCount);
+  next.mockClear();mock.manifest.estado='RECIBIDO';
+  await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();expect(json.mock.calls[0][0].data.inicio).toEqual(started.createdAt);
+  expect(mock.events).toHaveLength(eventCount);
+ });
 });
 
 describe('training agenda metadata',()=>{

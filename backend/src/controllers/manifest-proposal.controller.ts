@@ -214,6 +214,7 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    const rol=proposalRole(req.user,value.proposal);
    if(!rol)throw new AppError('Sólo una de las partes vinculadas puede iniciar',403);
    const existing=value.events.find(e=>COORDINATION_EVENTS.includes(e.tipo));
+   if(legacyInSituWithoutCarrier(value.proposal)&&['PENDIENTE_APROBACION','APROBADO'].includes(value.manifest.estado))throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
    if(proposalStateConflict(value.manifest,value.proposal,value.events)||value.events.some(e=>e.tipo==='RECHAZO_PARTE'))throw new AppError(CONFLICTING_STATE_MESSAGE,409);
    if(existing)return existing;
    if(legacyInSituWithoutCarrier(value.proposal))throw new AppError(LEGACY_IN_SITU_MESSAGE,409);
