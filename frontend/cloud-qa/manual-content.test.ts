@@ -626,7 +626,8 @@ test('four phones retain their roles and follow one new case through GPS and clo
   assert.match(guide.safety, /No se necesita la cuenta administradora personal/);
   assert.match(guide.steps[0].body.join(' '), /perfiles de navegador independientes/);
   assert.match(guide.steps[0].body.join(' '), /no certifica GPS físico/);
-  assert.match(guide.steps[2].body.join(' '), /Sync/);
+  assert.match(guide.steps[2].body.join(' '), /Última confirmación/);
+  assert.match(guide.steps[2].body.join(' '), /reloj del teléfono/);
   assert.match(guide.steps[3].body.join(' '), /Hoy → Viajes Activos/);
   assert.match(guide.steps[5].body.join(' '), /Los cuatro deben ver Tratado/);
   assert.match(read('index.html'), /guide=capacitacion-cuatro-telefonos/);
