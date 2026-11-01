@@ -157,6 +157,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026110101') {
     return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
   }
+  if (version === 'scheduled-cut-regression-62516a08'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026110102') {
+    return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
+  }
   if (version === 'liveness-20261031'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-liveness-20261031') {
     return path.join(root, 'backend/dist-qa-liveness-20261031/index.js');

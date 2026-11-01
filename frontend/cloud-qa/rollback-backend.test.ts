@@ -59,6 +59,8 @@ test('only the dedicated rehearsal can select one of the two fixed snapshots', (
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'followup-cut-20261031' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026110101', QA_COMPAT_BACKEND: 'scheduled-cut-62516a08' }), /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'scheduled-cut-62516a08' }));
+  assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-operational-ui-current2026110102', QA_COMPAT_BACKEND: 'scheduled-cut-regression-62516a08' }), /\.qa-scheduled-pause-20261101\/dist\/index\.js$/);
+  assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'scheduled-cut-regression-62516a08' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-liveness-20261031', QA_COMPAT_BACKEND: 'liveness-20261031' }), /backend\/dist-qa-liveness-20261031\/index\.js$/);
   assert.throws(() => qaBackendEntry({ QA_ARTIFACTS: '/tmp', QA_COMPAT_BACKEND: 'liveness-20261031' }));
   assert.match(qaBackendEntry({ QA_ARTIFACTS: '/work/sitrep/.qa-liveness-smoke-20261031', QA_COMPAT_BACKEND: 'liveness-smoke-20261031' }), /backend\/dist-qa-liveness-20261031\/index\.js$/);

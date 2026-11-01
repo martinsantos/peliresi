@@ -11,7 +11,8 @@ const out = process.env.QA_ARTIFACTS!;
 assert.ok(['/work/sitrep/.qa-operational-ui-current2026103070', '/work/sitrep/.qa-operational-ui-current2026103080',
   '/work/sitrep/.qa-operational-ui-current2026103090', '/work/sitrep/.qa-operational-ui-current2026103110',
   '/work/sitrep/.qa-operational-ui-current2026103111', '/work/sitrep/.qa-operational-ui-current2026103112',
-  '/work/sitrep/.qa-operational-ui-current2026103113', '/work/sitrep/.qa-operational-ui-current2026103114'].includes(out));
+  '/work/sitrep/.qa-operational-ui-current2026103113', '/work/sitrep/.qa-operational-ui-current2026103114',
+  '/work/sitrep/.qa-operational-ui-current2026110102'].includes(out));
 assert.equal(process.env.UPLOADS_DIR, path.join(out, 'uploads'));
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
 assert.equal(process.env.TRAINING_DATABASE_URL, '');
