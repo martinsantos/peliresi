@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
+import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
@@ -28,12 +29,21 @@ try {
     assert.equal(await db.trackingGPS.count({ where: { manifiestoId: item.id } }), 0);
     assert.equal(await db.eventoManifiesto.count({ where: { manifiestoId: item.id, tipo: 'ENTREGA' } }), 0);
   }
+  const { TRAINING_LOGINS } = backendRequire(path.join(path.dirname(qaBackendEntry()), 'lib/trainingDirectLogin.js'));
+  assert.equal(TRAINING_LOGINS.length, 4);
+  for (const [index, { email }] of TRAINING_LOGINS.entries()) {
+    assert.match(email, /@capacitacion\.invalid$/);
+    const response = await fetch('http://127.0.0.1:4177/api/auth/login', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: `sitrep_qa_client=127.11.49.${90 + index}` },
+      body: JSON.stringify({ email, password: 'expired-qa-probe' }) });
+    assert.equal(response.status, 403);
+  }
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { product: process.env.GITHUB_SHA, synthetic: true, production: false,
     beforeFailures: before.numFailedTests, unitPassed: after.numPassedTests, browserPassed: browser.stats.expected,
     fixtureTripsUnchanged: 3, gpsRows: 0, deliveryEvents: 0, emailAttempts: 0, emailsSent: 0,
-    capConfiguredClosed: true, pushEnabled: false, backgroundJobsPaused: true };
+    capClosedForSyntheticLogins: true, pushEnabled: false, backgroundJobsPaused: true };
   writeFileSync(path.join(out, 'audit.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 } finally { await db.$disconnect(); }
