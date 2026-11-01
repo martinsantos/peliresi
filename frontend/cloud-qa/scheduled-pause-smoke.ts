@@ -20,12 +20,12 @@ assert.equal(process.env.TRAINING_DATABASE_URL, '');
 assert.equal(process.env.VAPID_PUBLIC_KEY, '');
 assert.equal(process.env.VAPID_PRIVATE_KEY, '');
 assert.equal(process.env.ENABLE_ANALYTICS, 'false');
-assert.ok(['paused-0', 'paused-1', 'normal-0', 'invalid-0'].includes(process.env.QA_CASE || ''));
+assert.ok(['paused-0', 'paused-1', 'normal-0', 'default-0', 'invalid-0'].includes(process.env.QA_CASE || ''));
 const scenario = process.env.QA_CASE!;
 assert.equal(process.env.NODE_APP_INSTANCE, scenario.endsWith('-1') ? '1' : '0');
-assert.equal(process.env.SITREP_PAUSE_BACKGROUND_JOBS,
-  scenario.startsWith('paused-') ? 'true' : scenario.startsWith('normal-') ? 'false' : 'invalid');
-assert.ok(/^30(596|597|598|599)$/.test(process.env.PORT || ''));
+assert.equal(process.env.SITREP_PAUSE_BACKGROUND_JOBS, scenario.startsWith('paused-') ? 'true'
+  : scenario.startsWith('normal-') ? 'false' : scenario.startsWith('default-') ? undefined : 'invalid');
+assert.ok(/^(3059[6-9]|30600)$/.test(process.env.PORT || ''));
 const resultPath = `${qaRoot}/${scenario}.json`;
 
 const cron = require('/work/sitrep/backend/node_modules/node-cron');
