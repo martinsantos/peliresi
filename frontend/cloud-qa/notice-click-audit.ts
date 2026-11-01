@@ -79,6 +79,18 @@ for (const file of updateProofs) {
   const proof = JSON.parse(readFileSync(file, 'utf8'));
   assert.deepEqual(proof, { synthetic: true, oldShellRetainedWhileWaiting: true, draftEditableAfterUpdate: true, draftRecoveredAfterReload: true });
 }
+const savedDrafts = read('form-browser.json'); assert.equal(savedDrafts.stats.expected, 2); assert.equal(savedDrafts.stats.unexpected, 0);
+assert.equal(savedDrafts.stats.skipped, 0); assert.equal(savedDrafts.stats.flaky, 0); assert.deepEqual(savedDrafts.errors, []);
+const draftProofs = readdirSync(path.join(out, 'form-browser'), { withFileTypes: true })
+  .filter(entry => entry.isDirectory()).map(entry => path.join(out, 'form-browser', entry.name, 'proof.json'));
+assert.equal(draftProofs.length, 2);
+const workerResults: string[] = [];
+for (const file of draftProofs) {
+  const proof = JSON.parse(readFileSync(file, 'utf8'));
+  assert.equal(proof.synthetic, true); assert.equal(proof.systemClick, false); assert.equal(proof.pushSent, false);
+  assert.equal(proof.realWindowClientNavigation, true); assert.equal(proof.inspectionDraftRecovered, true);
+  assert.ok(['finished', 'InvalidAccessError'].includes(proof.workerResult)); workerResults.push(proof.workerResult);
+}
 for (const asset of ['directorio.html', 'directorio.css', 'directorio.js']) {
   const response = await fetch('http://127.0.0.1:4177/manual/' + asset);
   assert.equal(response.status, 200);
@@ -103,7 +115,8 @@ try {
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, production: false, previousProductCommit: previous.productCommit, frontendBuildCommit: compiled,
     previousIntegratedCommit: previous.previousIntegratedCommit, previousIntegratedBrowserTests: previous.previousIntegratedBrowserTests,
-    simulatedClickBrowserTests: 6, manualBrowserTests: 3, updateBrowserTests: 2, breadcrumbBrowserTests: 10, unitTests: 86, manualTests: 55,
+    simulatedClickBrowserTests: 6, manualBrowserTests: 3, updateBrowserTests: 2, breadcrumbBrowserTests: 10,
+    workerNavigationDraftTests: 2, workerResults, unitTests: 86, manualTests: 55,
     consoleErrors, realPushSent: false, systemClickVerified: false,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false, androidVerified: false };
   writeFileSync(path.join(out, 'notice-click-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
