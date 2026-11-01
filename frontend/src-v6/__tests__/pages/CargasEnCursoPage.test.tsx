@@ -58,6 +58,12 @@ async function chooseAndStart() {
   await act(async () => { locate({ coords: { latitude: -33, longitude: -69, accuracy: 10, speed: null, heading: null }, timestamp: Date.now() } as GeolocationPosition); });
   await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(2));
 }
+it('labels the local confirmation time as the device clock rather than the server receipt time', async () => {
+  const view = setup(); await chooseAndStart();
+  const selected = screen.getByRole('region', { name: 'Cargas marcadas' });
+  await waitFor(() => expect(within(selected).getAllByText(/hora de este dispositivo/)).toHaveLength(2));
+  view.unmount();
+});
 it('marks each confirmed GPS as no longer recent when the sensor capture ages', async () => {
   let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
   const view=setup();await chooseAndStart();

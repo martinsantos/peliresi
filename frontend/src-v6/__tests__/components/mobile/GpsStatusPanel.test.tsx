@@ -18,7 +18,21 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByText('GPS activo')).toBeInTheDocument();
     expect(screen.getByText(/-32.92871, -68.85352/)).toBeInTheDocument();
     expect(screen.getByText('3 pendientes')).toBeInTheDocument();
-    expect(screen.getByText('Sin enviar')).toBeInTheDocument();
+    expect(screen.getByText('Sin confirmar')).toBeInTheDocument();
+    expect(screen.queryByText('Sin enviar')).not.toBeInTheDocument();
+  });
+
+  it('offers a direct retry for a saved point without claiming that it was never sent', () => {
+    const retrySend = vi.fn();
+    const props = { status: 'acquiring' as const, sendStatus: 'error' as const,
+      sendError: 'No se pudo confirmar el envío de las ubicaciones.', position: null,
+      details: { accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null },
+      pendingCount: 1, lastSyncAt: null, onRetrySend: retrySend };
+    const view = render(<GpsStatusPanel {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar envío GPS', exact: true }));
+    expect(retrySend).toHaveBeenCalledOnce();
+    view.rerender(<GpsStatusPanel {...props} retryingSend />);
+    expect(screen.getByRole('button', { name: 'Comprobando envío GPS', exact: true })).toBeDisabled();
   });
 
   it('shows one GPS permission status, a direct retry and optional recovery guidance', () => {

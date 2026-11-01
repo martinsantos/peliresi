@@ -261,6 +261,28 @@ describe('GPS position provenance and cleanup', () => {
     unmount();
   });
 
+  it('retries a saved point immediately with the same reference without restarting the sensor', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('response lost'));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const calls = vi.mocked(manifiestoService.actualizarUbicacion).mock.calls;
+    expect(result.current.pendingCount).toBe(1);
+    expect(result.current.sendError).toContain('No se pudo confirmar');
+    expect(result.current.canRetryPending).toBe(true);
+    const reference = calls[0][5];
+    await act(async () => { await result.current.retryPending(); });
+    expect(calls).toHaveLength(2);
+    expect(calls[1][5]).toBe(reference);
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(result.current.sendStatus).toBe('ok');
+    expect(result.current.sendError).toBeNull();
+    expect(navigator.geolocation.watchPosition).toHaveBeenCalledTimes(1);
+    expect(navigator.geolocation.clearWatch).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('keeps an actionable server error visible when restoring an older queued point fails', async () => {
     const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
     localStorage.setItem(key, JSON.stringify([{ lat:-32, lng:-68, speed:null, heading:null }]));
