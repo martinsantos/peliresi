@@ -184,8 +184,12 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
+  const [incidenteError, setIncidenteError] = useState('');
+  const incidenteErrorRef = useRef<HTMLParagraphElement>(null);
+  const incidenteInFlightRef = useRef(false);
   const [vistaMapa, setVistaMapa] = useState(true);
   useEffect(() => { if (deliveryError) deliveryErrorRef.current?.focus(); }, [deliveryError]);
+  useEffect(() => { if (showIncidenteModal && incidenteError) incidenteErrorRef.current?.focus(); }, [showIncidenteModal, incidenteError]);
 
   useEffect(() => {
     if (!id || currentUser?.id == null) return;
@@ -384,10 +388,13 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   // Incident saving with description fallback + GPS coords
   const handleRegistrarIncidente = async () => {
+    if (incidenteInFlightRef.current) return;
     if (!incidenteTipo) {
-      toast.warning('Selecciona un tipo de incidente');
+      setIncidenteError('Seleccioná un tipo de incidente.');
       return;
     }
+    incidenteInFlightRef.current = true;
+    setIncidenteError('');
     const tipoLabels: Record<string, string> = {
       accidente: 'Accidente vehicular',
       derrame: 'Derrame de residuos',
@@ -408,8 +415,12 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       setShowIncidenteModal(false);
       setIncidenteTipo('');
       setIncidenteDescripcion('');
+      setIncidenteError('');
     } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo registrar el incidente');
+      const reason = getApiErrorMessage(err, 'No se pudo confirmar el registro.').replace(/[.!?]+$/, '');
+      setIncidenteError(`${reason}. Antes de volver a intentar, revisá si el incidente ya aparece en el historial.`);
+    } finally {
+      incidenteInFlightRef.current = false;
     }
   };
 
@@ -746,73 +757,71 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       </Modal>
 
       {/* Modal Incidente */}
-      {showIncidenteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card className="w-full max-w-sm">
-            <CardContent className="p-6">
-              <div className="text-center mb-4">
-                <div className="w-16 h-16 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertTriangle className="text-error-600" size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-neutral-900">Reportar Incidente</h3>
-                <p className="mt-2 text-sm text-neutral-600">Si hubo avería, registrala antes de coordinar otro vehículo o transportista. El incidente conserva el viaje y no cambia la asignación por sí solo.</p>
-              </div>
-              <div className="space-y-3 mb-4">
-                {/* Incident type buttons instead of native select */}
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">Tipo de incidente</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { value: 'accidente', label: 'Accidente vehicular' },
-                      { value: 'derrame', label: 'Derrame de residuos' },
-                      { value: 'robo', label: 'Robo o asalto' },
-                      { value: 'desvio', label: 'Desvío de ruta' },
-                      { value: 'averia', label: 'Avería mecánica' },
-                      { value: 'otro', label: 'Otro' },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setIncidenteTipo(opt.value)}
-                        className={`px-3 py-2.5 rounded-lg text-xs font-medium border-2 transition-all ${
-                          incidenteTipo === opt.value
-                            ? 'border-error-500 bg-error-50 text-error-700'
-                            : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Descripción (opcional)</label>
-                  <textarea
-                    value={incidenteDescripcion}
-                    onChange={(e) => setIncidenteDescripcion(e.target.value)}
-                    placeholder="Describe el incidente..."
-                    rows={3}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none text-sm"
-                  />
-                </div>
-                {eventLocation ? (
-                  <p className="text-xs text-neutral-400 flex items-center gap-1">
-                    <MapPin size={12} /> Se adjuntará la ubicación si sigue siendo reciente al registrar.
-                  </p>
-                ) : <p className="text-xs text-neutral-600">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
-              </div>
-              <div className="space-y-2">
-                <Button fullWidth onClick={handleRegistrarIncidente} disabled={registrarIncidente.isPending}>
-                  {registrarIncidente.isPending ? 'Registrando...' : 'Registrar Incidente'}
-                </Button>
-                <Button variant="outline" fullWidth onClick={() => { setShowIncidenteModal(false); setIncidenteTipo(''); setIncidenteDescripcion(''); }} disabled={registrarIncidente.isPending}>
-                  Cancelar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <Modal isOpen={showIncidenteModal} onClose={() => { setShowIncidenteModal(false); setIncidenteError(''); }}
+        title="Reportar Incidente" size="sm" showCloseButton={false} closeOnOverlayClick={false} isBusy={registrarIncidente.isPending}>
+        <div className="text-center mb-4">
+          <div className="w-16 h-16 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="text-error-600" size={32} aria-hidden="true" />
+          </div>
+          <p className="mt-2 text-sm text-neutral-600">Si hubo avería, registrala antes de coordinar otro vehículo o transportista. El incidente conserva el viaje y no cambia la asignación por sí solo.</p>
         </div>
-      )}
+        <div className="space-y-3 mb-4">
+          {/* Incident type buttons instead of native select */}
+          <fieldset disabled={registrarIncidente.isPending}>
+            <legend className="block text-sm font-medium text-neutral-700 mb-2">Tipo de incidente</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'accidente', label: 'Accidente vehicular' },
+                { value: 'derrame', label: 'Derrame de residuos' },
+                { value: 'robo', label: 'Robo o asalto' },
+                { value: 'desvio', label: 'Desvío de ruta' },
+                { value: 'averia', label: 'Avería mecánica' },
+                { value: 'otro', label: 'Otro' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={incidenteTipo === opt.value}
+                  onClick={() => { setIncidenteTipo(opt.value); setIncidenteError(''); }}
+                  className={`min-h-11 px-3 py-2.5 rounded-lg text-xs font-medium border-2 transition-all ${
+                    incidenteTipo === opt.value
+                      ? 'border-error-500 bg-error-50 text-error-700'
+                      : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <div>
+            <label htmlFor="incidente-descripcion" className="block text-sm font-medium text-neutral-700 mb-1">Descripción (opcional)</label>
+            <textarea
+              id="incidente-descripcion"
+              disabled={registrarIncidente.isPending}
+              value={incidenteDescripcion}
+              onChange={(e) => setIncidenteDescripcion(e.target.value)}
+              placeholder="Describe el incidente..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none text-sm"
+            />
+          </div>
+          {eventLocation ? (
+            <p className="text-xs text-neutral-400 flex items-center gap-1">
+              <MapPin size={12} /> Se adjuntará la ubicación si sigue siendo reciente al registrar.
+            </p>
+          ) : <p className="text-xs text-neutral-600">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
+        </div>
+        {incidenteError && <p ref={incidenteErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{incidenteError}</p>}
+        <div className="space-y-2">
+          <Button fullWidth onClick={handleRegistrarIncidente} disabled={registrarIncidente.isPending}>
+            {registrarIncidente.isPending ? 'Registrando...' : 'Registrar Incidente'}
+          </Button>
+          <Button variant="outline" fullWidth onClick={() => { setShowIncidenteModal(false); setIncidenteError(''); }} disabled={registrarIncidente.isPending}>
+            Cerrar
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
