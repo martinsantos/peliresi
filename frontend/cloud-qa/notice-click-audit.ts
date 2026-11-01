@@ -79,10 +79,10 @@ for (const file of updateProofs) {
   const proof = JSON.parse(readFileSync(file, 'utf8'));
   assert.deepEqual(proof, { synthetic: true, oldShellRetainedWhileWaiting: true, draftEditableAfterUpdate: true, draftRecoveredAfterReload: true });
 }
-const savedDrafts = read('form-browser.json'); assert.equal(savedDrafts.stats.expected, 2); assert.equal(savedDrafts.stats.unexpected, 0);
+const savedDrafts = read('draft-navigation-final.json'); assert.equal(savedDrafts.stats.expected, 2); assert.equal(savedDrafts.stats.unexpected, 0);
 assert.equal(savedDrafts.stats.skipped, 0); assert.equal(savedDrafts.stats.flaky, 0); assert.deepEqual(savedDrafts.errors, []);
-const draftProofs = readdirSync(path.join(out, 'form-browser'), { withFileTypes: true })
-  .filter(entry => entry.isDirectory()).map(entry => path.join(out, 'form-browser', entry.name, 'proof.json'));
+const draftProofs = readdirSync(path.join(out, 'draft-navigation-final'), { withFileTypes: true })
+  .filter(entry => entry.isDirectory()).map(entry => path.join(out, 'draft-navigation-final', entry.name, 'proof.json'));
 assert.equal(draftProofs.length, 2);
 const workerResults: string[] = [];
 for (const file of draftProofs) {
