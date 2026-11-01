@@ -18,7 +18,9 @@ async function open(browser: Browser, info: TestInfo, label: string) {
   });
   const page = await context.newPage(), errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await login(page, info, 'transportista');
+  // In-transit manifests intentionally redirect carriers to the trip screen.
+  // The manifest-detail action remains available to administrators.
+  await login(page, info, label === 'detail' ? 'admin' : 'transportista');
   if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
   await isolatedMapTiles(page, info);
   return { context, page, errors, data, manifest };
@@ -144,6 +146,9 @@ test('a second tab cannot submit while the first response is uncertain', async (
     await other.getByRole('button', { name: 'Comprobar envío', exact: true }).click();
     await expect(other.getByRole('alert').filter({ hasText: 'Otra ventana' })).toBeVisible(); expect(requests).toHaveLength(1);
     release(); await expect(dialog.getByText('El incidente puede estar registrado.', { exact: true })).toBeVisible();
+    // The pending banner is visible while the original request still owns the
+    // Web Lock. Wait for its response failure before retrying from another tab.
+    await expect(dialog.getByRole('button', { name: 'Cerrar', exact: true })).toBeEnabled();
     const response = other.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/manifiestos/${manifest.id}/incidente-idempotente`));
     await other.getByRole('button', { name: 'Comprobar envío', exact: true }).click();
     expect((await (await response).json()).data.idempotencia.repetido).toBe(true);
