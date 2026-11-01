@@ -1488,7 +1488,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <section id="mod-blockchain" data-role="all">
 <h3>3.10 Certificacion Blockchain</h3>
 <div class="section-intro">
-SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sellos + cadena de hashes acumulativos</strong> que garantiza la integridad de todo el ciclo de vida de un manifiesto, desde su firma legal hasta el cierre por tratamiento. Los sellos se registran en la red Ethereum como prueba inmutable y publica, verificable por cualquier persona sin costo.
+SITREP contempla una certificacion blockchain basada en <strong>2 sellos + cadena de hashes acumulativos</strong>. Si la funcion esta habilitada, el sistema intenta registrar los sellos en la red configurada; consultar su estado para saber si un sello fue confirmado. Una firma o un cambio de estado no demuestra por si solo que el registro externo haya tenido exito.
 </div>
 
 <div class="info-card">
@@ -1506,7 +1506,7 @@ SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sel
 <table>
 <thead><tr><th>Sello</th><th>Momento</th><th>Que fija</th></tr></thead>
 <tbody>
-<tr><td><strong>Genesis</strong></td><td>Cuando el manifiesto pasa a APROBADO (firma legal)</td><td>Identidad del manifiesto: numero, actores (CUITs), residuos declarados y fecha de firma</td></tr>
+<tr><td><strong>Genesis</strong></td><td>Cuando se completan las tres aprobaciones y el manifiesto pasa a APROBADO</td><td>Identidad del manifiesto: numero, actores (CUITs), residuos declarados y fecha de firma</td></tr>
 <tr><td><strong>Cierre</strong></td><td>Cuando el manifiesto pasa a TRATADO (fin del ciclo)</td><td>Todo el ciclo de vida: hash genesis + rolling hash final + todas las fechas + conteo de eventos</td></tr>
 </tbody>
 </table>
@@ -1516,11 +1516,11 @@ SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sel
 <p>La analogia mas simple: <strong>es como una cadena de eslabones donde cada eslabon contiene al anterior</strong>. Romper un eslabon intermedio rompe todos los siguientes, y el ultimo eslabon (que esta sellado en blockchain) ya no coincide.</p>
 
 <div class="workflow-diagram">
-<div class="wf-step"><div class="wf-number">1</div><div class="wf-step-body"><h4>Firma Legal (APROBADO)</h4><p>Se genera el <strong>hash genesis</strong> con los datos de identidad del manifiesto y se registra en blockchain como <strong>Sello Genesis</strong>.</p></div></div>
+<div class="wf-step"><div class="wf-number">1</div><div class="wf-step-body"><h4>Tres aprobaciones (APROBADO)</h4><p>Se calcula el <strong>hash genesis</strong> con los datos de identidad. Si blockchain esta habilitada, se intenta registrar el <strong>Sello Genesis</strong>; su estado indica si fue confirmado.</p></div></div>
 <div class="wf-arrow">&darr;</div>
 <div class="wf-step"><div class="wf-number">2</div><div class="wf-step-body"><h4>Cada Cambio de Estado</h4><p>En cada transicion (EN_TRANSITO, ENTREGADO, RECIBIDO, EN_TRATAMIENTO...) se calcula un <strong>rolling hash</strong> que acumula el hash anterior + datos del nuevo estado. Se guarda en BD (sin blockchain, costo $0).</p></div></div>
 <div class="wf-arrow">&darr;</div>
-<div class="wf-step"><div class="wf-number">3</div><div class="wf-step-body"><h4>Fin del Ciclo (TRATADO)</h4><p>Se genera el <strong>hash de cierre</strong> combinando: hash genesis + rolling hash final + todas las fechas + CUITs + residuos + conteo de eventos. Se registra en blockchain como <strong>Sello de Cierre</strong>.</p></div></div>
+<div class="wf-step"><div class="wf-number">3</div><div class="wf-step-body"><h4>Fin del Ciclo (TRATADO)</h4><p>Se calcula el <strong>hash de cierre</strong> con la informacion prevista del ciclo. Si blockchain esta habilitada, se intenta registrar el <strong>Sello de Cierre</strong>; hay que comprobar su estado.</p></div></div>
 <div class="wf-arrow">&darr;</div>
 <div class="wf-step"><div class="wf-number">4</div><div class="wf-step-body"><h4>Verificacion</h4><p>En cualquier momento, el sistema puede <strong>recalcular toda la cadena</strong> desde cero y comparar contra los hashes en blockchain. Si algun dato fue alterado, la verificacion falla.</p></div></div>
 </div>
@@ -1529,7 +1529,7 @@ SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sel
 <h4 id="blockchain-sellos">3.10.2 Que Certifica Cada Sello</h4>
 
 <p><strong>Sello Genesis &mdash; la identidad del manifiesto</strong></p>
-<p>El sello genesis se calcula cuando el generador firma el manifiesto (transicion a APROBADO). Fija de manera inmutable <em>quien</em> declara <em>que</em> residuos, con <em>que</em> actores intervienen, y <em>cuando</em> se firmo. Los campos incluidos en el hash son:</p>
+<p>Para una propuesta de tres partes, el hash genesis se calcula cuando se completa la ultima aprobacion y el manifiesto pasa a APROBADO; la firma del generador puede haberse registrado antes. El hash incluye la identidad y la fecha de firma. La confirmacion del sello externo depende de que la funcion este habilitada y el registro haya tenido exito. Los campos incluidos son:</p>
 
 <table>
 <thead><tr><th>Campo</th><th>Descripcion</th><th>Por que se incluye</th></tr></thead>
@@ -7123,8 +7123,8 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <!-- ============================================================ -->
 <section id="capacitacion-qa" data-role="all">
 <h2>17. Capacitación por rol y práctica segura</h2>
-<div class="callout callout-info"><strong>Primero, el modo:</strong> en <strong>Operación real</strong> la demostración es de <strong>solo lectura</strong>. Para practicar en este mismo SITREP, el administrador abre <strong>Ver como otro usuario → Capacitación</strong> y elige una cuenta CAP. Comprobar siempre la banda <strong>Capacitación · sin validez oficial</strong> antes de actuar. Si esta opción no está habilitada, no usar registros reales. Una etiqueta demo por sí sola no aísla los datos.</div>
-<p>El selector muestra hasta cinco usuarios por categoría, con búsqueda y paginación propias. Para el relevo, elegir el mismo número de equipo en generador, transportista y operador. <strong>Volver a mi cuenta</strong> restaura al administrador. Las cuentas escuela son para impersonación, sin contraseñas compartidas. No se envían correos, push ni registros a blockchain; no se emiten documentos oficiales. Usar otro perfil del navegador si hay formularios de trabajo abiertos.</p>
+<div class="callout callout-info"><strong>Primero, el entorno:</strong> en <strong>Operación real</strong> la demostración es de <strong>solo lectura</strong>. CAP puede estar cerrado. Para practicar, el instructor debe proporcionar un entorno aislado con datos y cuentas ficticias e indicar cómo reconocer su banda de práctica. Si no está disponible, no usar registros reales. Una etiqueta por sí sola no aísla los datos.</div>
+<p>Las cuentas y los números de capacitaciones anteriores no se presumen disponibles. Cada participante usa el acceso ficticio de su rol; un enlace local puede funcionar sólo en la computadora del instructor. Si correo y push están apagados, consultar los avisos dentro de SITREP. Usar otro perfil del navegador si hay formularios de trabajo abiertos.</p>
 <p><a href="tutorial.html?guide=capacitacion-por-rol">Abrir el recorrido guiado de 90 minutos</a> · <a href="tutorial.html?guide=alta-borradores-ocr">Alta, OCR y borradores</a> · <a href="tutorial.html?guide=soporte-enviar-seguir">Tickets y respuestas</a>.</p>
 
 <h3 id="cap-dataset">17.1 Datos sintéticos necesarios</h3>
@@ -7141,7 +7141,7 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <h3 id="cap-recorrido">17.2 Recorrido guiado por rol</h3>
 <table class="training-table"><thead><tr><th>Equipo</th><th>Ejercicio en entorno autorizado</th><th>Resultado de salida</th></tr></thead><tbody>
 <tr><td>Todos · 25 min</td><td>Acceso, identidad y modo prueba del alta. Revisar OCR y recuperar borrador en el mismo navegador.</td><td>Distinguir guardar, presentar y aprobar; saber qué archivos hay que volver a elegir.</td></tr>
-<tr><td>Generador / transporte / operador · 20 min</td><td>Relevo sobre un manifiesto CAP: firma → retiro → entrega → recepción y pesaje → tratamiento → cierre.</td><td>Cada parte encuentra su próxima acción y la trazabilidad. En capacitación, las descargas oficiales permanecen deshabilitadas.</td></tr>
+<tr><td>Generador / transporte / operador · 20 min</td><td>Un manifiesto ficticio: firma del generador y aprobaciones de transporte y operador → coordinación → retiro y entrega si hay traslado → recepción y pesaje → tratamiento → cierre.</td><td>Cada parte encuentra su próxima acción y la trazabilidad. En origen también se requiere transporte aprobador, sin crear viaje ni GPS.</td></tr>
 <tr><td>Inspector / autoridad / actor · 20 min</td><td>Visita y controles, foto vinculada, guardado, acta e informe; revisar requerimiento y respuesta del actor.</td><td>Distinguir constatación, análisis técnico y decisión de la autoridad.</td></tr>
 <tr><td>Administración / soporte · 15 min</td><td>Consultar solicitudes, padrón, CAA y Monitor. Ticket escuela: tomar, clasificar, derivar, nota interna y respuesta pública.</td><td>El responsable y el autor encuentran el mismo ticket con la visibilidad que corresponde.</td></tr>
 <tr><td>Todos · 10 min</td><td>Explicar la siguiente tarea, dónde pedir ayuda y qué hacer sin conexión.</td><td>Registrar lo comprobado y los pendientes del teléfono, sin prometer funcionamiento físico por una prueba emulada.</td></tr>
@@ -7151,7 +7151,7 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <ul>
 <li>Confirmar URL autorizada, conectividad del lugar y acceso de cada participante; no compartir contraseñas ni usar impersonación para eludir permisos.</li>
 <li>Mantener los correos automáticos apagados según la configuración de la jornada. La creación de cuentas que necesitan verificación por correo no forma parte de una demostración con envíos deshabilitados.</li>
-<li>Elegir los registros CAP del equipo con la banda de capacitación visible. En Operación real, sólo consultar; no ejecutar cargas, borrados ni pruebas de estrés para entrenar.</li>
+<li>Usar únicamente los registros ficticios del entorno aislado habilitado y comprobar su banda. En Operación real, sólo consultar; no ejecutar cargas, borrados ni pruebas de estrés para entrenar.</li>
 <li>Verificar en teléfonos reales cámara/QR, GPS, permiso denegado y recuperación de conexión. El APK, la PWA y el navegador no son una única validación.</li>
 <li>No cerrar formularios de trabajo abiertos ni borrar almacenamiento del navegador para iniciar la capacitación.</li>
 </ul>

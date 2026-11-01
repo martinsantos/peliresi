@@ -17,6 +17,17 @@
 
     guides: [
       {
+        id: 'entorno-practica-aislado', profile: 'generador', audiences: ['generador', 'transportista', 'operador', 'administrador', 'inspector'],
+        title: 'Practicar en un entorno separado', summary: 'Reconocé el espacio de práctica y distinguí sus documentos de la operación real.',
+        duration: '2 min', icon: 'school', keywords: ['práctica', 'datos artificiales', 'entorno', 'capacitación', 'PDF'],
+        safety: 'Usá sólo datos y archivos ficticios. Los documentos de práctica no tienen validez oficial.',
+        steps: [
+          { title: 'Comprobar dónde estás', body: ['En SITREP, fuera de este manual, la pantalla debe mostrar Entorno de práctica · Datos ficticios · Sin validez oficial. Si no se puede verificar el entorno, no ingreses datos: consultá al instructor y elegí Reintentar.'], expected: 'Identificás el espacio de práctica antes de iniciar sesión.' },
+          { title: 'Trabajar con tu rol', body: ['Ingresá con el acceso de práctica de tu rol y comprobá la identidad activa. Los manifiestos nuevos usan el prefijo PRUEBA; generador, transporte y operador aprueban según el circuito explicado en la clase.', 'Usá exclusivamente información ficticia. Los avisos internos se pueden consultar en la campana; este entorno no envía correos ni push.'], expected: 'Tu equipo reconoce el mismo manifiesto ficticio y sabe quién debe actuar.' },
+          { title: 'Revisar los documentos', body: ['Los manifiestos nuevos, anexos de adenda, certificaciones nuevas, actas, informes y reportes PDF generados en este entorno indican Datos artificiales · Sin validez oficial en cada página.', 'Un certificado firmado previamente se conserva tal como fue emitido y puede no llevar esa leyenda. No lo distribuyas como documento de práctica: consultá al instructor.'], expected: 'Distinguís una descarga de práctica de un documento firmado conservado.' }
+        ]
+      },
+      {
         id: 'actualizar-sin-perder-contexto', profile: 'generador', audiences: ['generador', 'transportista', 'operador', 'administrador', 'inspector'],
         title: 'Actualizar y recuperar una pantalla', summary: 'Distinguí una actualización de una falta de conexión y conservá el destino de tu trabajo.',
         duration: '2 min', icon: 'system_update', keywords: ['actualizar', 'versión', 'conexión', 'pantalla', 'recargar'],
@@ -658,19 +669,17 @@
     return Object.assign({}, step, index === 0 ? { title: 'Iniciar un manifiesto' } : {});
   });
 
-  // Classroom links identify existing synthetic records; they never switch
-  // identity, enable training, create records or bypass the application's ACL.
+  // A training guide cannot assume that an old classroom or its records exist.
   var workshop = window.SITREP_HELP.guides.find(function (guide) { return guide.id === 'capacitacion-por-rol'; });
-  workshop.summary = '90 minutos · Un caso completo, cinco equipos y accesos directos para web y app.';
+  workshop.summary = '90 minutos · Un recorrido por rol en un entorno de práctica habilitado.';
+  workshop.safety = 'CAP puede estar cerrado. Para practicar, el instructor debe proporcionar un entorno aislado con datos ficticios y señalar su banda de práctica; no supongas que las cuentas o números de un aula anterior sigan disponibles. No uses registros reales para completar el ejercicio. Si correo y push están apagados, consultá los avisos dentro de SITREP.';
   workshop.keywords.push('golden path', 'guion', 'CAP', 'equipos');
   workshop.steps[0].body = [
-    'Antes del taller: comprobá tu ingreso y usá un perfil de navegador separado de los formularios reales. Con correos apagados, no dependas de recuperar la contraseña durante la clase. Conservá el APK instalado; no borres sus datos.',
-    'Para el recorrido de cuatro teléfonos, cada participante entra directamente con el acceso de capacitación de su rol entregado por el instructor. Comprobá «Capacitación · sin validez oficial». Para los demás equipos y perfiles, el instructor conserva Administrador → Ver como otro usuario → Capacitación; sólo en ese caso se usa Volver a mi cuenta. Estos enlaces no inician sesión ni cambian el rol: cada participante conserva su acceso.',
-    'Equipo 1: demostración. Equipos 2–4: práctica. Equipo 5: reserva con respuestas de QA ya cargadas. Mantené el mismo número al cambiar de rol y un solo responsable por registro. No compartas tu contraseña personal; los accesos de aula son exclusivos de capacitación.',
-    'Las cuentas se llaman CAP · ADMIN N, INSPECTOR N, GENERADOR N, TRANSPORTISTA N y OPERADOR N. También hay ADMIN_GENERADOR N, ADMIN_TRANSPORTISTA N y ADMIN_OPERADOR N para consulta sectorial. Reemplazá N por tu equipo, del 1 al 5.',
-    'Los enlaces App abren la web móvil. Dentro del APK, seguí estos mismos números desde su menú si el manual se abrió en otro navegador. No instales ni actualices el APK para hacer este recorrido.'
+    'Confirmá con el instructor que el entorno aislado está disponible y reconocé la banda de datos ficticios. El acceso local de un instructor no es por sí solo un enlace para otros dispositivos.',
+    'Cada participante usa la cuenta de práctica de su rol y un perfil de navegador separado. No compartas contraseñas personales ni uses un formulario real para destrabar la demostración.',
+    'Anotá el número de cada caso y conservá la misma referencia durante el relevo. Si correo y push están apagados, revisá los avisos dentro de SITREP. La vista app en navegador no acredita Android físico.'
   ];
-  workshop.steps[0].resources = [{ label: 'Elegir cuenta CAP · requiere administrador', path: '/switch-user?modo=capacitacion' }];
+  workshop.steps[0].resources = [];
   workshop.steps[1].body = [
     'Abrí un alta en modo revisión. Para la demostración, usá Transportista: completá datos ficticios y agregá un chofer en Flota y choferes. No uses documentos personales.',
     'Descargá la licencia sintética de abajo y elegila en el campo de licencia. Compará las propuestas OCR con el original antes de usar los datos seleccionados. OCR no aprueba identidad, pagos ni habilitación.',
@@ -680,90 +689,57 @@
     return { label: 'Probar alta · ' + role, path: '/inscripcion/' + role + '?modo=revision' };
   }).concat([{ label: 'Licencia sintética · sin validez', href: '/manual/fixtures/licencia-capacitacion.png', action: 'Descargar PNG', download: true }]);
   workshop.steps[2].body = [
-    'Generador N: abrí CAP-N-BORRADOR, revisá actores y residuo y firmá. Verificá APROBADO. El número conserva «BORRADOR» aunque cambie el estado.',
-    'Volvé al administrador y elegí TRANSPORTISTA N. Abrí el mismo manifiesto: confirmá retiro y entrega. Verificá EN_TRANSITO y ENTREGADO antes de pasar el turno.',
-    'Elegí OPERADOR N: recibí, revisá pesaje, registrá tratamiento y cerrá. Verificá TRATADO y la cronología. Las descargas oficiales están deshabilitadas en capacitación.',
-    'Si falta tiempo, CAP-N-APROBADO es otro caso para empezar desde retiro. CAP-N-TRATADO sirve de consulta. No finjas continuidad entre ellos ni reinicies un caso ya utilizado.'
+    'Generador, Transporte u Operador inicia una propuesta con los actores y residuos ficticios del ejercicio. Anotá el número y revisá la fecha y la modalidad.',
+    'Cada parte decide desde su propia cuenta: Generador firma; Transporte y Operador aprueban su participación. Crear o firmar no aprueba por las demás partes. Comprobá las tres decisiones y sus avisos antes de iniciar la coordinación.',
+    'Con traslado, Transporte confirma retiro y entrega; Operador recibe, pesa y registra tratamiento. En origen también se elige un transportista aprobador, pero no se crea viaje ni GPS: Operador confirma la recepción en origen.',
+    'El operador cierra cuando corresponde y decide si emite los certificados. Si aparece una diferencia, registrala y resolvé su revisión antes de liberar la certificación final. Conservá el mismo número y no uses un caso distinto como si fuera la continuación.'
   ];
-  workshop.steps[2].body.push('Para practicar un alta de manifiesto: Nuevo manifiesto → residuo → transportista de tu equipo → vehículo y chofer de su nómina → operador del mismo equipo → Crear Manifiesto. Anotá el nuevo número y usalo en todos los relevos. Si cambiás de transportista, volvé a elegir vehículo y chofer; no se reemplazan automáticamente.');
-  workshop.steps[2].resources = [{ label: 'Crear un caso nuevo · cuenta GENERADOR CAP', path: '/manifiestos/nuevo' }, { label: 'Eventuales y adendas · práctica adicional', href: '/manual/tutorial.html?guide=capacitacion-novedades' }];
+  workshop.steps[2].resources = [{ label: 'Eventuales y adendas · práctica adicional', href: '/manual/tutorial.html?guide=capacitacion-novedades' }];
   workshop.steps[3].body = [
-    'Campo: INSPECTOR N abre CAP-I-N-GENERADOR → Visita → Iniciar visita → Controles. Marcá un control, guardá y reabrí. Es trabajo de campo, todavía no el expediente publicado que verá el actor.',
-    'Intercambio: GENERADOR, TRANSPORTISTA u OPERADOR N abre su CAP-P-N-ROL-A en el requerimiento recibido en Avisos. Leé el último requerimiento → Responder esta actuación → Presentar en expediente. Reabrí para verificar el guardado.',
-    'Autoridad: ADMIN N abre ese mismo CAP-P en Expediente → Comunicaciones, revisa y registra una decisión con fundamento. Volvé al actor para comprobarla. Responder no significa aprobar.',
-    'Son dos ejercicios distintos: visita de campo e intercambio preparado. El actor no ve inspecciones generales ni borradores del inspector. Si el caso ya cambió de estado, seguí su historial; no lo restablezcas.'
+    'La persona inspectora registra los controles de una visita ficticia. El trabajo de campo no equivale a un requerimiento ya comunicado.',
+    'Cuando Administración notifica un requerimiento, el actor autorizado lo abre desde Avisos, lee el plazo y responde sobre ese punto. El actor no accede al módulo general de Inspecciones ni a borradores del inspector.',
+    'La autoridad revisa la respuesta y registra una decisión. Volvé al aviso del actor para comprobar el resultado; responder no significa que la autoridad haya aprobado.'
   ];
   workshop.steps[4].body = [
-    'Actor CAP: Ayuda → Reportar problema. Describí el problema; adjunto opcional. Esperá la confirmación y anotá el número. Los tickets de abajo son reservas ya creadas, no el ticket nuevo.',
-    'Volvé como ADMIN N de Capacitación, no como administrador operativo. Abrí el ticket del autor → Asignarme → Derivar a otro ADMIN CAP habilitado → Nota interna → Responder. Los tickets de reserva ya tienen responsable; no des por demostrado Asignarme con uno que ya era tuyo.',
-    'Volvé al autor: abrí el mismo número, leé la respuesta pública y cerrá sólo después de comprobarla. Las notas internas quedan reservadas a soporte. No esperes un correo.'
+    'En el entorno de práctica, una cuenta ficticia abre Ayuda → Reportar problema y anota el número confirmado.',
+    'La persona de soporte autorizada revisa el mismo ticket y responde; la cuenta autora consulta la respuesta pública. Las notas internas permanecen reservadas a soporte.',
+    'Si no llega confirmación, conservá el formulario y revisá el estado antes de repetir. Con correo apagado no esperes una entrega externa.'
   ];
-  workshop.steps[4].resources = [{ label: 'Mis tickets / Mesa de soporte · según cuenta CAP', path: '/soporte' }];
+  workshop.steps[4].resources = [{ label: 'Ayuda para reportar y seguir un problema', href: '/manual/tutorial.html?guide=soporte-enviar-seguir' }];
   workshop.steps[5].body = [
-    'ADMIN CAP: Centro de Control → 30 días → Viajes Activos → buscá CAP-1-EN_TRANSITO y seleccionalo. Activá y desactivá En Tránsito para comprobar las capas. El rango debe incluir el 12/10/2026; no uses Hoy para buscar los casos preparados.',
-    'Monitor → Historial → Pausar → mové la barra → Reproducir. Pendientes muestra lo que falta; En vivo vuelve al estado actual. Son ubicaciones sintéticas, no un viaje físico en vivo.',
-    'Cada participante encuentra su próxima tarea y sabe volver al manual o pedir ayuda. En los teléfonos, comprobar cámara QR, permisos GPS y recuperación de red. Navegador y emulador no certifican batería ni segundo plano.',
-    'Si falta confirmación, conservá el formulario y consultá estado/historial antes de reintentar. Si desaparece la banda CAP, detené las modificaciones. No borres almacenamiento ni reinicies registros.',
-    'Anotá cualquier pendiente con rol, pantalla, número CAP, hora y resultado esperado. No activar correos, push, reglas masivas ni documentos oficiales durante el taller.'
+    'Administración busca el mismo viaje ficticio en Monitor o Centro de Control y comprueba el número y la hora de la última posición recibida. Indicá expresamente si la ubicación fue simulada.',
+    'Si desaparece la banda de práctica, detené las modificaciones. Si falta confirmación, conservá el formulario y consultá el mismo registro antes de reintentar.',
+    'Anotá el rol, la pantalla y el resultado observado. Una prueba en navegador no certifica GPS, batería o segundo plano en Android físico.'
   ];
-  workshop.steps[5].resources = [{ label: 'Centro de Control · consulta CAP', path: '/centro-control' }, { label: 'Monitor · consulta CAP', path: '/monitor' }];
-
-  function teams(records) {
-    return [1, 2, 3, 4, 5].map(function (n) {
-      return { label: 'Equipo ' + n, note: n === 1 ? 'Demostración' : n === 5 ? 'Reserva · contiene pruebas previas' : 'Práctica', records: records(n) };
-    });
-  }
-  workshop.steps[2].teams = teams(function (n) {
-    return [
-      { label: 'CAP-' + n + '-BORRADOR', role: 'Generador → Transportista → Operador · mismo número', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-BORRADOR' },
-      { label: 'CAP-' + n + '-APROBADO', role: 'Alternativa desde retiro · otro caso', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-APROBADO' },
-      { label: 'CAP-' + n + '-TRATADO', role: 'Cierre preparado · sólo consulta', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-TRATADO' }
-    ];
-  });
-  workshop.steps[3].teams = teams(function (n) {
-    var records = [{ label: 'CAP-I-' + n + '-GENERADOR', role: 'Inspector · trabajo de campo', path: '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR' }];
-    ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].forEach(function (role) {
-      var id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
-      records.push({ label: 'CAP-P-' + n + '-' + role + '-A', role: role + ' · el requerimiento recibido en Avisos', path: '/requerimientos/' + id });
-      records.push({ label: 'CAP-P-' + n + '-' + role + '-A', role: 'ADMIN · revisar respuesta de ' + role, path: '/inspecciones/' + id });
-    });
-    return records;
-  });
-  workshop.steps[4].teams = teams(function (n) {
-    return ['generador', 'transportista', 'operador'].map(function (role) {
-      return { label: 'CAP · Consulta de ' + role + ' ' + n, role: 'Reserva · autor ' + role + ' ' + n + ' / ADMIN ' + n, path: '/soporte/cap-20261012-ticket-' + role + '-' + n };
-    });
-  });
+  workshop.steps[5].resources = [];
   window.SITREP_HELP.guides.push({
     id: 'capacitacion-novedades', profile: 'generador', audiences: ['transportista', 'operador', 'administrador'],
     title: 'Eventuales, adendas y transporte · práctica simple',
-    summary: 'Tres novedades en web y app. Elegí un equipo CAP y seguí los mismos botones.', duration: '15 min', icon: 'school',
+    summary: 'Tres recorridos con datos ficticios en un entorno de práctica habilitado.', duration: '15 min', icon: 'school',
     keywords: ['eventual', 'eventuales', 'adenda', 'adendas', 'móvil', 'vehículo', 'chofer', 'incompleto', 'capacitación', 'novedades'],
-    safety: 'Sólo con la banda «Capacitación · sin validez oficial». Estas funciones están habilitadas en el aula; siguen apagadas en la operación real. No se envían correos ni push ni se emiten documentos oficiales.',
+    safety: 'CAP puede estar cerrado. Usá estos ejemplos sólo en un entorno aislado habilitado por el instructor y con la banda de datos ficticios; no supongas que una cuenta o función tenga el mismo estado en otro entorno. Si correo y push están apagados, consultá los avisos dentro de SITREP.',
     steps: [
-      { title: 'Entrar al aula y elegir un equipo', body: [
-        'Con cuatro teléfonos, usen los accesos directos de capacitación del equipo 1 y conserven cada rol. El generador inicia esta práctica. Para otros equipos, el instructor ingresa como administrador y usa Elegir cuenta CAP. Usá el mismo N para todos los roles; 1 es demostración, 2–4 práctica y 5 reserva.',
-        'Comprobá la banda «Capacitación · sin validez oficial». Para cambiar de rol: Volver a mi cuenta → Capacitación → cuenta del mismo equipo. Web y App usan los mismos pasos.',
-        'Cada ejercicio crea su propio registro. Anotá su número o guardá su enlace; no reinicies los casos anteriores.'
-      ], expected: 'Estás en el aula con un equipo identificado.', resources: [{ label: 'Elegir cuenta CAP', path: '/switch-user?modo=capacitacion' }] },
+      { title: 'Entrar al entorno de práctica', body: [
+        'El instructor confirma el entorno aislado y entrega a cada persona una cuenta ficticia para su rol. Un acceso local puede servir sólo en la computadora del instructor; no implica acceso desde otros teléfonos.',
+        'Comprobá la banda de datos ficticios y la identidad activa antes de hacer cambios. Cada ejercicio conserva su propio número; no reinicies casos anteriores ni uses datos reales.'
+      ], expected: 'Cada persona reconoce el entorno y el rol con el que participa.', resources: [] },
       { title: 'Elegir móvil y chofer ya registrados', body: [
-        'GENERADOR CAP: Manifiestos → Nuevo manifiesto. Completá el residuo de práctica y elegí el transportista de tu equipo.',
-        'En Vehículo y Chofer, seleccioná CAP00N y Chofer ficticio N de las listas de ese transportista. Elegí el operador del mismo equipo y creá el manifiesto.',
-        'Reabrí el detalle y verificá Transporte asignado. Si cambiás de transportista, las selecciones anteriores se limpian: elegilas otra vez. No inventes una asignación si la nómina está vacía.',
+        'En Nuevo manifiesto, completá el residuo ficticio y elegí el transportista y operador indicados por el instructor.',
+        'Si el ejercicio tiene traslado, elegí un vehículo y un chofer de la nómina del transportista. Reabrí el detalle y verificá la asignación. Si cambiás de transportista, las selecciones anteriores se limpian: elegilas otra vez. No inventes una asignación si la nómina está vacía.',
         'Cada parte aprueba desde su cuenta: generador firma; transporte y operador aprueban su participación. Crear no aprueba por los demás. Usá este número para el recorrido y la adenda antes de liberar la disposición final.'
       ], image: S + 'desktop/training-fleet-20261018.png', alt: 'Asignación de vehículo y chofer del equipo CAP', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El manifiesto conserva el vehículo y el chofer elegidos.', resources: [{ label: 'Nuevo manifiesto', path: '/manifiestos/nuevo' }] },
       { title: 'Registrar un Eventual con datos pendientes', body: [
-        'GENERADOR CAP: Manifiestos → Eventuales → Registrar operación. Tu parte se toma de la sesión. Al menos una de las otras partes debe estar fuera del padrón; si todas están registradas, usá el manifiesto ordinario.',
-        'Para la práctica: dejá Transportista fuera del padrón y buscá al OPERADOR CAP de tu equipo en el padrón. Cargá sólo los datos conocidos. Podés dejar identificación o domicilio pendientes; no inventes datos. Completá corriente Y1, cantidad 10 kg y el motivo ficticio.',
-        'Guardá y anotá el registro BI-. Aprobá como quien lo creó. El retiro sigue bloqueado hasta que el operador registrado apruebe como operador: avisale a la persona con ese teléfono que abra el mismo registro. Si el instructor practica solo, puede usar el selector CAP.',
+        'En Eventuales → Registrar operación, la parte propia se toma de la sesión. Al menos una de las otras partes debe estar fuera del padrón; si todas están registradas, usá el manifiesto ordinario.',
+        'En el caso ficticio indicado por el instructor, cargá sólo los datos conocidos. Podés dejar identificación o domicilio pendientes; no inventes datos. Completá la corriente, cantidad y motivo del ejercicio.',
+        'Guardá y anotá el número BI-. Cada participante registrado decide desde su cuenta; el retiro sigue bloqueado mientras falte una aprobación exigida.',
         'Con todas las aprobaciones, registrá retiro, recepción y tratamiento. Si hay una diferencia, registrala por separado. La revisión documental no cambia esos hechos ni otorga un número oficial.'
       ], image: S + 'desktop/training-eventual-20261018.png', alt: 'Eventual CAP tratado con una revisión observada que conserva los hechos', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'Se conserva lo declarado, los datos pendientes y la aprobación de cada participante con cuenta.', resources: [{ label: 'Eventuales · cuenta CAP', path: '/manifiestos/baja-intensidad' }] },
       { title: 'Agregar lo observado sin reescribir el original', body: [
-        'TRANSPORTISTA CAP: abrí el manifiesto ordinario ya firmado del paso 2 → Adendas → Registrar diferencia. El operador vinculado también puede registrar diferencias; en destino usa Informar hallazgo dentro de la adenda. Las cantidades distintas y Y omitidas quedan para evaluación en PSIP.',
-        'Ingresá la carga observada completa, por ejemplo Y1 · 12 kg, y un motivo concreto: «CAP: se observaron 12 kg frente a 10 kg declarados». Guardá y solicitá revisión. No se suma automáticamente a la carga original.',
-        'GENERADOR CAP: abrí las Adendas del mismo manifiesto. Compará Declaración conservada y Carga observada. Escribí el fundamento y elegí Aprobar post facto, Observar o Rechazar conformidad. Quien creó la adenda no se aprueba a sí mismo.',
+        'Abrí las Adendas del mismo manifiesto ficticio. En destino el operador usa Informar hallazgo para registrar cantidades distintas o corrientes Y omitidas; la declaración original permanece.',
+        'Ingresá la carga observada completa, por ejemplo Y1 · 12 kg frente a 10 kg declarados, y un motivo concreto. Guardá y solicitá revisión. No se suma automáticamente a la carga original.',
+        'La otra parte autorizada compara Declaración conservada y Carga observada, escribe el fundamento y decide. Quien creó la adenda no se aprueba a sí mismo.',
         'Reabrí y verificá la revisión y el original intacto. Si la adenda estaba equivocada, Agregar rectificación crea otra y conserva el antecedente. Registrar una diferencia no demuestra intención ni habilita una corriente; el circuito operativo continúa y la revisión queda trazada.'
-      ], image: S + 'desktop/training-addendum-20261018.png', alt: 'Adenda CAP con declaración original y carga observada separadas', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El original sigue intacto y la diferencia tiene autor, motivo y revisión. En capacitación no se descargan anexos oficiales.' }
+      ], image: S + 'desktop/training-addendum-20261018.png', alt: 'Adenda de práctica con declaración original y carga observada separadas', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El original sigue intacto y la diferencia tiene autor, motivo y revisión. Los documentos de práctica no tienen validez oficial.' }
     ]
   });
 
@@ -908,43 +884,43 @@
     title: 'Un manifiesto, cuatro teléfonos',
     summary: 'Cada persona conserva su rol. Crean un caso, siguen su viaje en C3 y comprueban juntos el cierre.',
     duration: '25 min', icon: 'devices', keywords: ['cuatro teléfonos', '4 celulares', 'capacitación', 'GPS', 'C3', 'generador', 'transportista', 'operador', 'administrador'],
-    safety: 'Sólo con «Capacitación · sin validez oficial» en los cuatro teléfonos. Cada participante usa el acceso de capacitación de su rol entregado por el instructor. No se necesita la cuenta administradora personal.',
+    safety: 'CAP puede estar cerrado. El ejercicio necesita un entorno aislado habilitado para los participantes, cuentas ficticias y su banda de práctica en cada dispositivo; un acceso local no garantiza conexión desde otros teléfonos. No se necesita la cuenta administradora personal.',
     steps: [
       { title: 'Entrar en los cuatro teléfonos · cada participante', body: [
-        'Usen todos Web o todos App para la primera vuelta. Cada participante ingresa con el correo y la contraseña de capacitación de su rol, entregados por el instructor: admin@capacitacion.invalid, generador@capacitacion.invalid, transporte@capacitacion.invalid u operador@capacitacion.invalid. Los cuatro accesos directos pertenecen al equipo 1; no requieren una cuenta administradora personal. Están disponibles sólo durante la ventana de capacitación anunciada por el instructor.',
-        'Cada participante conserva ese rol hasta terminar. Deben ser cuatro teléfonos o perfiles de navegador independientes. Confirmá la banda de capacitación y CAP · ADMIN 1, CAP · GENERADOR 1, CAP · TRANSPORTISTA 1 o CAP · OPERADOR 1. Al terminar, cada uno cierra su sesión. El acceso directo no guarda una sesión administradora a la que volver.',
-        'Antes de la clase: tocar Activar sonido en cada teléfono. Los avisos aparecen solos con la app abierta, aproximadamente cada 4 segundos, y se abren con Abrir manifiesto. Con el teléfono bloqueado no se promete sonido ni push. Conexión a Internet en los cuatro; ubicación del teléfono de transporte activada y permiso permitido para SITREP. Durante el seguimiento, mantener la pantalla de viaje abierta y el teléfono desbloqueado. Probar el permiso y un envío real en ese teléfono: una prueba de navegador no certifica GPS físico ni segundo plano.'
-      ], expected: 'Cuatro pantallas, cuatro roles del mismo equipo y conexión lista.', resources: [{label:'Ingresar con mi acceso de capacitación',path:'/login'}] },
+        'El instructor confirma que existe un entorno aislado accesible para los participantes y entrega cuentas ficticias separadas de Administración, Generador, Transporte y Operador. No supongas que las credenciales de una capacitación anterior siguen activas.',
+        'Cada participante conserva su rol hasta terminar. Usen cuatro teléfonos o perfiles de navegador independientes y comprueben la banda de práctica y la identidad activa. Si el entorno sólo responde en la computadora del instructor, no está disponible para los demás teléfonos.',
+        'Con correo y push apagados, consulten los avisos dentro de SITREP. El permiso GPS y un envío desde un teléfono real requieren una prueba física separada; una prueba en navegador no certifica GPS físico ni segundo plano.'
+      ], expected: 'Cuatro sesiones aisladas, roles identificados y entorno de práctica comprobado.', resources: [] },
       { title: 'Crear y aprobar · las tres partes', body: [
-        'Puede iniciar cualquiera: operador, transporte, generador o administrador CAP. Para la primera vuelta, que lo cree el operador. Manifiestos → Nuevo: Generador 1, Y-CAP, 10 kg, Transporte 1, CAP001, Chofer ficticio 1 y Operador 1. Elegí la fecha prevista de retiro y tocá Crear Manifiesto. La parte de tu cuenta queda fija.',
+        'Puede iniciar Generador, Transporte u Operador. Para la primera vuelta, Operador crea una propuesta con los actores, residuos, vehículo y chofer ficticios indicados por el instructor. Elegí la fecha prevista y anotá el número.',
         'Anoten el número. Generador, transporte y operador reciben un aviso visible sin ir a buscarlo. Toquen Abrir manifiesto: generador toca Firmar Manifiesto, dibuja su firma, Usar firma y Confirmar y Firmar; transporte toca Aprobar como transporte; operador toca Aprobar como operador. El administrador observa, no aprueba por ellos. Cada parte puede rechazar indicando motivo; una propuesta rechazada no se retira.',
         'Cada uno avisa «Aprobé mi participación». Sólo con las tres aprobaciones pasa a Aprobado. Una de las tres partes toca Iniciar coordinación: todos reciben el aviso de coordinación. Generador prepara la carga y operador coordina la recepción. Sólo el retiro físico inicia el viaje y GPS. En Manifiestos → Programados están los próximos manifiestos con fecha, ordenados por fecha, con búsqueda por número y páginas de 50; incluidos los que esperan aprobaciones; cada fila indica si faltan aprobaciones, si está lista para coordinar, si ya se coordinó o si requiere revisión. Para practicar la agenda, hagan otra propuesta para mañana; para el viaje de esta vuelta usen hoy. No reutilicen un caso preparado para simular el avance de éste.'
-      ], image: S + 'desktop/training-fleet-20261018.png', alt: 'Vehículo y chofer registrados del equipo CAP', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El mismo número tiene tres aprobaciones independientes, vehículo, chofer y fecha. La coordinación queda iniciada, separada del retiro físico.', resources: [{label:'Manifiestos · cualquiera de los cuatro roles CAP',path:'/manifiestos'}] },
+      ], image: S + 'desktop/training-fleet-20261018.png', alt: 'Vehículo y chofer registrados en una práctica anterior', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El mismo número tiene tres aprobaciones independientes, vehículo, chofer y fecha. La coordinación queda iniciada, separada del retiro físico.', resources: [] },
       { title: 'Retirar e iniciar GPS · teléfono del transporte', body: [
         'Abrir el menú → Manifiestos (Mis Viajes). Buscar el número compartido por quien lo creó y abrirlo. Si todavía no aparece, tocar Actualizar listado. Comprobar número, origen, destino, vehículo y chofer antes de continuar.',
         'Confirmar retiro. La pantalla pasa a Viaje en Curso. Permitir ubicación cuando el teléfono la solicite. Esperar GPS activo y después Última confirmación: indica que el dispositivo recibió respuesta; la hora mostrada usa el reloj del teléfono.',
         'Avisar «Ya retiré y estoy enviando ubicación». Dejar esta pantalla abierta. GPS activo significa que el teléfono obtuvo posición; no demuestra por sí solo que C3 ya la recibió. Los envíos se hacen aproximadamente cada 30 segundos.'
-      ], expected: 'El manifiesto está en tránsito y el teléfono confirma al menos un envío de ubicación.', resources: [{label:'Buscar el número en Manifiestos · transporte CAP',path:'/manifiestos'}] },
+      ], expected: 'Si se hizo la prueba física, el manifiesto está en tránsito y el teléfono confirma al menos un envío de ubicación.', resources: [] },
       { title: 'Ver el mismo viaje · teléfono del administrador', body: [
         'Centro de Control (Control en la barra de App) → Hoy → Viajes Activos. Buscar el número nuevo y seleccionarlo. Abrir Ver detalle del viaje para comprobar que es el mismo manifiesto; después volver a Control.',
         'Con transporte todavía en Viaje en Curso, hacer un desplazamiento corto y seguro, sin manejar mientras se usa el teléfono. Esperar el siguiente envío y la actualización de C3: entre ambos puede tardar alrededor de un minuto. Comparar el punto y el recorrido antes de confirmar la entrega.',
         'Avisar «Veo el mismo manifiesto y la ubicación recibida en C3». Explicar: una parte propuso, las tres partes aprobaron, el transporte retiró, el teléfono envió su ubicación y el administrador consulta ese mismo viaje. Si no hay posición recibida, decirlo; no presentar las coordenadas de origen o un caso preparado como GPS del teléfono.'
-      ], expected: 'El administrador identifica el número correcto y observa una ubicación recibida del transporte.', resources: [{label:'Centro de Control · ADMIN CAP',path:'/centro-control'}] },
+      ], expected: 'Administración identifica el número correcto y distingue una ubicación recibida de una posición simulada.', resources: [] },
       { title: 'Entregar y recibir · transporte y operador', body: [
         'Sólo después de mostrar el viaje en C3, transporte toca Confirmar entrega → Sí, Confirmar Entrega. Espera la confirmación. Avisar «Ya entregué». Entregado todavía no significa recibido.',
         'Operador abre Manifiestos, busca el mismo número y lo abre. El detalle abierto se actualiza aproximadamente cada 30 segundos; al volver a abrirlo consulta el estado actual. Cuando figure Entregado, tocar Confirmar Recepcion.',
         'Registrar Pesaje → Peso real: 10 → Confirmar Pesaje. Es el peso ficticio del ejercicio. Revisar que quedó guardado antes de pasar a tratamiento.'
-      ], expected: 'El operador confirmó recepción y pesaje sobre el mismo manifiesto.', resources: [{label:'Buscar el número en Manifiestos · operador CAP',path:'/manifiestos'}] },
+      ], expected: 'El operador confirmó recepción y pesaje sobre el mismo manifiesto.', resources: [] },
       { title: 'Tratar y liberar certificados · operador', body: [
-        'Operador: Registrar Tratamiento → observación «CAP: tratamiento ficticio» → Confirmar Tratamiento. En Certificaciones → Emitir certificación parcial: indicar 4 kg, comprobar el método que ya viene del tratamiento y dibujar la firma → Usar firma → Firmar y publicar certificación. La observación es opcional. Los demás ven y descargan ese parcial. Otro parcial sólo puede cubrir lo que falta de los 10 kg recibidos.',
-        'Generador, transportista, operador y administrador vuelven a Manifiestos y abren el mismo número. Los cuatro deben ver Tratado y su historial. En C3 deja de ser un viaje activo después de actualizarse; el historial permanece.',
-        'Si van a practicar adendas, háganlo antes del final y resuelvan su revisión con otra parte. Después el operador toca Cerrar Manifiesto. Tratado no libera automáticamente ningún documento. Cuando decida liberarlo: Emitir certificación final total → revisar los 10 kg y el método ya cargados → firmar → Firmar y publicar certificación. El final requiere pesaje, estado Tratado y las adendas resueltas; una rectificación aprobada deja la observación anterior como antecedente. Una vez liberado, se conserva ese expediente y no se agregan ni revisan adendas en este ensayo.',
-        'Todos pueden descargar el parcial y el final desde Certificaciones. Los PDF dicen CAPACITACIÓN — SIN VALIDEZ OFICIAL. Los documentos llevan marca C3 y aviso de práctica; el destinatario recibe un aviso al liberarlos. Para repetir, creen otro manifiesto; las decisiones y los documentos liberados permanecen en el historial.'
+        'Operador registra el tratamiento ficticio. Si corresponde, puede emitir y firmar un certificado parcial por una cantidad tratada; las partes autorizadas reciben un aviso y pueden descargarlo.',
+        'Si hay una diferencia, registren la adenda y resuelvan su revisión antes del final. El operador completa el tratamiento y luego cierra el manifiesto. Recién después comprueben el estado Tratado y su historial.',
+        'Tratado no libera automáticamente ningún documento. Cuando corresponda, el operador revisa y firma la certificación final. El final requiere pesaje, tratamiento completo y las adendas resueltas; una rectificación aprobada deja la observación anterior como antecedente.',
+        'Las partes autorizadas consultan los certificados emitidos desde el mismo manifiesto y sus avisos. Los documentos del entorno de práctica llevan la identificación artificial correspondiente y no tienen validez oficial.'
       ], expected: 'Los cuatro ven el mismo caso tratado y los certificados que el operador decidió liberar y firmó. Nadie cambió de rol.' },
       { title: 'Si algo no aparece · resolver sin trucos', body: [
-        'En Inicio, Manifiestos pendientes muestra primero los recién creados, con su número y los tres íconos de aprobación: verde aprobado, gris pendiente. Filtrar Por aprobar, En espera o En curso; elegir Hoy o Próximos días y buscar por número. Tocar la fila abre la acción del caso. Un aviso sin leer no significa una tarea pendiente. Caso que falta: comparar el número y el equipo CAP, volver al listado y tocar Actualizar listado. No crear otro por impaciencia ni cambiar un filtro sin mirar qué estado se busca.',
+        'En Inicio, Manifiestos pendientes muestra el número y los tres íconos de aprobación: verde aprobado, gris pendiente. Filtrar Por aprobar, En espera o En curso; elegir Hoy o Próximos días y buscar por número. Tocar la fila abre la acción del caso. Un aviso sin leer no significa una tarea pendiente. Si falta un caso, compará el número y actualizá el listado antes de crear otro.',
         'Sin GPS: revisar el permiso del navegador y la ubicación del teléfono, volver a Viaje en Curso y esperar GPS activo y Última confirmación. Mantener Internet y pantalla abierta. Si no llega una confirmación, registrar el problema y continuar explicando el flujo sin afirmar que se probó seguimiento físico.',
-        'Acción sin confirmación: conservar lo cargado y revisar estado/historial antes de reintentar. Si falta la banda CAP, detener las modificaciones y llamar al instructor. No borrar almacenamiento ni usar una cuenta real para destrabar la práctica.',
+        'Acción sin confirmación: conservar lo cargado y revisar estado/historial antes de reintentar. Si falta la banda de práctica, detener las modificaciones y llamar al instructor. No borrar almacenamiento ni usar una cuenta real para destrabar la práctica.',
         'Para Eventuales, usen su registro BI- independiente. Para adendas del viaje, registren y resuelvan la diferencia antes de liberar el certificado final. No mezclen los números de los dos circuitos.'
       ], expected: 'Cada persona sabe qué esperar, cómo comprobarlo y cuándo pedir ayuda.', resources: [{label:'Después: Eventuales y adendas',href:'/manual/tutorial.html?guide=capacitacion-novedades'}] }
     ]

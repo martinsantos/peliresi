@@ -28,6 +28,12 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('practice guidance distinguishes the isolated environment and preserved signed documents', () => {
+  const guide = guides.find((item: any) => item.id === 'entorno-practica-aislado');
+  const text = JSON.stringify(guide);
+  for (const phrase of ['Datos ficticios', 'PRUEBA', 'no envía correos ni push', 'en cada página', 'certificado firmado previamente']) assert.ok(text.includes(phrase), phrase);
+  for (const role of ['generador', 'transportista', 'operador', 'administrador', 'inspector']) assert.ok(guide.audiences.includes(role), role);
+});
 test('updating guidance explains work in other tabs and storage limits', () => {
   const guide = guides.find((item: any) => item.id === 'actualizar-sin-perder-contexto');
   const text = JSON.stringify(guide);
@@ -561,36 +567,25 @@ test('training does not present another server dataset or destructive resets as 
   assert.doesNotMatch(html, /<td>Texto libre<\/td>/);
 });
 
-test('classroom records keep five teams and distinct actor/authority views', () => {
+test('training requires an isolated environment and three independent approvals', () => {
   const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
   assert.equal(workshop.steps.length, 6);
-  assert.match(workshop.steps[0].body.join(' '), /enlaces no inician sesión ni cambian el rol/);
-  assert.match(workshop.steps[0].body.join(' '), /Equipo 5: reserva/);
-  assert.match(workshop.steps[2].body.join(' '), /número conserva/);
-  for (const index of [2, 3, 4]) {
-    assert.equal(workshop.steps[index].teams.length, 5);
-    for (const [i, team] of workshop.steps[index].teams.entries()) {
-      const n = i + 1;
-      assert.equal(team.label, 'Equipo ' + n);
-      for (const r of team.records) assert.match(r.path, new RegExp('cap-20261012-(?:manifiesto-' + n + '-|inspeccion-' + n + '-|participacion-' + n + '-|ticket-(?:generador|transportista|operador)-' + n + '$)'));
-      if (index === 2) assert.deepEqual(Array.from(team.records, (r: any) => r.path), ['BORRADOR', 'APROBADO', 'TRATADO'].map(s => '/manifiestos/cap-20261012-manifiesto-' + n + '-' + s));
-      if (index === 3) {
-        assert.equal(team.records[0].path, '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR');
-        for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
-          const id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
-          assert.ok(team.records.some((r: any) => r.path === '/requerimientos/' + id));
-          assert.ok(team.records.some((r: any) => r.path === '/inspecciones/' + id));
-          assert.ok(!team.records.some((r: any) => r.path === '/mis-inspecciones/' + id));
-        }
-      }
-    }
-  }
+  assert.match(workshop.safety, /CAP puede estar cerrado/);
+  assert.match(workshop.steps[0].body.join(' '), /entorno aislado/);
+  assert.match(workshop.steps[0].body.join(' '), /no es por sí solo un enlace para otros dispositivos/);
+  const flow = workshop.steps[2].body.join(' ');
+  assert.match(flow, /Crear o firmar no aprueba por las demás partes/);
+  assert.match(flow, /Comprobá las tres decisiones.*antes de iniciar la coordinación/);
+  assert.match(flow, /En origen también se elige un transportista aprobador/);
+  assert.doesNotMatch(flow, /firmá\. Verificá APROBADO|CAP-N-BORRADOR/);
+  assert.ok(workshop.steps.every((step: any) => !step.teams?.length));
+  assert.doesNotMatch(JSON.stringify(workshop), /cap-20261012-(?:manifiesto|participacion|ticket)-/);
 });
 
 test('all classroom links remain on the current/future domain; trial stays trial', () => {
   const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
   const resources = workshop.steps.flatMap((s: any) => [...(s.resources || []), ...(s.teams || []).flatMap((t: any) => t.records)]);
-  assert.equal(resources.length, 76);
+  assert.ok(resources.length > 0);
   assert.equal(resources.filter((r: any) => r.href === '/manual/tutorial.html?guide=capacitacion-cuatro-telefonos').length, 1);
   for (const r of resources) {
     const href = r.path || r.href;
@@ -610,12 +605,13 @@ test('all classroom links remain on the current/future domain; trial stays trial
 test('classroom new features explain incomplete identities, registered fleet and preserved declarations', () => {
   const guide = guides.find((g: any) => g.id === 'capacitacion-novedades');
   assert.equal(guide.steps.length, 4);
-  assert.match(guide.safety, /siguen apagadas en la operación real/);
+  assert.match(guide.safety, /CAP puede estar cerrado/);
+  assert.match(guide.safety, /no supongas.*otro entorno/);
   assert.match(JSON.stringify(guide), /no inventes datos/i);
   assert.match(JSON.stringify(guide), /otra.*conserva el antecedente/);
   assert.match(JSON.stringify(guide), /no se aprueba a sí mismo/);
   assert.match(JSON.stringify(guide), /no se reemplazan|elegilas otra vez/);
-  assert.equal(guide.steps[0].resources[0].path, '/switch-user?modo=capacitacion');
+  assert.equal(guide.steps[0].resources.length, 0);
   assert.match(read('index.html'), /guide=capacitacion-novedades/);
 });
 
@@ -623,13 +619,15 @@ test('classroom new features explain incomplete identities, registered fleet and
 test('four phones retain their roles and follow one new case through GPS and closure', () => {
   const guide = guides.find((g: any) => g.id === 'capacitacion-cuatro-telefonos');
   assert.equal(guide.steps.length, 7);
+  assert.match(guide.safety, /CAP puede estar cerrado/);
   assert.match(guide.safety, /No se necesita la cuenta administradora personal/);
   assert.match(guide.steps[0].body.join(' '), /perfiles de navegador independientes/);
   assert.match(guide.steps[0].body.join(' '), /no certifica GPS físico/);
   assert.match(guide.steps[2].body.join(' '), /Última confirmación/);
   assert.match(guide.steps[2].body.join(' '), /reloj del teléfono/);
   assert.match(guide.steps[3].body.join(' '), /Hoy → Viajes Activos/);
-  assert.match(guide.steps[5].body.join(' '), /Los cuatro deben ver Tratado/);
+  assert.match(guide.steps[5].body.join(' '), /luego cierra el manifiesto\. Recién después comprueben el estado Tratado/);
+  assert.doesNotMatch(guide.steps[0].body.join(' '), /admin@capacitacion\.invalid/);
   assert.match(read('index.html'), /guide=capacitacion-cuatro-telefonos/);
 });
 
@@ -637,15 +635,15 @@ test('four phones retain their roles and follow one new case through GPS and clo
 test('classroom new proposals separate authorship, three decisions, agenda and signed releases', () => {
   const guide=guides.find((g:any)=>g.id==='capacitacion-cuatro-telefonos');
   const text=JSON.stringify(guide);
-  assert.match(text,/Puede iniciar cualquiera: operador, transporte, generador o administrador CAP/);
+  assert.match(text,/Puede iniciar Generador, Transporte u Operador/);
   assert.match(text,/Sólo con las tres aprobaciones/);
   assert.match(text,/Manifiestos pendientes/);
   assert.match(text,/Por aprobar, En espera o En curso/);
   assert.match(text,/Iniciar coordinación/);
-  assert.match(text,/Activar sonido/);
+  assert.match(text,/correo y push apagados/);
   assert.match(text,/Tratado no libera automáticamente/);
   assert.match(text,/las adendas resueltas/);
-  assert.match(text,/CAPACITACIÓN — SIN VALIDEZ OFICIAL/);
+  assert.match(text,/no tienen validez oficial/);
 });
 
 test('signature reminders explain authorized representatives and the two phases', () => {
