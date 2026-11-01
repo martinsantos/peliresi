@@ -725,3 +725,13 @@ test('directory describes party and representative notices without a stale singl
   assert.match(section, /consultá el estado actual/);
   assert.doesNotMatch(section, /<td>Aprobacion<\/td><td>Transportista asignado<\/td>/);
 });
+
+test('manual distinguishes newly labelled artificial documents from signed historical certificates', () => {
+  for (const file of ['directorio.html', 'help-data.js']) {
+    const content = read(file);
+    assert.match(content, /DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL/);
+    assert.match(content, /cada página/);
+    assert.match(content, /Una banda visual por sí sola no convierte un registro real en una práctica/);
+    assert.match(content, /certifica(?:ciones|dos) guardad(?:as|os) anteriormente|certificaciones guardadas antes de este cambio/i);
+  }
+});
