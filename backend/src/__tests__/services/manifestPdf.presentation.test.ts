@@ -59,6 +59,15 @@ it.each(['PARCIAL','FINAL'] as const)('certificate retains snapshot and integrit
  expect(pdf.text).toContain(tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas');
  expect(pdf.text).toMatch(/Adenda 1\s*·\s*versión 1/);expect(pdf.text).not.toContain('qa-adenda');
 });
+it('does not label an operational certificate as artificial',async()=>{
+ const data={version:1 as const,tipo:'PARCIAL' as const,numero:'QA-CERT-OPERATIVO',manifiestoNumero:'QA-1',
+  generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',
+  fecha:'2026-10-23T13:00:00Z',metodo:'Método declarado',nota:'',
+  cantidades:[{corriente:'Y1',cantidad:1,unidad:'kg'}],parcialesPrevios:[],adendas:[],firmaSha256:'b'.repeat(64),artificial:false};
+ const pdf=inspect(await renderManifestCertificate(data,'qa-operational',sig),'certificado-operativo');
+ expect(pdf.text).not.toContain('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL');
+ expect(pdf.text).toContain('Firma manuscrita del operador');
+});
 it('keeps a short final with a prior partial and an approved finding together',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'2026-000269-F',manifiestoNumero:'2026-000269',
   generador:'QA Generador 1',transportista:'QA Transporte 1',operador:'QA Operador 1',autor:'QA operador',

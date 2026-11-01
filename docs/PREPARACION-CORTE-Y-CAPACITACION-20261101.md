@@ -30,6 +30,8 @@ En ese entorno, verificar por anticipado que correos y push estén apagados, que
 
 No activar `VITE_DEMO_MODE` sólo para conseguir una banda: en el código actual también incorpora accesos de demostración predefinidos y la banda de entorno revisada se usa en el acceso, no acredita por sí sola todas las pantallas autenticadas. La configuración y el acceso al entorno de la clase necesitan una verificación propia antes de invitar participantes.
 
+Para habilitar una clase sin reabrir CAP falta implementar y probar un modo de preview aislado que identifique automáticamente los casos como ficticios desde su creación, muestre la condición de práctica antes y después del ingreso y marque los documentos que se entreguen. Debe fallar cerrado si sus resguardos de aislamiento o entrega externa no se cumplen, y no alterar el comportamiento operativo cuando no está habilitado. Hay que probar creaciones reales desde la interfaz de cada rol, no marcar las filas manualmente en el arnés. Este modo todavía no está implementado ni disponible.
+
 ### Recorrido propuesto para el ensayo
 
 1. Cada persona entra con su propio rol y verifica que está en el entorno de práctica. La persona administradora observa; no aprueba por las partes.
