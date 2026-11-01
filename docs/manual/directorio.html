@@ -4630,24 +4630,10 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones automáticas del sistema" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones automáticas del sistema</div></div>
 
-<p><strong>Descripcion:</strong> Envio automatico de notificaciones a los actores involucrados en cada cambio de estado del manifiesto.</p>
-<p><strong>Disparador:</strong> Cualquier transicion de estado del manifiesto.</p>
-<p><strong>Destinatarios por evento:</strong></p>
-<table>
-<thead><tr><th>Evento</th><th>Destinatarios</th></tr></thead>
-<tbody>
-<tr><td>Aprobacion</td><td>Transportista asignado</td></tr>
-<tr><td>Retiro</td><td>Generador, Operador destino</td></tr>
-<tr><td>Entrega</td><td>Operador destino</td></tr>
-<tr><td>Recepcion</td><td>Generador, Transportista</td></tr>
-<tr><td>Tratamiento</td><td>Administrador</td></tr>
-<tr><td>Cierre</td><td>Generador, Transportista, Administrador</td></tr>
-<tr><td>Rechazo</td><td>Generador, Transportista, Administrador</td></tr>
-<tr><td>Cancelacion</td><td>Transportista, Operador, Administrador</td></tr>
-</tbody>
-</table>
-<p><strong>Mecanismo:</strong> Registro en tabla <code>Notificacion</code> con tipo, titulo, mensaje, prioridad. El frontend consulta via polling cada 30 segundos.</p>
-<p><span class="badge badge-complete">Completo</span></p>
+<p>Las propuestas y decisiones de aprobación generan avisos para las partes vinculadas y sus representantes autorizados. Al crear una propuesta también se informa a quien la inició.</p>
+<p>Las adendas y las certificaciones publicadas generan avisos para las otras partes y representantes autorizados. En los demás eventos los destinatarios dependen de la actuación y los permisos vigentes.</p>
+<p>Una notificación indica lo que ocurrió: una lectura no reemplaza la aprobación ni otra acción pendiente. Abrí el aviso y consultá el estado actual del manifiesto antes de actuar.</p>
+<p>Los avisos de la campana son independientes de la entrega de correos o notificaciones al dispositivo, que dependen de sus propias habilitaciones.</p>
 </div>
 
 <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-S03: Registrar Auditoria</button>
