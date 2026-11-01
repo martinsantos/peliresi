@@ -81,3 +81,37 @@ test('keeps keyboard focus inside the blocked delivery dialog and restores it on
     writeFileSync(info.outputPath('keyboard-proof.json'), JSON.stringify({ surface: info.project.name, focusContained: true, restored: true }));
   } finally { await context.close(); }
 });
+
+test('keeps keyboard focus inside the available delivery dialog and restores it on Escape', async ({ browser }, info) => {
+  const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'gps-unreadable-handoff-private.json'), 'utf8'));
+  const manifest = fixture.cases[info.project.name];
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
+    isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
+  const page = await context.newPage(), writes: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes(`/api/manifiestos/${manifest.id}/`)) writes.push(new URL(request.url()).pathname);
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+      watchPosition() { return 1; }, getCurrentPosition() {}, clearWatch() {},
+    } });
+  });
+  await isolatedMapTiles(page, info);
+  try {
+    await login(page, info, 'transportista');
+    if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
+    const opener = page.getByRole('button', { name: 'Confirmar entrega', exact: true });
+    await expect(opener).toBeEnabled(); await opener.focus(); await opener.press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Confirmar Entrega?', exact: true });
+    const confirm = dialog.getByRole('button', { name: 'Sí, Confirmar Entrega', exact: true });
+    const cancel = dialog.getByRole('button', { name: 'Cancelar', exact: true });
+    await expect(confirm).toBeEnabled();
+    await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+    await cancel.focus(); await page.keyboard.press('Tab'); await expect(confirm).toBeFocused();
+    await page.keyboard.press('Shift+Tab'); await expect(cancel).toBeFocused();
+    await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(opener).toBeFocused();
+    expect(writes).toEqual([]);
+    writeFileSync(info.outputPath('available-keyboard-proof.json'), JSON.stringify({ surface: info.project.name, focusContained: true, restored: true }));
+  } finally { await context.close(); }
+});

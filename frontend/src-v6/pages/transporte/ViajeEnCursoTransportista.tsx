@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
+import { Modal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
 import { hasParkedGpsLease } from '../../services/gpsCoordination';
@@ -377,7 +378,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   const prepareHandoff = async () => {
     await gps.stopAndDrain();
-    if (gps.hasStorageError()) throw new GpsPendingError('No se pudo verificar o guardar el recorrido. Mantené esta pantalla abierta y revisá el almacenamiento antes de continuar.');
+    if (gps.hasStorageError()) throw new GpsPendingError(gpsStorageErrorMessage(gps.storageIssue));
     if (!(await gps.flushPending())) throw new GpsPendingError(gps.deliveryWasConfirmed() ? 'La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.' : gps.lastSendError() || undefined);
   };
 
@@ -714,39 +715,35 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       </div>
 
       {/* Modal Finalizar / Confirmar Entrega */}
-      {showFinalizarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card role="dialog" aria-modal="true" aria-labelledby="confirmar-entrega-titulo" className="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto">
-            <CardContent className="p-6 text-center">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${gps.storageError ? 'bg-error-100' : 'bg-success-100'}`}>
-                {gps.storageError ? <AlertTriangle className="text-error-600" size={32} aria-hidden="true" /> : <CheckCircle2 className="text-success-600" size={32} aria-hidden="true" />}
-              </div>
-              <h3 id="confirmar-entrega-titulo" className="text-xl font-bold text-neutral-900 mb-2">Confirmar Entrega?</h3>
-              <p className="text-neutral-600 text-sm mb-4">{gps.storageError ? 'Destino: ' : 'Se confirmará la entrega en '}{m.operador?.razonSocial || 'destino'}</p>
-              {gps.storageError ? <div role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900">
-                <p className="font-semibold">No se puede confirmar la entrega todavía.</p>
-                <p>{gpsStorageErrorMessage(gps.storageIssue)}</p>
-              </div> : eventLocation ? (
-                <p className="text-xs text-neutral-400 mb-4">
-                  Se adjuntará la ubicación si sigue siendo reciente al confirmar.
-                </p>
-              ) : <p className="text-xs text-neutral-600 mb-4">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
-              {deliveryError && !gps.storageError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
-              <div className="space-y-3">
-                {gps.storageError && (!gps.storageIssue || gps.storageIssue === 'storage') && <Button variant="outline" fullWidth onClick={handleRetryGps} disabled={isActionPending || retryingGps}>
-                  {retryingGps ? 'Reintentando guardado' : 'Reintentar guardado'}
-                </Button>}
-                <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending || gps.storageError}>
-                  {isActionPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
-                </Button>
-                <Button variant="outline" fullWidth onClick={() => { setDeliveryError(''); setShowFinalizarModal(false); }} disabled={isActionPending}>
-                  Cancelar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <Modal isOpen={showFinalizarModal} onClose={() => { setDeliveryError(''); setShowFinalizarModal(false); }}
+        title="Confirmar Entrega?" size="sm" showCloseButton={false} closeOnOverlayClick={false} isBusy={isActionPending}>
+        <div className="text-center">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${gps.storageError ? 'bg-error-100' : 'bg-success-100'}`}>
+            {gps.storageError ? <AlertTriangle className="text-error-600" size={32} aria-hidden="true" /> : <CheckCircle2 className="text-success-600" size={32} aria-hidden="true" />}
+          </div>
+          <p className="text-neutral-600 text-sm mb-4">{gps.storageError ? 'Destino: ' : 'Se confirmará la entrega en '}{m.operador?.razonSocial || 'destino'}</p>
+          {gps.storageError ? <div role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900">
+            <p className="font-semibold">No se puede confirmar la entrega todavía.</p>
+            <p>{gpsStorageErrorMessage(gps.storageIssue)}</p>
+          </div> : eventLocation ? (
+            <p className="text-xs text-neutral-400 mb-4">
+              Se adjuntará la ubicación si sigue siendo reciente al confirmar.
+            </p>
+          ) : <p className="text-xs text-neutral-600 mb-4">No se adjuntará una ubicación: no hay una lectura reciente verificable. Podés continuar.</p>}
+          {deliveryError && !gps.storageError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
+          <div className="space-y-3">
+            {gps.storageError && (!gps.storageIssue || gps.storageIssue === 'storage') && <Button variant="outline" fullWidth onClick={handleRetryGps} disabled={isActionPending || retryingGps}>
+              {retryingGps ? 'Reintentando guardado' : 'Reintentar guardado'}
+            </Button>}
+            <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending || gps.storageError}>
+              {isActionPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
+            </Button>
+            <Button variant="outline" fullWidth onClick={() => { setDeliveryError(''); setShowFinalizarModal(false); }} disabled={isActionPending}>
+              Cancelar
+            </Button>
+          </div>
         </div>
-      )}
+      </Modal>
 
       {/* Modal Incidente */}
       {showIncidenteModal && (
