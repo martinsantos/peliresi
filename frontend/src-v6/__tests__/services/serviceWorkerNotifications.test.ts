@@ -81,6 +81,20 @@ it.each([false, true])('opens a window if navigation rejects (app=%s)', async ap
   expect(test.clients.openWindow).toHaveBeenCalledWith(`https://sitrep.test${app ? '/app' : ''}/notificaciones/qa`);
 });
 
+it.each([false, true])('tries a new window when the navigated window cannot be focused (app=%s)', async app => {
+  const test = worker(app, [app ? '/app/dashboard' : '/dashboard']);
+  test.windows[0].focus.mockRejectedValueOnce(new Error('window no longer focusable'));
+  await test.event('notificationclick', { notification: { close: vi.fn(), data: { url: '/notificaciones/qa' } } });
+  expect(test.clients.openWindow).toHaveBeenCalledWith(`https://sitrep.test${app ? '/app' : ''}/notificaciones/qa`);
+});
+
+it('reuses an app window at its scope root', async () => {
+  const test = worker(true, ['/app']);
+  await test.event('notificationclick', { notification: { close: vi.fn(), data: { url: '/notificaciones/qa' } } });
+  expect(test.windows[0].navigate).toHaveBeenCalledWith('https://sitrep.test/app/notificaciones/qa');
+  expect(test.clients.openWindow).not.toHaveBeenCalled();
+});
+
 it('keeps same-origin absolute links in the installed app, including query and fragment', async () => {
   const test = worker(true, []);
   await test.event('notificationclick', { notification: { close: vi.fn(), data: { url: 'https://sitrep.test/manifiestos/qa?adenda=1#anexo' } } });

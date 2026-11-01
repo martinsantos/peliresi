@@ -242,22 +242,31 @@ console.log(`[SW-App] Service Worker ${SW_VERSION} loaded`);
 // ========================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const requestedPath = event.notification.data?.url || '/';
-  const appPath = requestedPath.startsWith('/app/')
-    ? requestedPath
-    : requestedPath.startsWith('/')
-      ? `/app${requestedPath}`
-      : '/app/';
-  const url = new URL(appPath, self.location.origin).href;
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (new URL(client.url).pathname.startsWith('/app/') && 'focus' in client) {
-          client.navigate(url);
-          return client.focus();
-        }
+  const fallback = new URL('/app/', self.location.origin);
+  let target = fallback;
+  const requested = event.notification.data?.url;
+  if (typeof requested === 'string' && requested.trim()) {
+    try {
+      const candidate = new URL(requested, self.location.origin);
+      if (candidate.origin === self.location.origin && !candidate.username && !candidate.password) {
+        if (candidate.pathname === '/app') candidate.pathname = '/app/';
+        else if (!candidate.pathname.startsWith('/app/')) candidate.pathname = `/app${candidate.pathname}`;
+        target = candidate;
       }
-      return clients.openWindow(url);
-    })
-  );
+    } catch { /* An invalid destination returns to app home. */ }
+  }
+  event.waitUntil((async () => {
+    let clientList = [];
+    try { clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true }); } catch { /* Try a new window below. */ }
+    for (const client of clientList) {
+      let clientUrl;
+      try { clientUrl = new URL(client.url); } catch { continue; }
+      if (clientUrl.origin !== self.location.origin || !/^\/app(\/|$)/.test(clientUrl.pathname) || typeof client.navigate !== 'function') continue;
+      let navigated;
+      try { navigated = await client.navigate(target.href); } catch { continue; }
+      if (!navigated) continue;
+      try { await navigated.focus(); return; } catch { break; }
+    }
+    return clients.openWindow(target.href);
+  })());
 });
