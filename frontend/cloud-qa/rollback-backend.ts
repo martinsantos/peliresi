@@ -25,6 +25,10 @@ export function qaBackendEntry(env = process.env): string {
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-incident-retry-baseline-20261101') {
     return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
   }
+  if (version === 'incident-retry-final'
+    && env.QA_ARTIFACTS === '/work/sitrep/.qa-incident-retry-final-20261101') {
+    return path.join(root, '.qa-incident-retry-final-20261101/dist-backend/index.js');
+  }
   if (version === 'closure-f3307f3f'
     && env.QA_ARTIFACTS === '/work/sitrep/.qa-operational-ui-current2026110104') {
     return path.join(root, '.qa-scheduled-pause-20261101/dist/index.js');
