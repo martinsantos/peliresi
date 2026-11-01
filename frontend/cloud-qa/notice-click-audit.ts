@@ -43,7 +43,7 @@ for (const { pid } of read('processes.json')) {
   const env = Object.fromEntries(readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter(Boolean)
     .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
   assertCloudEnvironment(env); assert.equal(env.QA_ARTIFACTS, out); assert.equal(env.QA_COMPAT_BACKEND, 'notice-click-20261031');
-  assert.equal(env.QA_WEB_BUILD, path.join(out, 'web')); assert.equal(env.QA_APP_BUILD, path.join(out, 'app'));
+  assert.equal(env.QA_WEB_BUILD, path.join(out, 'web-current')); assert.equal(env.QA_APP_BUILD, path.join(out, 'app-current'));
   assert.equal(env.TRAINING_DATABASE_URL, ''); assert.equal(env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z');
   assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED, 'false'); assert.equal(env.EMAIL_NOTIFICATION_FAMILIES, '');
 }
@@ -63,6 +63,15 @@ for (const file of proofFiles) {
   assert.equal(proof.workerHandlerSimulated, true); assert.equal(proof.navigationAwaited, true);
   assert.equal(proof.destinationOpenedAfterSimulation, true);
 }
+const update = read('update-browser.json'); assert.equal(update.stats.expected, 2); assert.equal(update.stats.unexpected, 0);
+assert.equal(update.stats.skipped, 0); assert.equal(update.stats.flaky, 0); assert.deepEqual(update.errors, []);
+const updateProofs = readdirSync(path.join(out, 'update-browser'), { withFileTypes: true })
+  .filter(entry => entry.isDirectory()).map(entry => path.join(out, 'update-browser', entry.name, 'proof.json'));
+assert.equal(updateProofs.length, 2);
+for (const file of updateProofs) {
+  const proof = JSON.parse(readFileSync(file, 'utf8'));
+  assert.deepEqual(proof, { synthetic: true, oldShellRetainedWhileWaiting: true, draftEditableAfterUpdate: true, draftRecoveredAfterReload: true });
+}
 const manual = await fetch('http://127.0.0.1:4177/manual/directorio.html');
 assert.equal(manual.status, 200);
 assert.equal(sha(Buffer.from(await manual.arrayBuffer())), sha(readFileSync(path.join(root, 'docs/manual/directorio.html'))));
@@ -80,7 +89,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   const result = { productCommit: commit, synthetic: true, production: false, previousProductCommit: previous.productCommit,
     previousIntegratedCommit: previous.previousIntegratedCommit, previousIntegratedBrowserTests: previous.previousIntegratedBrowserTests,
-    simulatedClickBrowserTests: 6, unitTests: 86, manualTests: 54, realPushSent: false, systemClickVerified: false,
+    simulatedClickBrowserTests: 6, updateBrowserTests: 2, unitTests: 86, manualTests: 54, realPushSent: false, systemClickVerified: false,
     capClosed: true, emailAttempts: 0, emailSent: 0, pushEnabled: false, androidVerified: false };
   writeFileSync(path.join(out, 'notice-click-audit.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify(result));
