@@ -5,18 +5,49 @@ const roles = ['GENERADOR','TRANSPORTISTA','OPERADOR'];
 const approved = roles.map(rol=>({rol,aprobada:true}));
 describe('shared operational guidance never replaces server authorization',()=>{
   it.each(roles)('names every pending party for %s',role=>{
-    const next=manifestWork({estado:'PENDIENTE_APROBACION',partes:approved.map(p=>({...p,aprobada:p.rol!==role})),requiereMiAprobacion:true},role);
+    const next=manifestWork({estado:'PENDIENTE_APROBACION',partes:approved.map(p=>({...p,aprobada:p.rol!==role})),inicio:null,requiereMiAprobacion:true},role);
     expect(next.label).toBe('Te toca aprobar');expect(next.tone).toBe('pending');expect(next.responsible).toBe({GENERADOR:'Generador',TRANSPORTISTA:'Transporte',OPERADOR:'Operador'}[role]);
   });
   it.each([[[]],[approved.map(p=>({...p,aprobada:p.rol!=='OPERADOR'}))]])('does not infer unanimity from APROBADO: %j',partes=>{
     expect(manifestWork({estado:'APROBADO',partes},'ADMIN')).toMatchObject({label:'Revisar aprobaciones',tone:'blocked'});
   });
+  it.each(['PENDIENTE_APROBACION','APROBADO'])('does not infer a next step for %s when party data is unavailable or malformed', estado => {
+    const invalid = [null, undefined, [], {}, [null], approved.slice(0, 2), [approved[0], approved[0], approved[2]],
+      [approved[0], { ...approved[1], aprobada: 'false' }, approved[2]]];
+    for (const partes of invalid) {
+      expect(manifestWork({ estado, partes: partes as any, requiereMiAprobacion: true, inicio: '2026-10-25T12:00:00Z' }, 'TRANSPORTISTA'))
+        .toMatchObject({ label: 'Revisar aprobaciones', tone: 'blocked' });
+    }
+  });
+  it('does not say a pending record is waiting for decisions if all three already exist', () => {
+    expect(manifestWork({ estado: 'PENDIENTE_APROBACION', partes: approved, inicio:null }, 'GENERADOR'))
+      .toMatchObject({ label: 'Revisar aprobaciones', tone: 'blocked' });
+  });
+  it('does not ask a role to approve again if its own decision is already recorded', () => {
+    const parts = approved.map(part => ({ ...part, aprobada: part.rol !== 'OPERADOR' }));
+    expect(manifestWork({ estado: 'PENDIENTE_APROBACION', partes: parts, inicio:null, requiereMiAprobacion: true }, 'GENERADOR'))
+      .toMatchObject({ label: 'Revisar aprobaciones', tone: 'blocked' });
+  });
   it('distinguishes coordination from physical pickup',()=>{
-    expect(manifestWork({estado:'APROBADO',partes:approved},'TRANSPORTISTA').label).toBe('Listo para iniciar');
-    expect(manifestWork({estado:'APROBADO',partes:approved,inicio:'2026-10-25'},'TRANSPORTISTA')).toMatchObject({label:'Confirmar retiro',responsible:'Transporte'});
+    expect(manifestWork({estado:'APROBADO',partes:approved,inicio:null},'TRANSPORTISTA').label).toBe('Listo para iniciar');
+    expect(manifestWork({estado:'APROBADO',partes:approved,inicio:'2026-10-25T12:00:00Z'},'TRANSPORTISTA')).toMatchObject({label:'Confirmar retiro',responsible:'Transporte'});
+  });
+  it.each(['ADMIN','ADMIN_OPERADOR','GENERADOR'])('does not instruct %s to start when that account cannot coordinate', role => {
+    const work = manifestWork({ estado: 'APROBADO', partes: approved, inicio:null, puedeIniciar: false }, role);
+    expect(work.label).toBe('Listo para iniciar');
+    expect(work.detail).toContain('Una de las partes debe iniciar');
+    expect(work.detail).not.toContain('Iniciá');
+  });
+  it.each([undefined,'','fecha-inválida'])('does not infer coordination from unavailable start data: %j', inicio => {
+    expect(manifestWork({estado:'APROBADO',partes:approved,inicio},'TRANSPORTISTA')).toMatchObject({label:'Revisar aprobaciones',tone:'blocked'});
+  });
+  it('does not offer a decision when a still-pending proposal already records coordination', () => {
+    const parts=approved.map(part=>({...part,aprobada:part.rol!=='TRANSPORTISTA'}));
+    expect(manifestWork({estado:'PENDIENTE_APROBACION',partes:parts,inicio:'2026-10-25T12:00:00Z',requiereMiAprobacion:true},'TRANSPORTISTA'))
+      .toMatchObject({label:'Revisar aprobaciones',tone:'blocked'});
   });
   it('keeps in-situ responsibility without inventing transport',()=>{
-    expect(manifestWork({estado:'APROBADO',modalidad:'IN_SITU',inicio:'2026-10-25',partes:approved.filter(p=>p.rol!=='TRANSPORTISTA')},'OPERADOR')).toMatchObject({label:'Revisar aprobaciones',responsible:'Transporte',tone:'blocked'});
+    expect(manifestWork({estado:'APROBADO',modalidad:'IN_SITU',inicio:'2026-10-25T12:00:00Z',partes:approved.filter(p=>p.rol!=='TRANSPORTISTA')},'OPERADOR')).toMatchObject({label:'Revisar aprobaciones',responsible:'Ambiente',tone:'blocked'});
   });
   it.each(['ENTREGADO','RECIBIDO','EN_TRATAMIENTO','TRATADO'])('assigns post-delivery work to operator, even for other viewers: %s',estado=>{
     for(const role of [...roles,'ADMIN'])expect(manifestWork({estado},role).responsible).toBe('Operador');

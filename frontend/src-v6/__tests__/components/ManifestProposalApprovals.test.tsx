@@ -2,12 +2,12 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {cleanup,render,screen,waitFor,act,fireEvent} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {MemoryRouter} from 'react-router-dom';
-const mock=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}));
+const mock=vi.hoisted(()=>({get:vi.fn(),post:vi.fn(),role:'TRANSPORTISTA',actorId:'transport' as string|undefined}));
 vi.mock('../../services/api',()=>({api:mock}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'transport-user',rol:'TRANSPORTISTA',actorId:'transport',training:false}})}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'transport-user',rol:mock.role,actorId:mock.actorId,training:false}})}));
 vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:null})}));
 import {ManifestProposalApprovals} from '../../pages/manifiestos/components/ManifestProposalApprovals';
-afterEach(()=>{cleanup();vi.unstubAllEnvs();vi.clearAllMocks();});
+afterEach(()=>{cleanup();vi.unstubAllEnvs();vi.clearAllMocks();mock.role='TRANSPORTISTA';mock.actorId='transport';});
 it('refreshes the parent when another party starts coordination without changing APROBADO',async()=>{
  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
  const data={autorRol:'GENERADOR',estado:'APROBADO',inicio:null as string|null,puedeIniciar:true,puedeAprobar:null,partes:['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({rol,aprobada:true}))};
@@ -36,6 +36,90 @@ it('does not present approval or a start action from status alone when a party i
  expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();
  expect(screen.getByLabelText('Transporte: Pendiente')).toHaveClass('text-neutral-600');
  client.clear();
+});
+it.each([null,undefined,{},[],[{rol:'GENERADOR',aprobada:true}],
+ [{rol:'GENERADOR',aprobada:true},{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:true}],
+ [{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:'false'},{rol:'OPERADOR',aprobada:true}]].map(partes=>[partes]))
+ ('keeps the detail usable and requests refresh when approval data is invalid: %j',async partes=>{
+  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+  mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',partes}}});
+  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  render(<QueryClientProvider client={client}><ManifestProposalApprovals id="invalid" onSign={()=>{}}/></QueryClientProvider>);
+  expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos comprobar las aprobaciones');
+  expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Actualizar aprobaciones'}));
+  await waitFor(()=>expect(mock.get.mock.calls.length).toBeGreaterThan(1));
+  expect(mock.post).not.toHaveBeenCalled();client.clear();
+ });
+it('does not call a record approved or offer a decision when all three decisions conflict with pending status',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:null,
+  partes:['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({rol,aprobada:true}))}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="state-conflict" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('El estado no coincide con las decisiones registradas');
+ expect(screen.queryByText('3 de 3 · Aprobado')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();client.clear();
+});
+it.each(['GENERADOR','OPERADOR'])('does not offer another role’s approval to the current transport user: %s',async otherRole=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:otherRole,
+  partes:['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({rol,aprobada:rol!==otherRole}))}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="wrong-role" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos comprobar qué acción corresponde a tu cuenta');
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Firmar Manifiesto'})).not.toBeInTheDocument();client.clear();
+});
+it.each([
+ {puedeIniciar:'true'}, {puedeRechazar:'false'}, {requiereNuevaPropuesta:'false'}, {puedeAprobar:false},
+ {inicio:undefined}, {inicio:'no-es-una-fecha'}, {rechazo:{motivo:'dato inválido'}},
+])('does not offer actions from malformed coordination or permission data: %j',async overrides=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',
+  partes:[{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:true}],...overrides}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="bad-flags" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos comprobar las aprobaciones');
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
+});
+it('does not offer another decision if coordination is recorded on a still-pending proposal',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:'2026-10-25T12:00:00Z',puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',
+  partes:[{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:true}]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="premature-start" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('El estado no coincide con las decisiones registradas');
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
+});
+it('does not offer a second approval for a decision already recorded for the current user',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',
+  partes:[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:false}]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="already-approved" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos comprobar qué acción corresponde a tu cuenta');
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
+});
+it('does not offer coordination to an administrator if a response incorrectly claims they can start it',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');mock.role='ADMIN';mock.actorId=undefined;
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'APROBADO',inicio:null,puedeIniciar:true,puedeAprobar:null,
+  partes:['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({rol,aprobada:true}))}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="admin-start" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos comprobar qué acción corresponde a tu cuenta');
+ expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
+});
+it.each(['NO_IDENTIFICADO','constructor',null])('does not assign an unknown proposal creator to administration: %j',async autorRol=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol,estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:null,
+  partes:[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:false}]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="unknown-author" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByText('Creado por No informado')).toBeVisible();
+ expect(screen.queryByText('Creado por Administrador')).not.toBeInTheDocument();client.clear();
 });
 it('shows the busy response and lets the user refresh approvals without replaying the decision',async()=>{
  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');

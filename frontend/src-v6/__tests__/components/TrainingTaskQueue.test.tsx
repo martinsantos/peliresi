@@ -9,8 +9,8 @@ vi.mock('../../services/manifiesto.service',()=>({manifiestoService:{create:mock
 import {useCreateManifiesto} from '../../hooks/useManifiestoWorkflow';
 import {TrainingTaskQueue} from '../../components/TrainingTaskQueue';
 afterEach(()=>{vi.unstubAllEnvs();cleanup();sessionStorage.clear();Object.assign(mock,{training:true,id:'u',rol:'OPERADOR',actorId:'o',empresaId:'e',establecimientoId:'s'});vi.clearAllMocks();vi.useRealTimers();});
-const partes=[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:true}];
-const items=[{id:'a',numero:'CAP-NEW',estado:'PENDIENTE_APROBACION',requiereMiAprobacion:true,partes,fechaEstimadaRetiro:'2099-10-20T12:00:00Z'},{id:'b',numero:'CAP-TRIP',estado:'EN_TRANSITO',partes:partes.map(p=>({...p,aprobada:true})),fechaEstimadaRetiro:'2020-10-20T12:00:00Z'}];
+const partes=[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:false}];
+const items=[{id:'a',numero:'CAP-NEW',estado:'PENDIENTE_APROBACION',requiereMiAprobacion:true,partes,inicio:null,fechaEstimadaRetiro:'2099-10-20T12:00:00Z'},{id:'b',numero:'CAP-TRIP',estado:'EN_TRANSITO',partes:partes.map(p=>({...p,aprobada:true})),fechaEstimadaRetiro:'2020-10-20T12:00:00Z'}];
 function reply(records:any[], options:any={params:{}}){
  const {filter='all',period='all',search='',page=1,limit=6}=options.params||{};
  const day=(value:any)=>new Date(value).toLocaleDateString('sv-SE',{timeZone:'America/Argentina/Mendoza'}),today=day(new Date());
@@ -121,6 +121,45 @@ it('does not advertise a start in the agenda when an approval is missing despite
  expect(await screen.findByText('Revisar aprobaciones')).toBeVisible();
  expect(screen.queryByText('Listo para iniciar')).not.toBeInTheDocument();
  expect(screen.getByLabelText('Generador: Pendiente')).toBeVisible();
+ client.clear();
+});
+
+it.each([null,undefined,{incompletas:true}])('does not advertise pickup or a stale description when party data is %j',async partes=>{
+ mock.rol='TRANSPORTISTA';
+ mock.get.mockImplementation(async(_url,options)=>reply([{id:'incomplete',numero:'QA-INCOMPLETO',estado:'APROBADO',partes,
+  requiereMiAprobacion:false,detail:'Confirmá el retiro ahora',actores:{generador:'Origen',operador:'Destino'}},items[1]],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ const row=await screen.findByRole('link',{name:/QA-INCOMPLETO/});
+ expect(row).toHaveTextContent('Revisar aprobaciones');
+ expect(row).toHaveAccessibleName(/No se pueden comprobar las tres aprobaciones/);
+ expect(row).not.toHaveAccessibleName(/Confirmá el retiro ahora/);
+ expect(within(row).queryByLabelText('Aprobaciones')).not.toBeInTheDocument();
+ expect(screen.getByText('CAP-TRIP')).toBeVisible();
+ client.clear();
+});
+
+it('does not highlight a contradictory approval task as actionable',async()=>{
+ mock.rol='OPERADOR';mock.get.mockImplementation(async(_url,options)=>reply([{...items[0],id:'contradiction',numero:'QA-CONTRADICCION',
+  partes:partes.map(part=>({...part,aprobada:part.rol!=='GENERADOR'})),requiereMiAprobacion:true}],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ const row=await screen.findByRole('link',{name:/QA-CONTRADICCION/});
+ expect(row).toHaveTextContent('Revisar aprobaciones');expect(row).not.toHaveClass('bg-primary-50/60');
+ expect(row).not.toHaveAccessibleName(/Te toca aprobar/);client.clear();
+});
+
+it('does not present previous two-party decisions as current approvals or instruct a pending party to approve',async()=>{
+ mock.get.mockImplementation(async(_url,options)=>reply([{id:'legacy',numero:'QA-ANTERIOR',estado:'PENDIENTE_APROBACION',modalidad:'IN_SITU',
+  requiereNuevaPropuesta:true,requiereMiAprobacion:false,partes:[{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:false}],
+  detail:'No hay transporte aprobador.'}],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ const row=await screen.findByRole('link',{name:/QA-ANTERIOR/});
+ expect(row).toHaveTextContent('Necesita nueva propuesta');
+ expect(row).toHaveAccessibleName(/nueva propuesta con las tres partes/);
+ expect(row).not.toHaveAccessibleName(/Falta aprobar/);
+ expect(within(row).queryByLabelText('Aprobaciones')).not.toBeInTheDocument();
  client.clear();
 });
 

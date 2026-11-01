@@ -663,7 +663,8 @@
   ], image: S + 'mobile/form-retry-20261025.jpg', alt: 'App reabierta con Envío sin confirmar y la acción Comprobar envío', caption: 'Preview · datos artificiales · 25/10/2026 · app en navegador, no Android físico.', expected: 'Un reintento recupera el resultado del mismo envío. Crear una propuesta sigue requiriendo la aprobación posterior de las partes.' };
   proposalGuide.steps.splice(1, 0, pendingSendStep);
   proposalGuide.steps.find(function (step) { return step.title === 'Programar y coordinar el retiro'; }).body.push(
-    'Si un manifiesto anterior necesita una propuesta nueva, una cuenta habilitada puede elegir Abrir nueva propuesta en su ficha. El formulario vuelve al manifiesto anterior, pero no copia ni vincula automáticamente sus datos o aprobaciones. Un borrador local recuperado puede corresponder a otra operación: revisá sus datos y comprobá que no exista una propuesta duplicada antes de enviar. Si no aparece la opción, consultá a Ambiente.'
+    'Si un manifiesto anterior necesita una propuesta nueva, una cuenta habilitada puede elegir Abrir nueva propuesta en su ficha. El formulario vuelve al manifiesto anterior, pero no copia ni vincula automáticamente sus datos o aprobaciones. Un borrador local recuperado puede corresponder a otra operación: revisá sus datos y comprobá que no exista una propuesta duplicada antes de enviar. Si no aparece la opción, consultá a Ambiente.',
+    'Si aparece Revisar aprobaciones, faltan datos verificables o el estado no coincide con las decisiones. Abrí el manifiesto y actualizá las aprobaciones antes de actuar; si el problema continúa, consultá a Ambiente. No repitas una aprobación para intentar corregir el estado.'
   );
   createGuide.summary = proposalGuide.summary;
   createGuide.safety = proposalGuide.safety;

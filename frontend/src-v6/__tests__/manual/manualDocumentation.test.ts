@@ -126,7 +126,7 @@ it('explains the historical recovery link and a different restored draft without
  for (const id of ['manifiestos-tres-partes', 'generador-crear-manifiesto']) {
   const guide = data.guides.find(item => item.id === id)!;
   const content = guide.steps.flatMap(step => step.body).join(' ');
-  for (const text of ['Abrir nueva propuesta', 'no copia ni vincula automáticamente', 'puede corresponder a otra operación', 'propuesta duplicada']) {
+  for (const text of ['Abrir nueva propuesta', 'no copia ni vincula automáticamente', 'puede corresponder a otra operación', 'propuesta duplicada', 'Revisar aprobaciones', 'No repitas una aprobación']) {
    expect(content).toContain(text);
   }
  }
