@@ -182,3 +182,13 @@ it('shows a recorded rejection with no available reason without offering a new d
  expect(screen.getByText(/Rechazo registrado sin motivo disponible/)).toBeVisible();
  expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
 });
+it.each([null,'','   '])('does not offer an action when an older response includes a rejection without a readable reason: %j',async rechazo=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',rechazo,inicio:null,puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',puedeRechazar:false,
+  partes:[{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:true}]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="old-empty-rejection" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByText('Propuesta detenida')).toBeVisible();
+ expect(screen.getByText(/Rechazo registrado sin motivo disponible/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
+});
