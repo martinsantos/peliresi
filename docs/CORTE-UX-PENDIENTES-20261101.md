@@ -1,6 +1,6 @@
 # SITREP · estado del corte y prioridades
 
-**1 de noviembre de 2026.** El candidato de producto `f3307f3f` está en preview; no está acreditada su publicación. Este documento sintetiza la evidencia y los impedimentos de cierre; el detalle y la reproducción de cada cambio están en [el registro de revisión](REFACTOR-UX-20261025.md) y [el balance](BALANCE-CIERRE-20261030.md).
+**1 de noviembre de 2026.** El candidato de producto `f3307f3f` se probó en preview; el entorno de esta tanda se apagó al finalizar y no está acreditada su publicación. Este documento sintetiza la evidencia y los impedimentos de cierre; el detalle y la reproducción de cada cambio están en [el registro de revisión](REFACTOR-UX-20261025.md) y [el balance](BALANCE-CIERRE-20261030.md).
 
 ## Lo comprobado
 
