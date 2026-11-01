@@ -26,6 +26,10 @@ for (const stage of ['before', 'after']) {
   const source = read(`source-${stage}.json`); assert.equal(source.commit, commit); assert.equal(source.files, 2674);
   assert.deepEqual(source.missing, []); assert.deepEqual(source.different, []);
   const assets = read(`assets-${stage}.json`); assert.equal(assets.commit, commit); assert.ok(assets.files > 400); assert.deepEqual(assets.different, []);
+  const network = read(`network-isolation-${stage}.json`);
+  assert.deepEqual(network.networks, ['sitrep-qa-enterprise-net-20261016']); assert.equal(network.internal, true);
+  assert.equal(network.publishedPorts, false); assert.equal(network.nanoCpus, 1000000000);
+  assert.equal(network.memoryBytes, 2147483648); assert.equal(network.memorySwapBytes, 2147483648);
 }
 const http = read('incident-http-audit.json');
 assert.equal(http.simultaneousRequests, 8); assert.equal(http.created, 1); assert.equal(http.operatorNotices, 2);
