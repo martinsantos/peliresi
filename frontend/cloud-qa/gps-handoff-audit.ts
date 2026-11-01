@@ -19,8 +19,8 @@ const baseline = JSON.parse(readFileSync(path.join(previous, 'gps-unreadable-han
 assert.equal(baseline.stats.unexpected, 4); assert.equal(baseline.stats.expected, 0);
 const specs = baseline.suites.flatMap((suite: any) => suite.specs || []);
 function baselineError(title: string, project: string): string {
-  const spec = specs.find((item: any) => item.title === title); assert.ok(spec);
-  const test = spec.tests.find((item: any) => item.projectName === project); assert.ok(test);
+  const matching = specs.filter((item: any) => item.title === title); assert.ok(matching.length);
+  const test = matching.flatMap((item: any) => item.tests).find((item: any) => item.projectName === project); assert.ok(test);
   assert.equal(test.status, 'unexpected'); return test.results[0].error.message.replace(/\u001b\[[0-9;]*m/g, '');
 }
 assert.match(baselineError('explains an unreadable GPS copy before a handoff and keeps the form', 'app'), /No se pudo verificar o guardar el recorrido/);
