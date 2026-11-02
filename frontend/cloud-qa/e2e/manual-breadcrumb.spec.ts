@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { assertCloudDatabase } from '../safety';
-import { login } from './helpers';
+import { login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 async function positionHeading(page: Page, selector: string) {
@@ -78,4 +78,51 @@ test('la ruta conserva el foco hasta que la persona sale de ella', async ({ page
   await link.evaluate(element => (element as HTMLElement).blur());
   await expect(breadcrumb).not.toHaveClass(/visible/);
   await expect(breadcrumb).toHaveAttribute('aria-hidden', 'true');
+});
+
+
+test('el ancla se alinea y respeta el desplazamiento de la persona', async ({ page }, info) => {
+  await login(page, info, 'generador');
+  await page.goto(prefix(info) + '/manual/directorio.html');
+  await expect(page.locator('#guia-operador')).toBeAttached();
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(900);
+
+  async function openAnchor() {
+    await page.evaluate(() => {
+      history.replaceState(null, '', '#guia-generador');
+      location.hash = '#guia-operador';
+    });
+    await expect.poll(() => page.locator('#guia-operador').evaluate(element => {
+      const offset = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--scroll-offset'), 10) || 122;
+      return Math.abs(element.getBoundingClientRect().top - offset) < 80;
+    })).toBe(true);
+  }
+
+  await openAnchor();
+  await page.waitForTimeout(900);
+  expect(await page.locator('#guia-operador').evaluate(element => {
+    const offset = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--scroll-offset'), 10) || 122;
+    return Math.abs(element.getBoundingClientRect().top - offset) < 80;
+  })).toBe(true);
+
+  await openAnchor();
+  const before = await page.evaluate(() => window.scrollY);
+  if (info.project.name === 'app' || info.project.name === 'web-narrow') {
+    const session = await page.context().newCDPSession(page);
+    await session.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 220, y: 650 }] });
+    await page.waitForTimeout(60);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 220, y: 250 }] });
+    await page.waitForTimeout(60);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await session.detach();
+  } else {
+    const viewport = page.viewportSize()!;
+    await page.mouse.move(viewport.width - 50, 450);
+    await page.mouse.wheel(0, 550);
+  }
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before + 150);
+  await page.waitForTimeout(1100);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(before + 150);
 });

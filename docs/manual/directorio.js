@@ -158,14 +158,45 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!Number.isFinite(offset)) offset = 122;
     window.scrollTo({ top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - offset), behavior: 'instant' });
   }
-  function settleHashTarget() {
-    alignHashTarget();
-    setTimeout(alignHashTarget, 180);
-    setTimeout(alignHashTarget, 750);
+  var hashAlignmentTimers = [];
+  var hashAlignmentFrame = 0;
+  var hashAlignmentInterrupted = false;
+
+  function cancelHashAlignment() {
+    hashAlignmentTimers.forEach(clearTimeout);
+    hashAlignmentTimers = [];
+    if (hashAlignmentFrame) {
+      cancelAnimationFrame(hashAlignmentFrame);
+      hashAlignmentFrame = 0;
+    }
   }
-  window.addEventListener('hashchange', settleHashTarget);
-  window.addEventListener('load', settleHashTarget, { once: true });
-  if (window.location.hash) requestAnimationFrame(settleHashTarget);
+  function interruptHashAlignment(event) {
+    if (event.type === 'keydown' && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar', 'Tab'].indexOf(event.key) < 0) return;
+    hashAlignmentInterrupted = true;
+    cancelHashAlignment();
+  }
+  ['wheel', 'touchstart', 'pointerdown'].forEach(function(type) {
+    window.addEventListener(type, interruptHashAlignment, { capture: true, passive: true });
+  });
+  window.addEventListener('keydown', interruptHashAlignment, { capture: true });
+
+  function settleHashTarget() {
+    cancelHashAlignment();
+    if (hashAlignmentInterrupted) return;
+    alignHashTarget();
+    hashAlignmentTimers.push(setTimeout(alignHashTarget, 180), setTimeout(alignHashTarget, 750));
+  }
+  window.addEventListener('hashchange', function() {
+    hashAlignmentInterrupted = false;
+    settleHashTarget();
+  });
+  window.addEventListener('load', function() {
+    if (!hashAlignmentInterrupted) settleHashTarget();
+  }, { once: true });
+  if (window.location.hash) hashAlignmentFrame = requestAnimationFrame(function() {
+    hashAlignmentFrame = 0;
+    if (!hashAlignmentInterrupted) settleHashTarget();
+  });
 
   // Abrir todos los collapsibles (FAQ) por defecto
   document.querySelectorAll('.collapsible-header').forEach(function(h, index) {
