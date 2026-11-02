@@ -43,13 +43,15 @@ export default function PersonalManifestNoticeAction({ manifestId, target, user,
   return <div role="region" aria-label="Actividades con acceso al manifiesto" className="space-y-3 rounded-lg border border-primary-100 bg-primary-50 p-3 text-left">
     {accesses.length > 0 && <p className="text-sm text-neutral-700">Elegí la actividad autorizada para abrir este manifiesto.</p>}
     {!accesses.length && !incomplete && <p className="text-sm text-neutral-700">Ninguna actividad personal de esta cuenta puede abrir el manifiesto. Revisá tus autorizaciones o consultá a Administración.</p>}
-    {accesses.map(access => {
-      const matches = user.rol === access.rol && user.actorId === access.actorId && !user.empresaContexto;
-      return matches && onCurrent ? <Button key={access.rol} onClick={onCurrent}>Abrir como {labels[access.rol]}</Button>
-        : matches ? <Link key={access.rol} className="inline-flex min-h-11 items-center rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white"
-        to={mp(safeTarget)}>Abrir como {labels[access.rol]}</Link>
-        : <Button key={access.rol} disabled={busy} onClick={() => void open(access)}>Abrir como {labels[access.rol]}</Button>;
-    })}
+    {accesses.length > 0 && <div className="flex flex-wrap gap-2">
+      {accesses.map(access => {
+        const matches = user.rol === access.rol && user.actorId === access.actorId && !user.empresaContexto;
+        return matches && onCurrent ? <Button key={access.rol} onClick={onCurrent}>Abrir como {labels[access.rol]}</Button>
+          : matches ? <Link key={access.rol} className="inline-flex min-h-11 items-center rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white"
+          to={mp(safeTarget)}>Abrir como {labels[access.rol]}</Link>
+          : <Button key={access.rol} disabled={busy} onClick={() => void open(access)}>Abrir como {labels[access.rol]}</Button>;
+      })}
+    </div>}
     {incomplete && <div role="alert" className="space-y-2 text-sm text-neutral-700"><p>No pudimos comprobar todas tus actividades. Reintentá antes de elegir otra.</p>
       <Button variant="outline" onClick={() => void query.refetch()}>Reintentar comprobación</Button></div>}
     {error && <p role="alert" className="text-sm text-error-700">{error}</p>}
