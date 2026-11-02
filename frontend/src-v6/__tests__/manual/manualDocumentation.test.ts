@@ -14,6 +14,24 @@ const data = context.window.SITREP_HELP!;
 const catalogue = data.guides.find(guide => guide.id === 'administrador-alertas-proactivas')!;
 
 describe('manual documentation stays usable and truthful', () => {
+  it('keeps all manual icons in the bundled font without relying on the external font service', () => {
+    const metadata = JSON.parse(readFileSync(manual + 'material-symbols-manual.json', 'utf8')) as { font_sha256: string; icons: string[] };
+    const css = readFileSync(manual + 'manual.css', 'utf8');
+    const encoded = css.match(/data:font\/woff2;base64,([A-Za-z0-9+/=]+)/)?.[1];
+    expect(encoded).toBeDefined();
+    if (!encoded) throw new Error('Manual icon font is missing');
+    const font = Buffer.from(encoded, 'base64');
+    expect(font.subarray(0, 4).toString('ascii')).toBe('wOF2');
+    expect(createHash('sha256').update(font).digest('hex')).toBe(metadata.font_sha256);
+    const used = new Set<string>();
+    for (const file of ['index.html', 'search.html', 'tutorial.html', 'manual.js', 'help-data.js']) {
+      const source = readFileSync(manual + file, 'utf8');
+      for (const match of source.matchAll(/\bicon\s*:\s*['"]([a-z0-9_]+)['"]/g)) used.add(match[1]);
+      for (const match of source.matchAll(/class="material-symbols-rounded(?: [^"]*)?"[^>]*>\s*([a-z0-9_]+)\s*</g)) used.add(match[1]);
+      if (file.endsWith('.html')) expect(source).not.toContain('family=Material+Symbols+Rounded');
+    }
+    expect([...used].sort().filter(icon => !metadata.icons.includes(icon))).toEqual([]);
+  });
   it('distinguishes individual approval, repeated receipts and certificate issuance', () => {
     const guide = data.guides.find(item => item.id === 'correos-decisiones-documentos');
     expect(guide).toBeDefined();
