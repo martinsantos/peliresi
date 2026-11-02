@@ -213,6 +213,7 @@ interface Props {
   inspectionLoading?: boolean;
   mode: MonitorMode;
   dataState?: 'ready' | 'stale' | 'loading' | 'error' | 'offline';
+  errorDetail?: string;
   liveData: MonitorLiveResponse | null;
   forecastData: ForecastResponse | null;
   timelineData: TimelineResponse | null;
@@ -242,7 +243,7 @@ interface Props {
 
 export const DashboardPanels: React.FC<Props> = ({
   now, inspections, inspectionTotal, inspectionError, inspectionLoading,
-  mode, dataState = 'ready', liveData, forecastData, timelineData, playbackCounters, playbackEvents,
+  mode, dataState = 'ready', errorDetail, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
   currentEventId, enTransito = [], currentEvent, currentEventIndex = 0,
   totalEventCount = 0, onTripClick, onEventOpen, onViajeOpen,
 }) => {
@@ -341,8 +342,8 @@ export const DashboardPanels: React.FC<Props> = ({
         {dataState !== 'ready' && <p role="status" className="wr-panel p-3 text-sm text-neutral-700">
           {dataState === 'loading' ? 'Cargando los datos del Monitor…'
             : dataState === 'offline' ? 'Sin conexión. Conectate para consultar los datos del Monitor.'
-            : dataState === 'error' ? 'No pudimos cargar los datos del Monitor. Usá Actualizar para reintentar.'
-            : 'Consulta sin actualizar. Los datos mostrados pueden haber cambiado.'}
+            : dataState === 'error' ? errorDetail || 'No pudimos cargar los datos del Monitor. Usá Actualizar para reintentar.'
+            : `Consulta sin actualizar. Los datos mostrados pueden haber cambiado.${errorDetail ? ' ' + errorDetail : ''}`}
         </p>}
         {mode !== 'FORECAST' && <>
         {/* Widget: Pipeline */}

@@ -148,6 +148,9 @@ export interface ForecastResponse {
   }[];
 }
 
+/** Only our own actionable, static messages may be presented directly to readers. */
+export class TimelineReadError extends Error {}
+
 export async function fetchTimeline(fecha: string, dias = 1, signal?: AbortSignal): Promise<TimelineResponse> {
   let result: TimelineResponse | undefined;
   const seen = new Set<string>();
@@ -163,9 +166,9 @@ export async function fetchTimeline(fecha: string, dias = 1, signal?: AbortSigna
     }
     // A phone must not allocate an unbounded month of GPS. Never turn this
     // safety boundary into a partial movie labelled as the complete period.
-    if (result.eventos.length > 25000) throw new Error('El historial supera 25.000 registros. Elegí un período más corto para reproducirlo.');
+    if (result.eventos.length > 25000) throw new TimelineReadError('El historial supera 25.000 registros. Elegí un período más corto para reproducirlo.');
     if (!batch.paginacion?.siguiente) {
-      if (batch.resumen.incompleto) throw new Error('El servidor devolvió un historial incompleto. Elegí un período más corto.');
+      if (batch.resumen.incompleto) throw new TimelineReadError('El servidor devolvió un historial incompleto. Elegí un período más corto.');
       result.eventos.sort((a, b) => a.timestamp.localeCompare(b.timestamp) || (a.id || '').localeCompare(b.id || ''));
       result.paginacion = { pagina, siguiente: null };
       result.resumen = { ...result.resumen, incompleto: false, eventosRecortados: false, gpsRecortados: false,
@@ -173,9 +176,9 @@ export async function fetchTimeline(fecha: string, dias = 1, signal?: AbortSigna
         primeraActividad: result.eventos[0]?.timestamp ?? null, ultimaActividad: result.eventos.at(-1)?.timestamp ?? null };
       return result;
     }
-    if (batch.paginacion.siguiente !== pagina + 1) throw new Error('La paginación del historial no avanzó. Volvé a cargar el período.');
+    if (batch.paginacion.siguiente !== pagina + 1) throw new TimelineReadError('La paginación del historial no avanzó. Volvé a cargar el período.');
   }
-  throw new Error('El historial es demasiado grande. Elegí un período más corto.');
+  throw new TimelineReadError('El historial es demasiado grande. Elegí un período más corto.');
 }
 
 export async function fetchMonitorLive(): Promise<MonitorLiveResponse> {

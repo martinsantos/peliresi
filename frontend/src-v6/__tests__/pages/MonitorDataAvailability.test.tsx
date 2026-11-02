@@ -55,6 +55,14 @@ it('never substitutes live rankings into a history without data', () => {
   expect(screen.queryByText('QA tratamiento de hoy')).not.toBeInTheDocument();
 });
 
+it('explains when history needs a shorter period', () => {
+  render(<MemoryRouter><DashboardPanels mode="PLAYBACK" dataState="error"
+    errorDetail="El historial es demasiado grande. Elegí un período más corto."
+    liveData={null} forecastData={null} timelineData={null} /></MemoryRouter>);
+  expect(screen.getByText(/Elegí un período más corto/)).toBeVisible();
+  expect(screen.queryByText(/No pudimos cargar los datos/)).not.toBeInTheDocument();
+});
+
 it('keeps history labels and unknown values while history is unavailable', () => {
   render(<TimelineControls mode="PLAYBACK" liveData={liveData} playbackDate="2026-10-25"
     onDateChange={vi.fn()} onSwitchToPlayback={vi.fn()} timelineData={null} isLoading={false} playback={null} />);

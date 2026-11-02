@@ -65,7 +65,7 @@
     overflow-y: auto;
   }
 
-  .wr-header {
+  .wr-layout .wr-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
@@ -90,11 +90,11 @@
   }
   .wr-mode-selector svg { flex-shrink: 0; }
 
-  .wr-header-tools { gap: 4px; }
+  .wr-layout .wr-header-tools { gap: 4px; }
   .wr-header-tools > button { min-width: 44px; min-height: 44px; }
   .wr-clock { display: none; }
   .wr-layout-bottom > .wr-panel { flex-wrap: wrap; gap: 12px; padding: 12px; }
-  .wr-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .wr-layout .wr-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
   .wr-summary > div { min-width: 0; }
   .wr-summary-separator { display: none; }
   .wr-timeline-actions { flex-wrap: wrap; flex-basis: 100%; gap: 8px; }

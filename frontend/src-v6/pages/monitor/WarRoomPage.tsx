@@ -28,7 +28,7 @@ import { TimelineControls } from './components/TimelineControls';
 import { formatTimeShort, todayISO } from './utils/formatters';
 import { recentPeriod } from './utils/playback-period';
 import type { EnTransitoItem } from './api/monitor-api';
-import { fetchActiveDays, fetchTimeline } from './api/monitor-api';
+import { fetchActiveDays, fetchTimeline, TimelineReadError } from './api/monitor-api';
 import './styles/war-room.css';
 
 export type MonitorMode = 'LIVE' | 'PLAYBACK' | 'FORECAST';
@@ -74,6 +74,8 @@ const WarRoomPage: React.FC = () => {
   const panelDataState = dataAvailable
     ? (!online || selectedQuery.isError || staleLive ? 'stale' : 'ready')
     : (!online ? 'offline' : selectedQuery.isError || missingData ? 'error' : 'loading');
+  const panelErrorDetail = mode === 'PLAYBACK' && timelineData.error instanceof TimelineReadError
+    ? timelineData.error.message : undefined;
   const closeMonitor = useCallback(() => navigate(monitorReturnPath(routerLocation.pathname)), [navigate, routerLocation.pathname]);
 
   // Active days for date navigator
@@ -393,7 +395,6 @@ const WarRoomPage: React.FC = () => {
         <div className="wr-data-status flex items-center justify-between gap-2 px-4 border-b border-neutral-200 bg-white text-neutral-700">
           <p role="status" className={`text-xs ${dataStatus === 'Sin actualizar' || !online ? 'text-amber-800 font-semibold' : ''}`}>
             {dataStatus}{selectedQuery.dataUpdatedAt ? ` · última respuesta ${formatTimeShort(new Date(selectedQuery.dataUpdatedAt).toISOString())}` : ''}
-            {mode === 'PLAYBACK' && timelineData.isError && ` · ${timelineData.error.message}`}
           </p>
           <button type="button" aria-label="Actualizar datos del Monitor" disabled={!online || selectedQuery.isFetching} onClick={()=>void selectedQuery.refetch()} className="min-h-11 text-xs font-semibold text-[#1B5E3C] px-2 rounded hover:bg-neutral-100 disabled:opacity-50">Actualizar</button>
         </div>
@@ -405,6 +406,7 @@ const WarRoomPage: React.FC = () => {
         <DashboardPanels
           now={now}
           dataState={panelDataState}
+          errorDetail={panelErrorDetail}
           mode={mode}
           liveData={liveData.data || null}
           forecastData={forecastData.data || null}
