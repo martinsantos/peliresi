@@ -1,7 +1,7 @@
 import {api} from './api';
 import {manifiestoService} from './manifiesto.service';
 import {limitedLegReceipt,limitedLegRequest,relayCapabilityVersion,type TransportGpsPoint,type LimitedTransportUpload} from './limited-transport-gps';
-import {matchesGpsReceipt} from './gpsReceipts';
+import {parseGpsReceipt} from './gpsReceipts';
 export interface FleetGpsLoad {
   key:string;kind:'MANIFIESTO'|'RELEVO';id:string;numero:string;origen:string;destino:string;
   fechaInicio:string|null;referenciaTiempo:string;patente:string|null;puedeEntregar:boolean;gpsDisponible:boolean;
@@ -24,14 +24,15 @@ export const fleetGpsService={
     try{response=await api.get(`/manifiestos/${encodeURIComponent(load.id)}/ubicaciones/${encodeURIComponent(puntoId)}/confirmacion`);}
     catch(error){if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');throw error;}
     if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');
-    return matchesGpsReceipt(response,{lat:point.latitud,lng:point.longitud,speed:point.velocidad??null,heading:point.direccion??null,puntoId});
+    return parseGpsReceipt(response,{lat:point.latitud,lng:point.longitud,speed:point.velocidad??null,heading:point.direccion??null,puntoId});
   },
   async prepareRelay(load:FleetGpsLoad,credentials:Map<string,string>,isCurrent:()=>boolean):Promise<string>{
     if(load.kind!=='RELEVO')throw new Error('No se pudo identificar el relevo.');
     return (await relayAccess(load,credentials,isCurrent)).version;
   },
   async verifyRelay(load:FleetGpsLoad,point:TransportGpsPoint,puntoId:string,expectedVersion:string|null|undefined,credentials:Map<string,string>,isCurrent:()=>boolean):Promise<boolean>{
-    if(load.kind!=='RELEVO'||!expectedVersion)return false;
+    if(load.kind!=='RELEVO')throw new Error('No se pudo identificar el relevo.');
+    if(!expectedVersion)throw new Error('No se pudo verificar la autorización anterior del relevo. Conservá este dispositivo y consultá a soporte.');
     const {token}=await relayAccess(load,credentials,isCurrent);
     try{const result=await limitedLegReceipt(load.id,token,point,puntoId,expectedVersion);if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');return result;}
     catch(error){if(error&&typeof error==='object'&&'status'in error&&[401,403].includes(Number(error.status)))credentials.delete(load.key);throw error;}

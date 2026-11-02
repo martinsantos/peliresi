@@ -14,6 +14,21 @@ export function matchesGpsReceipt(response: unknown, point: PendingGpsPoint): bo
     && sameOptionalGpsNumber(saved.velocidad, point.speed) && sameOptionalGpsNumber(saved.direccion, point.heading);
 }
 
+/** A negative receipt must be explicit and scoped to the requested reference. */
+export function parseGpsReceipt(response: unknown, point: PendingGpsPoint): boolean {
+  const body = (response as { data?: { success?: unknown; data?: { idempotencia?: { version?: unknown; puntoId?: unknown; confirmado?: unknown }; tracking?: unknown } } } | undefined)?.data;
+  const data = body?.data, receipt = data?.idempotencia;
+  if (typeof point.puntoId !== 'string' || !point.puntoId || body?.success !== true || receipt?.version !== 1 || receipt.puntoId !== point.puntoId || typeof receipt.confirmado !== 'boolean') {
+    throw new GpsPendingError('No se pudo verificar la ubicación anterior. Conservá este dispositivo y consultá a soporte.');
+  }
+  if (!receipt.confirmado) {
+    if (!data || !Object.hasOwn(data, 'tracking') || data.tracking !== null) throw new GpsPendingError('La comprobación de ubicación no es válida. Conservá este dispositivo y consultá a soporte.');
+    return false;
+  }
+  if (!matchesGpsReceipt(response, point)) throw new GpsPendingError('La ubicación confirmada no coincide. Conservá este dispositivo y consultá a soporte.', 'conflict');
+  return true;
+}
+
 /** Read-only reconciliation. It deliberately never removes or rewrites the
  * shared queue: another tab may still be adding a location. */
 export async function verifyStoredGpsReceipts(ownerId: string | number, id: string, contextOwner?: string): Promise<GpsReceiptSummary> {

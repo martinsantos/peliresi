@@ -217,13 +217,11 @@ export const consultarConfirmacionUbicacion = async (req: AuthRequest, res: Resp
       const point = await tx.trackingGPS.findUnique({ where: { id: trackingId }, select: {
         manifiestoId: true, emisor: true, tramoId: true, latitud: true, longitud: true, velocidad: true, direccion: true,
       } });
-      if (!point || point.manifiestoId !== id || point.emisor !== `usuario:${userId}` || point.tramoId !== null) {
-        throw new AppError('Ubicación no encontrada', 404);
-      }
+      if (!point || point.manifiestoId !== id || point.emisor !== `usuario:${userId}` || point.tramoId !== null) return null;
       return { latitud: point.latitud, longitud: point.longitud, velocidad: point.velocidad ?? null, direccion: point.direccion ?? null };
     });
     res.set('Cache-Control', 'private, no-store');
-    res.json({ success: true, data: { idempotencia: { version: 1, puntoId, confirmado: true }, tracking } });
+    res.json({ success: true, data: { idempotencia: { version: 1, puntoId, confirmado: tracking !== null }, tracking } });
   } catch (error) { next(error); }
 };
 

@@ -58,6 +58,14 @@ it('checks a saved relay receipt under the current activity and capability, incl
   await expect(fleetGpsService.verifyRelay(load,point,reference,version,credentials,()=>false)).rejects.toThrow(/cuenta o actividad cambió/i);
   expect(mocks.receipt).toHaveBeenCalledTimes(2);
 });
+it('does not treat a missing relay authorization version as a negative receipt',async()=>{
+  const load={...base,kind:'RELEVO'} as FleetGpsLoad;
+  for (const missing of [null,undefined,'']) {
+    await expect(fleetGpsService.verifyRelay(load,point,reference,missing,new Map(),()=>true)).rejects.toThrow(/autorización anterior/i);
+  }
+  expect(mocks.post).not.toHaveBeenCalled();
+  expect(mocks.receipt).not.toHaveBeenCalled();
+});
 it('accepts a durably rebound version while still rejecting an unexpected version',async()=>{
   const old='1949916e-22df-4dc1-9d1e-98f98a3eab26',current='3a999c28-2e6a-4fd0-9127-777a7db7af3e';
   const id='491d2c6e-803c-48d3-a021-23eac2d75a62',load={...base,kind:'RELEVO'} as FleetGpsLoad,credentials=new Map<string,string>([['a',token(old)]]);
@@ -79,5 +87,13 @@ it('accepts an old receipt only when the reference and exact coordinates match',
   mocks.get.mockResolvedValueOnce({data:{success:true,data:{idempotencia:{version:1,puntoId:reference,confirmado:true},tracking:{latitud:-33,longitud:-69,velocidad:2,direccion:90}}}});
   expect(await fleetGpsService.verify({...base,kind:'MANIFIESTO'},point,reference,()=>true)).toBe(true);
   mocks.get.mockResolvedValueOnce({data:{success:true,data:{idempotencia:{version:1,puntoId:reference,confirmado:true},tracking:{latitud:-34,longitud:-69,velocidad:2,direccion:90}}}});
+  await expect(fleetGpsService.verify({...base,kind:'MANIFIESTO'},point,reference,()=>true)).rejects.toThrow(/no coincide/i);
+});
+it('accepts only an explicit negative receipt for the same reference',async()=>{
+  mocks.get.mockResolvedValueOnce({data:{success:true,data:{idempotencia:{version:1,puntoId:reference,confirmado:false},tracking:null}}});
   expect(await fleetGpsService.verify({...base,kind:'MANIFIESTO'},point,reference,()=>true)).toBe(false);
+  mocks.get.mockResolvedValueOnce({data:{success:true,data:{idempotencia:{version:1,puntoId:'other',confirmado:false},tracking:null}}});
+  await expect(fleetGpsService.verify({...base,kind:'MANIFIESTO'},point,reference,()=>true)).rejects.toThrow(/no se pudo verificar/i);
+  mocks.get.mockResolvedValueOnce({data:{success:true,data:{idempotencia:{version:1,puntoId:reference,confirmado:false},tracking:{}}}});
+  await expect(fleetGpsService.verify({...base,kind:'MANIFIESTO'},point,reference,()=>true)).rejects.toThrow(/no es válida/i);
 });

@@ -24,6 +24,14 @@ export class GpsPendingError extends Error {
   }
 }
 
+/** The saved point cannot be confirmed or safely replayed as a current fix. */
+export class GpsUnconfirmedPreviousPointError extends GpsPendingError {
+  constructor() {
+    super('SITREP no confirmó una ubicación anterior. Se conserva en este dispositivo; contactá a soporte antes de continuar.');
+    this.name = 'GpsUnconfirmedPreviousPointError';
+  }
+}
+
 export interface PendingGpsPoint {
   lat: number;
   lng: number;
@@ -100,8 +108,12 @@ export async function deliverPendingGpsPoint(
     return 'sent';
   }
   if (point.puntoId && verify) {
-    try { if (await verify(point)) return 'verified'; }
+    try {
+      if (await verify(point)) return 'verified';
+      throw new GpsUnconfirmedPreviousPointError();
+    }
     catch (error) {
+      if (error instanceof GpsUnconfirmedPreviousPointError) throw error;
       const status = (error as { response?: { status?: number } } | null)?.response?.status;
       if (status !== 404 && status !== 405 && status !== 501) throw error;
       // A missing receipt, older server or inaccessible resource is not proof

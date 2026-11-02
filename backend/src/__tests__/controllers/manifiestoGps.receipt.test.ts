@@ -29,11 +29,15 @@ it('reads a matching receipt after delivery without inserting a point or emittin
   expect(db.create).not.toHaveBeenCalled(); expect(db.emit).not.toHaveBeenCalled();
 });
 
-it('returns 404 for a missing receipt or another account even on the same carrier', async () => {
-  const missing = vi.fn(); await consultarConfirmacionUbicacion(request('d8256c28-2e6a-4fd0-9127-777a7db7af3e'), response(), missing);
-  expect(missing).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
-  const other = vi.fn(); await consultarConfirmacionUbicacion(request(puntoId, 'carrier', 'other-user'), response(), other);
-  expect(other).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 })); expect(db.create).not.toHaveBeenCalled();
+it('returns an explicit absence without revealing another account’s receipt', async () => {
+  const reference = 'd8256c28-2e6a-4fd0-9127-777a7db7af3e', missing = vi.fn(), absent = response();
+  await consultarConfirmacionUbicacion(request(reference), absent, missing);
+  expect(missing).not.toHaveBeenCalled();
+  expect(absent.json).toHaveBeenCalledWith({ success: true, data: { idempotencia: { version: 1, puntoId: reference, confirmado: false }, tracking: null } });
+  const other = vi.fn(), otherResponse = response(); await consultarConfirmacionUbicacion(request(puntoId, 'carrier', 'other-user'), otherResponse, other);
+  expect(other).not.toHaveBeenCalled();
+  expect(otherResponse.json).toHaveBeenCalledWith({ success: true, data: { idempotencia: { version: 1, puntoId, confirmado: false }, tracking: null } });
+  expect(db.create).not.toHaveBeenCalled(); expect(db.emit).not.toHaveBeenCalled();
 });
 
 it('checks the live actor and site scope before looking up a receipt', async () => {
@@ -46,6 +50,14 @@ it('checks the live actor and site scope before looking up a receipt', async () 
   const allowed = response(), next = vi.fn(); await consultarConfirmacionUbicacion(own, allowed, next);
   expect(next).not.toHaveBeenCalled(); expect(allowed.json).toHaveBeenCalled();
   expect(db.query.mock.calls.some(([parts]: [TemplateStringsArray]) => parts.join('').includes('"contextoEmpresa"'))).toBe(true);
+});
+
+it('never reveals a point whose stored emitter or leg does not match', async () => {
+  db.find.mockResolvedValueOnce({ ...point, emisor: 'usuario:other-user' });
+  const res = response(), next = vi.fn(); await consultarConfirmacionUbicacion(request(), res, next);
+  expect(next).not.toHaveBeenCalled();
+  expect(res.json).toHaveBeenCalledWith({ success: true, data: { idempotencia: { version: 1, puntoId, confirmado: false }, tracking: null } });
+  expect(db.create).not.toHaveBeenCalled(); expect(db.emit).not.toHaveBeenCalled();
 });
 
 it('rejects an invalid reference and never reads a point or creates data', async () => {

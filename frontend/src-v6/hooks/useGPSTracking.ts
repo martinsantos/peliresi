@@ -13,8 +13,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
 import api from '../services/api';
-import { matchesGpsReceipt } from '../services/gpsReceipts';
-import { GpsPendingError, acknowledgeGpsPoint, deliverPendingGpsPoint, gpsStorageErrorMessage, gpsTasksForTrip, hasVolatileGpsQueue, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
+import { parseGpsReceipt } from '../services/gpsReceipts';
+import { GpsPendingError, GpsUnconfirmedPreviousPointError, acknowledgeGpsPoint, deliverPendingGpsPoint, gpsStorageErrorMessage, gpsTasksForTrip, hasVolatileGpsQueue, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
 import { subscribeDeliveryConfirmed } from '../services/offlineSyncEvents';
 import { adoptParkedGpsLease, gpsLeaseClosing, parkGpsLease, rememberGpsLeaseClosing, startGpsLease, withGpsTransitionLock, type GpsLease } from '../services/gpsCoordination';
 import { EstadoManifiesto } from '../types/models';
@@ -149,7 +149,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
         ensureSession();
         const receipt = await api.get(`/manifiestos/${encodeURIComponent(tripId)}/ubicaciones/${encodeURIComponent(p.puntoId!)}/confirmacion`);
         ensureSession();
-        return matchesGpsReceipt(receipt, p);
+        return parseGpsReceipt(receipt, p);
       });
     // A response after a context switch is uncertain for this screen. Keep
     // the original reference so the authorized activity can safely retry.
@@ -328,10 +328,14 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
       }
       if (!setPendingUpdates(pending)) { reportSendError(new GpsPendingError(gpsStorageErrorMessage('storage'))); return; }
       let lastResult: 'sent' | 'verified' | null = null;
-      while (pending.length && active()) {
-        const point = pending[0];
+      let previousUnconfirmed: GpsUnconfirmedPreviousPointError | null = null;
+      for (const point of [...pending]) {
+        if (!active()) break;
         try { lastResult = await sendPoint(id, point); }
-        catch (error) { if (active()) reportSendError(error); return; }
+        catch (error) {
+          if (error instanceof GpsUnconfirmedPreviousPointError) { previousUnconfirmed = error; continue; }
+          if (active()) reportSendError(error); return;
+        }
         // A confirmed response may race with stopping the watcher; remove only
         // that exact point and keep any later fix saved during the stop.
         const acknowledged = acknowledgePendingUpdate(point);
@@ -342,7 +346,8 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
         pending = acknowledged.points;
         if (active() && lastResult === 'sent') setLastSyncAt(new Date());
       }
-      if (active() && pending.length === 0) { clearSendError(); setGpsSendStatus(lastResult === 'verified' ? 'verified' : 'ok'); }
+      if (active() && previousUnconfirmed && pending.length) reportSendError(previousUnconfirmed);
+      else if (active() && pending.length === 0) { clearSendError(); setGpsSendStatus(lastResult === 'verified' ? 'verified' : 'ok'); }
     });
   }, [acknowledgePendingUpdate, clearSendError, context, contextOwner, id, owner, reportSendError, sendPoint, setPendingUpdates]);
 
@@ -495,6 +500,7 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
         catch (error) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage'); return; }
         if (parsed.length > 0) {
             if (!setPendingUpdates(parsed)) { setGpsSendStatus('error'); return; }
+            let previousUnconfirmed: GpsUnconfirmedPreviousPointError | null = null;
             for (const p of parsed) {
               if (!isMounted || uploadsStoppedRef.current || activeContextRef.current !== context) break;
               try {
@@ -504,10 +510,12 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
                 if (!acknowledged?.ok || !acknowledged.durable) break;
                 if (isMounted && activeContextRef.current === context && acknowledged.points.length === 0) { clearSendError(); setGpsSendStatus(result === 'verified' ? 'verified' : 'ok'); }
               } catch (error) {
+                if (error instanceof GpsUnconfirmedPreviousPointError) { previousUnconfirmed = error; continue; }
                 if (isMounted && activeContextRef.current === context) reportSendError(error);
                 break;
               }
             }
+            if (previousUnconfirmed && isMounted && activeContextRef.current === context && pendingUpdatesRef.current.length) reportSendError(previousUnconfirmed);
         }
       })();
       trackGpsTask(id, replay);
@@ -654,10 +662,12 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
         if (isNewObservation) lastQueuedObservationRef.current = observation.key;
         if (!durable) { if (isActive()) setGpsSendStatus('error'); return; }
         let lastResult: 'sent' | 'verified' | null = null;
+        let previousUnconfirmed: GpsUnconfirmedPreviousPointError | null = null;
         for (const queued of [...pending]) {
           if (!isActive()) return;
           try { lastResult = await sendPoint(id, queued); }
           catch (error) {
+            if (error instanceof GpsUnconfirmedPreviousPointError) { previousUnconfirmed = error; continue; }
             if (isActive()) {
               reportSendError(error);
             }
@@ -668,7 +678,8 @@ export function useGPSTracking({ manifiestoId, ownerId, leaseOwner, sessionConte
           pending = acknowledged.points;
           if (isActive() && lastResult === 'sent') setLastSyncAt(new Date());
         }
-        if (isActive() && pending.length === 0) { clearSendError(); setGpsSendStatus(lastResult === 'verified' ? 'verified' : 'ok'); }
+        if (isActive() && previousUnconfirmed && pending.length) reportSendError(previousUnconfirmed);
+        else if (isActive() && pending.length === 0) { clearSendError(); setGpsSendStatus(lastResult === 'verified' ? 'verified' : 'ok'); }
       })());
     }, 30000);
 
