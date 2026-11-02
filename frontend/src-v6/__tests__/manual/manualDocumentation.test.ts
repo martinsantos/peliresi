@@ -23,6 +23,8 @@ describe('manual documentation stays usable and truthful', () => {
     const font = Buffer.from(encoded, 'base64');
     expect(font.subarray(0, 4).toString('ascii')).toBe('wOF2');
     expect(createHash('sha256').update(font).digest('hex')).toBe(metadata.font_sha256);
+    const localFont = readFileSync(manual + 'material-symbols-rounded-manual.woff2');
+    expect(createHash('sha256').update(localFont).digest('hex')).toBe(metadata.font_sha256);
     const used = new Set<string>();
     for (const file of ['index.html', 'search.html', 'tutorial.html', 'manual.js', 'help-data.js']) {
       const source = readFileSync(manual + file, 'utf8');
