@@ -76,17 +76,19 @@
     grid-column: 1 / -1;
     grid-row: 2;
     min-width: 0;
+    flex-wrap: wrap;
   }
 
   .wr-mode-selector > button {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 auto;
+    min-width: max-content;
     min-height: 44px;
     justify-content: center;
-    padding-left: 8px;
-    padding-right: 8px;
+    padding-left: 3px;
+    padding-right: 3px;
     font-size: 13px;
-    gap: 6px;
+    gap: 3px;
+    white-space: nowrap;
   }
   .wr-mode-selector svg { flex-shrink: 0; }
 
