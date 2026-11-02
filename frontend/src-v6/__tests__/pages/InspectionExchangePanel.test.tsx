@@ -325,6 +325,7 @@ describe('InspectionExchangePanel', () => {
     expect(await screen.findByText('Último plazo · histórico')).toBeInTheDocument();
     expect(screen.getByTestId('inspection-next-step')).toHaveTextContent('Seguimiento cerrado conforme');
     expect(screen.queryByText('Plazo vencido')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tu respuesta queda registrada/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Responder requerimiento/ })).not.toBeInTheDocument();
   });
 

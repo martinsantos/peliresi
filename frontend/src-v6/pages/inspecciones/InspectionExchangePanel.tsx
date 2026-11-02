@@ -646,7 +646,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
               </div>;
             })}
           </div>}
-          {party === 'AUTORIDAD' ? (<p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>) : <p className="mt-3 text-xs text-neutral-600">Tu respuesta queda registrada y la autoridad recibe un aviso.</p>}
+          {party === 'AUTORIDAD' ? (<p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>) : open ? <p className="mt-3 text-xs text-neutral-600">Tu respuesta queda registrada y la autoridad recibe un aviso.</p> : null}
         </div>
       </Card>
 
