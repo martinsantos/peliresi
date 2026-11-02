@@ -212,6 +212,7 @@ interface Props {
   inspectionError?: boolean;
   inspectionLoading?: boolean;
   mode: MonitorMode;
+  dataState?: 'ready' | 'stale' | 'loading' | 'error' | 'offline';
   liveData: MonitorLiveResponse | null;
   forecastData: ForecastResponse | null;
   timelineData: TimelineResponse | null;
@@ -241,7 +242,7 @@ interface Props {
 
 export const DashboardPanels: React.FC<Props> = ({
   now, inspections, inspectionTotal, inspectionError, inspectionLoading,
-  mode, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
+  mode, dataState = 'ready', liveData, forecastData, timelineData, playbackCounters, playbackEvents,
   currentEventId, enTransito = [], currentEvent, currentEventIndex = 0,
   totalEventCount = 0, onTripClick, onEventOpen, onViajeOpen,
 }) => {
@@ -261,7 +262,10 @@ export const DashboardPanels: React.FC<Props> = ({
   const minimize = (id: WId) => setWs(p => ({ ...p, [id]: p[id] === 'minimized' ? 'visible' : 'minimized' }));
   const close    = (id: WId) => setWs(p => ({ ...p, [id]: 'closed' }));
   const restore  = (id: WId) => setWs(p => ({ ...p, [id]: 'visible' }));
-  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed' && (w.id !== 'inspecciones' || inspections !== undefined));
+  const dataAvailable = dataState === 'ready' || dataState === 'stale';
+  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed'
+    && (w.id !== 'inspecciones' || inspections !== undefined)
+    && (dataAvailable || w.id === 'inspecciones'));
 
   // ── Drag divider ──
   const containerRef = useRef<HTMLDivElement>(null);
@@ -277,7 +281,7 @@ export const DashboardPanels: React.FC<Props> = ({
     : (liveData?.estadisticas?.porEstado || {});
   const maxEstado = Math.max(...Object.values(porEstado), 1);
   const stages = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
-  const eventos = playbackEvents || liveData?.eventosRecientes || [];
+  const eventos = mode === 'PLAYBACK' ? (playbackEvents || []) : (liveData?.eventosRecientes || []);
 
   // In PLAYBACK: derive Residuos/Tratamiento/Actores from timelineData events
   // (gives stats relevant to the selected day, not the live snapshot)
@@ -321,10 +325,10 @@ export const DashboardPanels: React.FC<Props> = ({
     };
   }, [mode, timelineData]);
 
-  const topGeneradores = timelineActores?.generadores || liveData?.topGeneradores || [];
-  const topOperadores = timelineActores?.operadores || liveData?.topOperadores || [];
-  const topResiduos = timelineResidues || liveData?.topResiduos || [];
-  const tratamientosActivos = timelineTratamientos || liveData?.tratamientosActivos || [];
+  const topGeneradores = mode === 'PLAYBACK' ? (timelineActores?.generadores || []) : (liveData?.topGeneradores || []);
+  const topOperadores = mode === 'PLAYBACK' ? (timelineActores?.operadores || []) : (liveData?.topOperadores || []);
+  const topResiduos = mode === 'PLAYBACK' ? (timelineResidues || []) : (liveData?.topResiduos || []);
+  const tratamientosActivos = mode === 'PLAYBACK' ? (timelineTratamientos || []) : (liveData?.tratamientosActivos || []);
 
   return (
     <div ref={containerRef} className={`wr-dashboard flex flex-col h-full overflow-hidden p-3 gap-0 ${mode === 'FORECAST' ? 'wr-dashboard-pending' : ''}`}>
@@ -332,11 +336,17 @@ export const DashboardPanels: React.FC<Props> = ({
       {/* ── ZONA STATS — altura controlada por divider ── */}
       <div
         className="flex flex-col gap-2 overflow-y-auto flex-shrink-0 pb-2"
-        style={{ height: mode === 'FORECAST' ? '100%' : `calc(${dividerPct}% - 28px)` }}
+        style={{ height: mode === 'FORECAST' || !dataAvailable ? '100%' : `calc(${dividerPct}% - 28px)` }}
       >
+        {dataState !== 'ready' && <p role="status" className="wr-panel p-3 text-sm text-neutral-700">
+          {dataState === 'loading' ? 'Cargando los datos del Monitor…'
+            : dataState === 'offline' ? 'Sin conexión. Conectate para consultar los datos del Monitor.'
+            : dataState === 'error' ? 'No pudimos cargar los datos del Monitor. Usá Actualizar para reintentar.'
+            : 'Consulta sin actualizar. Los datos mostrados pueden haber cambiado.'}
+        </p>}
         {mode !== 'FORECAST' && <>
         {/* Widget: Pipeline */}
-        {ws.pipeline !== 'closed' && (
+        {dataAvailable && ws.pipeline !== 'closed' && (
           <WidgetShell title="Estados del manifiesto" icon={GitBranch}
             state={ws.pipeline} onMin={() => minimize('pipeline')} onClose={() => close('pipeline')}>
             <div className="flex flex-col gap-1">
@@ -380,13 +390,16 @@ export const DashboardPanels: React.FC<Props> = ({
           {!!inspectionTotal && inspectionTotal > inspections.length && <Link className="text-xs text-primary-700" to="/inspecciones">Ver agenda completa ({inspectionTotal})</Link>}
         </WidgetShell>}
         {/* Widget: Viajes */}
-        {ws.viajes !== 'closed' && (
+        {dataAvailable && ws.viajes !== 'closed' && (
           <WidgetShell title="Viajes" icon={Truck}
             state={ws.viajes} onMin={() => minimize('viajes')} onClose={() => close('viajes')}>
             {enTransito.length === 0 ? (
-              <p className="text-[11px] text-neutral-400 text-center py-2">{mode === 'PLAYBACK' ? 'Sin viajes en este momento del historial' : 'Sin viajes activos'}</p>
+              <p className="text-xs text-neutral-600 text-center py-2">{dataState === 'stale'
+                ? 'La última consulta no tenía viajes. No se pudo actualizar.'
+                : mode === 'PLAYBACK' ? 'Sin viajes en este momento del historial' : 'Sin viajes activos'}</p>
             ) : (
               <div className="space-y-1">
+                {mode === 'LIVE' && enTransito.some(v => v.ruta.length > 1) && <p className="text-xs text-neutral-600">Las líneas unen posiciones por orden de recepción; no confirman el recorrido.</p>}
                 {enTransito.map(v => (
                   <button key={v.manifiestoId} type="button" aria-label={`Abrir viaje ${v.numero}`}
                     className="w-full text-left min-h-11 flex items-start gap-2 py-2 px-1 rounded hover:bg-orange-50 cursor-pointer transition-colors"
@@ -418,7 +431,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Manifiesto (compact card, no dark background) */}
-        {ws.manifiesto !== 'closed' && (
+        {dataAvailable && ws.manifiesto !== 'closed' && (
           <WidgetShell title="Manifiesto" icon={FileText}
             state={ws.manifiesto} onMin={() => minimize('manifiesto')} onClose={() => close('manifiesto')}>
             <ManifiestoCard
@@ -430,7 +443,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Top Actores */}
-        {ws.actores !== 'closed' && (topGeneradores.length > 0 || topOperadores.length > 0) && (
+        {dataAvailable && ws.actores !== 'closed' && (topGeneradores.length > 0 || topOperadores.length > 0) && (
           <WidgetShell title="Actores" icon={Users}
             state={ws.actores} onMin={() => minimize('actores')} onClose={() => close('actores')}>
             <h4 className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Top Generadores</h4>
@@ -473,7 +486,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Residuos */}
-        {ws.residuos !== 'closed' && (
+        {dataAvailable && ws.residuos !== 'closed' && (
           <WidgetShell title="Residuos" icon={Droplets}
             state={ws.residuos} onMin={() => minimize('residuos')} onClose={() => close('residuos')}>
             {(() => {
@@ -493,7 +506,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Tratamiento */}
-        {ws.tratamiento !== 'closed' && tratamientosActivos.length > 0 && (
+        {dataAvailable && ws.tratamiento !== 'closed' && tratamientosActivos.length > 0 && (
           <WidgetShell title="Tratamiento" icon={Beaker}
             state={ws.tratamiento} onMin={() => minimize('tratamiento')} onClose={() => close('tratamiento')}>
             {(() => {
@@ -520,7 +533,7 @@ export const DashboardPanels: React.FC<Props> = ({
 
         </>}
         {/* Actual pending work, not a prediction or cached live snapshot. */}
-        {mode === 'FORECAST' && forecastData && (
+        {mode === 'FORECAST' && dataAvailable && forecastData && (
           <>
             <div className="wr-panel p-3">
               <h3 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -598,12 +611,12 @@ export const DashboardPanels: React.FC<Props> = ({
       </div>
 
       {/* ── DRAG DIVIDER ── */}
-      {mode !== 'FORECAST' && <label className="wr-panel-divider flex items-center gap-2 min-h-7 px-1 text-xs text-neutral-600">
+      {mode !== 'FORECAST' && dataAvailable && <label className="wr-panel-divider flex items-center gap-2 min-h-7 px-1 text-xs text-neutral-600">
         <span>Paneles</span><input type="range" min={25} max={75} value={dividerPct} aria-label="Espacio para paneles del Monitor" className="flex-1 min-w-0 accent-[#1B5E3C]" onChange={event=>setDividerPct(Number(event.target.value))}/><span>Eventos</span>
       </label>}
 
       {/* ── ZONA EVENTOS — takes remaining height ── */}
-      {mode !== 'FORECAST' && <WidgetShell
+      {mode !== 'FORECAST' && dataAvailable && <WidgetShell
         title="Eventos"
         icon={Radio}
         state={ws.eventos}
@@ -611,12 +624,15 @@ export const DashboardPanels: React.FC<Props> = ({
         className="flex-1 min-h-0 overflow-hidden"
       >
         <div className="h-full overflow-y-auto -mr-1 pr-1">
+          {dataState === 'stale' && eventos.length === 0
+            ? <p className="text-sm text-neutral-600 text-center py-4">La última consulta no tenía eventos. No se pudo actualizar.</p>
+            :
           <EventFeed
             eventos={eventos}
             mode={mode}
             currentEventId={currentEventId}
             onEventClick={onEventOpen}
-          />
+          />}
         </div>
       </WidgetShell>}
     </div>

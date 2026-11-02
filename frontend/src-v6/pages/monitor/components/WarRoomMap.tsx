@@ -460,6 +460,7 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
                     )}
                     <MonitorPosition position={lastPos} now={now} />
                     <p className="text-xs text-neutral-600">{trip.ruta.length} {trip.ruta.length === 1 ? 'punto incluido' : 'puntos incluidos'} en la consulta</p>
+                    {trip.ruta.length > 1 && <p className="text-xs text-neutral-600">La línea une posiciones por orden de recepción; no confirma el recorrido.</p>}
                   </LivePopup>
                 </MonitorPopup>
               </Marker>

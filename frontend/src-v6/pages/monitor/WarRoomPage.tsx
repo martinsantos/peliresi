@@ -64,8 +64,13 @@ const WarRoomPage: React.FC = () => {
   }, []);
   const selectedQuery=mode==='LIVE'?liveData:mode==='PLAYBACK'?timelineData:forecastData;
   const staleLive=mode==='LIVE' && !!liveData.dataUpdatedAt && now-liveData.dataUpdatedAt>45000;
-  const liveCurrent=mode==='LIVE' && online && !liveData.isError && !!liveData.dataUpdatedAt && !staleLive;
-  const dataStatus=!online?'Sin conexión':selectedQuery.isError || staleLive?'Sin actualizar':selectedQuery.isPending?'Cargando datos':selectedQuery.isFetching?'Actualizando datos':'Datos actualizados';
+  const missingData = selectedQuery.isSuccess && selectedQuery.data == null;
+  const liveCurrent=mode==='LIVE' && online && !liveData.isError && !!liveData.data && !!liveData.dataUpdatedAt && !staleLive;
+  const dataStatus=!online?'Sin conexión':selectedQuery.isError || staleLive || missingData?'Sin actualizar':selectedQuery.isPending?'Cargando datos':selectedQuery.isFetching?'Actualizando datos':'Datos actualizados';
+  const dataAvailable = selectedQuery.data != null;
+  const panelDataState = dataAvailable
+    ? (!online || selectedQuery.isError || staleLive ? 'stale' : 'ready')
+    : (!online ? 'offline' : selectedQuery.isError || missingData ? 'error' : 'loading');
   const closeMonitor = useCallback(() => navigate(monitorReturnPath(routerLocation.pathname)), [navigate, routerLocation.pathname]);
 
   // Active days for date navigator
@@ -396,6 +401,7 @@ const WarRoomPage: React.FC = () => {
 
         <DashboardPanels
           now={now}
+          dataState={panelDataState}
           mode={mode}
           liveData={liveData.data || null}
           forecastData={forecastData.data || null}
@@ -403,7 +409,7 @@ const WarRoomPage: React.FC = () => {
           playbackCounters={playbackCountersForPipeline}
           playbackEvents={eventosRecientes}
           currentEventId={mode === 'PLAYBACK' && playback.currentEvent ? `pb-0-${playback.currentEvent.manifiestoId}` : undefined}
-          enTransito={enTransito}
+          enTransito={dataAvailable ? enTransito : []}
           currentEvent={currentEventForSidebar}
           currentEventIndex={mode === 'PLAYBACK' ? playback.currentEventIndex : 0}
           totalEventCount={mode === 'PLAYBACK' ? playback.totalEventCount : (liveData.data?.estadisticas?.total ?? 0)}
@@ -431,7 +437,7 @@ const WarRoomPage: React.FC = () => {
           onMinimize={minimizePanel}
         />
         {/* A compact entry to the same detail keeps the map visible. */}
-        {mode === 'PLAYBACK' && playback.currentEvent && (
+        {mode === 'PLAYBACK' && dataAvailable && playback.currentEvent && (
           <button type="button" aria-label="Abrir detalle del evento actual"
             className="wr-current-event absolute top-3 left-3 z-[1001] max-w-[calc(100%_-_24px)] min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-300 bg-white text-neutral-800 shadow-sm text-left hover:bg-neutral-50"
             onClick={() => { if(playback.currentEvent) handleEventOpen({...playback.currentEvent,tipo:playback.currentEvent.eventoTipo || 'EVENTO'}); }}>
@@ -443,13 +449,13 @@ const WarRoomPage: React.FC = () => {
           now={now}
           inspections={mode === 'LIVE' ? inspections.data?.items || [] : []}
           cinemaMode={cinemaMode}
-          actores={actores || null}
-          enTransito={enTransito}
+          actores={dataAvailable ? actores || null : null}
+          enTransito={dataAvailable ? enTransito : []}
           mode={mode}
           currentHour={mode === 'PLAYBACK' ? playback.currentHour : undefined}
-          playbackTrips={mode === 'PLAYBACK' ? playback.activeTrips : undefined}
-          currentEvent={currentEventForMap ?? (forcedFlyTo ? { lat: forcedFlyTo.lat, lng: forcedFlyTo.lng, tipo: 'GPS', manifiestoNumero: '' } : null)}
-          playbackEvents={mode === 'PLAYBACK' ? playbackEventFeed.map(e => ({
+          playbackTrips={mode === 'PLAYBACK' && dataAvailable ? playback.activeTrips : undefined}
+          currentEvent={dataAvailable ? currentEventForMap ?? (forcedFlyTo ? { lat: forcedFlyTo.lat, lng: forcedFlyTo.lng, tipo: 'GPS', manifiestoNumero: '' } : null) : null}
+          playbackEvents={mode === 'PLAYBACK' && dataAvailable ? playbackEventFeed.map(e => ({
             id: e.id,
             tipo: e.tipo,
             lat: e.latitud ?? 0,
