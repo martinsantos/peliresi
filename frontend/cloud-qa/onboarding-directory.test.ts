@@ -53,6 +53,9 @@ test('the admission figure and scrollable tables use the current directory style
   const css = readFileSync(new URL('../../docs/manual/directorio.css', import.meta.url));
   const cssHash = createHash('sha256').update(css).digest('hex').slice(0, 12);
   assert.ok(directory.includes('directorio.css?v=' + cssHash));
+  const script = readFileSync(new URL('../../docs/manual/directorio.js', import.meta.url));
+  const scriptHash = createHash('sha256').update(script).digest('hex').slice(0, 12);
+  assert.ok(directory.includes('directorio.js?v=' + scriptHash));
   assert.match(moduleBody, /class="cu-screenshot admission-figure"/);
   assert.match(moduleBody, /<table tabindex="0" aria-label="Estados y responsabilidades de la inscripción">/);
   assert.match(css.toString(), /\.admission-figure\s*\{\s*max-width:\s*393px/);
