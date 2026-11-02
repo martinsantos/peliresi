@@ -85,3 +85,29 @@ describe('physical start uses the server readiness of the complete proposal', ()
     expect(screen.queryByRole('button', { name: 'Firmar Manifiesto' })).not.toBeInTheDocument();
   });
 });
+
+describe('rejection presentation follows recorded events',()=>{
+ it('does not describe a refused proposal as rejected cargo or duplicate its guidance',()=>{
+  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+  mount({estado:EstadoManifiesto.RECHAZADO,eventos:[...marker,{tipo:'RECHAZO_PARTE'}] as NonNullable<Manifiesto['eventos']>},'OPERADOR');
+  expect(screen.getByText('Panel de aprobaciones')).toBeVisible();
+  expect(screen.queryByText('Carga rechazada')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Próximo paso del manifiesto')).not.toBeInTheDocument();
+  vi.unstubAllEnvs();
+ });
+ it('retains load rejection when the operator actually rejected the delivery',()=>{
+  mount({estado:EstadoManifiesto.RECHAZADO,eventos:[...marker,{tipo:'RECHAZO'}] as NonNullable<Manifiesto['eventos']>},'OPERADOR');
+  expect(screen.getByText('Carga rechazada')).toBeVisible();
+ });
+ it('still identifies a refused participation when proposal actions are disabled',()=>{
+  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','false');
+  mount({estado:EstadoManifiesto.RECHAZADO,eventos:[...marker,{tipo:'RECHAZO_PARTE'}] as NonNullable<Manifiesto['eventos']>},'OPERADOR');
+  expect(screen.getByText('Propuesta detenida')).toBeVisible();
+  expect(screen.queryByText('Carga rechazada')).not.toBeInTheDocument();
+  vi.unstubAllEnvs();
+ });
+ it('asks for review when no rejection type is recorded',()=>{
+  mount({estado:EstadoManifiesto.RECHAZADO,eventos:[]},'OPERADOR');
+  expect(screen.getByText('Rechazo por comprobar')).toBeVisible();
+ });
+});

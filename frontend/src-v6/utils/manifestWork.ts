@@ -13,6 +13,7 @@ export type ManifestWork = {
   pesajePendiente?: boolean;
   pesajeNoDisponible?: boolean;
   rechazo?: string | null;
+  tipoRechazo?: 'participacion' | 'carga' | 'conflicto';
   finalEmitido?: boolean;
 };
 export const partyNames: Record<string, string> = {
@@ -54,7 +55,8 @@ export function manifestWork(m: ManifestWork, role: string) {
   const missing = completeParties ? requiredParties.filter(role => !m.partes?.some(part => part.rol === role && part.aprobada)).map(role => partyNames[role]) : [];
   const result = (label: string, responsible: string, detail: string, tone: 'pending' | 'active' | 'done' | 'blocked' = 'active') => ({ label, responsible, detail, tone });
   if (m.requiereRevisionPropuesta) return result('Propuesta por revisar', 'Ambiente', 'No se pueden comprobar las aprobaciones. Contactá a Ambiente; el historial se conserva y no se puede iniciar.', 'blocked');
-  if (m.rechazo) return result('Propuesta detenida', 'Partes vinculadas', 'Hay una participación rechazada. Revisá el motivo antes de preparar otra propuesta.', 'blocked');
+  if (m.tipoRechazo === 'conflicto') return result('Revisar rechazo', 'Ambiente', 'El historial registra rechazos de participación y de carga. Consultá a Ambiente para revisar el caso.', 'blocked');
+  if (m.rechazo || m.tipoRechazo === 'participacion') return result('Propuesta detenida', 'Partes vinculadas', 'Hay una participación rechazada. Revisá el motivo antes de preparar otra propuesta.', 'blocked');
   if (m.requiereNuevaPropuesta) return result('Necesita nueva propuesta', 'Partes vinculadas', 'Creá una nueva propuesta con las tres partes; el registro anterior se conserva.', 'blocked');
   if (['PENDIENTE_APROBACION', 'APROBADO'].includes(m.estado || '') && !completeParties) return result('Revisar aprobaciones', 'Ambiente', 'No se pueden comprobar las tres aprobaciones. Abrí y actualizá el manifiesto; si continúa el problema, consultá a Ambiente.', 'blocked');
   if (['PENDIENTE_APROBACION', 'APROBADO'].includes(m.estado || '') && !validCoordinationTime(m.inicio)) return result('Revisar aprobaciones', 'Ambiente', 'No se pudo comprobar la coordinación. Abrí y actualizá el manifiesto; si continúa el problema, consultá a Ambiente.', 'blocked');
@@ -78,7 +80,7 @@ export function manifestWork(m: ManifestWork, role: string) {
     case 'EN_TRATAMIENTO': return result('En tratamiento', 'Operador', role === 'OPERADOR' ? 'Podés emitir parciales de lo tratado. Cerrá el manifiesto cuando termine el tratamiento.' : 'El operador puede emitir parciales de lo tratado y cerrar el manifiesto al finalizar el tratamiento.');
     case 'TRATADO': return m.finalEmitido ? result('Certificación final emitida', 'Partes vinculadas', 'El documento está disponible en Certificaciones.', 'done') : result(role === 'OPERADOR' ? 'Emitir certificación final' : 'Esperando certificado final', 'Operador', 'El cierre no emite el certificado. El operador lo firma cuando todas las adendas estén resueltas.', 'pending');
     case 'CANCELADO': return result('Manifiesto cancelado', 'Sin acción pendiente', 'Se conserva el historial de la operación.', 'done');
-    case 'RECHAZADO': return result('Carga rechazada', 'Partes vinculadas', 'Revisá el motivo del rechazo y coordiná la resolución con las partes.', 'blocked');
+    case 'RECHAZADO': return m.tipoRechazo === 'carga' ? result('Carga rechazada', 'Partes vinculadas', 'Revisá el motivo del rechazo y coordiná la resolución con las partes.', 'blocked') : result('Rechazo por comprobar', 'Ambiente', 'No pudimos identificar qué se rechazó. Actualizá el manifiesto y revisá el historial; si continúa el problema, consultá a Ambiente.', 'blocked');
     default: return result('Estado por verificar', 'Administración', 'Actualizá el manifiesto para comprobar cómo continuar.', 'blocked');
   }
 }

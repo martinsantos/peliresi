@@ -94,3 +94,16 @@ describe('shared operational guidance never replaces server authorization',()=>{
     expect(rejectionReason('null')).toBe('null');
   });
 });
+
+describe('rejection guidance distinguishes the decision from a physical load',()=>{
+ it('names a rejected participation without calling it rejected cargo',()=>{
+  expect(manifestWork({estado:'RECHAZADO',tipoRechazo:'participacion'},'OPERADOR')).toMatchObject({label:'Propuesta detenida',tone:'blocked'});
+ });
+ it('keeps the physical load wording when a load rejection is recorded',()=>{
+  expect(manifestWork({estado:'RECHAZADO',tipoRechazo:'carga'},'OPERADOR')).toMatchObject({label:'Carga rechazada',tone:'blocked'});
+ });
+ it('does not invent the type when events are missing or contradictory',()=>{
+  expect(manifestWork({estado:'RECHAZADO'},'OPERADOR')).toMatchObject({label:'Rechazo por comprobar',responsible:'Ambiente'});
+  expect(manifestWork({estado:'RECHAZADO',tipoRechazo:'conflicto',rechazo:'motivo'},'OPERADOR')).toMatchObject({label:'Revisar rechazo',responsible:'Ambiente'});
+ });
+});
