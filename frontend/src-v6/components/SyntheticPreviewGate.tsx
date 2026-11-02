@@ -5,7 +5,11 @@ export function allowedSyntheticPreviewOrigin(actual: string, configured: string
   try {
     const expected = new URL(configured);
     if (expected.username || expected.password || expected.pathname !== '/' || expected.search || expected.hash) return false;
-    if (expected.origin !== actual || expected.hostname.replace(/\.$/, '') === 'sitrep.ultimamilla.com.ar') return false;
+    const host = expected.hostname.replace(/\.$/, '');
+    const dedicatedTrainingOrigin = expected.protocol === 'https:'
+      && expected.hostname === 'sitrep.ultimamilla.com.ar'
+      && expected.port === '8443';
+    if (expected.origin !== actual || (host === 'sitrep.ultimamilla.com.ar' && !dedicatedTrainingOrigin)) return false;
     return expected.protocol === 'https:'
       || (expected.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(expected.hostname));
   } catch { return false; }

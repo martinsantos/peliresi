@@ -17,6 +17,12 @@ describe('isolated preview gate', () => {
     expect(allowedSyntheticPreviewOrigin(origin, origin)).toBe(true);
     expect(allowedSyntheticPreviewOrigin('https://preview.example.invalid', 'https://preview.example.invalid')).toBe(true);
     expect(allowedSyntheticPreviewOrigin('https://sitrep.ultimamilla.com.ar', 'https://sitrep.ultimamilla.com.ar')).toBe(false);
+    expect(allowedSyntheticPreviewOrigin('https://sitrep.ultimamilla.com.ar:8443', 'https://sitrep.ultimamilla.com.ar:8443')).toBe(true);
+    expect(allowedSyntheticPreviewOrigin('https://sitrep.ultimamilla.com.ar:9443', 'https://sitrep.ultimamilla.com.ar:9443')).toBe(false);
+    expect(allowedSyntheticPreviewOrigin('http://sitrep.ultimamilla.com.ar:8443', 'http://sitrep.ultimamilla.com.ar:8443')).toBe(false);
+    expect(allowedSyntheticPreviewOrigin('https://sitrep.ultimamilla.com.ar.:8443', 'https://sitrep.ultimamilla.com.ar.:8443')).toBe(false);
+    expect(allowedSyntheticPreviewOrigin('https://sitrep.ultimamilla.com.ar:8443', 'https://sitrep.ultimamilla.com.ar:8443/path')).toBe(false);
+    expect(allowedSyntheticPreviewOrigin('https://sitrep.ultimamilla.com.ar', 'https://sitrep.ultimamilla.com.ar:8443')).toBe(false);
     expect(allowedSyntheticPreviewOrigin('http://preview.example.invalid', 'http://preview.example.invalid')).toBe(false);
     expect(allowedSyntheticPreviewOrigin(origin, 'https://preview.example.invalid')).toBe(false);
     expect(allowedSyntheticPreviewOrigin(origin, origin + '/path')).toBe(false);
