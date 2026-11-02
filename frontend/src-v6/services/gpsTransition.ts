@@ -3,6 +3,7 @@ import { GpsPendingError, flushStoredGpsQueue, gpsScopeMatchesRequest, runExclus
 import { withGpsTransitionLock } from './gpsCoordination';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import { assertNoStoredFleetGpsForManifest } from './fleetGpsStorage';
+import { matchesGpsReceipt } from './gpsReceipts';
 
 /** Flush this device's owned queue before a delivery or handoff. This does not
  * guarantee that another device has no unsent points. */
@@ -26,7 +27,12 @@ export async function withStoredGpsBeforeTransition<T>(ownerId: string | number 
         // If the session changed during the response, retain the point; its
         // stable reference makes a later retry safe for the original owner.
         ensureSession();
-      }, contextOwner);
+      }, contextOwner, async point => {
+        ensureSession();
+        const receipt = await api.get(`/manifiestos/${encodeURIComponent(manifestId)}/ubicaciones/${encodeURIComponent(point.puntoId!)}/confirmacion`);
+        ensureSession();
+        return matchesGpsReceipt(receipt, point);
+      });
     } catch (error) {
       if (error instanceof GpsPendingError) throw error;
       if (error instanceof Error && /sin titular identificado|leer las ubicaciones|guardar las ubicaciones/.test(error.message)) {

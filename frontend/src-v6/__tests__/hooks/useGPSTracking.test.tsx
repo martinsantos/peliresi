@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { headingToCompass, useGPSTracking } from '../../hooks/useGPSTracking';
 import { EstadoManifiesto } from '../../types/models';
 import { manifiestoService } from '../../services/manifiesto.service';
+import api from '../../services/api';
 import { gpsQueueKey } from '../../services/gpsQueue';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
@@ -11,6 +12,8 @@ vi.mock('../../services/manifiesto.service', () => ({
     actualizarUbicacion: vi.fn(),
   },
 }));
+
+vi.mock('../../services/api', () => ({ default: { get: vi.fn() } }));
 
 vi.mock('../../components/ui/Toast', () => ({
   toast: {
@@ -34,6 +37,7 @@ describe('useGPSTracking', () => {
     restoreLocks = installMockGpsLocks();
     localStorage.clear();
     vi.clearAllMocks();
+    vi.mocked(api.get).mockRejectedValue(new Error('offline'));
   });
   afterEach(() => restoreLocks());
 
@@ -206,7 +210,7 @@ describe('useGPSTracking', () => {
     vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('offline'));
     localStorage.setItem(
       gpsQueueKey('carrier-a', 'trip-1'),
-      JSON.stringify([{ lat: -32.92871, lng: -68.85352, speed: null, heading: 90 }]),
+      JSON.stringify([{ lat: -32.92871, lng: -68.85352, speed: null, heading: 90, observedAt: Date.now() }]),
     );
 
     const { result, unmount } = renderHook(() =>

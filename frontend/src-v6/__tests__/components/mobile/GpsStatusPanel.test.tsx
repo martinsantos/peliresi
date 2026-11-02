@@ -164,3 +164,12 @@ describe('GpsStatusPanel', () => {
     expect(screen.queryByText('GPS no disponible')).not.toBeInTheDocument();
   });
 });
+
+
+it('identifies a verified earlier location without claiming a new GPS send', () => {
+  render(<GpsStatusPanel status="acquiring" sendStatus="verified" position={null}
+    details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+    pendingCount={0} lastSyncAt={null} />);
+  expect(screen.getByText('Ubicación anterior confirmada')).toBeVisible();
+  expect(screen.queryByText('Última confirmación')).toBeNull();
+});

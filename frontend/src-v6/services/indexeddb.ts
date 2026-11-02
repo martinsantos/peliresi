@@ -14,6 +14,7 @@ import {
 } from './syncQueuePolicy';
 import api from './api';
 import { GpsPendingError, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
+import { matchesGpsReceipt } from './gpsReceipts';
 import { withGpsTransitionLock } from './gpsCoordination';
 import { clearTripSnapshot } from './tripSnapshot';
 import { notifyDeliveryConfirmed, notifyOfflineQueueChanged } from './offlineSyncEvents';
@@ -537,15 +538,21 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
   return result;
 }
 
-type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };
+type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown>; get: (endpoint: string) => Promise<unknown> };
 
 async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, owner: string | number, contextOwner: string, isCurrent: () => boolean): Promise<void> {
   const manifiestoId = queuedDeliveryManifestId(endpoint);
   if (!manifiestoId || typeof localStorage === 'undefined') return;
-  await flushStoredGpsQueue(owner, manifiestoId, point => {
+  await flushStoredGpsQueue(owner, manifiestoId, async point => {
     if (!isCurrent()) throw new SyncContextChangedError();
-    return sendIdempotentGps(api, manifiestoId, point);
-  }, contextOwner);
+    await sendIdempotentGps(api, manifiestoId, point);
+    if (!isCurrent()) throw new SyncContextChangedError();
+  }, contextOwner, async point => {
+    if (!isCurrent()) throw new SyncContextChangedError();
+    const receipt = await api.get(`/manifiestos/${encodeURIComponent(manifiestoId)}/ubicaciones/${encodeURIComponent(point.puntoId!)}/confirmacion`);
+    if (!isCurrent()) throw new SyncContextChangedError();
+    return matchesGpsReceipt(receipt, point);
+  });
 }
 
 function cleanupAfterSuccessfulSync(endpoint: string, owner: string): void {

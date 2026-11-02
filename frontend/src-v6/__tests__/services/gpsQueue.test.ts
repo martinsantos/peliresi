@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushStoredGpsQueue, gpsContextScope, gpsScopeMatchesRequest, gpsPointPayload, gpsQueueKey, gpsTasksForTrip, hasVolatileGpsQueue, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask } from '../../services/gpsQueue';
+import { acknowledgeGpsPoint, flushStoredGpsQueue, gpsContextScope, gpsScopeMatchesRequest, gpsPointPayload, gpsQueueKey, gpsTasksForTrip, hasVolatileGpsQueue, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask } from '../../services/gpsQueue';
 
-const first = { lat: -33.1, lng: -68.1, speed: null, heading: null };
-const second = { lat: -33.2, lng: -68.2, speed: null, heading: null };
+const first = { lat: -33.1, lng: -68.1, speed: null, heading: null, observedAt: Date.now() };
+const second = { lat: -33.2, lng: -68.2, speed: null, heading: null, observedAt: Date.now() };
 const key = gpsQueueKey('carrier-a', 'trip');
 
 describe('GPS queue before an offline delivery', () => {
@@ -146,4 +146,46 @@ describe('GPS queue before an offline delivery', () => {
     expect(work).toHaveBeenCalledOnce();
     expect(gpsTasksForTrip('trip')).toHaveLength(0);
   });
+});
+
+describe('GPS observation age before replay', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  it('retains an old, unconfirmed point instead of sending it as current', async () => {
+    const old = { ...first, puntoId: '1949916e-22df-4dc1-9d1e-98f98a3eab26', observedAt: Date.now() - 120_000 };
+    localStorage.setItem(key, JSON.stringify([old]));
+    const send = vi.fn(), verify = vi.fn().mockResolvedValue(false);
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send, undefined, verify)).rejects.toThrow('ubicación anterior');
+    expect(send).not.toHaveBeenCalled(); expect(verify).toHaveBeenCalledOnce();
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([old]);
+  });
+
+  it('removes an old point only after an exact receipt, without retransmitting it', async () => {
+    const old = { ...first, puntoId: '1949916e-22df-4dc1-9d1e-98f98a3eab26', observedAt: Date.now() - 120_000 };
+    localStorage.setItem(key, JSON.stringify([old]));
+    const send = vi.fn(), verify = vi.fn().mockResolvedValue(true);
+    await flushStoredGpsQueue('carrier-a', 'trip', send, undefined, verify);
+    expect(send).not.toHaveBeenCalled(); expect(verify).toHaveBeenCalledWith(old);
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('keeps a point of unknown age when no receipt verifier is available', async () => {
+    const legacy = { lat: -33.1, lng: -68.1, speed: null, heading: null, puntoId: '1949916e-22df-4dc1-9d1e-98f98a3eab26' };
+    localStorage.setItem(key, JSON.stringify([legacy]));
+    const send = vi.fn();
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send)).rejects.toThrow('ubicación anterior');
+    expect(send).not.toHaveBeenCalled(); expect(JSON.parse(localStorage.getItem(key)!)).toEqual([legacy]);
+  });
+});
+
+
+it('keeps a point changed by another tab while its original receipt was checked', () => {
+  localStorage.clear();
+  const original = { ...first, puntoId: '1949916e-22df-4dc1-9d1e-98f98a3eab26' };
+  const changed = { ...original, lat: original.lat + 0.1 };
+  localStorage.setItem(key, JSON.stringify([changed]));
+  expect(acknowledgeGpsPoint('carrier-a', 'trip', original.puntoId, undefined, original)).toEqual({ ok: false, reason: 'conflict' });
+  expect(JSON.parse(localStorage.getItem(key)!)).toEqual([changed]);
+  localStorage.clear();
 });

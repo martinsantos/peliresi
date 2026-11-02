@@ -10,7 +10,7 @@ type GpsDisplayStatus = GpsStatus | 'stale' | 'unknown';
 
 interface GpsStatusPanelProps {
   status: GpsDisplayStatus;
-  sendStatus: 'ok' | 'error' | 'idle';
+  sendStatus: 'ok' | 'verified' | 'error' | 'idle';
   sendError?: string | null;
   position: [number, number] | null;
   details: GpsDetails;
@@ -62,7 +62,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{gpsStorageErrorMessage(storageIssue)}</p>;
   const sendNotice = sendStatus === 'error' && sendError && !storageError && <p role="alert" data-gps-send-error className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{sendError}</p>;
   if (paused) return <div className="space-y-2"><p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>{storageNotice}{sendNotice}</div>;
-  if (storageError && storageIssue && ['legacy', 'unscoped', 'context', 'invalid'].includes(storageIssue)) return <div>{storageNotice}</div>;
+  if (storageError && storageIssue && ['legacy', 'unscoped', 'context', 'invalid', 'conflict'].includes(storageIssue)) return <div>{storageNotice}</div>;
   const copy = STATUS_COPY[status];
   const retryStorage = storageError && (!storageIssue || storageIssue === 'storage');
 
@@ -79,6 +79,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               {pendingCount > 0 && <Badge color="warning" variant="solid" size="sm">{pendingCount} {pendingCount === 1 ? 'pendiente' : 'pendientes'}</Badge>}
               {sendStatus === 'ok' && <Badge color="success" variant="soft" size="sm">{formatLastSync(lastSyncAt)}</Badge>}
+              {sendStatus === 'verified' && <Badge color="success" variant="soft" size="sm">Ubicación anterior confirmada</Badge>}
               {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Sin confirmar</Badge>}
             </div>
           </div>

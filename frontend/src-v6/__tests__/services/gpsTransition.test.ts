@@ -3,8 +3,8 @@ import { gpsContextScope,gpsQueueKey } from '../../services/gpsQueue';
 import { saveFleetGpsPoint } from '../../services/fleetGpsStorage';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
-const mocks = vi.hoisted(() => ({ post: vi.fn(), owner: 'carrier-a', context: 'carrier-a:transportista' }));
-vi.mock('../../services/api', () => ({ default: { post: mocks.post } }));
+const mocks = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), owner: 'carrier-a', context: 'carrier-a:transportista' }));
+vi.mock('../../services/api', () => ({ default: { post: mocks.post, get: mocks.get } }));
 vi.mock('../../utils/supportSession', () => ({
   supportRequestContext: () => mocks.context,
   supportSessionMatches: (owner: string) => owner === mocks.owner,
@@ -12,7 +12,7 @@ vi.mock('../../utils/supportSession', () => ({
 import { withStoredGpsBeforeTransition } from '../../services/gpsTransition';
 
 const id = 'trip-a';
-const point = { lat: -33.1, lng: -68.9, speed: null, heading: null, puntoId: '2d65f4f5-6892-42e1-958d-bd23b6d54a76' };
+const point = { lat: -33.1, lng: -68.9, speed: null, heading: null, puntoId: '2d65f4f5-6892-42e1-958d-bd23b6d54a76', observedAt: Date.now() };
 const ownKey = gpsQueueKey('carrier-a', id);
 let restoreLocks: () => void;
 beforeEach(() => {
@@ -121,4 +121,42 @@ describe('GPS safety before a trip transition', () => {
     await expect(withStoredGpsBeforeTransition('carrier-a', id, action)).rejects.toThrow('cuenta o actividad cambió');
     expect(mocks.post).not.toHaveBeenCalled(); expect(action).not.toHaveBeenCalled();
   });
+});
+
+describe('GPS receipt before delivery or handoff', () => {
+  it('allows the transition when an old point has an exact receipt without posting it again', async () => {
+    const old = { ...point, observedAt: Date.now() - 120_000 };
+    localStorage.setItem(ownKey, JSON.stringify([old]));
+    mocks.get.mockResolvedValue({ data: { success: true, data: {
+      idempotencia: { version: 1, puntoId: old.puntoId, confirmado: true },
+      tracking: { latitud: old.lat, longitud: old.lng, velocidad: null, direccion: null },
+    } } });
+    const action = vi.fn().mockResolvedValue('done');
+    await expect(withStoredGpsBeforeTransition('carrier-a', id, action)).resolves.toBe('done');
+    expect(mocks.post).not.toHaveBeenCalled(); expect(action).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(ownKey)).toBeNull();
+  });
+
+  it('blocks the transition and retains an old point that has no receipt', async () => {
+    const old = { ...point, observedAt: Date.now() - 120_000 };
+    localStorage.setItem(ownKey, JSON.stringify([old]));
+    mocks.get.mockResolvedValue({ data: { success: true, data: {
+      idempotencia: { version: 1, puntoId: old.puntoId, confirmado: false }, tracking: null,
+    } } });
+    const action = vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a', id, action)).rejects.toThrow('ubicación anterior');
+    expect(mocks.post).not.toHaveBeenCalled(); expect(action).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(ownKey)!)).toEqual([old]);
+  });
+
+  it('retains the point and explains an absent receipt returned as 404', async () => {
+    const old = { ...point, observedAt: Date.now() - 120_000 };
+    localStorage.setItem(ownKey, JSON.stringify([old]));
+    mocks.get.mockRejectedValueOnce({ response: { status: 404 } });
+    const action = vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a', id, action)).rejects.toThrow('ubicación anterior');
+    expect(mocks.post).not.toHaveBeenCalled(); expect(action).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(ownKey)!)).toEqual([old]);
+  });
+
 });

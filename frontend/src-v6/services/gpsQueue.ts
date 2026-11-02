@@ -1,3 +1,5 @@
+import { gpsObservationIsFresh } from '../utils/gpsFreshness';
+
 /** Coordinates GPS uploads for a manifest within one browser page. */
 const tasksByTrip = new Map<string, Set<Promise<void>>>();
 const volatileQueues = new Map<string, PendingGpsPoint[]>();
@@ -28,6 +30,8 @@ export interface PendingGpsPoint {
   speed: number | null;
   heading: number | null;
   puntoId?: string;
+  /** Device capture time, retained locally; absent on queues from older versions. */
+  observedAt?: number | null;
 }
 
 export function gpsPointPayload(point: PendingGpsPoint) {
@@ -84,7 +88,30 @@ export async function sendIdempotentGps(api: GpsApiClient, id: string, point: Pe
   }
 }
 
-export type GpsStorageIssue = 'legacy' | 'unscoped' | 'context' | 'invalid' | 'storage' | 'reference';
+/** Only a recent sensor fix may be sent as a current position. An older or
+ * unclocked point may be removed from a queue only after an exact receipt. */
+export async function deliverPendingGpsPoint(
+  point: PendingGpsPoint,
+  send: (point: PendingGpsPoint) => Promise<unknown>,
+  verify?: (point: PendingGpsPoint) => Promise<boolean>,
+): Promise<'sent' | 'verified'> {
+  if (gpsObservationIsFresh(point.observedAt)) {
+    await send(point);
+    return 'sent';
+  }
+  if (point.puntoId && verify) {
+    try { if (await verify(point)) return 'verified'; }
+    catch (error) {
+      const status = (error as { response?: { status?: number } } | null)?.response?.status;
+      if (status !== 404 && status !== 405 && status !== 501) throw error;
+      // A missing receipt, older server or inaccessible resource is not proof
+      // that the point was never sent. Keep it for an authorized review.
+    }
+  }
+  throw new GpsPendingError('SITREP no confirmó una ubicación anterior. Se conserva en este dispositivo; contactá a soporte antes de continuar.');
+}
+
+export type GpsStorageIssue = 'legacy' | 'unscoped' | 'context' | 'invalid' | 'storage' | 'reference' | 'conflict';
 type QueueRead = { ok: true; durable: boolean; points: PendingGpsPoint[] } | { ok: false; reason: GpsStorageIssue };
 
 /** Explain the same blocking condition wherever the driver encounters it. */
@@ -94,6 +121,7 @@ export function gpsStorageErrorMessage(issue: GpsStorageIssue | null): string {
   if (issue === 'context') return 'Hay ubicaciones pendientes de otra actividad. Volvé a esa actividad o contactá a soporte.';
   if (issue === 'invalid') return 'No se pudieron leer las ubicaciones guardadas. La copia no se modificó; conservá este dispositivo y contactá a soporte antes de confirmar.';
   if (issue === 'reference') return 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.';
+  if (issue === 'conflict') return 'Una ubicación cambió durante la comprobación. Se conservó en este dispositivo; actualizá el viaje y consultá a soporte si persiste.';
   return 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.';
 }
 
@@ -194,6 +222,7 @@ export function readPendingGpsQueue(owner: string | number, id: string, contextO
     const parsed: unknown = JSON.parse(saved);
     if (!Array.isArray(parsed) || parsed.some(point => !point || typeof point !== 'object'
       || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)
+      || (point.observedAt != null && (typeof point.observedAt !== 'number' || !Number.isFinite(point.observedAt)))
       || (point.puntoId !== undefined && (typeof point.puntoId !== 'string' || !UUID.test(point.puntoId))))) return { ok: false, reason: 'invalid' };
     return { ok: true, durable: true, points: parsed as PendingGpsPoint[] };
   } catch {
@@ -202,11 +231,12 @@ export function readPendingGpsQueue(owner: string | number, id: string, contextO
 }
 
 /** Remove only the acknowledged point from the latest queue, retaining later additions. */
-export function acknowledgeGpsPoint(owner: string | number, id: string, puntoId: string, contextOwner?: string): QueueRead {
+export function acknowledgeGpsPoint(owner: string | number, id: string, puntoId: string, contextOwner?: string, expected?: PendingGpsPoint): QueueRead {
   const saved = readPendingGpsQueue(owner, id, contextOwner);
   if (!saved.ok) return saved;
   const index = saved.points.findIndex(point => point.puntoId === puntoId);
   if (index < 0) return saved;
+  if (expected && JSON.stringify(saved.points[index]) !== JSON.stringify(expected)) return { ok: false, reason: 'conflict' };
   const remaining = [...saved.points.slice(0, index), ...saved.points.slice(index + 1)];
   return { ok: true, durable: savePendingGpsQueue(owner, id, remaining, contextOwner), points: remaining };
 }
@@ -241,7 +271,7 @@ export function runExclusiveGpsTask(id: string, work: () => Promise<void>): Prom
 }
 
 /** Advance the durable queue after each confirmed response, preserving the rest on failure. */
-export async function flushStoredGpsQueue(owner: string | number, id: string, send: (point: PendingGpsPoint) => Promise<unknown>, contextOwner?: string): Promise<void> {
+export async function flushStoredGpsQueue(owner: string | number, id: string, send: (point: PendingGpsPoint) => Promise<unknown>, contextOwner?: string, verify?: (point: PendingGpsPoint) => Promise<boolean>): Promise<void> {
   const key = gpsQueueKey(owner, id, contextOwner);
   const read = (): PendingGpsPoint[] => {
     const saved = readPendingGpsQueue(owner, id, contextOwner);
@@ -255,7 +285,7 @@ export async function flushStoredGpsQueue(owner: string | number, id: string, se
   let pending = prepareGpsPoints(owner, id, read(), contextOwner);
   while (pending.length) {
     const first = pending[0];
-    await send(first);
+    await deliverPendingGpsPoint(first, send, verify);
     const current = read();
     if (!current.length || JSON.stringify(current[0]) !== JSON.stringify(first)) {
       throw new Error('Las ubicaciones pendientes cambiaron. Revisá la sincronización antes de continuar.');
