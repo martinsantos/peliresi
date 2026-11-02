@@ -18,6 +18,7 @@ import { domainEvents } from '../services/domainEvent.service';
 import { observeGpsCorridor } from '../services/gpsCorridorObservation.service';
 import { sampleGpsAnomalies } from '../services/gpsAnomalySampling.service';
 import { anomaliaDetector } from './notification.controller';
+import { sameGpsNumber, sameOptionalGpsNumber } from '../domain/gpsNumericEquality';
 import type { TramoTransporte, Prisma } from '@prisma/client';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -255,8 +256,8 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
         const previous=await tx.trackingGPS.findUnique({where:{id:trackingId}});
         if(previous){
           if(previous.manifiestoId!==leg.manifiestoId||previous.tramoId!==leg.id||previous.emisor!==emisor
-            ||previous.latitud!==latitud||previous.longitud!==longitud||(previous.precision??null)!==(precision??null)
-            ||(previous.velocidad??null)!==(velocidad??null)||(previous.direccion??null)!==(direccion??null))
+            ||!sameGpsNumber(previous.latitud,latitud)||!sameGpsNumber(previous.longitud,longitud)||!sameOptionalGpsNumber(previous.precision,precision)
+            ||!sameOptionalGpsNumber(previous.velocidad,velocidad)||!sameOptionalGpsNumber(previous.direccion,direccion))
             throw new AppError('La referencia de ubicación ya corresponde a otros datos. Revisá la sincronización.',409);
           return {tracking:{id:previous.id,timestamp:previous.timestamp,tramoId:previous.tramoId},manifest:leg.manifiesto,legOrder:leg.orden,repetido:true};
         }

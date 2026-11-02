@@ -1,6 +1,7 @@
 import api from './api';
 import { GpsPendingError, gpsScopeMatchesRequest, readPendingGpsQueue, type PendingGpsPoint } from './gpsQueue';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
+import { sameGpsNumber, sameOptionalGpsNumber } from '../utils/gpsNumericEquality';
 
 export type GpsReceiptSummary = { checked: number; confirmed: number; unconfirmed: number };
 
@@ -9,8 +10,8 @@ export function matchesGpsReceipt(response: unknown, point: PendingGpsPoint): bo
   const receipt = body?.data?.idempotencia, saved = body?.data?.tracking;
   return body?.success === true && receipt?.version === 1 && receipt.confirmado === true && receipt.puntoId === point.puntoId
     && saved != null && Object.hasOwn(saved, 'velocidad') && Object.hasOwn(saved, 'direccion')
-    && saved.latitud === point.lat && saved.longitud === point.lng
-    && (saved.velocidad ?? null) === (point.speed ?? null) && (saved.direccion ?? null) === (point.heading ?? null);
+    && sameGpsNumber(saved.latitud, point.lat) && sameGpsNumber(saved.longitud, point.lng)
+    && sameOptionalGpsNumber(saved.velocidad, point.speed) && sameOptionalGpsNumber(saved.direccion, point.heading);
 }
 
 /** Read-only reconciliation. It deliberately never removes or rewrites the

@@ -7,13 +7,25 @@ vi.mock('../../utils/supportSession', () => ({
   supportRequestContext: () => mock.context,
   supportSessionMatches: (owner: string) => owner === mock.owner,
 }));
-import { verifyStoredGpsReceipts } from '../../services/gpsReceipts';
+import { matchesGpsReceipt, verifyStoredGpsReceipts } from '../../services/gpsReceipts';
 
 const id = 'qa-trip', key = gpsQueueKey('carrier-a', id);
 const point = { lat: -33.1, lng: -68.9, speed: null, heading: null, puntoId: '2d65f4f5-6892-42e1-958d-bd23b6d54a76' };
 const confirmation = (p = point) => ({ data: { success: true, data: { idempotencia: { version: 1, puntoId: p.puntoId, confirmado: true }, tracking: { latitud: p.lat, longitud: p.lng, velocidad: p.speed, direccion: p.heading } } } });
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); mock.owner = 'carrier-a'; mock.context = 'carrier-a:transportista'; mock.get.mockResolvedValue(confirmation()); });
 afterEach(() => localStorage.clear());
+
+it('accepts only the reference with numerically equivalent persisted coordinates', () => {
+  const sent = { ...point, lat: -12.357009851458013 };
+  const received = confirmation(sent);
+  received.data.data.tracking.latitud = -12.35700985145801;
+  expect(matchesGpsReceipt(received, sent)).toBe(true);
+  received.data.data.tracking.latitud += 0.000001;
+  expect(matchesGpsReceipt(received, sent)).toBe(false);
+  received.data.data.tracking.latitud = -12.35700985145801;
+  received.data.data.idempotencia.puntoId = 'another-reference';
+  expect(matchesGpsReceipt(received, sent)).toBe(false);
+});
 
 it('verifies a receipt without changing the stored GPS queue', async () => {
   const original = JSON.stringify([point]); localStorage.setItem(key, original);

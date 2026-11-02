@@ -5,6 +5,18 @@ const point={latitud:-33,longitud:-69,precision:8};
 const reference='1949916e-22df-4dc1-9d1e-98f98a3eab26';
 afterEach(()=>vi.unstubAllGlobals());
 
+it('reconciles a relay receipt after float round trip but rejects a changed position',async()=>{
+  const sent={...point,latitud:-12.357009851458013};
+  const tracking={latitud:-12.35700985145801,longitud:sent.longitud,precision:sent.precision,velocidad:null,direccion:null};
+  const data={idempotencia:{version:1,puntoId:reference,confirmado:true},tracking};
+  const fetchMock=vi.fn()
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data})})
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data:{...data,tracking:{...tracking,latitud:tracking.latitud+.000001}}})});
+  vi.stubGlobal('fetch',fetchMock);
+  expect(await limitedLegReceipt('leg','private-token',sent,reference)).toBe(true);
+  await expect(limitedLegReceipt('leg','private-token',sent,reference)).rejects.toMatchObject({status:409});
+});
+
 it('requires the server to confirm the exact retry reference without sending cookies',async()=>{
   const fetchMock=vi.fn().mockResolvedValue({ok:true,status:200,json:async()=>({success:true,data:{tracking:{timestamp:'2026-10-29T00:00:00Z'},idempotencia:{version:1,puntoId:reference,repetido:true}}})});
   vi.stubGlobal('fetch',fetchMock);

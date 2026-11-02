@@ -10,6 +10,7 @@ import { canAccessManifiesto } from '../utils/roleFilter';
 import { observeGpsCorridor } from '../services/gpsCorridorObservation.service';
 import { clearGpsAnomalySampling, sampleGpsAnomalies } from '../services/gpsAnomalySampling.service';
 import { createHash } from 'node:crypto';
+import { sameGpsNumber, sameOptionalGpsNumber } from '../domain/gpsNumericEquality';
 
 // Zod schema for GPS update validation
 const actualizarUbicacionSchema = z.object({
@@ -138,8 +139,8 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
         const previous = await tx.trackingGPS.findUnique({ where: { id: trackingId } });
         if (previous) {
           if (previous.manifiestoId !== id || previous.emisor !== `usuario:${userId}` || previous.tramoId !== null
-            || previous.latitud !== latitud || previous.longitud !== longitud
-            || (previous.velocidad ?? null) !== (velocidad ?? null) || (previous.direccion ?? null) !== (direccion ?? null)) {
+            || !sameGpsNumber(previous.latitud, latitud) || !sameGpsNumber(previous.longitud, longitud)
+            || !sameOptionalGpsNumber(previous.velocidad, velocidad) || !sameOptionalGpsNumber(previous.direccion, direccion)) {
             throw new AppError('La referencia de ubicación ya corresponde a otros datos. Revisá la sincronización.', 409);
           }
           if (current.estado !== 'EN_TRANSITO') invalidateGpsCache(id);

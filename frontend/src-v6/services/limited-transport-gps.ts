@@ -1,3 +1,5 @@
+import { sameGpsNumber, sameOptionalGpsNumber } from '../utils/gpsNumericEquality';
+
 export interface TransportGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
 export interface LimitedTransportInfo {tramoId:string;numero:string;empresa:string;destino:string;domicilioDestino:string;orden:number;training:boolean;ultimaPosicion:string|null;vence:string}
 export interface LimitedTransportUpload {tracking:{id:string;timestamp:string;tramoId:string}}
@@ -29,8 +31,8 @@ export async function limitedLegReceipt(id:string,token:string,point:TransportGp
     if(result.success!==true||receipt?.version!==1||receipt.puntoId!==puntoId||typeof receipt.confirmado!=='boolean')throw new Error('SITREP no confirmó la ubicación. Consultá a soporte.');
     if(!receipt.confirmado){if(tracking!==null)throw new Error('La comprobación de ubicación no es válida. Consultá a soporte.');return false;}
     const matches=!!tracking&&['latitud','longitud','precision','velocidad','direccion'].every(key=>Object.hasOwn(tracking,key))
-      &&tracking.latitud===point.latitud&&tracking.longitud===point.longitud&&tracking.precision===point.precision
-      &&(tracking.velocidad??null)===(point.velocidad??null)&&(tracking.direccion??null)===(point.direccion??null);
+      &&sameGpsNumber(tracking.latitud,point.latitud)&&sameGpsNumber(tracking.longitud,point.longitud)&&sameGpsNumber(tracking.precision,point.precision)
+      &&sameOptionalGpsNumber(tracking.velocidad,point.velocidad)&&sameOptionalGpsNumber(tracking.direccion,point.direccion);
     if(!matches)throw Object.assign(new Error('La ubicación confirmada no coincide. Conservá este dispositivo y consultá a soporte.'),{status:409});
     return true;
   }catch(error){if(controller.signal.aborted)throw new Error('La conexión tardó demasiado. Revisá la señal del teléfono.');throw error;}
