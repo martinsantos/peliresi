@@ -192,3 +192,18 @@ it.each([null,'','   '])('does not offer an action when an older response includ
  expect(screen.getByText(/Rechazo registrado sin motivo disponible/)).toBeVisible();
  expect(screen.queryByRole('button',{name:/Aprobar como/})).not.toBeInTheDocument();expect(mock.post).not.toHaveBeenCalled();client.clear();
 });
+
+it('lets an already approved party reject a still pending proposal with a reason',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:null,puedeRechazar:true,
+  partes:[{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:false}]}}});
+ mock.post.mockResolvedValue({data:{success:true}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><ManifestProposalApprovals id="proposal" onSign={()=>{}}/></QueryClientProvider></MemoryRouter>);
+ expect(await screen.findByText(/Ambas decisiones quedan en el historial/)).toBeVisible();
+ fireEvent.click(screen.getByText('No puedo participar / rechazar'));
+ fireEvent.change(screen.getByLabelText('Motivo del rechazo'),{target:{value:'No puedo participar'}});
+ fireEvent.click(screen.getByRole('button',{name:'Rechazar mi participación'}));
+ await waitFor(()=>expect(mock.post).toHaveBeenCalledWith('/manifiestos/proposal/aprobar-parte',{decision:'RECHAZADA',motivo:'No puedo participar'}));
+ client.clear();
+});

@@ -752,3 +752,11 @@ test('manual distinguishes newly labelled artificial documents from signed histo
     assert.match(content, /certifica(?:ciones|dos) guardad(?:as|os) anteriormente|certificaciones guardadas antes de este cambio/i);
   }
 });
+
+test('explains that a prior approval can be rejected only while the proposal remains pending', () => {
+  const guide = guides.find((item: any) => item.id === 'manifiestos-tres-partes');
+  const text = JSON.stringify(guide);
+  assert.match(text, /Aunque ya hayas aprobado, podés rechazar mientras la propuesta siga pendiente/);
+  assert.match(text, /ambas decisiones quedan en el historial/);
+  assert.match(read('directorio.html'), /Mientras la propuesta siga pendiente, una parte que ya aprobó puede rechazar con motivo/);
+});

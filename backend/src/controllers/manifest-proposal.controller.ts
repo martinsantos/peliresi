@@ -78,7 +78,7 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
       requiereNuevaPropuesta: legacyBlocked,
       puedeIniciar: !stateConflict && !!role && unanimous && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
       puedeAprobar: !stateConflict && !rejected && !legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
-      puedeRechazar: !stateConflict && !rejected && legacyBlocked && value.manifest.estado === 'PENDIENTE_APROBACION' && !!role,
+      puedeRechazar: !stateConflict && !rejected && value.manifest.estado === 'PENDIENTE_APROBACION' && !!role,
     } : null });
   } catch (error) { next(error); }
 }
@@ -123,7 +123,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     // Retry does not append a second approval or replace the first signature.
     if (!reject && value.events.some(e => e.tipo === APPROVAL_EVENTS[rol])) return value.manifest;
     if (!reject && legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE, 409);
-    if (value.manifest.estado !== 'PENDIENTE_APROBACION') throw new AppError('La propuesta ya no admite aprobaciones', 409);
+    if (value.manifest.estado !== 'PENDIENTE_APROBACION') throw new AppError(reject ? 'La propuesta ya no está pendiente. Actualizá y revisá su estado antes de continuar.' : 'La propuesta ya no admite aprobaciones', 409);
     const createdAt = await proposalEventTime(tx);
     const event = await tx.eventoManifiesto.create({ data: {
       manifiestoId: id, tipo: reject ? 'RECHAZO_PARTE' : APPROVAL_EVENTS[rol], usuarioId: req.user.id,

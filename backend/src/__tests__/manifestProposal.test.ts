@@ -26,6 +26,38 @@ beforeEach(()=>{
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
 });
 describe('three independently authenticated parties',()=>{
+ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'] as const)('lets %s reject after approving while the proposal is pending and keeps both decisions',async rol=>{
+  await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  const {getManifestProposal}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();
+  await inTrainingSession(()=>getManifestProposal(req(rol),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data).toMatchObject({estado:'PENDIENTE_APROBACION',puedeAprobar:null,puedeRechazar:true});
+  const first=mock.events.at(-1),rejection=req(rol,{decision:'RECHAZADA',motivo:'No puedo participar'});
+  await inTrainingSession(()=>approveManifestProposal(rejection));
+  expect(mock.manifest.estado).toBe('RECHAZADO');
+  expect(mock.events).toContain(first);
+  expect(mock.events.filter(e=>e.tipo==='RECHAZO_PARTE')).toHaveLength(1);
+  expect(JSON.parse(mock.events.at(-1).descripcion)).toMatchObject({rol,decision:'RECHAZADA',motivo:'No puedo participar'});
+  const writes=mock.tx.eventoManifiesto.create.mock.calls.length,notices=mock.tx.notificacion.createMany.mock.calls.length;
+  await inTrainingSession(()=>approveManifestProposal(rejection));
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(writes);
+  expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(notices);
+  json.mockClear();
+  await inTrainingSession(()=>getManifestProposal(req(rol),{json} as any,next));
+  expect(json.mock.calls[0][0].data).toMatchObject({estado:'RECHAZADO',puedeRechazar:false});
+ });
+ it('does not permit rejection once all three have approved',async()=>{
+  for(const rol of ['GENERADOR','TRANSPORTISTA','OPERADOR'] as const) await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  const {getManifestProposal}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();
+  await inTrainingSession(()=>getManifestProposal(req('TRANSPORTISTA'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();
+  expect(json.mock.calls[0][0].data).toMatchObject({estado:'APROBADO',puedeRechazar:false});
+  const writes=mock.tx.eventoManifiesto.create.mock.calls.length;
+  await expect(inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA',{decision:'RECHAZADA',motivo:'No puedo participar'})))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('ya no está pendiente')});
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(writes);
+ });
  it('dates each decision from the database clock after acquiring the proposal locks',async()=>{
   await inTrainingSession(()=>approveManifestProposal(req('OPERADOR')));
   expect(mock.events.at(-1).createdAt).toEqual(mock.clock);
