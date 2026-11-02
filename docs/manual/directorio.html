@@ -815,17 +815,19 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <section id="guia-operador" data-role="operador">
 <h3>2.4 Operador -- Recibir y Tratar Residuos</h3>
 <div class="info-card role-card-operador">
-<p><strong>Rol:</strong> Operador &mdash; Planta de tratamiento y disposicion final.</p>
+<p><strong>Rol:</strong> Operador &mdash; Planta de tratamiento y disposición final.</p>
 </div>
 <ol>
 <li>Ingresar con credenciales de operador.</li>
-<li>Ver los manifiestos entrantes en el <strong>Dashboard</strong>.</li>
+<li>En <strong>Inicio</strong> o <strong>Manifiestos</strong>, abrir el manifiesto entrante.</li>
 <li>Si la carga no es aceptable, seleccionar <strong>Rechazar Carga</strong> antes de confirmar la recepción.</li>
 <li>Si se acepta la carga, seleccionar <strong>Confirmar recepción</strong>; el manifiesto pasa a RECIBIDO.</li>
 <li>Registrar el <strong>pesaje real</strong> y compararlo con el peso declarado por el generador.</li>
 <li>Si las cantidades o corrientes no coinciden, informar el hallazgo mediante una adenda y solicitar su revisión.</li>
 <li>Registrar el <strong>tratamiento aplicado</strong> (seleccionar metodo del catalogo autorizado).</li>
-<li><strong>Cerrar Manifiesto</strong> &rarr; el sistema genera el <strong>Certificado de Disposicion Final</strong> (PDF descargable).</li>
+<li>Si corresponde, firmar y emitir una certificación parcial desde <strong>Certificaciones</strong>.</li>
+<li>Cerrar el manifiesto cuando termine el tratamiento.</li>
+<li>Después del cierre y de resolver las adendas, el operador firma y emite la <strong>certificación final total</strong> desde Certificaciones. El cierre no la emite automáticamente.</li>
 </ol>
 
 <h4>Consejos para el Operador</h4>
@@ -2636,7 +2638,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <li><strong>Confirmar recepción:</strong> El operador verifica la carga y confirma la recepción (ENTREGADO &rarr; RECIBIDO). Alternativamente, puede <strong>Rechazar Carga</strong> si hay discrepancias (ENTREGADO &rarr; RECHAZADO).</li>
 <li><strong>Registrar Pesaje:</strong> Modal para ingresar el peso real de cada residuo recibido. Los datos de pesaje se almacenan y se comparan con las cantidades declaradas por el generador.</li>
 <li><strong>Registrar Tratamiento:</strong> Indica que el residuo comenzo a ser procesado (RECIBIDO &rarr; EN_TRATAMIENTO).</li>
-<li><strong>Cerrar Manifiesto:</strong> Confirma que el tratamiento se completo exitosamente (EN_TRATAMIENTO &rarr; TRATADO). Esto habilita la generacion del Certificado de Disposicion Final.</li>
+<li><strong>Cerrar Manifiesto:</strong> Registra el cierre del tratamiento (EN_TRATAMIENTO &rarr; TRATADO). La certificación final requiere resolver las adendas y completar el tratamiento de las corrientes halladas; el operador la emite y firma desde Certificaciones.</li>
 </ol>
 
 <div class="cu-screenshot-mobile">
