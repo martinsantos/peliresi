@@ -55,11 +55,14 @@ const WarRoomPage: React.FC = () => {
   const timelineData = useMonitorTimeline(playbackDate, playbackDias, mode === 'PLAYBACK');
   const forecastData = useForecast(7, mode === 'FORECAST');
   const [online, setOnline] = useState(navigator.onLine);
-  const [now, setNow] = useState(Date.now());
+  const [clockTick, setClockTick] = useState(Date.now());
+  // A response can arrive between clock ticks. Compare its receipt timestamp
+  // against at least the client's response time, not the previous tick.
+  const now = Math.max(clockTick, liveData.dataUpdatedAt || 0);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     window.addEventListener('online', update);window.addEventListener('offline', update);
-    const timer=setInterval(()=>setNow(Date.now()),15000);
+    const timer=setInterval(()=>setClockTick(Date.now()),15000);
     return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);clearInterval(timer);};
   }, []);
   const selectedQuery=mode==='LIVE'?liveData:mode==='PLAYBACK'?timelineData:forecastData;
