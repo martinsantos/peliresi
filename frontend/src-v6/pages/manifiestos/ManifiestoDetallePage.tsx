@@ -283,12 +283,12 @@ const ManifiestoDetailPage: React.FC = () => {
 
   const handleConfirmarRecepcion = () => handleAction(
     () => confirmarRecepcion.mutateAsync({ id: id! }),
-    'Recepcion confirmada exitosamente',
+    'Recepción confirmada exitosamente',
   );
 
   const handleConfirmarRecepcionInSitu = () => handleAction(
     () => confirmarRecepcionInSitu.mutateAsync({ id: id! }),
-    'Recepcion in situ confirmada exitosamente',
+    'Recepción en origen confirmada exitosamente',
   );
 
   const handlePesaje = (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => {
