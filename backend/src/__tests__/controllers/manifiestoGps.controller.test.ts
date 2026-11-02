@@ -11,7 +11,7 @@ import { actualizarUbicacion, getViajeActual, invalidateGpsCache } from '../../c
 
 const trip = {
   id: 'gps-qa-trip', estado: 'EN_TRANSITO', numero: 'QA-50', transportistaId: 'carrier-1',
-  generadorId: 'generator-1', operadorId: 'operator-1', fechaRetiro: null,
+  generadorId: 'generator-1', operadorId: 'operator-1', fechaRetiro: null, isDemoData: false,
   generador: null, operador: null,
 };
 const point = { latitud: -32.88, longitud: -68.84, velocidad: 15, direccion: 180 };
@@ -41,7 +41,15 @@ describe('GPS concurrency and recovery guards', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mocks.find).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledTimes(2);
-    expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point,emisor:'usuario:user-carrier-1' } });
+    expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point,isDemoData:false,emisor:'usuario:user-carrier-1' } });
+  });
+
+  it.each([true, false])('keeps the parent manifest practice marker on an original GPS point: %s', async isDemoData => {
+    mocks.current.mockResolvedValue([{ ...trip, isDemoData }]);
+    const next = vi.fn();
+    await actualizarUbicacion(request(), response(), next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isDemoData }) }));
   });
 
   it('describes a corridor observation as received points without claiming a current or sustained route', async () => {

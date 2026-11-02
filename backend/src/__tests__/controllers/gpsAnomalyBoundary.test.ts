@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 
 const db = vi.hoisted(() => ({ manifest: vi.fn(), points: vi.fn(), list: vi.fn(), createMany: vi.fn(), emit: vi.fn(),
   transaction: vi.fn(), query: vi.fn(), admins: vi.fn(), existing: vi.fn(), notices: vi.fn(), channels: vi.fn(), inserted: new Set<string>() }));
@@ -12,7 +13,7 @@ vi.mock('../../jobs/seguimientoCierre.job', () => ({ simularSeguimientoCierre: v
 import { anomaliaDetector, detectarAnomalias, getAnomalias } from '../../controllers/notification.controller';
 
 const manifest = { id: 'synthetic-trip', numero: 'QA-001', generadorId: 'generator-a', transportistaId: 'carrier-a', operadorId: 'operator-a',
-  contextoEmpresa: { empresaId: 'company-a', establecimientoId: 'site-a' } };
+  contextoEmpresa: { empresaId: 'company-a', establecimientoId: 'site-a' }, isDemoData: false };
 const response = () => ({ json: vi.fn() });
 
 describe('GPS anomaly access', () => {
@@ -81,6 +82,71 @@ describe('GPS anomaly repeated analysis', () => {
     await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-user');
     expect(db.inserted.size).toBe(1);
     expect(db.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([true, false])('retains the manifest practice marker on new GPS observations: %s', async isDemoData => {
+    db.manifest.mockResolvedValue({ ...manifest, isDemoData });
+    await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-admin');
+    expect(db.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ isDemoData })],
+    }));
+  });
+
+  it('does not compare an original position with a position of a different relay', async () => {
+    db.points.mockResolvedValue([
+      { id: 'origin', tramoId: null, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:00Z') },
+      { id: 'relay', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33.5, longitud: -69, timestamp: new Date('2026-01-01T00:00:01Z') },
+    ]);
+    expect(await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-admin')).toEqual([]);
+    expect(db.createMany).not.toHaveBeenCalled();
+    expect(db.emit).not.toHaveBeenCalled();
+  });
+
+  it('compares interleaved positions only with the preceding position of the same leg', async () => {
+    db.points.mockResolvedValue([
+      { id: 'original', tramoId: null, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:00Z') },
+      { id: 'relay-1-a', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:01Z') },
+      { id: 'relay-2-a', tramoId: 'leg-2', tramo: { orden: 2 }, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:02Z') },
+      { id: 'relay-1-b', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33.5, longitud: -69, timestamp: new Date('2026-01-01T00:00:03Z') },
+      { id: 'relay-2-b', tramoId: 'leg-2', tramo: { orden: 2 }, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:04Z') },
+    ]);
+    const result = await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-admin');
+    expect(result).toHaveLength(1);
+    expect(result[0].tipo).toBe('VELOCIDAD_ANORMAL');
+    expect(result[0].descripcion).toMatch(/tramo de relevo 1/i);
+    const expected = 'gpsan1_' + createHash('sha256').update(JSON.stringify([manifest.id, 'VELOCIDAD_ANORMAL', 'relay-1-a', 'relay-1-b'])).digest('hex');
+    expect([...db.inserted]).toEqual([expected]);
+  });
+
+  it('does not attribute a relay observation to the original carrier during automatic sampling', async () => {
+    db.points.mockResolvedValue([
+      { id: 'relay-a', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:00Z') },
+      { id: 'relay-b', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33.1, longitud: -69, timestamp: new Date('2026-01-01T00:00:01Z') },
+    ]);
+    await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-carrier', { automatic: true });
+    expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', userId: undefined }));
+  });
+
+  it('attributes a manual relay analysis to the administrator who requested it', async () => {
+    db.points.mockResolvedValue([
+      { id: 'relay-a', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:00Z') },
+      { id: 'relay-b', tramoId: 'leg-1', tramo: { orden: 1 }, latitud: -33.1, longitud: -69, timestamp: new Date('2026-01-01T00:00:01Z') },
+    ]);
+    await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-admin');
+    expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', userId: 'synthetic-admin' }));
+  });
+
+  it.each([
+    ['same sender', 'usuario:synthetic-carrier', 'usuario:synthetic-carrier', 'synthetic-carrier'],
+    ['other sender', 'usuario:another', 'usuario:synthetic-carrier', undefined],
+    ['legacy sender unknown', null, null, undefined],
+  ])('attributes an automatic original observation only with matching receipts: %s', async (_label, first, second, expected) => {
+    db.points.mockResolvedValue([
+      { id: 'original-a', tramoId: null, emisor: first, latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:00Z') },
+      { id: 'original-b', tramoId: null, emisor: second, latitud: -33.1, longitud: -69, timestamp: new Date('2026-01-01T00:00:01Z') },
+    ]);
+    await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-carrier', { automatic: true });
+    expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', userId: expected }));
   });
 
   it('saves only one anomaly and emits one event when analyses run concurrently', async () => {

@@ -123,8 +123,8 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
     // ownership/state under a shared row lock before persisting every point;
     // delivery updates serialize with this short transaction across workers.
     const result = await prisma.$transaction(async tx => {
-      const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null; contextoEmpresa: unknown }>>`
-        SELECT estado, "generadorId", "transportistaId", "operadorId", "contextoEmpresa"
+      const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null; contextoEmpresa: unknown; isDemoData: boolean }>>`
+        SELECT estado, "generadorId", "transportistaId", "operadorId", "contextoEmpresa", "isDemoData"
         FROM manifiestos WHERE id = ${id} FOR SHARE
       `;
       const current = rows[0];
@@ -155,7 +155,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
       const activeLeg = await tx.tramoTransporte.findFirst({ where:{manifiestoId:id,fin:null} });
       if (activeLeg && activeLeg.tipo !== 'ORIGINAL') throw new AppError('El GPS de este manifiesto continúa desde el enlace del transporte de reemplazo',409);
       const tracking = await tx.trackingGPS.create({ data: {
-        ...(trackingId ? { id: trackingId } : {}), manifiestoId: id, latitud, longitud, velocidad, direccion, emisor:`usuario:${userId}`,
+        ...(trackingId ? { id: trackingId } : {}), manifiestoId: id, latitud, longitud, velocidad, direccion, isDemoData: current.isDemoData, emisor:`usuario:${userId}`,
       } });
       return { tracking, repetido: false };
     });
@@ -190,7 +190,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
     });
 
     // Sampling remains best-effort and per worker; it is not a durable queue.
-    sampleGpsAnomalies(id, userId, (manifestId, authorId) => anomaliaDetector.detectarAnomalias(manifestId, authorId));
+    sampleGpsAnomalies(id, userId, (manifestId, authorId) => anomaliaDetector.detectarAnomalias(manifestId, authorId, { automatic: true }));
   } catch (error) {
     next(error);
   }

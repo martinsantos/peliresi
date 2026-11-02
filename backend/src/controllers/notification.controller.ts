@@ -1,9 +1,10 @@
 import { withApplicationNoticeContext } from '../services/applicationNotice.service';
 import { Request, Response, NextFunction } from 'express';
-import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia, Prisma } from '@prisma/client';
+import { EventoAlerta, EstadoAlerta, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { domainEvents } from '../services/domainEvent.service';
+import { detectGpsReceptionObservations } from '../services/gpsReceptionObservations.service';
 import { AppError } from '../middlewares/errorHandler';
 import { normalizeAlertCondition } from '../services/alertRuleCondition.service';
 import { validateFollowupRule, alertResolution, FOLLOWUP_RULE_ID, followupDays } from '../services/alertFollowupPolicy.service';
@@ -403,38 +404,17 @@ export const evaluarCatalogoAlerta = async (_req: Request, res: Response, next: 
 
 // ============ DETECCION DE ANOMALIAS GPS ============
 
-interface PuntoGPS {
-    latitud: number;
-    longitud: number;
-    timestamp: Date;
-    velocidad?: number;
-}
-
 class AnomaliaDetector {
-    // Calcular distancia entre dos puntos en km (Haversine)
-    private calcularDistancia(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371; // Radio de la Tierra en km
-        const dLat = this.toRad(lat2 - lat1);
-        const dLon = this.toRad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    private toRad(deg: number): number {
-        return deg * (Math.PI / 180);
-    }
-
     // Detectar anomalias en la ruta
-    async detectarAnomalias(manifiestoId: string, userId?: string): Promise<any[]> {
+    async detectarAnomalias(manifiestoId: string, userId?: string, options: { automatic?: boolean } = {}): Promise<any[]> {
         const anomaliasDetectadas: any[] = [];
 
         // Obtener tracking del manifiesto
         const tracking = await prisma.trackingGPS.findMany({
             where: { manifiestoId },
-            orderBy: [{ timestamp: 'asc' }, { id: 'asc' }]
+            orderBy: [{ timestamp: 'asc' }, { id: 'asc' }],
+            select: { id: true, latitud: true, longitud: true, timestamp: true, tramoId: true, emisor: true,
+                tramo: { select: { orden: true } } }
         });
 
         if (tracking.length < 2) return anomaliasDetectadas;
@@ -450,69 +430,15 @@ class AnomaliaDetector {
 
         if (!manifiesto) return anomaliasDetectadas;
 
-        // Analizar puntos
-        const keys: string[] = [];
-        const addAnomaly = (anomaly: any, previousId: string, currentId: string) => {
-            anomaliasDetectadas.push(anomaly);
-            // Pair and anomaly type identify the same observation across
-            // repeated analyses and separate workers, without a schema change.
-            keys.push('gpsan1_' + createHash('sha256')
-                .update(JSON.stringify([manifiestoId, anomaly.tipo, previousId, currentId])).digest('hex'));
-        };
-        for (let i = 1; i < tracking.length; i++) {
-            const puntoAnterior = tracking[i - 1];
-            const puntoActual = tracking[i];
-
-            // Calcular distancia y tiempo
-            const distancia = this.calcularDistancia(
-                puntoAnterior.latitud, puntoAnterior.longitud,
-                puntoActual.latitud, puntoActual.longitud
-            );
-            const tiempoHoras = (puntoActual.timestamp.getTime() - puntoAnterior.timestamp.getTime()) / (1000 * 60 * 60);
-            const velocidadCalculada = tiempoHoras > 0 ? distancia / tiempoHoras : 0;
-
-            // 1. Detectar velocidad anormal (> 120 km/h)
-            if (velocidadCalculada > 120) {
-                addAnomaly({
-                    tipo: 'VELOCIDAD_ANORMAL' as TipoAnomalia,
-                    descripcion: 'Hora de captura no disponible. Verificá el caso con transporte. La distancia y el intervalo entre dos recepciones superan el umbral de velocidad; esto no confirma la velocidad real.',
-                    latitud: puntoActual.latitud,
-                    longitud: puntoActual.longitud,
-                    valorDetectado: velocidadCalculada,
-                    valorEsperado: 100,
-                    severidad: 'ALTA' as SeveridadAnomalia
-                }, puntoAnterior.id, puntoActual.id);
-            }
-
-            // 2. Detectar parada prolongada (> 2 horas sin movimiento significativo)
-            if (distancia < 0.1 && tiempoHoras > 2) {
-                addAnomaly({
-                    tipo: 'PARADA_PROLONGADA' as TipoAnomalia,
-                    descripcion: `Hora de captura no disponible. Verificá el caso con transporte. Se recibieron dos posiciones próximas con ${(tiempoHoras * 60).toFixed(0)} minutos de diferencia; esto no confirma una parada.`,
-                    latitud: puntoActual.latitud,
-                    longitud: puntoActual.longitud,
-                    valorDetectado: tiempoHoras * 60,
-                    valorEsperado: 60,
-                    severidad: tiempoHoras > 4 ? 'ALTA' as SeveridadAnomalia : 'MEDIA' as SeveridadAnomalia
-                }, puntoAnterior.id, puntoActual.id);
-            }
-
-            // 3. Detectar perdida de GPS (gap > 30 min sin datos)
-            if (tiempoHoras > 0.5 && distancia > 10) {
-                addAnomaly({
-                    tipo: 'GPS_PERDIDO' as TipoAnomalia,
-                    descripcion: `Hora de captura no disponible. Verificá el caso con transporte. Pasaron ${(tiempoHoras * 60).toFixed(0)} minutos entre dos recepciones; esto no confirma pérdida de señal.`,
-                    latitud: puntoActual.latitud,
-                    longitud: puntoActual.longitud,
-                    valorDetectado: tiempoHoras * 60,
-                    valorEsperado: 5,
-                    severidad: 'MEDIA' as SeveridadAnomalia
-                }, puntoAnterior.id, puntoActual.id);
-            }
-        }
+        const observations = detectGpsReceptionObservations(tracking, { userId, automatic: options.automatic });
 
         // Guardar anomalias detectadas
-        for (const [index, anomalia] of anomaliasDetectadas.entries()) {
+        for (const { anomaly: anomalia, previousId, currentId, authorId } of observations) {
+            anomaliasDetectadas.push(anomalia);
+            // Pair and anomaly type identify the same observation across
+            // repeated analyses and separate workers, without a schema change.
+            const id = 'gpsan1_' + createHash('sha256')
+                .update(JSON.stringify([manifiestoId, anomalia.tipo, previousId, currentId])).digest('hex');
             const event = {
                 type: 'ANOMALIA_GPS' as const,
                 manifiestoId,
@@ -520,10 +446,10 @@ class AnomaliaDetector {
                 tipoAnomalia: anomalia.tipo,
                 descripcion: anomalia.descripcion,
                 severidad: anomalia.severidad,
-                userId,
+                userId: authorId,
                 avisosConfirmados: true,
             };
-            const recorded = await recordGpsAnomaly(prisma, { id: keys[index], manifiestoId, ...anomalia }, event);
+            const recorded = await recordGpsAnomaly(prisma, { id, manifiestoId, isDemoData: manifiesto.isDemoData, ...anomalia }, event);
             if (!recorded.created) continue;
 
             // The inbox is committed first. Channels and configurable rules

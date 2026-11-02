@@ -182,7 +182,7 @@ function trackingClaim(req:AuthRequest) {
   }catch{throw new AppError('El enlace de seguimiento no es válido o venció. Pedí uno nuevo a la transportista de origen.',401);}
 }
 async function liveLeg(tx:Tx,claim:jwt.JwtPayload) {
-  const leg=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},include:{manifiesto:{select:{id:true,numero:true,estado:true,fechaRetiro:true,transportistaId:true,
+  const leg=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},include:{manifiesto:{select:{id:true,numero:true,estado:true,fechaRetiro:true,transportistaId:true,isDemoData:true,
     generador:{select:{latitud:true,longitud:true}},operador:{select:{razonSocial:true,domicilio:true,latitud:true,longitud:true}}}}}});
   if(!leg||leg.fin||leg.accesoVersion!==claim.jti||!leg.accesoHasta||leg.accesoHasta<=new Date()||leg.manifiesto.estado!=='EN_TRANSITO') throw new AppError('Este seguimiento ya no está activo',403);
   assertClassroomIssuerOpen(leg.creadoPorId);
@@ -261,7 +261,7 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
           return {tracking:{id:previous.id,timestamp:previous.timestamp,tramoId:previous.tramoId},manifest:leg.manifiesto,legOrder:leg.orden,repetido:true};
         }
       }
-      const tracking=await tx.trackingGPS.create({data:{...(trackingId?{id:trackingId}:{}),latitud,longitud,velocidad,direccion,precision,manifiestoId:leg.manifiestoId,tramoId:leg.id,emisor},select:{id:true,timestamp:true,tramoId:true}});
+      const tracking=await tx.trackingGPS.create({data:{...(trackingId?{id:trackingId}:{}),latitud,longitud,velocidad,direccion,precision,manifiestoId:leg.manifiestoId,tramoId:leg.id,isDemoData:leg.manifiesto.isDemoData,emisor},select:{id:true,timestamp:true,tramoId:true}});
       return {tracking,manifest:leg.manifiesto,legOrder:leg.orden,repetido:false};
     });
     res.setHeader('Cache-Control','private, no-store');res.json({success:true,data:{tracking:result.tracking,
@@ -278,7 +278,7 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
       segment:{kind:'relay',id:result.tracking.tramoId!,order:result.legOrder}});
     // The limited capability is not an authenticated SITREP user. A system
     // analysis must not falsely attribute the relay's positions to its issuer.
-    sampleGpsAnomalies(result.manifest.id,undefined,(manifestId,userId)=>anomaliaDetector.detectarAnomalias(manifestId,userId));
+    sampleGpsAnomalies(result.manifest.id,undefined,(manifestId,userId)=>anomaliaDetector.detectarAnomalias(manifestId,userId,{automatic:true}));
   }catch(error){next(error);}
 }
 export const limitedTransportGps=(req:AuthRequest,res:Response,next:NextFunction)=>saveLimitedTransportGps(req,res,next,false);

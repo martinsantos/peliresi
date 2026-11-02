@@ -89,13 +89,19 @@ it('keeps an acknowledged relay point successful if the later corridor analysis 
   expect(response.json).toHaveBeenCalledWith(expect.objectContaining({success:true}));
   expect(next).not.toHaveBeenCalled();
 });
+it.each([true,false])('keeps the parent manifest practice marker on a relay position: %s',async(isDemoData)=>{
+  const leg=await mocks.leg();mocks.leg.mockResolvedValue({...leg,manifiesto:{...leg.manifiesto,isDemoData}});
+  const next=vi.fn();await limitedTransportGps({...req(token()),body:{latitud:-33,longitud:-69}},res(),next);
+  expect(next).not.toHaveBeenCalled();
+  expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({isDemoData})}));
+});
 it('samples GPS observations from an authorized relay without inventing a user identity',async()=>{
   mocks.detect.mockResolvedValue([]);
   const request={...req(token()),body:{latitud:-33,longitud:-69}};const next=vi.fn();
   for(let i=0;i<10;i++)await limitedTransportGps(request,res(),next);
   await new Promise(resolve=>setImmediate(resolve));
   expect(next).not.toHaveBeenCalled();
-  expect(mocks.detect).toHaveBeenCalledWith('manifest',undefined);
+  expect(mocks.detect).toHaveBeenCalledWith('manifest',undefined,{automatic:true});
 });
 it('does not count retries of the same relay GPS point as fresh samples',async()=>{
   const saved=new Map<string,any>();mocks.detect.mockResolvedValue([]);
