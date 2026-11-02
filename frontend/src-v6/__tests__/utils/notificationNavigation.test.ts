@@ -302,3 +302,16 @@ describe('return to the notification inbox',()=>{
   expect(notificationInboxReturnPath(state,'o')).toBe('/notificaciones');
  });
 });
+
+
+describe('manifest state notices linked from mail', () => {
+  it.each(['EN_TRATAMIENTO', 'CANCELADO'])('%s resolves from the owned notice to the manifest in the recipient context', estado => {
+    const notice = { ...base, manifiestoId: 'm', datos: JSON.stringify({ tipo: 'estado_manifiesto', version: 1, estado }) };
+    const web = resolveNotificationPath(notice, '', 'GENERADOR');
+    const app = resolveNotificationPath(notice, '/app', 'GENERADOR');
+    expect(web).toBe('/manifiestos/m');
+    expect(app).toBe('/app/manifiestos/m');
+    expect(resolveNotificationPath(notice, '/app', 'GENERADOR', false, true)).toBe('/app/notificaciones/n-1');
+    expect(notificationActionLabel(web, notice)).toBe('Abrir manifiesto y ver qué sigue →');
+  });
+});

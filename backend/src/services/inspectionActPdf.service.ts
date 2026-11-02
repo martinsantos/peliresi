@@ -1,5 +1,7 @@
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { buildInspectionFieldActPresentation } from './inspectionFieldActPdf.service';
 import {
   buildInspectionDocumentFingerprint,
@@ -838,7 +840,8 @@ export async function streamInspectionTechnicalReportPdf(
       .text(`${unified ? 'Expediente' : 'Informe técnico'} · ${inspection.numero} · v${inspection.version}`, 44, footerY, { width: 205, lineBreak: false })
       .text(`Huella ${fingerprint.slice(0, 16)}…`, 224, footerY, { width: 170, align: 'center', lineBreak: false })
       .text(`Página ${i + 1} de ${range.count}`, 421, footerY, { width: 130, align: 'right', lineBreak: false });
-    doc.fontSize(6.1).text(`Gobierno de Mendoza · Ministerio de Energía y Ambiente · Documento oficial generado por SITREP · ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });
+    doc.fontSize(6.1).text(`Gobierno de Mendoza · Ministerio de Energía y Ambiente · Documento ${syntheticPreviewEnabled() ? 'de práctica' : 'oficial'} generado por SITREP · ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });
+    drawSyntheticPreviewFooter(doc, footerY);
     doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();

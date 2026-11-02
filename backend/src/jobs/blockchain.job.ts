@@ -1,3 +1,4 @@
+import { mayRegisterScheduledJob } from '../config/scheduledTaskGate';
 import cron from 'node-cron';
 import { config } from '../config/config';
 import { procesarPendientes } from '../services/blockchain.service';
@@ -8,12 +9,7 @@ export function iniciarBlockchainJob(): void {
     return;
   }
 
-  // Solo ejecutar en instancia 0 de PM2 cluster para evitar duplicacion
-  const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.env.pm_id || '0';
-  if (instanceId !== '0') {
-    console.log(`[BlockchainJob] PM2 instancia ${instanceId}, skipping cron`);
-    return;
-  }
+  if (!mayRegisterScheduledJob('BlockchainJob')) return;
 
   // Verificar registros pendientes/fallidos cada 60 segundos
   cron.schedule('*/1 * * * *', async () => {

@@ -1,3 +1,4 @@
+import { mayRegisterScheduledJob } from '../config/scheduledTaskGate';
 import cron from 'node-cron';
 import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
@@ -111,7 +112,7 @@ export async function ejecutarSeguimientoCierre(now = new Date()): Promise<numbe
 }
 
 export function iniciarSeguimientoCierreJob(): void {
-  if ((process.env.NODE_APP_INSTANCE || process.env.pm_id || '0') !== '0') return;
+  if (!mayRegisterScheduledJob('seguimientoCierre')) return;
   let running = false;
   cron.schedule('0 8 * * *', async () => {
     if (running) return;

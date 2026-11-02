@@ -1,3 +1,4 @@
+import { syntheticPreviewHeaders } from './syntheticPreviewHeaders';
 import { sameGpsNumber, sameOptionalGpsNumber } from '../utils/gpsNumericEquality';
 
 export interface TransportGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
@@ -23,7 +24,7 @@ export async function limitedLegReceipt(id:string,token:string,point:TransportGp
   try{
     const query=version?`?version=${encodeURIComponent(version)}`:'';
     const response=await fetch(`${endpoint(id)}/ubicaciones/${encodeURIComponent(puntoId)}/confirmacion${query}`,{method:'GET',signal:controller.signal,
-      headers:{Authorization:`Bearer ${token}`},credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});
+      headers:{Authorization:`Bearer ${token}`,...syntheticPreviewHeaders()},credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});
     const body:unknown=await response.json().catch(()=>({}));
     const result=body&&typeof body==='object'?body as {success?:unknown;message?:unknown;data?:{idempotencia?:{version?:unknown;puntoId?:unknown;confirmado?:unknown};tracking?:Record<string,unknown>|null}}:{};
     if(!response.ok)throw Object.assign(new Error(typeof result.message==='string'?result.message:'No se pudo comprobar la ubicación.'),{status:[404,405,501].includes(response.status)?503:response.status});
@@ -45,7 +46,7 @@ export async function limitedLegRequest<T=LimitedTransportInfo>(id:string,token:
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
   try{
     const response=await fetch(endpoint(id)+(point?'/ubicacion-idempotente':''),{method:point?'POST':'GET',signal:controller.signal,
-      headers:{Authorization:`Bearer ${token}`,...(point?{'Content-Type':'application/json'}:{})},
+      headers:{Authorization:`Bearer ${token}`,...syntheticPreviewHeaders(),...(point?{'Content-Type':'application/json'}:{})},
       credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',...(point?{body:JSON.stringify({...point,puntoId})}:{})});
     const body:unknown=await response.json().catch(()=>({}));
     const data=body&&typeof body==='object'?body as {success?:unknown;message?:unknown;data?:T & {idempotencia?:{version?:unknown;puntoId?:unknown}}}:{};

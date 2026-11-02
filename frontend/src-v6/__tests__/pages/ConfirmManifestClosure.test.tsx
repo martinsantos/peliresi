@@ -1,18 +1,23 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmManifestClosure } from '../../pages/manifiestos/components/ConfirmManifestClosure';
 import ManifiestoActions from '../../pages/manifiestos/components/ManifiestoActions';
 import { EstadoManifiesto } from '../../types/models';
 
+// ManifiestoActions contains action affordances that read the active role from auth.
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa', rol: 'GENERADOR' } }) }));
+vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
+
 describe('manifest closure confirmation', () => {
   it('explains why an earlier draft cannot be signed when three-party proposals are enabled', () => {
     vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
     const noop = vi.fn(), pending = { isPending: false };
-    render(<ManifiestoActions manifiesto={{estado:EstadoManifiesto.BORRADOR,eventos:[]}} manifiestoId="qa"
+    render(<MemoryRouter><ManifiestoActions manifiesto={{estado:EstadoManifiesto.BORRADOR,eventos:[]}} manifiestoId="qa"
       userRol="GENERADOR" isAdmin={false} isActionPending={false} isCancelling={false}
       mutations={{firmar:pending,confirmarRetiro:pending,confirmarEntrega:pending,confirmarRecepcion:pending,confirmarRecepcionInSitu:pending,pesaje:pending,registrarTratamiento:pending,cerrar:pending,rechazar:pending,registrarIncidente:pending,revertir:pending}}
       onCerrar={noop} onFirmar={noop} onConfirmarRetiro={noop} onConfirmarEntrega={noop} onConfirmarRecepcion={noop} onConfirmarRecepcionInSitu={noop}
-      onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} />);
+      onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} /></MemoryRouter>);
     expect(screen.getByRole('region',{name:'Aprobaciones pendientes'})).toHaveTextContent('Las tres partes deben aprobar');
     expect(screen.queryByRole('button',{name:'Firmar Manifiesto'})).not.toBeInTheDocument();
     vi.unstubAllEnvs();
@@ -20,11 +25,11 @@ describe('manifest closure confirmation', () => {
   it('opens the confirmation from the real action instead of closing on the first click', async () => {
     const onCerrar = vi.fn().mockResolvedValue(true), noop = vi.fn();
     const pending = { isPending: false };
-    render(<ManifiestoActions manifiesto={{estado:EstadoManifiesto.EN_TRATAMIENTO,residuos:[]}} manifiestoId="qa"
+    render(<MemoryRouter><ManifiestoActions manifiesto={{estado:EstadoManifiesto.EN_TRATAMIENTO,residuos:[]}} manifiestoId="qa"
       userRol="OPERADOR" isAdmin={false} isActionPending={false} isCancelling={false}
       mutations={{firmar:pending,confirmarRetiro:pending,confirmarEntrega:pending,confirmarRecepcion:pending,confirmarRecepcionInSitu:pending,pesaje:pending,registrarTratamiento:pending,cerrar:pending,rechazar:pending,registrarIncidente:pending,revertir:pending}}
       onCerrar={onCerrar} onFirmar={noop} onConfirmarRetiro={noop} onConfirmarEntrega={noop} onConfirmarRecepcion={noop} onConfirmarRecepcionInSitu={noop}
-      onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} />);
+      onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar Manifiesto' }));
     expect(onCerrar).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Cerrar manifiesto' })).toBeVisible();

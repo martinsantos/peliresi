@@ -355,7 +355,9 @@ const NuevoManifiestoForm: React.FC = () => {
       const result = await createManifiesto.mutateAsync({
         idempotencyKey: pending.id,
         generadorId: submittedForm.generadorId || submittedForm.generador,
-        ...(submittedForm.transportista && (partyProposal || submittedForm.modalidad !== 'IN_SITU') ? { transportistaId: submittedForm.transportista } : {}),
+        // A pending create is an immutable command. Preserve its approving carrier
+        // even if this client now has a different proposal feature setting.
+        ...(submittedForm.transportista && (draft.draft.pendingCreate || partyProposal || submittedForm.modalidad !== 'IN_SITU') ? { transportistaId: submittedForm.transportista } : {}),
         ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.vehiculoId ? { vehiculoId: submittedForm.vehiculoId } : {}),
         ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.choferId ? { choferId: submittedForm.choferId } : {}),
         operadorId: submittedForm.operador,

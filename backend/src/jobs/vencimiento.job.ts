@@ -1,3 +1,4 @@
+import { mayRegisterScheduledJob } from '../config/scheduledTaskGate';
 import cron from 'node-cron';
 import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
@@ -5,12 +6,7 @@ import { domainEvents } from '../services/domainEvent.service';
 const DIAS_ANTICIPACION = 30;
 
 export function iniciarVencimientoJob(): void {
-  // Solo ejecutar en instancia 0 de PM2 cluster para evitar duplicación
-  const instanceId = process.env.NODE_APP_INSTANCE || process.env.pm_id || '0';
-  if (instanceId !== '0') {
-    console.log(`[VencimientoJob] PM2 instancia ${instanceId}, skipping cron`);
-    return;
-  }
+  if (!mayRegisterScheduledJob('VencimientoJob')) return;
 
   // Ejecutar diariamente a las 8:00
   cron.schedule('0 8 * * *', async () => {

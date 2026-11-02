@@ -1,3 +1,4 @@
+import { mayRegisterScheduledJob } from '../config/scheduledTaskGate';
 import cron from 'node-cron';
 import { createHash } from 'node:crypto';
 import { Prisma, Rol, type ReglaAlerta } from '@prisma/client';
@@ -170,7 +171,7 @@ export async function ejecutarCatalogo(now = new Date()): Promise<number> {
 }
 
 export function iniciarAlertCatalogueJob(): void {
-  if ((process.env.NODE_APP_INSTANCE || process.env.pm_id || '0') !== '0') return;
+  if (!mayRegisterScheduledJob('alertCatalogue')) return;
   let running = false;
   cron.schedule('5 8 * * *', async () => {
     if (running) return; running = true;

@@ -1,6 +1,7 @@
 import { iniciarRecordatorioFirmaJob } from './jobs/manifestSignatureReminder.job';
 import { iniciarDuracionTransitoJob } from './jobs/transitDuration.job';
 import express, { Request, Response } from 'express';
+import { existsSync, readFileSync } from 'node:fs';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -9,6 +10,7 @@ import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
 import { resolveListenHost } from './config/listenHost';
 import { createScheduledTaskGate } from './config/scheduledTaskGate';
+import { assertSyntheticPreviewDatabase, assertSyntheticPreviewRuntime, syntheticPreviewEnabled, syntheticPreviewRequestAllowed } from './config/syntheticPreview';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { isAuthenticated } from './middlewares/auth.middleware';
 import authRoutes from './routes/auth.routes';
@@ -46,6 +48,19 @@ import { PostgresAdmissionStore } from './services/apiAdmission.service';
 import { trainingSession } from './middlewares/trainingSession';
 import empresaRoutes from './routes/empresa.routes';
 
+// The opt-in must pass runtime and connected database checks before traffic.
+const syntheticPreview = syntheticPreviewEnabled();
+if (syntheticPreview) assertSyntheticPreviewRuntime({ platform: process.platform, container: existsSync('/.dockerenv'),
+  cpu: readFileSync('/sys/fs/cgroup/cpu.max', 'utf8'), memory: readFileSync('/sys/fs/cgroup/memory.max', 'utf8'),
+  swap: readFileSync('/sys/fs/cgroup/memory.swap.max', 'utf8'), ipv4Routes: readFileSync('/proc/net/route', 'utf8'),
+  ipv6Routes: existsSync('/proc/net/ipv6_route') ? readFileSync('/proc/net/ipv6_route', 'utf8') : '' });
+const verifySyntheticPreviewDatabase = async () => {
+  const rows = await prisma.$queryRaw<Array<{ name: string; port: number; address: string; schema: string; directory: string }>>`
+    SELECT current_database() AS name, inet_server_port() AS port, host(inet_server_addr()) AS address,
+      current_schema() AS schema, current_setting('data_directory') AS directory`;
+  assertSyntheticPreviewDatabase(rows);
+};
+
 // Inicializar la aplicación Express
 const app = express();
 
@@ -69,6 +84,13 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use('/api/', (req, res, next) => {
+  if (!syntheticPreviewRequestAllowed(syntheticPreview, req.method, req.path, req.get('X-SITREP-Synthetic-Preview'))) {
+    res.status(403).json({ success: false, message: 'No se pudo verificar la versión del entorno. Recargá la pantalla.' });
+    return;
+  }
+  next();
+});
 app.use(trainingSession);
 
 // Shared counters across workers. Valid sessions have independent work quotas;
@@ -108,6 +130,16 @@ app.get('/api/docs.json', (req, res, next) => {
     }
     return res.json(swaggerSpec);
   });
+});
+
+if (syntheticPreview) app.get('/api/preview/identity', async (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await verifySyntheticPreviewDatabase();
+    res.json({ mode: 'synthetic-preview-v1' });
+  } catch {
+    res.status(503).json({ error: 'No se pudo confirmar el entorno de práctica.' });
+  }
 });
 
 // Rutas
@@ -276,8 +308,16 @@ const onListening = () => {
   logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
   scheduledTasks.run(() => startEmailFlushTimer());
 };
-if (HOST) app.listen(PORT, HOST, onListening);
-else app.listen(PORT, onListening);
+const listen = () => {
+  if (HOST) app.listen(PORT, HOST, onListening);
+  else app.listen(PORT, onListening);
+};
+if (syntheticPreview) {
+  void verifySyntheticPreviewDatabase().then(listen).catch(() => {
+    logger.fatal('Synthetic preview database identity could not be verified');
+    process.exit(1);
+  });
+} else listen();
 
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {

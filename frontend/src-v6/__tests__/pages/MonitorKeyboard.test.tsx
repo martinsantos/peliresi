@@ -10,7 +10,7 @@ vi.mock('../../hooks/useInspectionOperations',()=>({useInspectionOperations:()=>
 vi.mock('../../pages/monitor/hooks/useWarRoomData',()=>({useWarRoomData:()=>({data:{actores:{generadores:[],transportistas:[],operadores:[]}},isError:state.error,isPending:false,isFetching:false,dataUpdatedAt:state.updated,refetch:state.refetch})}));
 vi.mock('../../pages/monitor/hooks/useForecast',()=>({useForecast:()=>({data:null,isError:false,isPending:false,refetch:vi.fn()})}));
 vi.mock('../../pages/monitor/hooks/useMonitorTimeline',()=>({useMonitorTimeline:()=>({data:null,isError:false,isPending:false,refetch:vi.fn()})}));
-vi.mock('../../pages/monitor/api/monitor-api',()=>({fetchActiveDays:async()=>[],fetchTimeline:vi.fn()}));
+vi.mock('../../pages/monitor/api/monitor-api',()=>({fetchActiveDays:async()=>[],fetchTimeline:vi.fn(),TimelineReadError:class TimelineReadError extends Error {}}));
 vi.mock('../../pages/monitor/components/WarRoomMap',()=>({WarRoomMap:()=>null}));
 vi.mock('../../pages/monitor/components/DashboardPanels',()=>({DashboardPanels:()=>null}));
 vi.mock('../../pages/monitor/components/DepartureBoard',()=>({DepartureBoard:()=>null}));

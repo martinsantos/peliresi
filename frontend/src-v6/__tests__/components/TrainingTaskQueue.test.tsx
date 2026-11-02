@@ -27,8 +27,8 @@ it('filters current work, preserves approval states and links to the exact manif
  fireEvent.click(screen.getByRole('button',{name:'Todos'}));fireEvent.click(screen.getByRole('button',{name:'Filtrar',exact:true}));fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'future'}});expect(screen.queryByText('CAP-TRIP')).not.toBeInTheDocument();
  fireEvent.change(screen.getByLabelText('Buscar manifiesto en agenda'),{target:{value:'missing'}});expect(await screen.findByText('Sin manifiestos para estos filtros.')).toBeVisible();
 });
-it('is not enabled in operational sessions',()=>{mock.training=false;mount();expect(mock.get).not.toHaveBeenCalled();expect(screen.queryByLabelText('Agenda de manifiestos')).not.toBeInTheDocument();});
-it('shows an operations agenda for the CAP administrator',async()=>{mock.rol='ADMIN';mount();expect(await screen.findByText('Manifiestos pendientes')).toBeVisible();expect(await screen.findByText('CAP-TRIP')).toBeVisible();});
+it('is not enabled in operational sessions unless the proposal feature is enabled',()=>{mock.training=false;vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','false');mount();expect(mock.get).not.toHaveBeenCalled();expect(screen.queryByLabelText('Agenda de manifiestos')).not.toBeInTheDocument();});
+it('shows the operations agenda for a CAP administrator when the proposal feature is enabled',async()=>{mock.training=false;mock.rol='ADMIN';vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');mount();expect(await screen.findByText('Manifiestos pendientes')).toBeVisible();expect(await screen.findByText('CAP-TRIP')).toBeVisible();});
 
 it('keeps Hoy and Próximos on the Mendoza date when UTC is already the following day',async()=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-20T01:30:00Z'));

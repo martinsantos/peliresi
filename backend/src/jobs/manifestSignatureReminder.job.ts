@@ -1,3 +1,4 @@
+import { mayRegisterScheduledJob } from '../config/scheduledTaskGate';
 import cron from 'node-cron';
 import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
@@ -68,7 +69,7 @@ export async function ejecutarRecordatorioFirma(now = new Date()): Promise<numbe
   return inserted;
 }
 export function iniciarRecordatorioFirmaJob() {
-  if ((process.env.NODE_APP_INSTANCE || process.env.pm_id || '0') !== '0') return;
+  if (!mayRegisterScheduledJob('manifestSignatureReminder')) return;
   let running = false;
   cron.schedule('15 8 * * *', async () => {
     if (running) return; running = true;

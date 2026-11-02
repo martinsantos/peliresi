@@ -1,6 +1,8 @@
 import PDFDocument from 'pdfkit';
 import { drawInstitutionalMasthead, drawInstitutionalRule, loadInspectionPdfBranding, type InspectionPdfBranding } from './inspectionPdfBranding.service';
 import { inspectionPdfLines, drawInspectionPdfBlocks } from './inspectionPdfLayout.service';
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
+import { PRACTICE_PDF_NOTICE } from './syntheticPreviewPdf.service';
 
 export const PDF_STYLE = { green: '#1B5E3C', ink: '#172C24', muted: '#526359', line: '#DCE5DF', light: '#F3F7F4' };
 
@@ -37,13 +39,14 @@ export function documentHeader(doc: PDFKit.PDFDocument, title: string, reference
   else masthead();
   if (structure) artifact(doc, () => drawInstitutionalRule(doc, 44, 83, 507));
   else drawInstitutionalRule(doc, 44, 83, 507);
-  if (notice) {
+  const visibleNotice = syntheticPreviewEnabled() ? PRACTICE_PDF_NOTICE : notice;
+  if (visibleNotice) {
     const background = () => { doc.roundedRect(44, 88, 507, 17, 3).fill('#FEF3C7'); };
     const noticeText = () => { doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#78350F')
-      .text(notice, 52, 92, { width: 491, lineBreak: false }); };
+      .text(visibleNotice, 52, 92, { width: 491, lineBreak: false }); };
     if (structure) {
       artifact(doc, background);
-      if (page === 1) element(doc, structure, 'P', noticeText, { actual: notice });
+      if (page === 1) element(doc, structure, 'P', noticeText, { actual: visibleNotice });
       else artifact(doc, noticeText, 'Pagination');
     } else { background(); noticeText(); }
   }

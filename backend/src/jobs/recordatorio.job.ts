@@ -1,3 +1,4 @@
+import { mayRegisterScheduledJob } from '../config/scheduledTaskGate';
 import cron from 'node-cron';
 import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
@@ -7,8 +8,7 @@ import { manifestCompanyRecipients, type ManifestCompanyAccess } from '../servic
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 
 export function iniciarRecordatorioJob(): void {
-  const instanceId = process.env.NODE_APP_INSTANCE || process.env.pm_id || '0';
-  if (instanceId !== '0') return;
+  if (!mayRegisterScheduledJob('RecordatorioJob')) return;
   cron.schedule('0 */6 * * *', async () => {
     try { await ejecutarRecordatorios(); }
     catch (error) { console.error('[RecordatorioJob] Evaluación incompleta:', error); }

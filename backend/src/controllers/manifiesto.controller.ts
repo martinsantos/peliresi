@@ -1,5 +1,6 @@
 import { certificatesEnabled, CERTIFICATE_MANAGED } from '../services/manifestCertificate.service';
 import { isTrainingSession } from '../lib/trainingScope';
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { validateProposalParties, notifyManifestParties } from '../services/manifestProposal.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import { manifestProposalsEnabled, canCreateManifestProposal, MANIFEST_PROPOSAL } from '../domain/manifestProposal';
@@ -184,6 +185,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const created = await tx.manifiesto.create({
       data: {
         numero,
+        ...(syntheticPreviewEnabled() ? { isDemoData: true } : {}),
         generadorId,
         transportistaId: modalidad === 'IN_SITU' && !partyProposal ? null : transportistaId,
         ...(asignacionTransporte ? { asignacionTransporte } : {}),

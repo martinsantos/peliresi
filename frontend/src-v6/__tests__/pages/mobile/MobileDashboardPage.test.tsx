@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileDashboardPage } from '../../../pages/mobile/MobileDashboardPage';
 import { EstadoManifiesto } from '../../../types/models';
 
@@ -60,9 +60,14 @@ vi.mock('../../../hooks/useManifiestos', () => ({
 
 describe('MobileDashboardPage operator queue', () => {
   beforeEach(() => {
+    // Exercise the legacy operator action queue; the proposals agenda replaces
+    // it only when the separately gated feature is explicitly enabled.
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'false');
     navigateMock.mockClear();
     manifiestosByEstado.clear();
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it('includes manifests in treatment as pending operator actions', () => {
     manifiestosByEstado.set(EstadoManifiesto.EN_TRATAMIENTO, [

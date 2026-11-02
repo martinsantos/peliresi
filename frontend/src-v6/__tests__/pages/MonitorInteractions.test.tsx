@@ -92,7 +92,8 @@ describe('Monitor: controles operativos y datos sin simulación',()=>{
   });
   it('el deslizador avanza realmente el historial, no queda como una maqueta',()=>{
     const playback={isPlaying:false,speed:'normal' as const,currentEventIndex:2,totalEventCount:10,progress:.3,isDone:false,counters:{},play:vi.fn(),pause:vi.fn(),setSpeed:vi.fn(),skipToNext:vi.fn(),skipToPrev:vi.fn(),seek:vi.fn()};
-    render(<TimelineControls mode="PLAYBACK" liveData={null} playbackDate="2026-10-02" onDateChange={vi.fn()} onSwitchToPlayback={vi.fn()} timelineData={null} isLoading={false} playback={playback}/>);
+    const timeline: TimelineResponse={eventos:[],actores:{generadores:[],transportistas:[],operadores:[]},resumen:{totalEventos:0,totalManifiestos:0,totalGpsPoints:0,primeraActividad:null,ultimaActividad:null}};
+    render(<TimelineControls mode="PLAYBACK" liveData={null} playbackDate="2026-10-02" onDateChange={vi.fn()} onSwitchToPlayback={vi.fn()} timelineData={timeline} isLoading={false} playback={playback}/>);
     const slider=screen.getByRole('slider',{name:'Recorrer historial'});
     expect(slider).toHaveValue('300');fireEvent.change(slider,{target:{value:'700'}});
     expect(playback.seek).toHaveBeenCalledWith(.7);

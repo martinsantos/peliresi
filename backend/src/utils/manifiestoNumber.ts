@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { isTrainingSession } from '../lib/trainingScope';
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 
 /**
  * Generate a unique manifiesto number in format YYYY-NNNNNN.
@@ -9,7 +10,7 @@ import { isTrainingSession } from '../lib/trainingScope';
  */
 export async function generarNumeroManifiesto(tx: Pick<Prisma.TransactionClient, 'manifiesto'>): Promise<string> {
   const año = new Date().getFullYear();
-  const prefix = `${isTrainingSession() ? 'CAP-' : ''}${año}-`;
+  const prefix = `${isTrainingSession() ? 'CAP-' : syntheticPreviewEnabled() ? 'PRUEBA-' : ''}${año}-`;
   const latest = await tx.manifiesto.findFirst({
     where: { numero: { startsWith: prefix } },
     orderBy: { numero: 'desc' },

@@ -126,19 +126,18 @@ describe('manifest transport compatibility after changing residues', () => {
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('choferId');
   });
 
-  it('explains that an in-situ draft needs a new proposal before starting', async () => {
+  it('requires all three parties when an in-situ draft is created', async () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
     prepareDestination(/^Transporte Y8$/);
-    expect(screen.getByRole('button', { name: /^Con traslado/ })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Ya asignaste un transporte');
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar sin transporte' }));
-    expect(screen.getByText(/El borrador se conserva. Para iniciar necesitás una nueva propuesta con las tres partes/)).toBeVisible();
-    expect(screen.queryByLabelText('Transportista *')).not.toBeInTheDocument();
+    expect(screen.getByText(/Las tres partes reciben un aviso y deben aprobar/)).toBeVisible();
+    expect(screen.getByLabelText('Transportista aprobador *')).toHaveTextContent('Transporte Y8');
     choose('Operador / Destino *', /Operador QA/);
     fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
-    expect(mocks.create.mock.calls[0][0].modalidad).toBe('IN_SITU');
-    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('transportistaId');
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({ modalidad: 'IN_SITU', transportistaId: 'trans-y8', operadorId: 'operador-1' });
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('vehiculoId');
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('choferId');
   });
 
   it('warns before entry that disabled proposals cannot start with a single signature', () => {
@@ -237,17 +236,38 @@ describe('manifest transport compatibility after changing residues', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Manifiesto recuperado', expect.stringContaining('no se creó otro')));
   });
 
-  it('retries an earlier in-situ send without changing its original payload after proposals are enabled', async () => {
+  it('retries an earlier in-situ send unchanged after the proposal setting changes', async () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
     prepareDestination(/^Transporte Y8$/);
     fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar sin transporte' }));
     choose('Operador / Destino *', /Operador QA/);
     fireEvent.change(screen.getByLabelText('Fecha prevista de inicio'), { target: { value: '2099-12-25' } });
     mocks.create.mockRejectedValueOnce(new Error('QA disconnected'));
     fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
     const original = mocks.create.mock.calls[0][0];
+    expect(original).toMatchObject({ modalidad: 'IN_SITU', transportistaId: 'trans-y8', operadorId: 'operador-1' });
+    cleanup(); sessionStorage.clear();
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'false');
+    render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);
+    mocks.create.mockResolvedValueOnce({ id: 'manifest-1', numero: 'QA-1', creationRecovered: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2));
+    expect(mocks.create.mock.calls[1][0]).toEqual(original);
+  });
+
+  it('recovers a legacy in-situ send without adding a carrier when proposals become enabled', async () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'false');
+    prepareDestination(/^Transporte Y8$/);
+    fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar sin transporte' }));
+    choose('Operador / Destino *', /Operador QA/);
+    mocks.create.mockRejectedValueOnce(new Error('QA disconnected'));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+    const original = mocks.create.mock.calls[0][0];
     expect(original).not.toHaveProperty('transportistaId');
+
     cleanup(); sessionStorage.clear();
     vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
     render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);
@@ -255,6 +275,7 @@ describe('manifest transport compatibility after changing residues', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2));
     expect(mocks.create.mock.calls[1][0]).toEqual(original);
+    expect(mocks.create.mock.calls[1][0]).not.toHaveProperty('transportistaId');
   });
 
   it('blocks an unrecorded send rather than losing its identity if the app closes', async () => {

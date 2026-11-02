@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
 import {
   buildInspectionDocumentFingerprint,
   buildInspectionFieldActFingerprint,
@@ -954,6 +955,7 @@ export async function streamInspectionActPdf(
     doc.fontSize(6.1)
       .text(`Gobierno de Mendoza · SITREP · ${inspection.numero} · ${presentation.statusLabel}`, 34, footerY + 9, { width: 410, lineBreak: false })
       .text(`Página ${index + 1} de ${pages.count}`, 466, footerY + 9, { width: 95, align: 'right', lineBreak: false });
+    drawSyntheticPreviewFooter(doc, footerY);
     doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();

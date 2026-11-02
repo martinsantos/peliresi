@@ -44,9 +44,11 @@ describe('Sidebar: one visible current destination',()=>{
     expect(help.parentElement).not.toHaveClass('fixed');
   });
   beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;authState.training=false;attention.support=0;attention.applicationPending=0;});
-  it.each(['ADMIN','GENERADOR','OPERADOR','TRANSPORTISTA'])('enables web offline synchronization only for %s when appropriate',rol=>{
+  it.each(['ADMIN','GENERADOR','OPERADOR','TRANSPORTISTA'])('keeps actor manifests out of web offline cache for %s',rol=>{
     authState.rol=rol; sync.mockClear(); show('/dashboard');
-    expect(sync).toHaveBeenCalledWith({downloadManifests:false,enabled:rol==='TRANSPORTISTA'});
+    // The shell can process already queued work for every role, while actor
+    // manifests stay out of the offline cache in every web workspace.
+    expect(sync).toHaveBeenCalledWith({downloadManifests:false});
   });
   it.each(['button','Escape'])('closes the compact menu with %s and restores keyboard focus without leaving the page',method=>{
     show('/dashboard');
@@ -169,7 +171,10 @@ describe('Sidebar: one visible current destination',()=>{
     expect(title).toHaveAttribute('title',label);
     expect(title.parentElement).toHaveClass('min-w-0','flex-1');
     const help=within(header).getByRole('button',{name:path.startsWith('/admin/actores') || path === '/inspecciones' ? 'Ayuda y soporte técnico':'Ver tour de ayuda',exact:true});
-    expect(help).toHaveClass('h-11','w-11');
+    // Both Tailwind h-11/w-11 (tour button) and explicit 44px (support
+    // bubble) are 44px touch targets; the paths intentionally render each.
+    if(path==='/centro-control') expect(help).toHaveClass('h-11','w-11');
+    else expect(help).toHaveClass('h-[44px]','w-[44px]','p-0');
     expect(help.parentElement).toHaveClass('shrink-0');
   });
 });

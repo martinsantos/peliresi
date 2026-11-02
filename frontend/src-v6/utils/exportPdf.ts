@@ -183,6 +183,10 @@ export async function exportReportePDF(config: ExportConfig) {
     doc.setTextColor(...GRAY_COLOR);
     doc.text('SITREP - Sistema de Trazabilidad RRPP | Generado automáticamente', 14, pageH - 10);
     doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, pageH - 10, { align: 'right' });
+    if (import.meta.env.VITE_SYNTHETIC_PREVIEW === 'true') {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(120, 53, 15);
+      doc.text('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL', pageWidth / 2, pageH - 4, { align: 'center' });
+    }
   }
 
   // Download

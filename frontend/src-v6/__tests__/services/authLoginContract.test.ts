@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const api = vi.hoisted(() => ({ post: vi.fn(), setTokensDurably: vi.fn() }));
-vi.mock('../../services/api', () => ({ default: { post: api.post }, setTokensDurably: api.setTokensDurably, clearTokensDurably: vi.fn(), getAccessToken: vi.fn() }));
+const api = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), setTokensDurably: vi.fn() }));
+vi.mock('../../services/api', () => ({ default: { post: api.post, get: api.get }, setTokensDurably: api.setTokensDurably, clearTokensDurably: vi.fn(), getAccessToken: vi.fn() }));
 import { authService } from '../../services/auth.service';
 import { restrictedSessionHint } from '../../services/registrationSession';
 
@@ -15,6 +15,8 @@ describe('login response contract', () => {
   });
   it('does not invent a restriction for full-access login', async () => {
     api.post.mockResolvedValue({ data: { data: { user: { id: 'active', activo: true }, tokens: { accessToken: 'access', refreshToken: 'refresh' } } } });
+    // Enterprise/multirole builds fetch the profile after login; keep that contract dependency valid.
+    api.get.mockResolvedValue({ data: { data: { user: { id: 'active', activo: true } } } });
     const response = await authService.login({ email: 'qa@test.invalid', password: 'synthetic' });
     expect(response.restricted).toBeUndefined();
     expect(response.solicitudId).toBeUndefined();

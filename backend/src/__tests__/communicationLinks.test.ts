@@ -55,10 +55,20 @@ describe('communication links', () => {
     const mail = renderMail('verify', { name: 'QA', token: 'a/b+c&d' });
     expect(mail.html).toContain('token=a%2Fb%2Bc%26d');
   });
-  it.each(['EN_TRATAMIENTO', 'CANCELADO'])('covers intermediate event %s with a real destination', estado => {
+  it.each([
+    ['EN_TRATAMIENTO', 'Tratamiento iniciado'],
+    ['CANCELADO', 'Manifiesto cancelado'],
+  ])('routes %s through the recipient notice before resolving its manifest destination', (estado, subject) => {
     const mail = notificationMailContent({ id:'n',tipo:'INFO_GENERAL',manifiestoId:'m',datos:JSON.stringify({tipo:'estado_manifiesto',estado}),rol:'GENERADOR' } as any)!;
-    expect(mail.family).toBe('manifiestos'); expect(mail.html).toContain('/app/manifiestos/m');
-    expect(mail.subject).not.toContain('Novedad');
+    expect(mail.family).toBe('manifiestos');
+    expect(mail.subject).toContain(subject);
+    const links = [...mail.html.matchAll(/href="([^"]+)"/g)].map(match => new URL(match[1].replace(/&amp;/g, '&')));
+    expect(links).toHaveLength(3);
+    expect(links[0].pathname).toBe('/app/abrir');
+    expect(links[0].searchParams.get('destino')).toBe('/notificaciones/n');
+    expect(links[1].pathname).toBe('/notificaciones/n');
+    expect(links[2].pathname).toBe('/app/notificaciones/n');
+    expect(mail.html).not.toContain('/manifiestos/m');
   });
   it('selects the exact application, avoiding another activity of the same applicant', () => {
     const mail = notificationMailContent({id:'n',tipo:'SOLICITUD_MENSAJE',datos:'{"solicitudId":"second"}',rol:'GENERADOR'} as any)!;

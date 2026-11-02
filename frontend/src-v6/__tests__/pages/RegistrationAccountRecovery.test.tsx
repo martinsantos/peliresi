@@ -11,7 +11,8 @@ vi.mock('../../services/api', () => ({ setTokensDurably: mock.tokens }));
 vi.mock('../../pages/public/inscripcion/RegisteredAccount', () => ({ RegisteredAccount: ({ children }: { children: React.ReactNode }) => children }));
 function LoginDestination() { const l = useLocation(); return <p>Ingreso para {(l.state as { from: string }).from}</p>; }
 function Account({ type }: { type: TipoActor }) {
-  const [reg, setReg] = useState({ nombre: 'QA persona', email: 'qa@night-qa.invalid', cuit: '30709876543', password: 'OnlyLocal-NightQA-2026!', confirmPassword: 'OnlyLocal-NightQA-2026!' });
+  // Valid synthetic Argentine CUIT; enterprise builds verify its check digit before POST.
+  const [reg, setReg] = useState({ nombre: 'QA persona', email: 'qa@night-qa.invalid', cuit: '20-12345678-6', password: 'OnlyLocal-NightQA-2026!', confirmPassword: 'OnlyLocal-NightQA-2026!' });
   return <StepCuenta tipoActor={type} isGenerador={type === 'GENERADOR'} isOperador={type === 'OPERADOR'} isTransportista={type === 'TRANSPORTISTA'} reg={reg} onRegChange={(key,value)=>setReg(old=>({...old,[key]:value}))} onPhase2={mock.next}/>;
 }
 function open(type: TipoActor = 'GENERADOR', app = false) { return render(<MemoryRouter basename={app?'/app':undefined} initialEntries={[`${app?'/app':''}/inscripcion/${type.toLowerCase()}`]}><Routes><Route path="/inscripcion/:tipo" element={<Account type={type}/>}/><Route path="/login" element={<LoginDestination/>}/></Routes></MemoryRouter>); }

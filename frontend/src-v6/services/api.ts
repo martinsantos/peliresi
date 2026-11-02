@@ -10,6 +10,7 @@ import { rateLimitMessage } from '../utils/rateLimitMessage';
 import { ACTIVITY_HEADER, readActorActivity } from './actorActivity';
 import { readCompanyContext,companyHeaders } from './companyContext';
 import { readSessionCheckpoint, writeSessionCheckpoint, type SessionCheckpoint } from './sessionCheckpoint';
+import { syntheticPreviewHeaders } from './syntheticPreviewHeaders';
 
 const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
@@ -18,7 +19,7 @@ const MAX_RENEWALS = 4;
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...syntheticPreviewHeaders() },
   timeout: 30000,
 });
 

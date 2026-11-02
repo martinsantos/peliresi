@@ -1,3 +1,8 @@
+## Aviso de fuente vigente — 2 nov 2026
+
+Identificar producción mediante `https://sitrep.ultimamilla.com.ar/release.json` y sus huellas; un candidato o HEAD de rama no acredita un despliegue. El corte de partida comprobado el 2/11 es `5c1aad1b484a9bf4b845ea77bc62edb7980e031b`, preservado en el bare repository de recuperación, la rama remota `codex/sitrep-release-5c1aad1b-20261102` y la etiqueta `sitrep-production-2026-11-02-5c1aad1b`. La respuesta 422 anterior quedó supersedida por esta preservación HTTPS. La preparación posterior vive en `codex/sitrep-ops-preview-2h-20261102`; consultar `docs/CIERRE-VIGENTE-20261102.md` y la evidencia del candidato antes de integrarla o publicarla. No tratar el checkout histórico ni `main` como fuente del release. No actualizar checkout, hacer merge, desplegar ni publicar refs por inferencia. Las rutas operativas actuales son `/srv/umsa-clean-apps/sitrep-backend` y `/srv/umsa-clean-proxy/static/sitrep`; `/var/www/*` es histórico. El resto de este archivo conserva antecedentes y no reemplaza el cierre vigente.
+
+
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
 ## Fichas y edición — preview, 24/10/2026
