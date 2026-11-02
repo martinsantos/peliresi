@@ -51,15 +51,21 @@ export function measureInspectionPdfBlocks(doc: PDFKit.PDFDocument, blocks: Insp
 export function drawInspectionPdfBlocks(
   doc: PDFKit.PDFDocument,
   blocks: InspectionPdfTextBlock[],
-  options: { x: number; width: number; bottom: number; newPage: () => void; continuation: string },
+  options: {
+    x: number; width: number; bottom: number; newPage: () => void; continuation: string;
+    /** Optional marked-content boundaries; callers without a structure retain the original rendering. */
+    drawLine?: (draw: () => void) => void;
+    drawContinuation?: (draw: () => void) => void;
+  },
 ): void {
   for (const block of blocks) {
     doc.font(block.font || 'Helvetica').fontSize(block.size);
     const lineHeight = doc.currentLineHeight(true) + 1.5;
     const nextPage = () => {
       options.newPage();
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(block.color)
+      const drawContinuation = () => doc.font('Helvetica-Bold').fontSize(7.5).fillColor(block.color)
         .text(options.continuation, options.x, doc.y, { width: options.width });
+      if (options.drawContinuation) options.drawContinuation(drawContinuation); else drawContinuation();
       doc.y += 8;
       doc.font(block.font || 'Helvetica').fontSize(block.size).fillColor(block.color);
     };
@@ -79,7 +85,10 @@ export function drawInspectionPdfBlocks(
         if (doc.y + (remaining === 2 ? 2 : 1) * lineHeight > options.bottom) nextPage();
         doc.font(block.font || 'Helvetica').fontSize(block.size).fillColor(block.color);
         const y = doc.y;
-        if (line) doc.text(line, options.x, y, { width: options.width, lineBreak: false });
+        if (line) {
+          const drawLine = () => doc.text(line, options.x, y, { width: options.width, lineBreak: false });
+          if (options.drawLine) options.drawLine(drawLine); else drawLine();
+        }
         doc.y = y + lineHeight;
       });
     }

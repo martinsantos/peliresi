@@ -19,8 +19,18 @@ function inspect(bytes:Buffer,name:string){
  const pages=raw.split('\f').filter(p=>p.trim());pages.forEach((p,i)=>{expect(p).toContain('SITREP');expect(p).toContain('Página '+(i+1));});
  return {text:raw.replace(/\s+/g,' '),pages};
 }
+function inspectStructure(bytes: Buffer, columns: number, rows: number) {
+ const raw=bytes.toString('latin1');
+ const count=(tag:string)=>[...raw.matchAll(new RegExp('\\/S \\/'+tag+'(?=\\s|$)','g'))].length;
+ expect(raw).toContain('/Type /StructTreeRoot');
+ expect(raw).toContain('/Marked true');expect(raw).toContain('/Lang (es-AR)');
+ expect(count('Document')).toBe(1);expect(count('H1')).toBe(1);expect(count('H2')).toBeGreaterThanOrEqual(3);
+ expect(count('Table')).toBe(1);expect(count('TR')).toBe(rows+1);expect(count('TH')).toBe(columns);expect(count('TD')).toBe(columns*rows);
+ expect(count('Figure')).toBeGreaterThanOrEqual(2);expect(raw).toContain('/ActualText');expect(raw).toContain('/Alt');
+}
 it.each([false,true])('preserves records, signatures and page boundaries; long=%s',async long=>{
- const m=fixture(long),before=JSON.stringify(m),pdf=inspect(await renderManifestPdf(m),long?'manifiesto-extenso':'manifiesto');
+ const m=fixture(long),before=JSON.stringify(m),bytes=await renderManifestPdf(m),pdf=inspect(bytes,long?'manifiesto-extenso':'manifiesto');
+ inspectStructure(bytes,4,m.residuos.length);
  expect(JSON.stringify(m)).toBe(before);expect(pdf.text).toContain('Firma manuscrita adjunta');expect(pdf.text).toContain('a'.repeat(64));
  for(const r of m.residuos)expect(pdf.text).toContain(r.tipoResiduo.codigo);
  if(long){expect(pdf.pages.length).toBeGreaterThan(3);expect(pdf.text.match(/OBSERVACIÓN\b/g)).toHaveLength(150);expect(pdf.text.match(/COMPLETA\b/g)).toHaveLength(150);}
@@ -54,7 +64,8 @@ it('does not label an operational manifest as artificial',async()=>{
 });
 it.each(['PARCIAL','FINAL'] as const)('certificate retains snapshot and integrity %s',async tipo=>{
  const data={version:1 as const,tipo,numero:'QA-CERT-'+tipo,manifiestoNumero:'QA-DISEÑO-0001',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método declarado artificial',nota:'Prueba de diseño',cantidades:[{corriente:'Y1',cantidad:21,unidad:'kg'}],parcialesPrevios:tipo==='FINAL'?['QA-CERT-PARCIAL']:[],adendas:[{id:'qa-adenda',version:1}],firmaSha256:'b'.repeat(64),artificial:true};
- const before=JSON.stringify(data),pdf=inspect(await renderManifestCertificate(data,'qa-certificate',sig),'certificado-'+tipo.toLowerCase());
+ const before=JSON.stringify(data),bytes=await renderManifestCertificate(data,'qa-certificate',sig),pdf=inspect(bytes,'certificado-'+tipo.toLowerCase());
+ inspectStructure(bytes,3,data.cantidades.length);
  expect(pdf.pages).toHaveLength(1);expect(JSON.stringify(data)).toBe(before);expect(pdf.text).toContain('SIN VALIDEZ OFICIAL');expect(pdf.text).toContain('Firma manuscrita del operador');expect(pdf.text).toContain('b'.repeat(64));
  expect(pdf.text).toContain(tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas');
  expect(pdf.text).toMatch(/Adenda 1\s*·\s*versión 1/);expect(pdf.text).not.toContain('qa-adenda');
@@ -84,7 +95,8 @@ it('keeps a short final with a prior partial and an approved finding together',a
 });
 it('renders 200 certified quantities across pages without clipping',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-200',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:Array.from({length:200},(_,i)=>({residuoId:`r${i}`,corriente:`Y${i+1}`,cantidad:1,unidad:'kg'})),parcialesPrevios:[],adendas:[],firmaSha256:'b'.repeat(64),artificial:true};
- const pdf=inspect(await renderManifestCertificate(data,'qa-200',sig),'certificado-200');
+ const bytes=await renderManifestCertificate(data,'qa-200',sig),pdf=inspect(bytes,'certificado-200');
+ inspectStructure(bytes,3,200);
  expect(pdf.pages.length).toBeGreaterThan(3);
  for(const page of pdf.pages) expect(page).toContain('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL');
  expect(pdf.text).toMatch(/Y1\s+1\s+kg/);
@@ -93,6 +105,18 @@ it('renders 200 certified quantities across pages without clipping',async()=>{
  const signaturePage=pdf.pages.find(page=>page.includes('Firma manuscrita del operador'));
  expect(signaturePage).toContain('Huella de la firma');
 },15000);
+it('keeps a multi-page table row together in the logical structure without dropping its text',async()=>{
+ const m=fixture(),phrase='Descripción artificial extensa para comprobar la continuidad. ';
+ m.residuos=[{...m.residuos[0],tipoResiduo:{codigo:'Y1',nombre:phrase.repeat(150)}}];
+ const bytes=await renderManifestPdf(m),pdf=inspect(bytes,'manifiesto-fila-extrema');
+ expect(pdf.pages.length).toBeGreaterThan(3);expect(pdf.text.match(/Descripción artificial extensa/g)).toHaveLength(150);
+ inspectStructure(bytes,4,1);
+},15000);
+it('retains the accessible fallback when the QR cannot be rendered',async()=>{
+ const m={...fixture(),qrCode:'data:image/png;base64,Zm9v'};
+ const bytes=await renderManifestPdf(m),pdf=inspect(bytes,'manifiesto-qr-invalido');
+ expect(pdf.text).toContain('No se pudo representar el QR');inspectStructure(bytes,4,m.residuos.length);
+});
 it('distinguishes treated findings from findings declared not treated in the final PDF',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-F',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:[{residuoId:'hallazgo:Y12:kg',corriente:'Y12',cantidad:1,unidad:'kg',origen:'HALLAZGO' as const,adendas:[{id:'a',version:1}]}],parcialesPrevios:[],adendas:[{id:'a',version:1}],hallazgosNoTratados:[{id:'hallazgo:Y13:kg',corriente:'Y13',unidad:'kg',observado:2,adendas:[{id:'a',version:1}]}],firmaSha256:'b'.repeat(64),artificial:true};
  const pdf=inspect(await renderManifestCertificate(data,'qa-findings',sig),'certificado-hallazgos');

@@ -49,7 +49,7 @@ export async function notifyCertificateParties(tx: Prisma.TransactionClient, man
 export function renderManifestCertificate(data: CertificateSnapshot, id: string, signature: string): Promise<Buffer> {
  return institutionalPdf(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', data.numero, layout => {
   const doc = layout.doc;
-  layout.text(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', true, 22, PDF_STYLE.green);
+  layout.text(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', true, 22, PDF_STYLE.green, 'H1');
   layout.text(data.numero, true, 13);
   layout.fields([{label: 'Manifiesto', value: data.manifiestoNumero}, {label: 'Emisión (Mendoza)', value: new Date(data.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza',hour12:false})}]);
   layout.section('01  PARTES Y EMISOR');
@@ -86,7 +86,7 @@ export function renderManifestCertificate(data: CertificateSnapshot, id: string,
    + measureInspectionPdfBlocks(doc, integrity, 507) + 2;
   layout.section('03  FIRMA E INTEGRIDAD', signatureHeight);
   layout.text('Firma manuscrita del operador',true,10);
-  const y=doc.y;doc.image(Buffer.from(signature.split(',')[1],'base64'),44,y,{fit:[220,60]});doc.y=y+70;
+  const y=doc.y;layout.figure('Firma manuscrita del operador',()=>{doc.image(Buffer.from(signature.split(',')[1],'base64'),44,y,{fit:[220,60]});});doc.y=y+70;
   layout.text('Registro: '+id,false,8);layout.text('Huella de la firma: '+data.firmaSha256,false,8,PDF_STYLE.muted);
  }, new Date(data.fecha), data.artificial ? { notice: 'DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL' } : {});
 }

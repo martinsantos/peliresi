@@ -7,7 +7,7 @@ const states: Record<string, string> = { BORRADOR: 'Borrador', PENDIENTE_APROBAC
 export function renderManifestPdf(m: any): Promise<Buffer> {
   return institutionalPdf(m.modalidad === 'IN_SITU' ? 'Manifiesto de tratamiento en origen' : 'Manifiesto de transporte de residuos peligrosos', m.numero, layout => {
     const doc = layout.doc;
-    layout.text(m.modalidad === 'IN_SITU' ? 'MANIFIESTO · TRATAMIENTO EN ORIGEN' : 'MANIFIESTO', true, 9, PDF_STYLE.green);
+    layout.text(m.modalidad === 'IN_SITU' ? 'MANIFIESTO · TRATAMIENTO EN ORIGEN' : 'MANIFIESTO', true, 9, PDF_STYLE.green, 'H1');
     layout.text(m.numero, true, 22);
     layout.fields([{ label: 'Estado actual', value: states[m.estado] || m.estado }, { label: 'Creado', value: date(m.createdAt) }]);
     layout.text('Ley Nacional 24.051 · Decreto 831/93 · Provincia de Mendoza', false, 8, PDF_STYLE.muted);
@@ -41,7 +41,7 @@ export function renderManifestPdf(m: any): Promise<Buffer> {
       const signature = [...m.eventos].reverse().find(e => e.tipo === 'FIRMA');
       if (signature?.firmaImagen) {
         layout.ensure(120); layout.text('Firma manuscrita adjunta', true, 9);
-        const y = doc.y; doc.image(signature.firmaImagen, 44, y, { fit: [220, 60] }); doc.y = y + 66;
+        const y = doc.y; layout.figure('Firma manuscrita del generador', () => { doc.image(signature.firmaImagen, 44, y, { fit: [220, 60] }); }); doc.y = y + 66;
         layout.text([signature.usuario?.nombre, signature.usuario?.apellido].filter(Boolean).join(' '), false, 9);
         layout.text('Registro: ' + date(signature.createdAt) + ' | SHA-256: ' + signature.firmaSha256, false, 8, PDF_STYLE.muted);
       } else layout.text('Aprobación registrada en SITREP. Sin firma manuscrita adjunta.', false, 9, PDF_STYLE.muted);
@@ -50,7 +50,7 @@ export function renderManifestPdf(m: any): Promise<Buffer> {
       layout.section('07  VERIFICACIÓN');
       if (m.qrCode) {
         layout.ensure(105);
-        try { const y = doc.y; doc.image(Buffer.from(m.qrCode.split(',')[1], 'base64'), 44, y, { width: 80, height: 80 }); doc.y = y + 86; layout.text('Código QR de verificación', false, 8, PDF_STYLE.muted); }
+        try { const y = doc.y; layout.decorative(() => { doc.image(Buffer.from(m.qrCode.split(',')[1], 'base64'), 44, y, { width: 80, height: 80 }); }); doc.y = y + 86; layout.text('Código QR de verificación', false, 8, PDF_STYLE.muted); }
         catch { layout.text('No se pudo representar el QR. Consultá el registro en SITREP.', false, 8, PDF_STYLE.muted); }
       }
       if (m.blockchainStatus === 'CONFIRMADO' && m.blockchainHash) {
