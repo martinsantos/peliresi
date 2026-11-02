@@ -239,7 +239,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     await delivered;await transportista.unroute(gpsPattern);
     evidence.steps.push('delivery waits for an in-flight GPS write; no GPS writes after delivery');
     await openManifest(operador,info,manifest.numero);
-    await post(operador,'/'+manifest.id+'/confirmar-recepcion',()=>operador.getByRole('button',{name:'Confirmar Recepcion',exact:true}).click());
+    await post(operador,'/'+manifest.id+'/confirmar-recepcion',()=>operador.getByRole('button',{name:'Confirmar recepción',exact:true}).click());
     await operador.getByRole('button',{name:'Registrar Pesaje',exact:true}).click();
     const weighing=operador.getByRole('dialog',{name:'Registrar Pesaje',exact:true});
     await weighing.getByPlaceholder('Peso real',{exact:true}).fill('10');

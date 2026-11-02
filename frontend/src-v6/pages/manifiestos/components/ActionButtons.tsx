@@ -133,7 +133,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           disabled={isActionPending || pickupBlocked}
           className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900"
         >
-          Confirmar Recepcion In Situ
+          Confirmar recepción en origen
         </Button>
       )}
 
@@ -169,7 +169,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           onClick={onConfirmarRecepcion}
           disabled={isActionPending}
         >
-          Confirmar Recepcion
+          Confirmar recepción
         </Button>
       )}
 

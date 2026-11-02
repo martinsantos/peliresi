@@ -100,7 +100,7 @@ test('school creates a manifest with registered fleet; an addendum preserves its
   await page.getByRole('button', { name: 'Sí, Confirmar Entrega', exact: true }).click(); expect((await delivered).status()).toBe(200);
   await role(page, info, 'Operadores', n); await page.goto(prefix(info) + '/manifiestos/' + manifest.id);
   const received = page.waitForResponse(r => r.url().endsWith('/confirmar-recepcion') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Confirmar Recepcion', exact: true }).click(); expect((await received).status()).toBe(200);
+  await page.getByRole('button', { name: 'Confirmar recepción', exact: true }).click(); expect((await received).status()).toBe(200);
   await page.getByRole('button', { name: 'Registrar Tratamiento', exact: true }).click();
   const treatment = page.getByRole('dialog', { name: 'Registrar Tratamiento', exact: true });
   await treatment.getByPlaceholder('Observaciones del tratamiento...').fill('CAP: tratamiento ficticio, sin validez oficial');

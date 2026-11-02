@@ -120,7 +120,7 @@ for(const creator of lifecycleCreators)test('complete ordinary lifecycle: '+crea
   await expect(delivery).not.toBeVisible();
   const op=pages.operador;
   await op.reload();
-  await post(op,'/'+m.id+'/confirmar-recepcion',()=>op.getByRole('button',{name:'Confirmar Recepcion',exact:true}).click());
+  await post(op,'/'+m.id+'/confirmar-recepcion',()=>op.getByRole('button',{name:'Confirmar recepción',exact:true}).click());
   await op.getByRole('button',{name:'Registrar Pesaje',exact:true}).click();
   const weighing=op.getByRole('dialog',{name:'Registrar Pesaje',exact:true});
   await weighing.getByLabel('Peso recibido de Y1 (kg)',{exact:true}).fill('22');

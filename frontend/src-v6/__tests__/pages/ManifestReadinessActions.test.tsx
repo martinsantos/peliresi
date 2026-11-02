@@ -39,7 +39,7 @@ describe('physical start uses the server readiness of the complete proposal', ()
   });
   it('also blocks in-situ receipt for an inconsistent proposal', () => {
     mount({ estado: EstadoManifiesto.APROBADO, eventos: marker, aprobacionOperacion: 'INCONSISTENTE', transportistaId: 't' }, 'OPERADOR', true);
-    expect(screen.getByRole('button', { name: 'Confirmar Recepcion In Situ' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Confirmar recepción en origen' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('Contactá a Ambiente');
   });
   it('offers an explicit retry if readiness was not received', () => {

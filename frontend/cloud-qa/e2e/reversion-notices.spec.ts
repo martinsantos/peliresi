@@ -52,7 +52,7 @@ test('an old in-situ record cannot start reception without three recorded approv
  await page.goto(prefix(info) + '/manifiestos/' + fixture.legacyCases.IN_SITU.oldId);
  await expect(page.getByText(fixture.legacyCases.IN_SITU.oldNumber, { exact: true }).first()).toBeVisible();
  await expect(page.getByRole('region', { name: 'Aprobaciones pendientes' })).toContainText('Las tres partes deben aprobar');
- await expect(page.getByRole('button', { name: 'Confirmar Recepcion In Situ' })).toBeDisabled();
+ await expect(page.getByRole('button', { name: 'Confirmar recepción en origen' })).toBeDisabled();
  await page.screenshot({ path: info.outputPath('historical-in-situ.png'), animations: 'disabled', scale: 'css' });
 });
 

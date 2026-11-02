@@ -36,7 +36,7 @@ test('a damaged proposal no longer hides the agenda or invents an action', async
   await expect(page.getByRole('button', { name: 'Firmar Manifiesto' })).toHaveCount(0);
   await page.goto(`${prefix(info)}/manifiestos/${f.cases.origin.id}`);
   await expect(page.getByRole('alert').filter({ hasText: 'Contactá a Ambiente' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Confirmar Recepcion In Situ' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Confirmar recepción en origen' })).toBeDisabled();
   await page.screenshot({ path: info.outputPath('origin-review.png'), animations: 'disabled' });
 });
 

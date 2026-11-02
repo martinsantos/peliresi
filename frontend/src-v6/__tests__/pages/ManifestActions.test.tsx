@@ -13,10 +13,10 @@ function input(estado: EstadoManifiesto, userRol: string, isInSitu = false): Act
 const workflows = [
   [EstadoManifiesto.BORRADOR, 'GENERADOR', 'Firmar Manifiesto', 'onOpenFirmaModal', false],
   [EstadoManifiesto.APROBADO, 'TRANSPORTISTA', 'Confirmar Retiro', 'onConfirmarRetiro', false],
-  [EstadoManifiesto.APROBADO, 'OPERADOR', 'Confirmar Recepcion In Situ', 'onConfirmarRecepcionInSitu', true],
+  [EstadoManifiesto.APROBADO, 'OPERADOR', 'Confirmar recepción en origen', 'onConfirmarRecepcionInSitu', true],
   [EstadoManifiesto.EN_TRANSITO, 'TRANSPORTISTA', 'Confirmar Entrega', 'onConfirmarEntrega', false],
   [EstadoManifiesto.EN_TRANSITO, 'TRANSPORTISTA', 'Registrar Incidente', 'onOpenIncidenteModal', false],
-  [EstadoManifiesto.ENTREGADO, 'OPERADOR', 'Confirmar Recepcion', 'onConfirmarRecepcion', false],
+  [EstadoManifiesto.ENTREGADO, 'OPERADOR', 'Confirmar recepción', 'onConfirmarRecepcion', false],
   [EstadoManifiesto.ENTREGADO, 'OPERADOR', 'Rechazar Carga', 'onOpenRechazarModal', false],
   [EstadoManifiesto.RECIBIDO, 'OPERADOR', 'Registrar Pesaje', 'onOpenPesajeModal', false],
   [EstadoManifiesto.RECIBIDO, 'OPERADOR', 'Registrar Tratamiento', 'onOpenTratamientoModal', false],
@@ -27,7 +27,7 @@ describe('manifest workflow actions', () => {
   it('keeps in-situ reception blocked until the approved parties start coordination', () => {
     const props = input(EstadoManifiesto.APROBADO, 'OPERADOR', true);
     const view = render(<ActionButtons {...props} pickupBlocked />);
-    const receipt = screen.getByRole('button', { name: 'Confirmar Recepcion In Situ' });
+    const receipt = screen.getByRole('button', { name: 'Confirmar recepción en origen' });
     expect(receipt).toBeDisabled(); fireEvent.click(receipt);
     expect(props.onConfirmarRecepcionInSitu).not.toHaveBeenCalled();
     view.rerender(<ActionButtons {...props} pickupBlocked={false} />);

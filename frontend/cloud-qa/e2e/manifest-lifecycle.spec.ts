@@ -81,7 +81,7 @@ test('legacy manifest UI with proposals disabled completes signature, transport,
   expect(signedResponse.status()).toBe(200);
   await expect(dialog).not.toBeVisible();
   for (const [button, endpoint] of [
-    ['Confirmar Retiro', 'confirmar-retiro'], ['Confirmar Entrega', 'confirmar-entrega'], ['Confirmar Recepcion', 'confirmar-recepcion'],
+    ['Confirmar Retiro', 'confirmar-retiro'], ['Confirmar Entrega', 'confirmar-entrega'], ['Confirmar recepción', 'confirmar-recepcion'],
   ]) {
     const changed = page.waitForResponse(res => res.url().endsWith(`/api/manifiestos/${record.id}/${endpoint}`) && res.request().method() === 'POST');
     await page.getByRole('button', { name: button, exact: true }).click();

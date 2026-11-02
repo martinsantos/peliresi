@@ -166,7 +166,7 @@ test('school generator signs and hands the same manifest to transport and operat
   await enter(page, info, 'Operadores', index);
   await page.goto(prefix(info) + '/manifiestos/' + id);
   const received = page.waitForResponse(r => r.url().endsWith('/confirmar-recepcion') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Confirmar Recepcion', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar recepción', exact: true }).click();
   expect((await received).status()).toBe(200);
   await page.getByRole('button', { name: 'Registrar Tratamiento', exact: true }).click();
   const treatment = page.getByRole('dialog', { name: 'Registrar Tratamiento', exact: true });

@@ -820,7 +820,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <ol>
 <li>Ingresar con credenciales de operador.</li>
 <li>Ver los manifiestos entrantes en el <strong>Dashboard</strong>.</li>
-<li>Al recibir la carga: <strong>Confirmar Recepcion</strong>.</li>
+<li>Al recibir la carga: <strong>Confirmar recepción</strong>.</li>
 <li>Registrar el <strong>pesaje real</strong> y comparar con el peso declarado por el generador.</li>
 <li>Si hay diferencias significativas de peso: se documentan automaticamente en el sistema.</li>
 <li>Si todo esta conforme: <strong>Firmar Recepcion Conforme</strong> &rarr; el manifiesto pasa a estado RECIBIDO.</li>
@@ -975,7 +975,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <tr><td><span class="workflow-state ws-borrador">PENDIENTE DE APROBACIÓN</span></td><td>La propuesta espera las decisiones de generador, transporte y operador.</td><td>Revisar y decidir desde la cuenta propia</td></tr>
 <tr><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Las tres partes aprobaron. Falta iniciar la coordinación antes de la recepción o el retiro.</td><td>Iniciar coordinación</td></tr>
 <tr><td><span class="workflow-state ws-transito">EN_TRANSITO</span></td><td>Residuo retirado. GPS activo. Transportista en ruta.</td><td>Confirmar Entrega, Registrar Incidente, Cancelar</td></tr>
-<tr><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Residuo entregado en planta del operador. GPS desactivado.</td><td>Confirmar Recepcion, Rechazar Carga, Cancelar</td></tr>
+<tr><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Residuo entregado en planta del operador. GPS desactivado.</td><td>Confirmar recepción, Rechazar Carga, Cancelar</td></tr>
 <tr><td><span class="workflow-state ws-recibido">RECIBIDO</span></td><td>Operador confirmo recepcion. Pesaje registrado.</td><td>Registrar Tratamiento, Cerrar Manifiesto, Cancelar</td></tr>
 <tr><td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span></td><td>Metodo de tratamiento aplicado. En proceso de disposicion.</td><td>Cerrar Manifiesto, Cancelar</td></tr>
 <tr><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Tratamiento cerrado. El operador debe firmar y emitir la certificación final cuando se cumplen sus condiciones.</td><td>Consultar el manifiesto y las certificaciones emitidas</td></tr>
@@ -2634,7 +2634,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 </div>
 
 <ol>
-<li><strong>Confirmar Recepcion:</strong> El operador verifica la carga y confirma la recepcion (ENTREGADO &rarr; RECIBIDO). Alternativamente, puede <strong>Rechazar Carga</strong> si hay discrepancias (ENTREGADO &rarr; RECHAZADO).</li>
+<li><strong>Confirmar recepción:</strong> El operador verifica la carga y confirma la recepción (ENTREGADO &rarr; RECIBIDO). Alternativamente, puede <strong>Rechazar Carga</strong> si hay discrepancias (ENTREGADO &rarr; RECHAZADO).</li>
 <li><strong>Registrar Pesaje:</strong> Modal para ingresar el peso real de cada residuo recibido. Los datos de pesaje se almacenan y se comparan con las cantidades declaradas por el generador.</li>
 <li><strong>Registrar Tratamiento:</strong> Indica que el residuo comenzo a ser procesado (RECIBIDO &rarr; EN_TRATAMIENTO).</li>
 <li><strong>Cerrar Manifiesto:</strong> Confirma que el tratamiento se completo exitosamente (EN_TRATAMIENTO &rarr; TRATADO). Esto habilita la generacion del Certificado de Disposicion Final.</li>
@@ -3192,7 +3192,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/aprobar</td><td>Aprobar manifiesto (BORRADOR a APROBADO)</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/confirmar-retiro</td><td>Confirmar retiro (APROBADO a EN_TRANSITO)</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/entregar</td><td>Confirmar entrega (EN_TRANSITO a ENTREGADO)</td></tr>
-<tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/recibir</td><td>Confirmar recepcion (ENTREGADO a RECIBIDO)</td></tr>
+<tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/recibir</td><td>Confirmar recepción (ENTREGADO a RECIBIDO)</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/tratamiento</td><td>Registrar tratamiento (RECIBIDO a EN_TRATAMIENTO)</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/cerrar</td><td>Cerrar manifiesto (a TRATADO)</td></tr>
 <tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/manifiestos/:id/rechazar</td><td>Rechazar carga (ENTREGADO a RECHAZADO)</td></tr>
@@ -3485,7 +3485,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr>
 <td><span class="workflow-state ws-entregado">ENTREGADO</span> &rarr; <span class="workflow-state ws-recibido">RECIBIDO</span></td>
 <td>Operador</td>
-<td>Confirmar Recepcion, registrar pesaje</td>
+<td>Confirmar recepción, registrar pesaje</td>
 <td>Registra fechaRecepcion y cantidadRecibida. Calcula diferencia de peso. Crea evento RECEPCION. Notifica al generador y transportista.</td>
 </tr>
 <tr>
@@ -3570,7 +3570,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td>Confirmar Retiro</td><td>APROBADO</td><td>EN_TRANSITO</td><td>TRANSPORTISTA, ADMIN</td></tr>
 <tr><td>Confirmar Entrega</td><td>EN_TRANSITO</td><td>ENTREGADO</td><td>TRANSPORTISTA, ADMIN</td></tr>
 <tr><td>Registrar Incidente</td><td>EN_TRANSITO</td><td><em>(solo evento)</em></td><td>TRANSPORTISTA, ADMIN</td></tr>
-<tr><td>Confirmar Recepcion</td><td>ENTREGADO</td><td>RECIBIDO</td><td>OPERADOR, ADMIN</td></tr>
+<tr><td>Confirmar recepción</td><td>ENTREGADO</td><td>RECIBIDO</td><td>OPERADOR, ADMIN</td></tr>
 <tr><td>Rechazar Carga</td><td>ENTREGADO</td><td>RECHAZADO</td><td>OPERADOR, ADMIN</td></tr>
 <tr><td>Registrar Pesaje</td><td>RECIBIDO</td><td><em>(actualiza pesos)</em></td><td>OPERADOR, ADMIN</td></tr>
 <tr><td>Registrar Tratamiento</td><td>RECIBIDO</td><td>EN_TRATAMIENTO</td><td>OPERADOR, ADMIN</td></tr>
@@ -4458,7 +4458,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
-<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O02: Confirmar Recepcion</button>
+<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">CU-O02: Confirmar recepción</button>
 <div class="collapsible-body">
 <div class="cu-screenshot-duo">
 <div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Confirmar Recepción — estado ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Recepción — estado ENTREGADO</div></div>
@@ -4471,7 +4471,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <ol>
 <li>Acceder al detalle del manifiesto ENTREGADO.</li>
 <li>Verificar los datos del manifiesto contra la documentacion fisica.</li>
-<li>Clic en &quot;Confirmar Recepcion&quot;.</li>
+<li>Clic en &quot;Confirmar recepción&quot;.</li>
 <li>Registrar la cantidad recibida (peso real medido en la planta).</li>
 <li>El sistema calcula automaticamente la diferencia con el peso declarado.</li>
 </ol>

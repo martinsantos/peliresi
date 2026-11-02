@@ -912,7 +912,7 @@
       ], expected: 'Administración identifica el número correcto y distingue una ubicación recibida de una posición simulada.', resources: [] },
       { title: 'Entregar y recibir · transporte y operador', body: [
         'Sólo después de mostrar el viaje en C3, transporte toca Confirmar entrega → Sí, Confirmar Entrega. Espera la confirmación. Avisar «Ya entregué». Entregado todavía no significa recibido.',
-        'Operador abre Manifiestos, busca el mismo número y lo abre. El detalle abierto se actualiza aproximadamente cada 30 segundos; al volver a abrirlo consulta el estado actual. Cuando figure Entregado, tocar Confirmar Recepcion.',
+        'Operador abre Manifiestos, busca el mismo número y lo abre. El detalle abierto se actualiza aproximadamente cada 30 segundos; al volver a abrirlo consulta el estado actual. Cuando figure Entregado, tocar Confirmar recepción.',
         'Registrar Pesaje → Peso real: 10 → Confirmar Pesaje. Es el peso ficticio del ejercicio. Revisar que quedó guardado antes de pasar a tratamiento.'
       ], expected: 'El operador confirmó recepción y pesaje sobre el mismo manifiesto.', resources: [] },
       { title: 'Tratar y liberar certificados · operador', body: [

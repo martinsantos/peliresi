@@ -33,7 +33,7 @@ test('the current version reopens the received proposal and its three approvals 
   const approvals = page.getByRole('region', { name: 'Aprobaciones de las partes' });
   await expect(approvals).toContainText('Aprobaciones registradas');
   for (const name of ['Generador', 'Transporte', 'Operador']) await expect(approvals.getByLabel(name + ': Aprobado', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Confirmar Recepcion In Situ', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Confirmar recepción en origen', exact: true })).toHaveCount(0);
   await readablePageHeading(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);

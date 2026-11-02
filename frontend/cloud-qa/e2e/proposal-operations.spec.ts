@@ -154,7 +154,7 @@ for(const creator of roles)test('in-situ proposal: '+creator+' creates; three pa
   const operator=pages.operador,operatorPanel=operator.getByRole('region',{name:'Aprobaciones de las partes'});
   await expect(operatorPanel).toContainText('3 de 3 · Aprobado',{timeout:12000});
   for(const name of ['Generador','Transporte','Operador'])await expect(operatorPanel.getByLabel(name+': Aprobado',{exact:true})).toBeVisible();
-  const receipt=operator.getByRole('button',{name:'Confirmar Recepcion In Situ',exact:true});
+  const receipt=operator.getByRole('button',{name:'Confirmar recepción en origen',exact:true});
   await expect(receipt).toBeDisabled();
   await post(operator,'/'+m.id+'/iniciar-coordinacion',()=>operatorPanel.getByRole('button',{name:'Iniciar coordinación',exact:true}).click());
   await expect(receipt).toBeEnabled({timeout:12000});await proof(operator,info,'in-situ-approved-'+creator);
