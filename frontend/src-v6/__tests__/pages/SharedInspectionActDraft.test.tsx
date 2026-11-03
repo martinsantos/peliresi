@@ -75,6 +75,7 @@ describe('limited acta link — unsent presentation', () => {
     expect(await screen.findByText(/fue revocado/)).toBeTruthy();
     expect(localStorage.getItem(actPresentationDraftKey('grant-a'))).toBeNull();
     expect(screen.queryByDisplayValue(text)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull();
   });
 
   it('keeps the text through a connection failure while opening', async () => {

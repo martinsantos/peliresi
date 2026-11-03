@@ -74,11 +74,13 @@ describe('staff reply to a limited-link presentation', () => {
     expect(screen.getByText('1 presentación pendiente de respuesta · 1 respondidas')).toBeTruthy();
     const order = screen.getAllByText(/Consulta (antigua|reciente)/).map(node => node.textContent);
     expect(order).toEqual(['Consulta antigua sin respuesta.', 'Consulta reciente ya respondida.']);
+    expect(screen.getByText('Presentaciones respondidas (1)')).toBeTruthy();
   });
 
   it('folds the follow-up form of an answered presentation', () => {
     open(inspection([presentation, { id: 'ans', tipo: 'ACTA_PRESENTACION_RESPONDIDA', detalle: 'Respuesta.', metadata: { respondeAId: 'pres-1' }, createdAt: new Date().toISOString() }]));
     expect(screen.queryByLabelText('Respuesta al inspeccionado')).toBeNull();
+    fireEvent.click(screen.getByText('Presentaciones respondidas (1)'));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar otra respuesta' }));
     expect(box()).toBeTruthy();
   });

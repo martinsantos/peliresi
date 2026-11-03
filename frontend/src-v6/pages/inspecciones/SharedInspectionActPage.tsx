@@ -11,7 +11,7 @@ type Fields = { name: string; kind: string; text: string };
 
 export default function SharedInspectionActPage() {
   const { accesoId = '' } = useParams();
-  const [data, setData] = useState<any>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [success, setSuccess] = useState('');
+  const [data, setData] = useState<any>(null), [error, setError] = useState(''), [closed, setClosed] = useState(false), [busy, setBusy] = useState(false), [success, setSuccess] = useState('');
   const [name, setName] = useState(''), [text, setText] = useState(''), [kind, setKind] = useState('DESCARGO');
   const [submitError, setSubmitError] = useState(''), [restored, setRestored] = useState(''), [conflict, setConflict] = useState<'changed' | 'cleared' | ''>(''), [storageFailed, setStorageFailed] = useState(false);
   const attempt = useRef(''), flight = useRef(false), hydrated = useRef(''), saved = useRef('');
@@ -48,11 +48,11 @@ export default function SharedInspectionActPage() {
     setRestored(`Recuperamos el texto que no se había enviado (guardado ${inspectionDate(draft.savedAt, true)}). Revisalo y registralo cuando quieras.`);
   }
   async function load() {
-    setError('');
+    setError(''); setClosed(false);
     try { const loaded = await request(); setData(loaded); hydrate(loaded); }
     catch(e) {
       setData(null); setError((e as Error).message);
-      if (terminal((e as any).status)) { forget(); hydrated.current = ''; adopt(null); setRestored(''); }
+      if (terminal((e as any).status)) { forget(); hydrated.current = ''; adopt(null); setRestored(''); setClosed(true); }
     }
   }
   useEffect(() => { token.current = window.location.hash.slice(1); hydrated.current = ''; setData(null); setRestored(''); setSuccess(''); setConflict(''); adopt(null); void load(); }, [accesoId]);
@@ -111,7 +111,7 @@ export default function SharedInspectionActPage() {
   const field = 'mt-2 min-h-12 w-full rounded-lg border border-neutral-300 bg-white p-3 text-base';
   return <main className="mx-auto min-h-screen max-w-3xl space-y-6 bg-white px-4 py-6 sm:px-8">
     <header className="border-b pb-4"><p className="text-2xl font-bold text-green-900">SITREP</p><h1 className="mt-3 text-xl font-bold">Mi acta de inspección</h1></header>
-    {error && <div role="alert" className="rounded-lg bg-red-50 p-4 text-red-900">{error}<button type="button" onClick={() => void load()} className="block min-h-11 underline">Reintentar</button></div>}
+    {error && <div role="alert" className="rounded-lg bg-red-50 p-4 text-red-900">{error}{!closed && <button type="button" onClick={() => void load()} className="block min-h-11 underline">Reintentar</button>}</div>}
     {!data && !error && <p role="status">Verificando acceso…</p>}
     {data && <>
       {restored && (name || text) && <button type="button" onClick={() => form.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="min-h-11 w-full rounded-lg bg-amber-50 px-4 py-2 text-left text-sm font-semibold text-amber-950 underline">Tenés un texto sin registrar · ir al formulario</button>}
