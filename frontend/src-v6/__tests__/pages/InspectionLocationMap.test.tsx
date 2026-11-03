@@ -39,6 +39,7 @@ describe('mapa de la inspección: punto, sector y referencias', () => {
     expect((screen.getByRole('button', { name: 'Sector' }) as HTMLButtonElement).disabled).toBe(true);
     tap(-32.9, -68.85);
     expect(last).toMatchObject({ latitud: -32.9, longitud: -68.85, origen: 'MAPA' });
+    expect(screen.getByText('Punto registrado · -32.900000, -68.850000 · marcado en el mapa')).toBeTruthy();
   });
 
   it('traza el sector, muestra superficie y obliga a guardar otra vista', () => {

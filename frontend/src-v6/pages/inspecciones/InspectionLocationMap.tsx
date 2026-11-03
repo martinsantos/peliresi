@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { CircleMarker, MapContainer, Marker, Polygon, Polyline, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import { ACTOR_ICONS } from '../../utils/map-icons';
 import type { InspectionFieldLocation } from '../../types/inspection';
-import { areaSquareMeters, distanceMeters, MAP_MAX_DISTANCE_M, MAP_REFERENCE_LABELS, MAP_REFERENCE_TYPES, perimeterMeters, type MapPoint, type MapReference, type MapReferenceType } from '../../utils/inspectionMapGeometry';
+import { areaSquareMeters, distanceMeters, MAP_MAX_DISTANCE_M, MAP_REFERENCE_LABELS, MAP_REFERENCE_TYPES, perimeterMeters, inspectionPointText, type MapPoint, type MapReference, type MapReferenceType } from '../../utils/inspectionMapGeometry';
 
 type Mode = 'PUNTO' | 'SECTOR' | 'REFERENCIA';
 const MAX_VERTICES = 40, MAX_REFERENCES = 20, GREEN = '#1B5E3C', BLUE = '#174a7e';
@@ -119,7 +119,7 @@ export default function InspectionLocationMap({ value, disabled, onChange }: { v
     {!disabled && <p className="text-sm text-neutral-700">{value ? MODE_HELP[activeMode] : 'Primero ubicá el punto inspeccionado; después podés trazar el sector y marcar referencias.'}</p>}
     <div className="relative z-0 h-72 overflow-hidden rounded-xl border border-neutral-300 sm:h-96" aria-label="Mapa del lugar inspeccionado"><MapContainer center={value ? [value.latitud, value.longitud] : [-32.89, -68.84]} zoom={value?.zoom || 13} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© OpenStreetMap contributors' crossOrigin="anonymous" /><Drawing value={value} mode={activeMode} disabled={disabled} onChange={onChange} onRejected={setMessage} /><MapSnapshot value={value} disabled={disabled} onChange={onChange} onStatus={setMessage} slot={slot} /></MapContainer></div>
     <div className="flex flex-wrap gap-2">{!disabled && <button type="button" disabled={busy} onClick={locate} className="min-h-11 rounded-lg border border-green-700 px-4 font-semibold text-green-900">{busy ? 'Obteniendo ubicación…' : 'Usar mi ubicación'}</button>}<div ref={setSlot} className="contents" /></div>
-    <p role="status" className="text-sm text-neutral-600">{message || (value ? `Punto registrado · ${value.latitud.toFixed(6)}, ${value.longitud.toFixed(6)}${value.precisionMetros != null ? ` · precisión GPS ±${Math.round(value.precisionMetros)} m` : ' · marcado manual'}` : 'Todavía no hay un punto registrado. Tocá el mapa o usá el GPS.')}</p>
+    <p role="status" className="text-sm text-neutral-600">{message || (value ? `Punto registrado · ${inspectionPointText(value)}` : 'Todavía no hay un punto registrado. Tocá el mapa o usá el GPS.')}</p>
     {sector.length > 0 && <div className="space-y-2 rounded-lg border border-neutral-200 p-3 text-sm">
       <p className="font-semibold">Sector observado</p>
       <p>{sector.length < 3 ? `${sector.length} ${sector.length === 1 ? 'vértice' : 'vértices'} · ${3 - sector.length === 1 ? 'falta 1' : `faltan ${3 - sector.length}`} para cerrar el sector.` : `${sector.length} vértices · superficie ≈ ${fmtArea(areaSquareMeters(sector))} · perímetro ≈ ${fmtMeters(perimeterMeters(sector))}`}</p>
