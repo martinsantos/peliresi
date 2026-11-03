@@ -36,7 +36,7 @@ function Drawing({ value, mode, disabled, onChange, onRejected }: { value?: Insp
   return <>
     {sector.length >= 3 ? <Polygon positions={sector} pathOptions={{ color: GREEN, weight: 3, dashArray: '8 6', fillOpacity: 0.15 }} /> : sector.length === 2 ? <Polyline positions={sector} pathOptions={{ color: GREEN, weight: 3, dashArray: '8 6' }} /> : null}
     {sector.map((p, i) => <CircleMarker key={i} center={p} radius={5} pathOptions={{ color: GREEN, fillColor: '#fff', fillOpacity: 1, weight: 2 }} />)}
-    {(value.referencias || []).map((r, i) => <Marker key={r.id} position={[r.latitud, r.longitud]} icon={numberIcon(i + 1)} title={`${i + 1}. ${r.etiqueta || MAP_REFERENCE_LABELS[r.tipo]}`} />)}
+    {(value.referencias || []).map((r, i) => <Marker key={`${r.id}:${r.tipo}:${r.etiqueta || ''}`} position={[r.latitud, r.longitud]} icon={numberIcon(i + 1)} title={`${i + 1}. ${r.etiqueta || MAP_REFERENCE_LABELS[r.tipo]}`} />)}
     <Marker position={[value.latitud, value.longitud]} icon={ACTOR_ICONS.inspeccion} title="Lugar registrado de la inspección" />
   </>;
 }

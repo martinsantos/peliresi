@@ -22,7 +22,7 @@ describe('geometría aproximada del mapa de inspección', () => {
       { id: 'a', tipo: 'VIVIENDA', etiqueta: 'Casa lindera', latitud: point.latitud + dLat, longitud: point.longitud },
       { id: 'b', tipo: 'CURSO_AGUA', etiqueta: ' ', latitud: point.latitud, longitud: point.longitud + 3 * dLon },
     ] });
-    expect(lines[0]).toMatch(/^Sector observado, trazado aproximado por el inspector: 4 vértices · superficie ≈ [\d.,]+ (m²|ha) · perímetro ≈ \d{3} m\. No delimita el predio inscripto\.$/);
+    expect(lines[0]).toMatch(/^Sector observado, trazado aproximado por el inspector: 4 vértices · superficie aprox\. [\d.,]+ (m²|ha) · perímetro aprox\. \d{3} m\. No delimita el predio inscripto\.$/);
     expect(lines[2]).toBe('1. Vivienda — Casa lindera · 100 m');
     expect(lines[3]).toBe('2. Curso o cuerpo de agua · 300 m');
     expect(inspectionMapSummary(point)).toEqual([]);

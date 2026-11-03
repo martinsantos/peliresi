@@ -32,10 +32,11 @@ const meters = (value: number) => value >= 1000 ? `${(value / 1000).toLocaleStri
 const area = (value: number) => value >= 10000 ? `${(value / 10000).toLocaleString('es-AR', { maximumFractionDigits: 2 })} ha` : `${Math.round(value).toLocaleString('es-AR')} m²`;
 export const referenceName = (r: Pick<MapReference, 'tipo' | 'etiqueta'>) => r.etiqueta?.trim() || MAP_REFERENCE_LABELS[r.tipo];
 
-/** Plain-language lines for the act; numbering matches the saved map image. */
+/** Plain-language lines for the act; numbering matches the saved map image.
+ * PDF standard fonts lack «≈»: write «aprox.» instead. */
 export function inspectionMapSummary(location: MapPoint & { perimetro?: MapPoint[]; referencias?: MapReference[] }): string[] {
   const lines: string[] = [];
-  if (location.perimetro && location.perimetro.length >= 3) lines.push(`Sector observado, trazado aproximado por el inspector: ${location.perimetro.length} vértices · superficie ≈ ${area(areaSquareMeters(location.perimetro))} · perímetro ≈ ${meters(perimeterMeters(location.perimetro))}. No delimita el predio inscripto.`);
+  if (location.perimetro && location.perimetro.length >= 3) lines.push(`Sector observado, trazado aproximado por el inspector: ${location.perimetro.length} vértices · superficie aprox. ${area(areaSquareMeters(location.perimetro))} · perímetro aprox. ${meters(perimeterMeters(location.perimetro))}. No delimita el predio inscripto.`);
   if (location.referencias?.length) {
     lines.push('Referencias del entorno (distancia aproximada en línea recta desde el punto inspeccionado):');
     location.referencias.forEach((r, i) => lines.push(`${i + 1}. ${MAP_REFERENCE_LABELS[r.tipo]}${r.etiqueta?.trim() ? ` — ${r.etiqueta.trim()}` : ''} · ${meters(distanceMeters(location, r))}`));
