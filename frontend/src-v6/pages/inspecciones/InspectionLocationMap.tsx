@@ -1,4 +1,5 @@
 import { DomEvent, divIcon } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import React, { useState, useRef } from 'react';
 import { CircleMarker, MapContainer, Marker, Polygon, Polyline, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import { ACTOR_ICONS } from '../../utils/map-icons';
