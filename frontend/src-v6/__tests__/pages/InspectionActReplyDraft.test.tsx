@@ -67,6 +67,15 @@ describe('staff reply to a limited-link presentation', () => {
     expect(readReplyDrafts(ctx())['pres-1']).toBeUndefined();
   });
 
+  it('lists unanswered presentations first with a pending count', () => {
+    const older = { ...presentation, id: 'pres-old', createdAt: '2026-11-01T10:00:00Z', detalle: 'Consulta antigua sin respuesta.' };
+    const newer = { ...presentation, id: 'pres-new', createdAt: '2026-11-03T10:00:00Z', detalle: 'Consulta reciente ya respondida.' };
+    open(inspection([newer, older, { id: 'ans', tipo: 'ACTA_PRESENTACION_RESPONDIDA', detalle: 'Respuesta.', metadata: { respondeAId: 'pres-new' }, createdAt: '2026-11-03T11:00:00Z' }]));
+    expect(screen.getByText('1 presentación pendiente de respuesta · 1 respondidas')).toBeTruthy();
+    const order = screen.getAllByText(/Consulta (antigua|reciente)/).map(node => node.textContent);
+    expect(order).toEqual(['Consulta antigua sin respuesta.', 'Consulta reciente ya respondida.']);
+  });
+
   it('shows what mail was prepared and that it was not sent', async () => {
     open();
     fireEvent.click(await screen.findByText('Avisos por correo (1)'));

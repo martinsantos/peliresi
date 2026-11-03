@@ -15,20 +15,25 @@ export const ACT_MAIL_PREFIX = 'inspection-act:';
 const KIND: Record<string, string> = { APELACION: 'apelación', DESCARGO: 'descargo', CONSULTA: 'consulta' };
 const kindOf = (tipo: string) => KIND[tipo] || 'presentación';
 const capital = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-const when = (value: Date | string) => new Date(value).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' });
+// «Descargo» is masculine; apelación, consulta and the fallback are feminine.
+const agree = (tipo: string) => tipo === 'DESCARGO' ? { a: 'un', received: 'recibido', fresh: 'Nuevo' } : { a: 'una', received: 'recibida', fresh: 'Nueva' };
+/** Explicit 24-hour Mendoza time: runtime ICU defaults may drop the a. m./p. m. marker. */
+export const mailDateTime = (value: Date | string) => new Date(value).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) + ' h (Mendoza)';
+const when = mailDateTime;
 
 export type ActMailContext = {
   event: ActMailEvent; audience: ActMailAudience; inspeccionId: string; numero: string; numeroActa?: string | null;
   tipo: string; nombre: string; fecha: Date | string; presentadaAt?: Date | string; inspector: string; responsable?: string; expiresAt: string;
 };
 
+/** Stacked label/value pairs: a two-column table splits labels mid-word on 320 px clients. */
 function rows(items: Array<[string, string]>): string {
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0;border-collapse:collapse">${items.map(([label, value]) => `<tr><td style="padding:8px 12px 8px 0;vertical-align:top;width:34%;color:#526359;font-size:14px;border-top:1px solid #e4ebe6">${escapeMail(label)}</td><td style="padding:8px 0;vertical-align:top;border-top:1px solid #e4ebe6">${escapeMail(value)}</td></tr>`).join('')}</table>`;
+  return `<div style="margin:16px 0">${items.map(([label, value]) => `<p style="margin:0;padding:10px 0 2px;border-top:1px solid #e4ebe6;color:#526359;font-size:13px;line-height:1.4;font-weight:bold">${escapeMail(label)}</p><p style="margin:0 0 8px">${escapeMail(value)}</p>`).join('')}</div>`;
 }
 
 /** Every variant states the reason, the dossier, who is responsible and the next action. */
 export function renderInspectionActMail(c: ActMailContext): { subject: string; html: string; text: string } {
-  const kind = kindOf(c.tipo), acta = c.numeroActa || c.numero, received = c.event === 'PRESENTACION_RECIBIDA';
+  const kind = kindOf(c.tipo), g = agree(c.tipo), acta = c.numeroActa || c.numero, received = c.event === 'PRESENTACION_RECIBIDA';
   const linkNote = `Usá el enlace personal del correo «Copia del acta ${acta}». Está disponible hasta el ${when(c.expiresAt)}. Por seguridad, este aviso no incluye ese enlace.`;
   let subject: string, title: string, table: Array<[string, string]>, after = '';
   if (c.audience === 'INSPECCIONADO') {
@@ -39,15 +44,15 @@ export function renderInspectionActMail(c: ActMailContext): { subject: string; h
       : [['Motivo', `Hay una respuesta a tu ${kind}${c.presentadaAt ? ` del ${when(c.presentadaAt)}` : ''}.`], ['Acta', acta], ['Responsable', 'Equipo de inspección de la Dirección General de Fiscalización Ambiental'], ['Próxima acción', `Consultá la respuesta. ${linkNote}`]];
     after = `<p style="font-size:14px">${received ? 'Registrar la presentación no implica aceptación ni suspende automáticamente los plazos del acta.' : 'La respuesta no modifica por sí misma los plazos del acta.'} Si no reconocés esta actuación, comunicate con el equipo de inspección.</p>`;
   } else if (received) {
-    subject = c.audience === 'INSPECTOR' ? `${capital(kind)} recibida · inspección ${c.numero}` : `Seguimiento · ${kind} recibida en ${c.numero}`;
-    title = c.audience === 'INSPECTOR' ? `Nueva ${kind} para responder` : `Seguimiento de una ${kind}`;
-    table = [['Motivo', `Se registró una ${kind} mediante el enlace limitado del acta ${acta}.`], ['Expediente', c.numero], ['Presentada por', `${c.nombre} · identidad declarada por quien usó el enlace`], ['Responsable de responder', `${c.inspector} (inspector asignado)`],
-      ['Próxima acción', c.audience === 'INSPECTOR' ? 'Revisá la presentación y publicá la respuesta desde Expediente y seguimiento → Copia del acta y respuestas.' : 'Supervisar que el inspector asignado publique la respuesta. No requiere otra acción si ya la atiende.']];
+    subject = c.audience === 'INSPECTOR' ? `${capital(kind)} ${g.received} · inspección ${c.numero}` : `Seguimiento · ${kind} ${g.received} en ${c.numero}`;
+    title = c.audience === 'INSPECTOR' ? `${g.fresh} ${kind} para responder` : `Seguimiento de ${g.a} ${kind}`;
+    table = [['Motivo', `Se registró ${g.a} ${kind} mediante el enlace limitado del acta ${acta}.`], ['Expediente', c.numero], ['Presentó', `${c.nombre} · identidad declarada por quien usó el enlace`], ['Responsable de responder', `${c.inspector} (inspector asignado)`],
+      ['Próxima acción', c.audience === 'INSPECTOR' ? 'Revisá la presentación y publicá la respuesta: abrí el expediente, paso 4, tarea «Copia del acta y respuestas».' : 'Supervisar que el inspector asignado publique la respuesta. No requiere otra acción si ya la atiende.']];
     after = mailAction(`/inspecciones/${encodeURIComponent(c.inspeccionId)}`, 'Abrir el expediente');
   } else {
     subject = c.audience === 'INSPECTOR' ? `Respuesta publicada · inspección ${c.numero}` : `Seguimiento · respuesta publicada en ${c.numero}`;
     title = 'Respuesta publicada al inspeccionado';
-    table = [['Motivo', `Se publicó la respuesta a una ${kind} en el enlace limitado del acta ${acta}.`], ['Expediente', c.numero], ['Respondió', c.responsable || 'Equipo de inspección'], ['Responsable del expediente', `${c.inspector} (inspector asignado)`], ['Próxima acción', 'Ninguna obligatoria. Queda registrada en el expediente; revisá el seguimiento si corresponde.']];
+    table = [['Motivo', `Se publicó la respuesta a ${g.a} ${kind} en el enlace limitado del acta ${acta}.`], ['Expediente', c.numero], ['Respondió', c.responsable || 'Equipo de inspección'], ['Responsable del expediente', `${c.inspector} (inspector asignado)`], ['Próxima acción', 'Ninguna obligatoria. Queda registrada en el expediente; revisá el seguimiento si corresponde.']];
     after = mailAction(`/inspecciones/${encodeURIComponent(c.inspeccionId)}`, 'Abrir el expediente');
   }
   const html = mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 8px">${escapeMail(title)}</h1>${rows(table)}${after}`);

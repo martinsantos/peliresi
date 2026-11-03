@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ event: vi.fn(), first: vi.fn(), inspection: vi.fn(), user: vi.fn(), queue: vi.fn(), managers: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { eventoInspeccion: { findUnique: m.event, findFirst: m.first }, inspeccion: { findUnique: m.inspection }, usuario: { findUnique: m.user }, emailQueue: { findMany: m.queue } } }));
 vi.mock('../../services/inspectionManagementRole.service', () => ({ inspectionManagementRecipientIds: m.managers }));
-import { renderInspectionActMail, inspectionActMailState, queueInspectionActMails, inspectionActMailStillEligible, actMailId, listInspectionActMails, type ActMailAudience, type ActMailEvent } from '../../services/inspectionActMail.service';
+import { mailDateTime, renderInspectionActMail, inspectionActMailState, queueInspectionActMails, inspectionActMailStillEligible, actMailId, listInspectionActMails, type ActMailAudience, type ActMailEvent } from '../../services/inspectionActMail.service';
 
 const future = new Date(Date.now() + 86400000).toISOString();
 const base = { inspeccionId: 'case', numero: 'INS-2026-0001', numeroActa: 'QA-001', tipo: 'APELACION', nombre: 'Persona de práctica', fecha: new Date('2026-11-03T15:00:00Z'), inspector: 'Inspector de práctica', responsable: 'Jefa de práctica', expiresAt: future };
@@ -32,6 +32,15 @@ describe('inspection act mail content', () => {
   it('gives staff an explicit web and app route to the dossier that still requires login', () => {
     const mail = renderInspectionActMail({ ...base, event: 'PRESENTACION_RECIBIDA', audience: 'INSPECTOR' });
     expect(mail.html).toContain('data-mail-action="web"'); expect(mail.html).toContain('/app/inspecciones/case'); expect(mail.text).toContain('después de ingresar');
+  });
+  it('agrees in gender with the presentation type', () => {
+    const descargo = renderInspectionActMail({ ...base, tipo: 'DESCARGO', event: 'PRESENTACION_RECIBIDA', audience: 'INSPECTOR' });
+    expect(descargo.subject).toBe('[SITREP] Descargo recibido · inspección INS-2026-0001'); expect(descargo.text).toContain('Nuevo descargo para responder'); expect(descargo.text).toContain('Se registró un descargo');
+    const consulta = renderInspectionActMail({ ...base, tipo: 'CONSULTA', event: 'PRESENTACION_RECIBIDA', audience: 'JEFATURA' });
+    expect(consulta.subject).toBe('[SITREP] Seguimiento · consulta recibida en INS-2026-0001'); expect(consulta.text).toContain('Seguimiento de una consulta');
+  });
+  it('writes unambiguous 24-hour Mendoza times', () => {
+    expect(mailDateTime('2026-11-03T22:00:59Z')).toMatch(/^03\/11\/2026,? 19:00 h \(Mendoza\)$/);
   });
   it('escapes declared names', () => {
     const mail = renderInspectionActMail({ ...base, nombre: '<img src=x onerror=alert(1)>', event: 'PRESENTACION_RECIBIDA', audience: 'INSPECTOR' });

@@ -10,7 +10,7 @@ import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.servic
 import { resolveInspectionEvidence } from '../services/inspectionEvidence.service';
 import { inspectionManagementRecipientIds } from '../services/inspectionManagementRole.service';
 import { mailShell, mailLink, escapeMail, mailText } from '../services/email-templates';
-import { queueInspectionActMails, listInspectionActMails, inspectionActMailState } from '../services/inspectionActMail.service';
+import { queueInspectionActMails, listInspectionActMails, inspectionActMailState, mailDateTime } from '../services/inspectionActMail.service';
 
 function enabled() { if (process.env.INSPECTION_FIELD_MODEL_ENABLED !== 'true') throw new AppError('Recurso no disponible', 404); }
 const shareHash = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -44,7 +44,7 @@ export async function createActShare(req: AuthRequest, res: Response, next: Next
     const token = randomBytes(32).toString('hex'); const expiresAt = new Date(Date.now() + input.diasAcceso * 86400000).toISOString();
     const event = await prisma.eventoInspeccion.create({ data: { inspeccionId: i.id, usuarioId: req.user.id, tipo: 'ACTA_ACCESO_HABILITADO', titulo: 'Acceso limitado a copia firmada preparado', destinatario: input.destinatario, estadoEntrega: 'NO_ENVIADO', visibleActor: false, metadata: { schemaVersion: 1, firmaId: signature!.id, contenidoSha256: signed.contenidoSha256, tokenHash: shareHash(token), expiresAt } } });
     const path = `/acta-compartida/${event.id}#${token}`, url = mailLink(path), appUrl = mailLink('/app' + path);
-    const html = mailShell(`<h1 style="color:#1B5E3C;font-size:22px">Tu copia del acta ${escapeMail(i.numeroActa || i.numero)}</h1><p>Podés consultar y descargar la versión firmada, presentar un descargo o una apelación y consultar la respuesta del equipo de inspección.</p><p>Este enlace es personal. Su acceso vence el ${escapeMail(new Date(expiresAt).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' }))}; este vencimiento no modifica los plazos del acta.</p><p><a href="${escapeMail(url)}" style="background:#1B5E3C;color:white;display:inline-block;padding:12px 20px;border-radius:6px">Consultar mi acta</a></p><p><a href="${escapeMail(appUrl)}">Abrir en la app</a></p>`);
+    const html = mailShell(`<h1 style="color:#1B5E3C;font-size:22px">Tu copia del acta ${escapeMail(i.numeroActa || i.numero)}</h1><p>Podés consultar y descargar la versión firmada, presentar un descargo o una apelación y consultar la respuesta del equipo de inspección.</p><p>Este enlace es personal. Su acceso vence el ${escapeMail(mailDateTime(expiresAt))}; este vencimiento no modifica los plazos del acta.</p><p><a href="${escapeMail(url)}" style="background:#1B5E3C;color:white;display:inline-block;padding:12px 20px;border-radius:6px">Consultar mi acta</a></p><p><a href="${escapeMail(appUrl)}">Abrir en la app</a></p>`);
     res.status(201).json({ success: true, data: { id: event.id, url, appUrl, expiresAt, destinatario: input.destinatario, correo: { subject: `[SITREP] Copia del acta ${i.numeroActa || i.numero}`, html, text: mailText(html), enviado: false } } });
   } catch(e) { next(e); }
 }

@@ -43,7 +43,9 @@ describe('limited acta link — unsent presentation', () => {
     const first = open(); await fill();
     replies = [{ status: 0, body: null }];
     fireEvent.click(screen.getByRole('button', { name: 'Registrar presentación' }));
-    expect(await screen.findByText(/Tu texto sigue guardado en este dispositivo/)).toBeTruthy();
+    const failure = await screen.findByText(/Tu texto sigue guardado en este dispositivo/);
+    // The failure is announced next to the button, not only at the top of the page.
+    expect(failure.closest('form')).toBeTruthy(); expect(failure.textContent).toContain('sin conexión con SITREP');
     const pending = readPresentationDraft('grant-a');
     expect(pending?.texto).toBe(text); expect(pending?.clienteId).toMatch(/^[0-9a-f-]{36}$/);
     first.unmount();

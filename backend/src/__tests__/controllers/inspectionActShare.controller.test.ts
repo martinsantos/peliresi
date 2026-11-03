@@ -7,7 +7,7 @@ vi.mock('../../services/inspectionFieldActPdf.service', () => ({ streamInspectio
 vi.mock('../../services/inspectionEvidence.service', () => ({ resolveInspectionEvidence: vi.fn() }));
 vi.mock('../../services/inspectionManagementRole.service', () => ({ inspectionManagementRecipientIds: vi.fn().mockResolvedValue([]) }));
 const mail = vi.hoisted(() => ({ queue: vi.fn(), list: vi.fn(), state: vi.fn() }));
-vi.mock('../../services/inspectionActMail.service', () => ({ queueInspectionActMails: mail.queue, listInspectionActMails: mail.list, inspectionActMailState: mail.state }));
+vi.mock('../../services/inspectionActMail.service', () => ({ queueInspectionActMails: mail.queue, listInspectionActMails: mail.list, inspectionActMailState: mail.state, mailDateTime: (value: string) => value }));
 import { readSharedAct, downloadSharedAct, createActShare, presentSharedAct, respondSharedAct, listActMails } from '../../controllers/inspectionActShare.controller';
 import { inspectionSignatureHash } from '../../domain/inspectionSignature';
 const token = 'a'.repeat(64), hash = createHash('sha256').update(token).digest('hex');
