@@ -25,6 +25,7 @@ import { RENEWAL_NOTICE_LABELS, renewalNoticeReference, validRenewalNotice } fro
 import { OPERATION_REMINDER_WINDOW_MS, operationReminderDate } from '../domain/operationReminder';
 import { approvedActivities, isActorActivity } from '../domain/actorActivities';
 import { personalManifestNotice } from '../domain/manifestNoticeContext';
+import { ACT_MAIL_PREFIX, inspectionActMailStillEligible } from './inspectionActMail.service';
 
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
@@ -287,6 +288,7 @@ async function recipientEligible(notice: NoticeForMail, family: string): Promise
 
 /** Eligibility can change while an item waits or retries; never send to an old address. */
 export async function queuedNoticeStillEligible(queueId: string, recipient: string): Promise<boolean> {
+  if (queueId.startsWith(ACT_MAIL_PREFIX)) return inspectionActMailStillEligible(queueId, recipient);
   if (!queueId.startsWith('notification:')) return true;
   const notice = await prisma.notificacion.findUnique({
     where: { id: queueId.slice('notification:'.length) },

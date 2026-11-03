@@ -1,4 +1,4 @@
-import { createActShare, revokeActShare, readSharedAct, downloadSharedAct, presentSharedAct, respondSharedAct } from '../controllers/inspectionActShare.controller';
+import { createActShare, revokeActShare, readSharedAct, downloadSharedAct, presentSharedAct, respondSharedAct, listActMails } from '../controllers/inspectionActShare.controller';
 import { listInspectionManagement, setInspectionManagement } from '../controllers/inspectionManagementRole.controller';
 import { previewInspectionSignature, signInspectionAct, downloadSignedInspectionAct } from '../controllers/inspectionSignature.controller';
 import { Router } from 'express';
@@ -80,6 +80,7 @@ router.get('/:id/intercambios/:intercambioId/adjuntos/:evidenciaId', descargarAd
 router.post('/:id/accesos-acta', createActShare);
 router.post('/:id/accesos-acta/:accesoId/revocar', revokeActShare);
 router.post('/:id/presentaciones-acta/responder', respondSharedAct);
+router.get('/:id/correos-acta', listActMails);
 router.get('/:id/firma/vista', previewInspectionSignature);
 router.post('/:id/firmas', signInspectionAct);
 router.get('/:id/firmas/:firmaId/acta.pdf', downloadSignedInspectionAct);

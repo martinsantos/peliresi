@@ -10,6 +10,7 @@ import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.servic
 import { resolveInspectionEvidence } from '../services/inspectionEvidence.service';
 import { inspectionManagementRecipientIds } from '../services/inspectionManagementRole.service';
 import { mailShell, mailLink, escapeMail, mailText } from '../services/email-templates';
+import { queueInspectionActMails, listInspectionActMails, inspectionActMailState } from '../services/inspectionActMail.service';
 
 function enabled() { if (process.env.INSPECTION_FIELD_MODEL_ENABLED !== 'true') throw new AppError('Recurso no disponible', 404); }
 const shareHash = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -75,6 +76,8 @@ export async function presentSharedAct(req: Request, res: Response, next: NextFu
       const inspection = await tx.inspeccion.findUniqueOrThrow({ where: { id: a.event.inspeccionId } });
       const recipients = await tx.usuario.findMany({ where: { activo: true, OR: [{ rol: 'ADMIN' }, { id: inspection.inspectorId }, { id: { in: managers } }, ...(inspection.tipoActor ? [{ rol: `ADMIN_${inspection.tipoActor}` as any }] : [])] }, select: { id: true } });
       await tx.notificacion.createMany({ data: recipients.map(u => ({ usuarioId: u.id, tipo: 'INFO_GENERAL', titulo: `PSIP · ${input.tipo === 'APELACION' ? 'Apelación' : input.tipo === 'DESCARGO' ? 'Descargo' : 'Consulta'} recibida`, mensaje: `${inspection.numero} · Revisá la presentación y respondé al inspeccionado.`, datos: JSON.stringify({ tipo: 'agenda_inspeccion', version: 1, inspeccionId: inspection.id, destino: 'inspeccion', eventoId: event.id, soloCampana: true }) })) });
+      // Bell notices stay soloCampana; mail for this event has its own guarded ledger.
+      await queueInspectionActMails(tx, { event: 'PRESENTACION_RECIBIDA', eventoId: event.id, managers, inspection, share: { destinatario: fresh.event.destinatario, expiresAt: fresh.meta.expiresAt }, tipo: input.tipo, nombre: input.nombre, fecha: event.createdAt });
       return { id: event.id, fecha: event.createdAt };
     });
     res.status(201).json({ success: true, data: result, message: 'Presentación registrada para revisión. No cambia ni suspende automáticamente los plazos del acta.' });
@@ -82,14 +85,28 @@ export async function presentSharedAct(req: Request, res: Response, next: NextFu
 }
 export async function respondSharedAct(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const i = await staff(req); const input = z.object({ clienteId: z.string().uuid(), respondeAId: z.string().min(1), texto: z.string().trim().min(10).max(12000) }).strict().parse(req.body);
+    const i = await staff(req); const input = z.object({ clienteId: z.string().uuid(), respondeAId: z.string().min(1), texto: z.string().trim().min(10).max(12000) }).strict().parse(req.body); const managers = await inspectionManagementRecipientIds();
     const result = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "inspecciones" WHERE id = ${i.id} FOR UPDATE`;
       const prior = await tx.eventoInspeccion.findFirst({ where: { inspeccionId: i.id, tipo: 'ACTA_PRESENTACION_RESPONDIDA', metadata: { path: ['clienteId'], equals: input.clienteId } } });
       if (prior) { const m = prior.metadata as any; if (prior.usuarioId !== req.user.id || prior.detalle !== input.texto || m.respondeAId !== input.respondeAId) throw new AppError('La respuesta ya corresponde a otra operación.', 409); return prior.id; }
       const original = await tx.eventoInspeccion.findFirst({ where: { id: input.respondeAId, inspeccionId: i.id, tipo: 'ACTA_PRESENTACION_RECIBIDA' } }); if (!original) throw new AppError('Presentación no encontrada', 404); const meta = original.metadata as any;
-      const event = await tx.eventoInspeccion.create({ data: { inspeccionId: i.id, usuarioId: req.user.id, tipo: 'ACTA_PRESENTACION_RESPONDIDA', titulo: 'Respuesta disponible al inspeccionado', detalle: input.texto, visibleActor: false, canal: 'ENLACE_PERSONAL', estadoEntrega: 'DISPONIBLE_NO_ENVIADO', metadata: { clienteId: input.clienteId, respondeAId: original.id, accesoId: meta.accesoId, firmaId: meta.firmaId, tipo: 'RESPUESTA', nombre: 'Equipo de inspección' } } }); return event.id;
+      const event = await tx.eventoInspeccion.create({ data: { inspeccionId: i.id, usuarioId: req.user.id, tipo: 'ACTA_PRESENTACION_RESPONDIDA', titulo: 'Respuesta disponible al inspeccionado', detalle: input.texto, visibleActor: false, canal: 'ENLACE_PERSONAL', estadoEntrega: 'DISPONIBLE_NO_ENVIADO', metadata: { clienteId: input.clienteId, respondeAId: original.id, accesoId: meta.accesoId, firmaId: meta.firmaId, tipo: 'RESPUESTA', nombre: 'Equipo de inspección' } } });
+      const share = await tx.eventoInspeccion.findFirst({ where: { id: meta.accesoId, inspeccionId: i.id, tipo: 'ACTA_ACCESO_HABILITADO' } });
+      const revoked = share && await tx.eventoInspeccion.findFirst({ where: { inspeccionId: i.id, tipo: 'ACTA_ACCESO_REVOCADO', metadata: { path: ['accesoId'], equals: share.id } }, select: { id: true } });
+      // A revoked link gets no mail; staff still receive the follow-up copy.
+      await queueInspectionActMails(tx, { event: 'RESPUESTA_PUBLICADA', eventoId: event.id, autorId: req.user.id, managers, inspection: i, share: { destinatario: share && !revoked ? share.destinatario : null, expiresAt: String((share?.metadata as any)?.expiresAt || '') }, tipo: meta.tipo, nombre: meta.nombre, fecha: event.createdAt, presentadaAt: original.createdAt });
+      return event.id;
     });
     res.json({ success: true, data: { id: result }, message: 'Respuesta disponible en el enlace del acta. No se enviaron correos.' });
+  } catch(e) { next(e); }
+}
+/** Prepared mail for this dossier's link events. Shown to staff with the same access as the dossier. */
+export async function listActMails(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    protect(res); const i = await staff(req);
+    const ids = i.eventos.filter(e => e.tipo === 'ACTA_PRESENTACION_RECIBIDA' || e.tipo === 'ACTA_PRESENTACION_RESPONDIDA').map(e => e.id);
+    const state = inspectionActMailState();
+    res.json({ success: true, data: { envioHabilitado: state.ready, motivo: state.reason, correos: await listInspectionActMails(ids) } });
   } catch(e) { next(e); }
 }
