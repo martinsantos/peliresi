@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "name": "backend-types",
+      "code": 0
+    },
+    {
+      "name": "frontend-types",
+      "code": 0
+    },
+    {
+      "name": "backend-tests",
+      "code": 0
+    },
+    {
+      "name": "frontend-tests",
+      "code": 0
+    }
+  ],
+  "stop": "",
+  "peak": 1563508736,
+  "production": false,
+  "emails": false,
+  "push": false
+}

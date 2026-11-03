@@ -1,0 +1,30 @@
+{
+  "commit": "76f2c4709e8bb3c32934385d043e76fb47e16e3f",
+  "preview": "http://127.0.0.1:4188",
+  "backendTests": 158,
+  "frontendTests": 86,
+  "builds": [
+    "backend",
+    "web",
+    "app"
+  ],
+  "widths": [
+    320,
+    393,
+    768,
+    1365,
+    1920
+  ],
+  "productionChanged": false,
+  "mainChanged": false,
+  "workflows": false,
+  "capOpen": false,
+  "emailsEnabled": false,
+  "pushEnabled": false,
+  "notes": [
+    "QA-CAMPO-0001 completed with synthetic data through administrative approval.",
+    "Second synthetic case created via web, reopened draft recovered, started in field.",
+    "Mobile actions measured below content surface without overlap at 320/393/768px.",
+    "Physical Android, automatic reply email variants and recovery of response text after closing remain pending."
+  ]
+}
