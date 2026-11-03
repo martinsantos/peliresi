@@ -1,3 +1,4 @@
+import { toast } from '../components/ui/Toast';
 import { clearPreparedInvitations } from '../services/preparedCompanyInvitations';
 /**
  * SITREP v6 - Auth Context
@@ -5,7 +6,7 @@ import { clearPreparedInvitations } from '../services/preparedCompanyInvitations
  * Contexto de autenticacion contra API real
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -176,6 +177,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [signOutRedirectPending, setSignOutRedirectPending] = useState(false);
   const finishSignOutRedirect = useCallback(() => setSignOutRedirectPending(false), []);
 
+  const toastIdentity = JSON.stringify([currentUser?.id ?? null, currentUser?.rol ?? null,
+    currentUser?.actorId ?? null, currentUser?.training === true, isRestricted,
+    currentUser?.empresaContexto?.empresaId ?? null,
+    currentUser?.empresaContexto?.actividadId ?? null,
+    currentUser?.empresaContexto?.establecimientoId ?? null]);
+  const previousToastIdentity = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    // Storage token rotation temporarily hides the profile until validation.
+    // Preserve notices if the server confirms the same user/activity afterwards.
+    if (isLoading && !currentUser && getAccessToken()) return;
+    if (previousToastIdentity.current !== toastIdentity) {
+      toast.clear();
+      previousToastIdentity.current = toastIdentity;
+    }
+  }, [toastIdentity, isLoading, currentUser]);
+
   // A saved profile only restores the same, unexpired session after a transport
   // failure. Reconnect/focus always asks the server again before renewing it.
   useEffect(() => {
@@ -270,6 +287,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storage = (event: StorageEvent) => {
       if (event.key !== 'sitrep_access_token' && event.key !== null) return;
       if (event.oldValue === event.newValue && event.key !== null) return;
+      // A confirmed profile change clears in the layout effect. A token
+      // rotation for the same account must not clear a current action notice.
+      if (!event.newValue) toast.clear();
       // Another tab may have logged out or selected a different account.
       ++authGeneration.current;
       pendingToken = null;
@@ -328,6 +348,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real login via API — accepts email or CUIT
   const login = useCallback(async (identifier: string, password: string, options?: { deferWelcome?: boolean }) => {
+    toast.clear();
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
@@ -381,6 +402,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Route guards can render before a layout's explicit navigation settles.
     // Tell them whether this is an intentional exit or a session to resume.
     setSignOutRedirectPending(options?.reason !== 'expired');
+    toast.clear();
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
@@ -423,6 +445,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Switch user — real API login with known credentials
   const switchUser = useCallback(async (userId: number) => {
+    toast.clear();
     ++authGeneration.current;
     validatedToken.current = null;
     setIsLoading(true);

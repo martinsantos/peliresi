@@ -324,9 +324,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         () => confirmarRetiro.mutateAsync({
           id: id!,
           ...location,
-          observaciones: 'Retiro confirmado desde app móvil',
+          observaciones: 'Retiro confirmado',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { ...location, observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser.id, contextOwner: syncOwner }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { ...location, observaciones: 'Retiro confirmado' }, userId: currentUser.id, contextOwner: syncOwner }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — El retiro se confirmará al reconectar');
@@ -364,7 +364,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         }
         return;
       }
-      const delivery = { ...gpsEventCoordinates(gpsForEventRef.current), observaciones: 'Entrega confirmada desde app móvil' };
+      const delivery = { ...gpsEventCoordinates(gpsForEventRef.current), observaciones: 'Entrega confirmada' };
       const result = await confirmarEntrega.mutateAsync({ id: id!, ...delivery });
       if (result.status === 'pending') {
         ++queueCheckVersion.current;

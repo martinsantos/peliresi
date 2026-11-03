@@ -1,12 +1,36 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { toast, ToastContainer } from '../../components/ui/Toast';
+import { toast, ToastContainer, holdNoticeLayout } from '../../components/ui/Toast';
 import { OfflineSyncNotice, offlineSyncNoticeMessage } from '../../components/OfflineSyncNotice';
 
 const ids: string[] = [];
 afterEach(() => { act(() => ids.forEach(id => toast.remove(id))); ids.length = 0; vi.useRealTimers(); });
 
 describe('system notices', () => {
+  it('clears all ephemeral notices and their expiry timers at a session boundary', () => {
+    vi.useFakeTimers(); render(<ToastContainer />);
+    act(() => {
+      ids.push(toast.success('Manifiesto firmado exitosamente'));
+      ids.push(toast.add({ type: 'warning', title: 'Aviso de la cuenta anterior', duration: 0 }));
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => toast.clear());
+    expect(screen.queryByRole('region', { name: 'Avisos del sistema' })).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.queryByText('Manifiesto firmado exitosamente')).toBeNull();
+  });
+  it('clears the visible snapshot immediately during a signature hold without reviving old notices', () => {
+    render(<ToastContainer />);
+    act(() => { ids.push(toast.success('Firma de la cuenta anterior')); });
+    const release = holdNoticeLayout();
+    act(() => { ids.push(toast.info('Otro aviso anterior')); toast.clear(); });
+    expect(screen.queryByText('Firma de la cuenta anterior')).toBeNull();
+    act(() => release());
+    expect(screen.queryByText('Otro aviso anterior')).toBeNull();
+    act(() => { ids.push(toast.success('Acción de la cuenta nueva')); });
+    expect(screen.getByText('Acción de la cuenta nueva')).toBeVisible();
+  });
   it('keeps one actionable sync explanation and never revives a duplicate delivery notice', () => {
     const message = 'El GPS sigue abierto en otra pestaña. Volvé allí y sincronizá.';
     const status = { processed:0, pending:1, retryable:1, terminal:0, auth:0, skipped:0, syncing:false, lastError:message, retry:vi.fn(async () => {}) };

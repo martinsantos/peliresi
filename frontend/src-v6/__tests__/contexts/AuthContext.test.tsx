@@ -80,6 +80,7 @@ vi.mock('../../components/OnboardingWizard', () => ({
 }));
 
 // Import AFTER mocks are declared
+import { toast } from '../../components/ui/Toast';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import LoginPage from '../../pages/auth/LoginPage';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -225,6 +226,7 @@ describe('AuthContext', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    toast.clear();
     vi.mocked(getAccessToken).mockImplementation(() => localStorage.getItem('sitrep_access_token'));
     vi.mocked(clearTokens).mockImplementation(() => {
       localStorage.removeItem('sitrep_access_token');
@@ -233,7 +235,57 @@ describe('AuthContext', () => {
     vi.mocked(authService.getMe).mockRejectedValue(new Error('No token'));
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { toast.clear(); vi.useRealTimers(); });
+
+  it.each(['login-btn', 'logout-btn', 'switch-btn'])('clears prior-account notices synchronously on %s', async button => {
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    let visible: { title: string }[] = [];
+    const unsubscribe = toast.subscribe(rows => { visible = rows; });
+    try {
+      act(() => { toast.success('Manifiesto firmado exitosamente'); });
+      expect(visible).toHaveLength(1);
+      await userEvent.setup().click(screen.getByTestId(button));
+      expect(visible).toHaveLength(0);
+    } finally { unsubscribe(); }
+  });
+
+  it('preserves notices across same-account token refresh but clears a confirmed role change', async () => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValue(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    let visible: { title: string }[] = [];
+    const unsubscribe = toast.subscribe(rows => { visible = rows; });
+    try {
+      act(() => { toast.success('Acción actual de la misma cuenta'); });
+      const oldToken = getAccessToken();
+      const rotated = tokenFor(inspector.id, Date.now() + 48 * 60 * 60 * 1000);
+      localStorage.setItem('sitrep_access_token', rotated);
+      await act(async () => window.dispatchEvent(new StorageEvent('storage', { key: 'sitrep_access_token', oldValue: oldToken, newValue: rotated })));
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+      expect(visible.map(row => row.title)).toEqual(['Acción actual de la misma cuenta']);
+      vi.mocked(authService.getMe).mockResolvedValue({ ...inspector, rol: 'ADMIN' } as Usuario);
+      await act(async () => window.dispatchEvent(new Event('focus')));
+      await waitFor(() => expect(screen.getByTestId('rol')).toHaveTextContent('ADMIN'));
+      expect(visible).toHaveLength(0);
+    } finally { unsubscribe(); }
+  });
+
+  it('clears ephemeral notices on cross-tab logout', async () => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValue(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    let visible: { title: string }[] = [];
+    const unsubscribe = toast.subscribe(rows => { visible = rows; });
+    try {
+      act(() => { toast.info('Acción de la cuenta anterior'); });
+      const oldValue = getAccessToken(); localStorage.removeItem('sitrep_access_token');
+      act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'sitrep_access_token', oldValue, newValue: null })));
+      expect(visible).toHaveLength(0);
+    } finally { unsubscribe(); }
+  });
 
   it.each([
     [401, 'Credenciales inválidas'],

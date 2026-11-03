@@ -102,6 +102,16 @@ export function reserveSignatureNoticeLayout(): () => void {
 }
 
 export const toast = {
+  /** Ephemeral UI only: never marks, removes or mutates the durable inbox. */
+  clear: () => {
+    for (const id of expiryTimers.keys()) clearExpiry(id);
+    toasts = [];
+    visibleToasts = [];
+    pendingNoticeChange = false;
+    // A session boundary must take effect immediately, even during a canvas
+    // layout hold. Keep hold counters intact so their cleanup remains balanced.
+    toastListeners.forEach(listener => listener([]));
+  },
   add: (t: Omit<Toast, 'id'>) => {
     // Success confirmations are a current-state signal, not an accumulating
     // timeline. Never supersede errors, warnings or duration-zero notices.
