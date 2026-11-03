@@ -59,6 +59,8 @@ El [arnés de QA](evidence/inspection-redesign-20261103/qa-harness.mjs) conserva
 
 ## Pendientes prioritarios para la otra AI
 
+> **Actualización 03/11, `28bf6967`:** los dos P0 tienen implementación y evidencia en preview; ver [P0 de presentaciones y correos](INSPECCION-P0-PRESENTACIONES-CORREOS-20261103.md). Quedan abiertos los límites listados allí (envío real no autorizado, Android físico, validación humana).
+
 | Prioridad | Trabajo | Criterio de cierre |
 |---|---|---|
 | P0 | Recuperación de presentaciones y respuestas del enlace al cerrar/reabrir | Persistir texto con aislamiento por identidad, enlace y expediente; recuperar tras cierre/sesión vencida; limpiar sólo tras envío confirmado; resolver conflictos y adjuntos pendientes. Hoy conservar texto ante error de envío NO cubre cierre. |
