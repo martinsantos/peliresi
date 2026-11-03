@@ -63,8 +63,8 @@ El [arnés de QA](evidence/inspection-redesign-20261103/qa-harness.mjs) conserva
 
 | Prioridad | Trabajo | Criterio de cierre |
 |---|---|---|
-| P0 | Recuperación de presentaciones y respuestas del enlace al cerrar/reabrir | Persistir texto con aislamiento por identidad, enlace y expediente; recuperar tras cierre/sesión vencida; limpiar sólo tras envío confirmado; resolver conflictos y adjuntos pendientes. Hoy conservar texto ante error de envío NO cubre cierre. |
-| P0 | Correos automáticos de respuesta y confirmación | Completar destinatarios inspector/inspeccionado/jefatura según permisos, plantillas, enlaces y deduplicación; probar captura/render sin SMTP ni push real. Muestra de entrega actual NO es circuito completo de correos. |
+| P0 · **implementado en preview (`28bf6967`)** | Recuperación de presentaciones y respuestas del enlace al cerrar/reabrir | Persistir texto con aislamiento por identidad, enlace y expediente; recuperar tras cierre/sesión vencida; limpiar sólo tras envío confirmado; resolver conflictos y adjuntos pendientes. Hoy conservar texto ante error de envío NO cubre cierre. |
+| P0 · **preparado y renderizado, sin envío (`28bf6967`)** | Correos automáticos de respuesta y confirmación | Completar destinatarios inspector/inspeccionado/jefatura según permisos, plantillas, enlaces y deduplicación; probar captura/render sin SMTP ni push real. Muestra de entrega actual NO es circuito completo de correos. |
 | P1 | Validación visual exhaustiva del recorrido | Estados vacíos, lentos, errores, texto largo, teclado, zoom, todos los pasos y modos; cero botones ocultos/campos tapados; coherencia de nombres y ayuda. |
 | P1 | Enlaces limitados y sesión | Revalidar expiración, revocación, cambio de identidad, no exposición de expediente, doble envío y conflicto de versión. |
 | P1 | Prueba móvil de campo | Android real, firma táctil, cámara, GPS, reconexión, cierre y reapertura; aún falta dispositivo. |

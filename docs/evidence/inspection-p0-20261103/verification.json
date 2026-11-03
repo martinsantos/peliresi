@@ -15,9 +15,9 @@
     "app 320/393: escribir presentación, cerrar y reabrir → recuperada con aviso y acceso superior",
     "app 320: envío sin conexión (fetch POST simulado en la pestaña) → texto e id conservados, error junto al botón; reapertura → recuperado",
     "app 320: registro confirmado → borrador eliminado",
-    "app 320: enlace revocado → 403, borrador de ese enlace eliminado, borrador de otro enlace conservado, sin 'Reintentar'",
+    "app 320: enlace revocado → 403, borrador de ese enlace eliminado, borrador de otro enlace conservado; sin 'Reintentar' comprobado en el build final",
     "web 1365: respuesta del inspector sin publicar → recuperada tras salir/volver y tras cerrar sesión, ingresar como generador y volver como inspector",
-    "web 1365 / 768 / app 393: panel con pendientes primero, enlaces y respondidas plegados, registro de avisos visible, sin desborde horizontal",
+    "web 1365 / 768 / app 393 (build final, capturas panel-*.jpg): panel con pendientes primero, enlaces y respondidas plegados, respuesta recuperada visible, registro de avisos legible, sin desborde horizontal",
     "generador: sin Inspecciones ni Mis inspecciones en el menú; expediente → 'Acceso no disponible'",
     "correos renderizados a 320/375 px: 8 variantes del circuito revisadas"
   ],

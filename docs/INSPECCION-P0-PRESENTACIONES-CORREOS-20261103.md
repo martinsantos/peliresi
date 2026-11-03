@@ -81,6 +81,9 @@ Registro único de esta tanda: defectos, cobertura y pendientes. Continúa [el c
 | P1 | Pruebas sólo automatizadas | Conflicto entre pestañas, vencimiento real del enlace, sesión vencida por tiempo (se probó cierre voluntario). |
 | P1 | Dispositivo | Android físico, PWA instalada, red real intermitente: pendientes. La caída de red se simuló en la pestaña. |
 | P1 | Dispositivo compartido | El borrador del personal sobrevive al cierre de sesión en ese equipo (mismo criterio que los intercambios). Revisar si la institución lo acepta. |
+| P1 | Filas que podrían quedar «En cola» | El flush sólo toma filas creadas en los últimos 30 min (`notBefore`). Si el envío se habilita y el flush se interrumpe más que eso, una fila `inspection-act:` quedaría `PENDIENTE` sin enviarse ni suprimirse y el registro mostraría «En cola de envío» indefinidamente. Antes de activar: barrido que las marque `SUPRIMIDO` o etiqueta por antigüedad. Hoy todas quedan `SUPRIMIDO`. |
+| P1 | Correo dentro de la transacción | El render (`mailLink`) lanza `MAIL_ORIGIN_INVALID` si `FRONTEND_URL` no es https ni loopback. Como se arma dentro de la transacción, una mala configuración haría fallar la presentación o la respuesta (500). Mismo acoplamiento que ya tenía el correo de entrega. Opción: capturar el error del render y registrar sin abortar. |
+| P2 | Mensaje sin conexión | La causa «sin conexión con SITREP» se detecta por el texto de Chrome `Failed to fetch`; en otros navegadores se muestra el texto nativo. Usar `instanceof TypeError`. |
 | P2 | Preview | El navegador reutilizó un `index.html` anterior tras una recompilación (sin service worker): conviene `no-cache` en el relay del preview. |
 | P2 | Datos de laboratorio | El caso `qa-field-case` acumula 19 enlaces y 18 presentaciones artificiales de las corridas; útil para estados largos, no representa un caso típico. Se agregó una cuenta artificial `jefatura01@practica.sitrep.test` (ADMIN_GENERADOR + ADMIN_INSPECCIONES) mediante el alta de administración; su contraseña está sólo en el laboratorio. |
 | — | Validación humana | Comprensión con inspectores, alcance de firma, entrega, apelación y jefatura: pendiente. Nada de lo anterior la sustituye. |
@@ -88,3 +91,12 @@ Registro único de esta tanda: defectos, cobertura y pendientes. Continúa [el c
 ## Seguridad operativa
 
 Sólo preview y datos artificiales. Producción, main, workflows y cuentas reales sin cambios. Correos y push apagados; 0 filas enviadas. Sin migraciones nuevas (la de `ADMIN_INSPECCIONES` de la tanda anterior sigue sin aplicarse fuera del preview). En el laboratorio: vigencia de `lab-secrets.json` extendida 10 h (sin rotar secretos, respaldo `.bak-20261103`), relay y bridge reiniciados, API 3048 reiniciada para cada backend; capacitación 3038 intacta. Para compilar dentro de la guarda se liberó caché de páginas del cgroup del contenedor QA y se detuvo la API aislada durante el build; los límites 1 CPU / 2 GiB / sin swap no se modificaron.
+
+## Estado del laboratorio que queda para continuar
+
+- Copia de trabajo: `/Users/santosma/.codex/visualizations/2026/10/17/01a14c11-b01f-7b40-87c5-1672e1d92833/inspection-p0-20261103/repo` (rama local con estos commits; el bare preservado no se modificó). Scripts auxiliares en `../lab/`.
+- Preview sirviendo `28bf6967` (`candidate.json` del laboratorio). Vigencia de `lab-secrets.json` hasta **2026-11-04 07:41 UTC**; respaldo `lab-secrets.json.bak-20261103`.
+- En `/opt/sitrep-qa-isolated-16218-20261101/inspection-model-20261103`: `qa-p0.mjs` (tipos/pruebas/builds), `flow-p0.mjs` (circuito P0), `backend-cycle.sh`, `rebuild-all.sh` (detiene la API, compila y reinicia API y relay), `revoke-live.mjs`, `candidate-76f2c470.json`, copia `build.bak-76f2c470/`.
+- `build/web/qa-correos/` publica en el preview los correos renderizados del último circuito (sólo laboratorio).
+- `results/p0-accounts.json` (contraseña de la cuenta artificial de jefatura) y `results/p0-live-link.json` (enlace artificial vigente), modo 600. No copiarlos al repositorio.
+- Para compilar dentro de la guarda: usar `rebuild-all.sh` (API detenida, caché de páginas liberada, heap Vite 950 MB). Tras recompilar, abrir el preview con un parámetro (`?r=…`): el navegador puede reutilizar el `index.html` anterior.
