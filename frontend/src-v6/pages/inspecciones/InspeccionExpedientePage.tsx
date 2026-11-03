@@ -880,13 +880,14 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     if (!flushDraft()) return;
     navigate({ pathname: location.pathname, search: location.search, hash: '#' + nextTask.id });
   };
+  // Phone: status on its own thin line, then one row of buttons. Wide: everything in one row.
   const fieldSaveAction = guided && canWriteDraft() ?
-      <div data-testid="inspection-field-save-bar" className="flex min-w-0 items-center gap-2 sm:gap-4">
-        <div className="flex min-w-0 flex-1 flex-col justify-center sm:min-h-11"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-0.5 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
+      <div data-testid="inspection-field-save-bar" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-nowrap sm:gap-4">
+        <div className="flex min-w-0 basis-full flex-col justify-center sm:min-h-11 sm:flex-1 sm:basis-auto"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-0.5 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
         {/* Keep the Android editor/keyboard in place until the ordinary click;
             moving focus on touch-down can move this footer before touch-up. */}
         <Button variant={nextTask ? 'outline' : 'primary'} aria-label={fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'} className={nextTask ? 'shrink-0 max-sm:px-2.5' : 'shrink-0 max-sm:px-3'} leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className={nextTask ? 'sr-only' : 'sm:hidden'}>Guardar</span><span className="hidden sm:inline">{fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
-        {nextTask && <Button variant="primary" className="ml-auto min-h-11 max-w-full shrink-0 max-sm:px-3" rightIcon={<ArrowRight size={17} />} aria-label={(currentFingerprint === serverFingerprint ? 'Continuar a ' : 'Guardar y continuar a ') + inspectionTaskLabel(nextTask)} disabled={saveDisabled || dictating || recording || savingDraft} isLoading={savingDraft} onClick={() => void continueJourney()}>{currentFingerprint === serverFingerprint ? 'Continuar' : 'Guardar y continuar'}</Button>}
+        {nextTask && <Button variant="primary" className="ml-auto min-h-11 max-w-full shrink-0 max-sm:flex-1 max-sm:px-3" rightIcon={<ArrowRight size={17} />} aria-label={(currentFingerprint === serverFingerprint ? 'Continuar a ' : 'Guardar y continuar a ') + inspectionTaskLabel(nextTask)} disabled={saveDisabled || dictating || recording || savingDraft} isLoading={savingDraft} onClick={() => void continueJourney()}>{currentFingerprint === serverFingerprint ? 'Continuar' : 'Guardar y continuar'}</Button>}
       </div> : undefined;
   return <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="inspection-page-frame">
   <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
@@ -1008,7 +1009,7 @@ function DraftSaveFeedback({ status }: { status: DraftSaveStatus }) {
   const color = status.tone === 'error' ? 'text-error-800' : status.tone === 'success' ? 'text-success-800' : 'text-neutral-700';
   // On a phone the status shares one row with two buttons: one or two words, never a sentence.
   const compact = status.tone === 'success' ? 'Guardado' : status.message === 'Guardando cambios en el servidor…' ? 'Guardando…' : status.message.startsWith('Solo en este dispositivo') || status.message === 'Falta guardar en servidor.' ? 'Sin guardar' : status.message;
-  return <p role="status" aria-label={status.message} aria-live="polite" className={'text-sm font-medium leading-snug max-sm:text-xs max-sm:line-clamp-2 ' + color}>{compact !== status.message ? <><span className="sm:hidden" aria-hidden="true">{compact}</span><span className="max-sm:sr-only">{status.message}</span></> : status.message}</p>;
+  return <p role="status" aria-label={status.message} aria-live="polite" className={'text-sm font-medium leading-snug max-sm:text-xs max-sm:leading-4 ' + color}>{compact !== status.message ? <><span className="sm:hidden" aria-hidden="true">{compact}</span><span className="max-sm:sr-only">{status.message}</span></> : status.message}</p>;
 }
 
 function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionItem[]; activeId?: string; onSelect: (item: InspectionItem) => void }) {
