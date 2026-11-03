@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import { inspectionMeasureText } from '../domain/inspectionFieldModel';
-import { inspectionMapSummary } from '../domain/inspectionMapGeometry';
+import { inspectionMapSummary, inspectionPointText } from '../domain/inspectionMapGeometry';
 import PDFDocument from 'pdfkit';
 import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
 import { syntheticPreviewEnabled } from '../config/syntheticPreview';
@@ -739,7 +739,7 @@ export async function streamInspectionTechnicalReportPdf(
   if (location) {
     doc.addPage(); doc.y = PAGE.top;
     section(doc, 'Ubicación y entorno', 'Punto registrado por el inspector; el mapa no determina por sí solo una restricción ambiental');
-    narrativeBox(doc, `Coordenadas: ${location.latitud}, ${location.longitud} · Fuente: ${location.origen}${location.precisionMetros != null ? ` · Precisión informada: ${location.precisionMetros} m` : ''}`);
+    narrativeBox(doc, `Coordenadas: ${inspectionPointText(location)}`);
     if (location.mapaImagen) {
       const y = doc.y; doc.image(Buffer.from(location.mapaImagen.split(',')[1], 'base64'), 44, y, { fit: [507, 300], align: 'center' }); doc.y = y + 310;
       doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('Mapa guardado durante la visita · © OpenStreetMap contributors', 44, doc.y, { width: 507 });

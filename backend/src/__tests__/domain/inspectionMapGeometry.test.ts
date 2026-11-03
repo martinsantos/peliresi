@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { inspectionFieldExtensions } from '../../domain/inspectionFieldModel';
-import { areaSquareMeters, distanceMeters, inspectionMapSummary, perimeterMeters } from '../../domain/inspectionMapGeometry';
+import { areaSquareMeters, distanceMeters, inspectionMapSummary, inspectionPointText, perimeterMeters } from '../../domain/inspectionMapGeometry';
 
 const point = { latitud: -32.89, longitud: -68.84 };
 // ~100 m × ~100 m square around the point (1° lat ≈ 111.2 km; longitude scaled by cos(lat)).
@@ -26,6 +26,10 @@ describe('geometría aproximada del mapa de inspección', () => {
     expect(lines[2]).toBe('1. Vivienda — Casa lindera · 100 m');
     expect(lines[3]).toBe('2. Curso o cuerpo de agua · 300 m');
     expect(inspectionMapSummary(point)).toEqual([]);
+  });
+  it('escribe el punto con 6 decimales y origen legible', () => {
+    expect(inspectionPointText({ latitud: -32.8899303014876, longitud: -68.84016036987306, origen: 'MAPA' })).toBe('-32.889930, -68.840160 · marcado en el mapa');
+    expect(inspectionPointText({ ...point, origen: 'GPS', precisionMetros: 7.6 })).toBe('-32.890000, -68.840000 · GPS del dispositivo · precisión ±8 m');
   });
   it('acepta actas anteriores y un trazado válido', () => {
     expect(schema.safeParse({ ubicacionCampo: location }).success).toBe(true);

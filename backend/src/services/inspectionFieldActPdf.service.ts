@@ -1,6 +1,6 @@
 import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { inspectionMeasureText } from '../domain/inspectionFieldModel';
-import { inspectionMapSummary } from '../domain/inspectionMapGeometry';
+import { inspectionMapSummary, inspectionPointText } from '../domain/inspectionMapGeometry';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
@@ -828,7 +828,7 @@ export async function streamInspectionActPdf(
     extra.entornoObservado && `Entorno: ${extra.entornoObservado}`,
     extra.receptores?.length && `Receptores considerados: ${extra.receptores.join(', ')}`,
     extra.restriccionReferencia && `Referencia de restricción o antecedente: ${extra.restriccionReferencia}`,
-    extra.ubicacionCampo && `Ubicación confirmada: ${extra.ubicacionCampo.latitud}, ${extra.ubicacionCampo.longitud} (${extra.ubicacionCampo.origen})${extra.ubicacionCampo.precisionMetros != null ? `; precisión GPS ±${extra.ubicacionCampo.precisionMetros} m` : ''}`,
+    extra.ubicacionCampo && `Ubicación confirmada: ${inspectionPointText(extra.ubicacionCampo)}`,
   ].filter(Boolean).join('\n');
   inspection = { ...inspection, datosActa: act, observaciones: [inspection.observaciones, additional].filter(Boolean).join('\n\n') };
   const actNumber = value(inspection.numeroActa, inspection.numero);
@@ -970,8 +970,7 @@ export async function streamInspectionActPdf(
   if (locationMap) {
     doc.addPage(); institutionalHeader(doc, actNumber, branding, 'Lugar y entorno de la visita');
     band(doc, 'Ubicación registrada');
-    doc.moveDown(); doc.font('Helvetica').fontSize(10).fillColor(COLORS.ink).text(`Coordenadas: ${locationMap.latitud}, ${locationMap.longitud} · Origen: ${locationMap.origen}`, 40, doc.y, { width: 510 });
-    if (locationMap.precisionMetros != null) doc.text(`Precisión GPS informada: ±${Math.round(locationMap.precisionMetros)} m`);
+    doc.moveDown(); doc.font('Helvetica').fontSize(10).fillColor(COLORS.ink).text(`Coordenadas: ${inspectionPointText(locationMap)}`, 40, doc.y, { width: 510 });
     doc.moveDown();
     if (locationMap.mapaImagen) {
       const y = doc.y; doc.image(Buffer.from(locationMap.mapaImagen.split(',')[1], 'base64'), 40, y, { fit: [515, 350], align: 'center' }); doc.y = y + 365;
@@ -1036,7 +1035,7 @@ async function streamTypicalInspectionAct(res: Response, inspection: any, resolv
   for(const f of inspection.firmasCapturadas || []) write('Constancia de firma',`${f.nombre} · ${f.documento} · ${f.caracter}\n${f.alcance}\nVersión revisada: ${f.contenidoSha256}`);
   const location = act.ubicacionCampo;
   if(location || act.entornoObservado || act.restriccionReferencia){
-    newPage();write('Lugar y entorno',location ? `${location.latitud}, ${location.longitud} · ${location.origen}${location.precisionMetros!=null ? ' · Precisión ±'+location.precisionMetros+' m' : ''}` : inspection.ubicacion);
+    newPage();write('Lugar y entorno',location ? inspectionPointText(location) : inspection.ubicacion);
     if(location?.mapaImagen){const y=doc.y;doc.image(Buffer.from(location.mapaImagen.split(',')[1],'base64'),40,y,{fit:[515,300],align:'center'});doc.y=y+312;}
     if(location)write('Sector y referencias del entorno',inspectionMapSummary(location).join('\n'));
     write('Referencia cartográfica',location?.mapaImagen?'© OpenStreetMap contributors. La vista guardada no delimita el predio ni determina por sí sola restricciones ambientales.':'No se guardó una imagen de mapa. Las coordenadas identifican el punto registrado.');

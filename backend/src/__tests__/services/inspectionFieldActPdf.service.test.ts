@@ -191,7 +191,7 @@ describe('inspection field act PDF', () => {
       expect(compactText.stdout).toContain('Actividad de prueba');
       expect(compactText.stdout).toContain('Detalle adicional conservado');
       expect(compactText.stdout).toContain('Vista general del control observado.');
-      expect(compactText.stdout).toContain('-32.89, -68.84');
+      expect(compactText.stdout).toContain('-32.890000, -68.840000 · coordenadas ingresadas');
       expect(compactText.stdout).toContain('Sector observado, trazado aproximado');
       expect(compactText.stdout).toContain('1. Vivienda — Casa lindera de práctica');
       expect(compactText.stdout).not.toContain('FORMALIDADES DOCUMENTALES DEL ART. 44');

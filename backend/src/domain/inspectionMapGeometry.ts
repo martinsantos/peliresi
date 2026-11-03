@@ -30,6 +30,11 @@ export function areaSquareMeters(points: MapPoint[]): number {
 }
 const meters = (value: number) => value >= 1000 ? `${(value / 1000).toLocaleString('es-AR', { maximumFractionDigits: 2 })} km` : `${Math.round(value).toLocaleString('es-AR')} m`;
 const area = (value: number) => value >= 10000 ? `${(value / 10000).toLocaleString('es-AR', { maximumFractionDigits: 2 })} ha` : `${Math.round(value).toLocaleString('es-AR')} m²`;
+const ORIGIN: Record<string, string> = { GPS: 'GPS del dispositivo', MAPA: 'marcado en el mapa', MANUAL: 'coordenadas ingresadas' };
+/** Six decimals (about 0.1 m) and a readable origin; the stored value keeps full precision. */
+export function inspectionPointText(location: MapPoint & { origen?: string; precisionMetros?: number | null }): string {
+  return `${location.latitud.toFixed(6)}, ${location.longitud.toFixed(6)} · ${ORIGIN[location.origen || ''] || location.origen || 'origen no informado'}${location.precisionMetros != null ? ` · precisión ±${Math.round(location.precisionMetros)} m` : ''}`;
+}
 export const referenceName = (r: Pick<MapReference, 'tipo' | 'etiqueta'>) => r.etiqueta?.trim() || MAP_REFERENCE_LABELS[r.tipo];
 
 /** Plain-language lines for the act; numbering matches the saved map image.
