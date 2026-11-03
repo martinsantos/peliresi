@@ -386,7 +386,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
   });
 
-  it('keeps mobile actions in normal flow without covering the active wizard step', async () => {
+  it('keeps mobile actions after the fields on the shared page scroll surface', async () => {
     renderPage(inspectionFixture(), true);
 
     const content = await screen.findByTestId('inspection-step-content');
@@ -394,7 +394,13 @@ describe('InspeccionExpedientePage critical review UX', () => {
     const actionBar = screen.queryByTestId('inspection-action-bar');
     if (!actionBar) { expect(screen.queryByRole('progressbar', { name: 'Paso actual del recorrido' })).toBeNull(); return; }
     const positioningContract = `${actionBar.className} ${actionBar.getAttribute('style') || ''}`;
-    expect(positioningContract).not.toMatch(/\b(?:sticky|fixed|absolute)\b/);
+    expect(positioningContract).not.toMatch(/\b(?:fixed|absolute)\b/);
+    expect(actionBar.className).toContain('sticky bottom-0');
+    const page = content.closest('[data-inspection-page-scroll]');
+    expect(page).not.toBeNull();
+    expect(page?.contains(actionBar)).toBe(true);
+    expect(screen.getByTestId('inspection-scroll-region')).not.toHaveAttribute('data-inspection-scroll');
+    expect(screen.getByTestId('inspection-navigation').className).not.toMatch(/\bsticky\b/);
     expect(content.compareDocumentPosition(actionBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole('progressbar', { name: 'Paso actual del recorrido' })).toBeNull();
   });
