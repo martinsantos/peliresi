@@ -27,10 +27,10 @@ interface Props {
 }
 
 const sections = [
-  { label: 'Visita y lugar', ids: ['resumen', 'contexto'] },
-  { label: 'Constataciones', ids: ['acta', 'checklist', 'declaracion'] },
-  { label: 'Evidencias', ids: ['evidencias'] },
-  { label: 'Revisar y firmar', ids: ['revision', 'firma', 'informe-tecnico', 'intercambios', 'trazabilidad', 'verificacion'] },
+  { label: 'Visita y lugar', mobileLabel: 'Visita', ids: ['resumen', 'contexto'] },
+  { label: 'Constataciones', mobileLabel: 'Observado', ids: ['acta', 'checklist', 'declaracion'] },
+  { label: 'Evidencias', mobileLabel: 'Evidencias', ids: ['evidencias'] },
+  { label: 'Revisar y firmar', mobileLabel: 'Revisión', ids: ['revision', 'firma', 'informe-tecnico', 'intercambios', 'trazabilidad', 'verificacion'] },
 ];
 const labels: Record<string, string> = {
   checklist: 'En campo', declaracion: 'Datos declarados', acta: 'Lo observado',
@@ -167,8 +167,8 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   return <div ref={workspaceRef} data-testid="inspection-workspace" data-inspection-scroll={!pageScroll && constrainedViewport ? '' : undefined} data-constrained-viewport={constrainedViewport || undefined} className={(pageScroll ? 'shrink-0 ' : 'h-full ') + 'flex min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]' + (!pageScroll && constrainedViewport ? ' overflow-y-auto overscroll-contain [overflow-anchor:none]' : '')} onScroll={(event) => { if (!pageScroll && constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
     <div data-testid="inspection-navigation" className={(pageScroll || constrainedViewport ? 'relative' : 'sticky top-0') + ' z-20 shrink-0 rounded-t-xl bg-white'}>
       <nav aria-label="Secciones del expediente" className="flex gap-1 border-b border-neutral-200 bg-neutral-100 p-2">
-        {availableSections.map((section) => <a key={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'page' : undefined} onClick={(event) => go(event, section.entries[0])}
-          className={'flex min-h-[68px] [@media(max-height:500px)]:min-h-14 min-w-0 flex-[1_1_auto] flex-col items-center justify-center gap-1.5 rounded-lg px-1 text-xs font-semibold !no-underline transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-14 sm:flex-row sm:gap-3 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white focus-visible:text-white' : 'text-neutral-700 hover:bg-white hover:text-neutral-900')}><span aria-hidden="true" className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold leading-none tabular-nums ' + (selectedSection === section ? 'bg-white/20 text-white' : 'bg-white text-neutral-600')}>{sections.findIndex(entry => entry.label === section.label) + 1}</span><span className="leading-4 sm:leading-5">{section.label}</span></a>)}
+        {availableSections.map((section) => <a key={section.label} aria-label={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'page' : undefined} onClick={(event) => go(event, section.entries[0])}
+          className={'flex min-h-[68px] [@media(max-height:500px)]:min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-lg px-1 text-xs font-semibold !no-underline transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-14 sm:flex-row sm:gap-3 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white focus-visible:text-white' : 'text-neutral-700 hover:bg-white hover:text-neutral-900')}><span aria-hidden="true" className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold leading-none tabular-nums ' + (selectedSection === section ? 'bg-white/20 text-white' : 'bg-white text-neutral-600')}>{sections.findIndex(entry => entry.label === section.label) + 1}</span><span className="text-center text-[11px] leading-4 sm:hidden">{section.mobileLabel}</span><span className="hidden leading-5 sm:inline">{section.label}</span></a>)}
       </nav>
       {selectedSection && selectedSection.entries.length > 1 && <nav aria-label={'Apartados de ' + selectedSection.label} className="flex gap-1 overflow-x-auto border-b border-primary-200 bg-primary-50 px-2 py-1">
         {selectedSection.entries.map((step) => <a key={step.id} href={'#' + step.id} aria-current={active.id === step.id ? 'page' : undefined} onClick={(event) => go(event, step)}

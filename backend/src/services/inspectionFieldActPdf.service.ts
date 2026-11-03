@@ -1,3 +1,4 @@
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { inspectionMeasureText } from '../domain/inspectionFieldModel';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
@@ -377,7 +378,7 @@ function institutionalHeader(
     .text('ACTA DE INSPECCIÓN / CONSTATACIÓN', 34, 97, { width: 310 });
   doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.green)
     .text(`N.º ${actNumber}`, 337, 94, { width: 224, align: 'right' });
-  doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted).text('DOCUMENTO OFICIAL GENERADO POR SITREP', 34, 115, { width: 295, lineBreak: false });
+  doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted).text(syntheticPreviewEnabled() ? 'PRÁCTICA - SIN VALIDEZ OFICIAL' : 'DOCUMENTO GENERADO POR SITREP', 34, 115, { width: 295, lineBreak: false });
   if (subtitle) doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
     .text(subtitle, 337, 115, { width: 224, align: 'right', height: 13, ellipsis: true });
   doc.moveTo(34, 133).lineTo(doc.page.width - 34, 133).lineWidth(0.6).strokeColor(COLORS.line).stroke();
@@ -813,6 +814,7 @@ export async function streamInspectionActPdf(
   inspection: any,
   resolveEvidence: (key: string) => string,
 ): Promise<void> {
+  if (inspection.datosActa?.modeloCampo === 2) return streamTypicalInspectionAct(res, inspection, resolveEvidence);
   const actor = actorOf(inspection);
   const originalInspection = inspection;
   const storedAct = actDataOf(inspection);
@@ -996,4 +998,51 @@ export async function streamInspectionActPdf(
     doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();
+}
+
+/** Compact field model: only recorded observations, one location sheet and one page per photo. */
+async function streamTypicalInspectionAct(res: Response, inspection: any, resolveEvidence: (key: string) => string) {
+  const act = inspection.datosActa || {}, actor = actorOf(inspection), number = value(inspection.numeroActa, inspection.numero);
+  const branding = await loadInspectionPdfBranding(), images = await prepareInspectionPdfImages(inspection.evidencias || [], resolveEvidence);
+  const fingerprint = buildInspectionFieldActFingerprint(inspection);
+  const doc = new PDFDocument({size:'A4',margins:{top:145,bottom:82,left:40,right:40},bufferPages:true,info:{Title:`Acta de inspección ${number}`,Author:'SITREP Mendoza'}});
+  res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename=acta_${number.replace(/[^a-zA-Z0-9_-]+/g,'_')}.pdf`);doc.pipe(res);
+  const newPage = () => { doc.addPage(); institutionalHeader(doc,number,branding,inspection.numero); };
+  institutionalHeader(doc,number,branding,inspection.numero);
+  const write = (label: string, body: unknown) => {
+    if (!String(body ?? '').trim()) return;
+    drawInspectionPdfBlocks(doc,[{text:label,font:'Helvetica-Bold',size:10,color:COLORS.green,gap:4},{text:String(body),size:10,color:COLORS.ink,gap:12}],{x:40,width:515,bottom:doc.page.height-85,newPage,continuation:label+' - continuación'});
+  };
+  write(inspection.firmasCapturadas?.length ? 'Copia firmada de la versión revisada' : 'Acta en preparación', inspection.firmasCapturadas?.length ? 'La firma deja constancia de lectura y recepción. No implica conformidad con los hallazgos ni cierre del expediente.' : 'Sin firma capturada para esta copia. La descarga no cierra ni notifica el expediente.');
+  write('Visita', [dateParts(inspection.iniciadaAt || inspection.createdAt).date,inspection.ubicacion].filter(Boolean).join(' · '));
+  write('Establecimiento', [actor.razonSocial,actor.cuit].filter(Boolean).join(' · ') || 'Lugar sin actor registrado vinculado');
+  write('Inspector interviniente', [inspection.inspector?.nombre,inspection.inspector?.apellido].filter(Boolean).join(' '));
+  write('Persona que atiende', [act.atendidoPor,act.dniAtendido,act.cargoAtendido].filter(Boolean).join(' · '));
+  write('Motivo', [act.motivoTipo,act.motivoInspeccion].filter(Boolean).join(' · '));
+  write('Constatación', inspection.observaciones);
+  write('Actividad observada',act.actividadObservada);
+  write('Instalaciones y ampliaciones', [act.ampliacionEstado,act.ampliacionDetalle].filter(Boolean).join(' · '));
+  for(const r of inspection.items || []) if(r.resultado!=='PENDIENTE'||r.observacion)write(r.etiqueta,[r.resultado,r.observacion].filter(Boolean).join(' · '));
+  for(const r of inspection.comparaciones || []) write(r.etiqueta,`Declarado: ${r.valorDeclarado || 'Sin dato'}\nObservado: ${r.valorObservado || 'Sin dato'}\nResultado: ${r.resultado}${r.observacion?' · '+r.observacion:''}`);
+  write('Requerimientos y responsables',[act.requerimientos,inspectionMeasureText(act.medidas || [])].filter(Boolean).join('\n'));
+  write('Contacto declarado para copia',act.contactoActa);
+  const optional: Record<string,string> = {codigoPostal:'Código postal',departamento:'Departamento',calle:'Calle',numeroDomicilio:'Número de domicilio',titular:'Titular',dniTitular:'Documento del titular',area:'Área interviniente',lugarAfectacion:'Lugar de afectación',infraestructura:'Infraestructura',detalleInfraestructura:'Detalle de infraestructura',estadoInfraestructura:'Estado de infraestructura',generacion:'Generación observada',actaAnterior:'Acta anterior',plazoDescargoDias:'Días de descargo registrados',danosEstado:'Daños: estado',danosDetalle:'Daños: detalle',tercerosTestigosEstado:'Terceros y testigos',tercerosTestigosDetalle:'Detalle de terceros y testigos',libroOperacionesEstado:'Libro de operaciones',libroOperacionesDetalle:'Detalle del libro de operaciones',firmaIntervinienteEstado:'Firma: constancia',firmaIntervinienteDetalle:'Firma: detalle',copiaActaEstado:'Entrega de copia',copiaActaDetalle:'Entrega: detalle',domicilioLegal:'Domicilio legal',notificacionEstado:'Notificación',notificacionDetalle:'Notificación: detalle'};
+  for(const [key,label] of Object.entries(optional)) write(label,act[key]);
+  if(act.solicitaCopia===true) write('Copia solicitada','La persona solicitó una copia del acta.');
+  if(doc.y>doc.page.height-200)newPage();
+  signatureBlock(doc,inspection,act,branding,number);
+  for(const f of inspection.firmasCapturadas || []) write('Constancia de firma',`${f.nombre} · ${f.documento} · ${f.caracter}\n${f.alcance}\nVersión revisada: ${f.contenidoSha256}`);
+  const location = act.ubicacionCampo;
+  if(location || act.entornoObservado || act.restriccionReferencia){
+    newPage();write('Lugar y entorno',location ? `${location.latitud}, ${location.longitud} · ${location.origen}${location.precisionMetros!=null ? ' · Precisión ±'+location.precisionMetros+' m' : ''}` : inspection.ubicacion);
+    if(location?.mapaImagen){const y=doc.y;doc.image(Buffer.from(location.mapaImagen.split(',')[1],'base64'),40,y,{fit:[515,300],align:'center'});doc.y=y+312;}
+    write('Referencia cartográfica',location?.mapaImagen?'© OpenStreetMap contributors. La vista guardada no delimita el predio ni determina por sí sola restricciones ambientales.':'No se guardó una imagen de mapa. Las coordenadas identifican el punto registrado.');
+    write('Entorno observado',act.entornoObservado);write('Receptores considerados',(act.receptores || []).join(', '));write('Restricción o antecedente identificado',act.restriccionReferencia);
+  }
+  photoAnnex(doc,inspection,images,number,branding);
+  const pages=doc.bufferedPageRange();for(let index=pages.start;index<pages.start+pages.count;index++){
+    doc.switchToPage(index);const bottom=doc.page.margins.bottom;doc.page.margins.bottom=0;const y=doc.page.height-55;
+    doc.moveTo(34,y-5).lineTo(561,y-5).strokeColor(COLORS.line).stroke();
+    doc.font('Helvetica').fontSize(6).fillColor(COLORS.muted).text(`SITREP · ${inspection.numero} · Huella ${fingerprint.slice(0,20)}`,34,y,{width:420,lineBreak:false}).text(`${index+1} / ${pages.count}`,466,y,{width:95,align:'right',lineBreak:false});drawSyntheticPreviewFooter(doc,y);doc.page.margins.bottom=bottom;
+  }doc.end();
 }
