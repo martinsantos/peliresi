@@ -1,5 +1,8 @@
+import { validateInspectionMap } from '../services/inspectionMap.service';
+import { inspectionCurrentSignatures } from '../domain/inspectionSignature';
 import { createInspectionAgendaNotices, recordInspectionScheduleChange, INSPECTION_AGENDA_LABELS, type InspectionAgendaEvent } from '../services/inspectionAgendaNotice.service';
 import fs from 'fs';
+import { inspectionFieldExtensions } from '../domain/inspectionFieldModel';
 import { intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import type { NextFunction, Request, Response } from 'express';
@@ -72,7 +75,7 @@ export const CHECKLIST_BY_ACTOR: Record<TipoActorInspeccion, ChecklistDefinition
   ],
 };
 
-const inspectionInclude = {
+export const inspectionInclude = {
   inspector: { select: { id: true, nombre: true, apellido: true, email: true, esInspector: true } },
   generador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, activo: true } },
   transportista: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, activo: true } },
@@ -132,6 +135,7 @@ const ENVIRONMENTAL_CHECKLIST: Record<'PETROLEO' | 'AIRE', ChecklistDefinition[]
 };
 
 export const actaDataSchema = z.object({
+  ...inspectionFieldExtensions,
   codigoPostal: z.string().trim().max(20).optional(),
   departamento: z.string().trim().max(120).optional(),
   calle: z.string().trim().max(200).optional(),
@@ -273,12 +277,12 @@ export function hasSingleEvidenceTarget(targets: Array<string | null | undefined
 }
 
 function isAuthorizedAdmin(user: any): boolean {
-  return ADMIN_ROLES.has(String(user?.rol));
+  return Boolean(user?.esJefeInspecciones) || ADMIN_ROLES.has(String(user?.rol));
 }
 
 function isSectorReviewer(user: any, tipoActor?: TipoActorInspeccion | null): boolean {
   if (!isAuthorizedAdmin(user)) return false;
-  return user.rol === 'ADMIN' || user.rol === `ADMIN_${tipoActor}`;
+  return Boolean(user.esJefeInspecciones) || user.rol === 'ADMIN' || user.rol === `ADMIN_${tipoActor}`;
 }
 
 type InspectionAccessTarget = {
@@ -293,7 +297,7 @@ type InspectionAccessTarget = {
  */
 export function canAccessInspection(user: any, inspection: InspectionAccessTarget): boolean {
   const role = String(user?.rol || '');
-  if (role === 'ADMIN') return true;
+  if (role === 'ADMIN' || user?.esJefeInspecciones) return true;
   if (role.startsWith('ADMIN_')) return role === `ADMIN_${inspection.tipoActor}`;
   return Boolean(user?.esInspector) && user?.id === inspection.inspectorId;
 }
@@ -669,6 +673,7 @@ export async function agregarEventoInspeccion(req: AuthRequest, res: Response, n
 export async function actualizarInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = updateSchema.parse(req.body);
+    await validateInspectionMap(input.datosActa?.ubicacionCampo?.mapaImagen);
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { id: true, numero: true, inspectorId: true, tipoActor: true, estado: true, version: true, fechaProgramada: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
@@ -678,6 +683,7 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
       where: { id: req.params.id, version, estado: { in: Array.from(EDITABLE_STATES) } },
       data: {
         ...fields,
+        ...(datosActa?.ubicacionCampo ? { latitud: datosActa.ubicacionCampo.latitud, longitud: datosActa.ubicacionCampo.longitud } : {}),
         datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
         informeTecnico: informeTecnico === undefined ? undefined : informeTecnico === null ? Prisma.DbNull : informeTecnico as Prisma.InputJsonValue,
         fechaProgramada: fields.fechaProgramada === undefined ? undefined : fields.fechaProgramada ? new Date(fields.fechaProgramada) : null,
@@ -696,6 +702,7 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
 export async function guardarBorradorInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = draftSchema.parse(req.body);
+    await validateInspectionMap(input.datosActa?.ubicacionCampo?.mapaImagen);
     const inspection = await prisma.inspeccion.findUnique({
       where: { id: req.params.id },
       select: { id: true, numero: true, inspectorId: true, tipoActor: true, estado: true, version: true, fechaProgramada: true },
@@ -727,7 +734,8 @@ export async function guardarBorradorInspeccion(req: AuthRequest, res: Response,
         where: { id: req.params.id },
         data: {
           ...fields,
-          datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
+          ...(datosActa?.ubicacionCampo ? { latitud: datosActa.ubicacionCampo.latitud, longitud: datosActa.ubicacionCampo.longitud } : {}),
+        datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
           informeTecnico: informeTecnico === undefined ? undefined : informeTecnico === null ? Prisma.DbNull : informeTecnico as Prisma.InputJsonValue,
           fechaProgramada: fields.fechaProgramada === undefined ? undefined : fields.fechaProgramada ? new Date(fields.fechaProgramada) : null,
           plazoRespuestaAt: fields.plazoRespuestaAt === undefined ? undefined : fields.plazoRespuestaAt ? new Date(fields.plazoRespuestaAt) : null,
@@ -1163,7 +1171,7 @@ export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, 
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanAccess(req, inspection);
-    await streamInspectionActPdf(res, inspection, resolveInspectionEvidence);
+    await streamInspectionActPdf(res, { ...inspection, firmasCapturadas: inspectionCurrentSignatures(inspection) }, resolveInspectionEvidence);
   } catch (error) { next(error); }
 }
 
@@ -1202,4 +1210,21 @@ export async function descargarEvidencia(req: AuthRequest, res: Response, next: 
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(evidence.nombreOriginal)}`);
     res.sendFile(filePath);
   } catch (error) { next(error); }
+}
+
+export async function describirEvidencia(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = z.object({ version: z.number().int().positive(), descripcion: z.string().trim().max(2000) }).strict().parse(req.body);
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id } });
+    if (!inspection) throw new AppError('Inspección no encontrada', 404); assertCanEdit(req, inspection);
+    const evidence = await prisma.evidenciaInspeccion.findFirst({ where: { id: req.params.evidenciaId, inspeccionId: inspection.id, anuladaAt: null, intercambioId: null, tipo: 'FOTO' } });
+    if (!evidence) throw new AppError('Fotografía de campo no encontrada', 404);
+    await prisma.$transaction(async tx => {
+      await reserveFieldMutation(tx, inspection.id, input.version);
+      const changed = await tx.evidenciaInspeccion.updateMany({ where: { id: evidence.id, inspeccionId: inspection.id, anuladaAt: null, intercambioId: null }, data: { descripcion: input.descripcion || null } });
+      if (!changed.count) throw new AppError('La fotografía cambió; actualizá antes de continuar.', 409);
+      await tx.eventoInspeccion.create({ data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'EVIDENCIA_DESCRIPCION', titulo: 'Descripción de fotografía actualizada', metadata: { evidenciaId: evidence.id, anterior: evidence.descripcion, nueva: input.descripcion, archivoSha256: evidence.sha256 } } });
+    });
+    res.json({ success: true, data: { descripcion: input.descripcion, version: input.version + 1 } });
+  } catch (e) { next(e); }
 }

@@ -1,3 +1,4 @@
+import SharedInspectionActPage from './pages/inspecciones/SharedInspectionActPage';
 import OpenLinkPage from './pages/notificaciones/OpenLinkPage';
 import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
@@ -63,7 +64,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/relevo/', '/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
+  const publicPaths = ['/acta-compartida/', '/relevo/', '/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
   const isPublic = location.pathname === '/abrir' || publicPaths.some(p => location.pathname.startsWith(p));
 
   // Keep public forms mounted while validating a session or login attempt.
@@ -212,6 +213,7 @@ function AppMobile() {
 
           {/* Verificación pública de manifiesto (QR) */}
           <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
+          <Route path="/acta-compartida/:accesoId" element={<SharedInspectionActPage />} />
           <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
           {/* Root redirect */}

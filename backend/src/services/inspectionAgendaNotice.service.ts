@@ -1,3 +1,4 @@
+import { inspectionManagementRecipientIds } from './inspectionManagementRole.service';
 import { createHash } from 'node:crypto';
 import type { Prisma, TipoActorInspeccion } from '@prisma/client';
 import { inspectionParticipantNoticeWhere } from './inspectionExchangeNotice.service';
@@ -20,9 +21,10 @@ export function inspectionScheduleChange(before: Date | null | undefined, after:
 export async function createInspectionAgendaNotices(tx: Prisma.TransactionClient, inspection: Target,
   input: { evento: InspectionAgendaEvent; eventoId: string; autorId: string; assignedSelf?: boolean }) {
   const roles = ['ADMIN', ...(inspection.tipoActor ? [`ADMIN_${inspection.tipoActor}`] : [])] as Array<'ADMIN' | 'ADMIN_GENERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_OPERADOR'>;
+  const managementIds = await inspectionManagementRecipientIds();
   const staff = await tx.usuario.findMany({ where: { activo: true,
     ...(input.assignedSelf ? {} : { id: { not: input.autorId } }),
-    OR: [{ rol: { in: roles } }, { id: inspection.inspectorId, esInspector: true, NOT: { rol: { in: ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] } } }],
+    OR: [{ id: { in: managementIds } }, { rol: { in: roles } }, { id: inspection.inspectorId, esInspector: true, NOT: { rol: { in: ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] } } }],
   }, select: { id: true } });
   const recipients = new Map(staff.map(user => [user.id, 'inspeccion']));
   if (['NOTIFICADA', 'EN_TRAMITE_LEGAL', 'FINALIZADA'].includes(input.evento) && inspection.tipoActor) {

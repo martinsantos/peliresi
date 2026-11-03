@@ -27,14 +27,14 @@ interface Props {
 }
 
 const sections = [
-  { label: 'Visita', ids: ['resumen', 'contexto'] },
-  { label: 'Controles', ids: ['checklist', 'declaracion'] },
-  { label: 'Registro', ids: ['acta', 'evidencias'] },
-  { label: 'Expediente', ids: ['revision', 'informe-tecnico', 'intercambios', 'trazabilidad', 'verificacion'] },
+  { label: 'Visita y lugar', ids: ['resumen', 'contexto'] },
+  { label: 'Constataciones', ids: ['acta', 'checklist', 'declaracion'] },
+  { label: 'Evidencias', ids: ['evidencias'] },
+  { label: 'Revisar y firmar', ids: ['revision', 'firma', 'informe-tecnico', 'intercambios', 'trazabilidad', 'verificacion'] },
 ];
 const labels: Record<string, string> = {
   checklist: 'En campo', declaracion: 'Datos declarados', acta: 'Lo observado',
-  evidencias: 'Fotos y archivos', revision: 'Resumen y cierre', 'informe-tecnico': 'Evaluación técnica',
+  firma: 'Leer y firmar', evidencias: 'Fotos y archivos', revision: 'Resumen y cierre', 'informe-tecnico': 'Evaluación técnica',
   intercambios: 'Comunicaciones', trazabilidad: 'Historial', verificacion: 'Verificación',
 };
 

@@ -43,6 +43,7 @@ describe('synthetic preview safety gate', () => {
   ])('rejects an unsafe %s setting', (key, value) => {
     expect(() => syntheticPreviewEnabled({ ...safe(), [key]: value })).toThrow(/SYNTHETIC_PREVIEW_/);
   });
+  it('isolates the field-model rehearsal in its explicit synthetic schema', () => { expect(syntheticPreviewEnabled({ ...safe(), DATABASE_URL: safe().DATABASE_URL!.replace('proposal_operations_20261021', 'inspection_field_20261103') })).toBe(true); expect(() => syntheticPreviewEnabled({ ...safe(), DATABASE_URL: safe().DATABASE_URL!.replace('proposal_operations_20261021', 'production') })).toThrow(); });
   it('checks the actual connected database identity', () => {
     expect(() => assertSyntheticPreviewDatabase([{ name: 'sitrep_ephemeral_qa_1a93', port: 55441, address: '127.0.0.1', schema: 'proposal_operations_20261021', directory: '/qa/ephemeral-pg' }])).not.toThrow();
     expect(() => assertSyntheticPreviewDatabase([{ name: 'production', port: 55441, address: '127.0.0.1', schema: 'proposal_operations_20261021', directory: '/qa/ephemeral-pg' }])).toThrow(/DATABASE_IDENTITY/);

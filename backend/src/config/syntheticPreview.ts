@@ -1,3 +1,5 @@
+const SYNTHETIC_SCHEMAS = new Set(['proposal_operations_20261021', 'inspection_field_20261103']);
+
 /**
  * A rehearsal is allowed only in the isolated ephemeral QA database.
  * A UI label alone is never proof that requests are separated from production.
@@ -27,7 +29,7 @@ export function syntheticPreviewEnabled(env: NodeJS.ProcessEnv = process.env): b
   try { db = new URL(env.DATABASE_URL || ''); }
   catch { throw new Error('SYNTHETIC_PREVIEW_UNSAFE_DATABASE'); }
   if (db.protocol !== 'postgresql:' || db.hostname !== '127.0.0.1' || db.port !== '55441'
-    || db.pathname !== '/sitrep_ephemeral_qa_1a93' || db.searchParams.get('schema') !== 'proposal_operations_20261021') {
+    || db.pathname !== '/sitrep_ephemeral_qa_1a93' || !SYNTHETIC_SCHEMAS.has(db.searchParams.get('schema') || '')) {
     throw new Error('SYNTHETIC_PREVIEW_UNSAFE_DATABASE');
   }
   return true;
@@ -45,12 +47,12 @@ export function syntheticPreviewRequestAllowed(enabled: boolean, method: string,
 export function assertSyntheticPreviewDatabase(rows: Array<{ name: string; port: number; address: string; schema: string; directory: string }>): void {
   if (rows.length !== 1 || rows[0].name !== 'sitrep_ephemeral_qa_1a93'
     || rows[0].port !== 55441 || rows[0].address !== '127.0.0.1'
-    || rows[0].schema !== 'proposal_operations_20261021' || rows[0].directory !== '/qa/ephemeral-pg') {
+    || !SYNTHETIC_SCHEMAS.has(rows[0].schema) || rows[0].directory !== '/qa/ephemeral-pg') {
     throw new Error('SYNTHETIC_PREVIEW_DATABASE_IDENTITY');
   }
 }
 
-export function assertSyntheticPreviewRuntime(proof: { platform: string; container: boolean; cpu: string; memory: string; swap: string; ipv4Routes: string; ipv6Routes: string }): void {
+export function assertSyntheticPreviewRuntime(proof: { platform: string; container: boolean; cpu: string; memory: string; swap: string; ipv4Routes: string; ipv6Routes: string; swapDevices?: string }): void {
   const cpu = proof.cpu.trim().split(/\s+/).map(Number), memory = Number(proof.memory.trim());
   const ipv4 = proof.ipv4Routes.trim().split('\n').slice(1).map(line => line.trim().split(/\s+/));
   const ipv6 = proof.ipv6Routes.trim().split('\n').filter(Boolean).map(line => line.trim().split(/\s+/));
@@ -58,7 +60,7 @@ export function assertSyntheticPreviewRuntime(proof: { platform: string; contain
     || ipv6.some(row => row[0] === '00000000000000000000000000000000' && row[1] === '00' && row[row.length - 1] !== 'lo');
   if (proof.platform !== 'linux' || !proof.container || cpu.length !== 2
     || !cpu.every(value => Number.isFinite(value) && value > 0) || cpu[0] > cpu[1]
-    || !Number.isFinite(memory) || memory <= 0 || memory > 2147483648 || proof.swap.trim() !== '0'
+    || !Number.isFinite(memory) || memory <= 0 || memory > 2147483648 || !(proof.swap.trim() === '0' || (proof.swap.trim() === 'max' && /^Filename\s+Type\s+Size\s+Used\s+Priority\s*$/.test(proof.swapDevices || '')))
     || !proof.ipv4Routes.startsWith('Iface') || externalDefault) {
     throw new Error('SYNTHETIC_PREVIEW_UNSAFE_RUNTIME');
   }

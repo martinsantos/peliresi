@@ -1,3 +1,7 @@
+import { InspectionActAccessPanel } from './InspectionActAccessPanel';
+import { InspectionPhotoDescriptions } from './InspectionPhotoDescriptions';
+import { InspectionSignaturePanel } from './InspectionSignaturePanel';
+import { InspectionFieldModel } from './InspectionFieldModel';
 import { inspectionContextKey, inspectionFieldDraftKey, inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -204,7 +208,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   useEffect(() => { void warmInspectionShell(); }, []);
   useEffect(() => () => { evidenceScopeRef.current = ''; }, []);
   const draftKey = inspectionFieldDraftKey(currentUser?.id || '', owner, id);
-  const isAdmin = Boolean(inspection && (currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${inspection.tipoActor}`));
+  const isAdmin = Boolean(inspection && (currentUser?.esJefeInspecciones || currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${inspection.tipoActor}`));
   const isAssignedInspector = Boolean(inspection && currentUser?.esInspector && String(inspection.inspectorId) === String(currentUser.id));
   const fieldEditAllowed = Boolean(!query.isError && inspection && ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(inspection.estado) && (isAdmin || isAssignedInspector));
   const reportEditAllowed = Boolean(!query.isError && inspection && (fieldEditAllowed || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
@@ -763,6 +767,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       <label className="text-sm font-semibold text-neutral-700">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
       <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
     </div>
+    <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="visita" />
     <dl className="grid gap-4 border-t border-neutral-200 pt-5 text-sm sm:grid-cols-2"><div><dt className="text-xs text-neutral-500">Programada</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.fechaProgramada, true)}</dd></div><div><dt className="text-xs text-neutral-500">Inicio de campo</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.iniciadaAt, true)}</dd></div></dl>
   </div>;
   const observationLabel = environmentalInspection ? `Registro de ${INSPECTION_TYPES[inspectionType].label.toLocaleLowerCase('es-AR')}` : inspection.tipoActor ? 'Registro de lo observado' : 'Descripción de la denuncia o hallazgo';
@@ -774,9 +779,11 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       </div>
       <textarea id="inspection-observations" disabled={!canEdit} value={observaciones} onChange={(event) => setObservaciones(event.target.value)} rows={4} placeholder="Qué observaste, dónde y en qué condiciones. Podés escribir o dictar." className="block w-full resize-y rounded-lg border border-neutral-400 p-3 text-base font-normal leading-relaxed text-neutral-900 focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50" />
     </div>
-    <InspectionDocumentsPanel actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />
+    <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="constatacion" />
+    <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="medidas" />
+    <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Constancias y datos complementarios</summary><InspectionDocumentsPanel actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></details>
   </div>;
-  const evidence = <EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} pendingActions={canEdit ? pendingEvidenceActions : undefined} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} />;
+  const evidence = <><InspectionPhotoDescriptions inspection={inspection} editable={Boolean(canEdit && currentFingerprint === serverFingerprint && !savingDraft && !pendingEvidence.length && !organizationPending)} /><EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} pendingActions={canEdit ? pendingEvidenceActions : undefined} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /></>;
   const report = <InspectionDocumentsPanel section="informe" actData={datosActa} report={informeTecnico} actEditable={false} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />;
   const readiness = <>{fieldEditAllowed ? <FieldReadinessPanel requiresComparison={Boolean(inspection.tipoActor)} state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /> : inspection.tipoActor && dossierReadiness ? <DossierReadinessPanel readiness={dossierReadiness} /> : null}
     {inspection.tipoActor && (inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <label className="block text-sm font-semibold text-neutral-700">Plazo de respuesta<input aria-label="Plazo de respuesta" type="datetime-local" value={plazoRespuestaAt} onChange={(event) => setPlazoRespuestaAt(event.target.value)} className="mt-2 h-11 w-full max-w-sm rounded-lg border border-neutral-300 px-3 text-sm" /><span className="mt-2 block text-xs font-normal text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</span></label>}
@@ -805,6 +812,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     if (declaration >= 0) steps.splice(declaration, 1);
   }
   const reference: InspectionWorkspaceStep[] = [
+    { id: 'firma', label: 'Leer y firmar', title: 'Leer y firmar el acta', description: 'Presentá el contenido al inspeccionado y conservá su firma con la versión revisada.', content: <><InspectionSignaturePanel inspectionId={inspection.id} saved={currentFingerprint === serverFingerprint && !pendingEvidence.length && !savingDraft && !organizationPending && !pendingEvidenceReadFailed && !staleDraft && !syncingEvidence && !changingStage && canWriteDraft()} editable={Boolean(canEdit && isOnline)} /><InspectionActAccessPanel inspection={inspection} /></> },
     ...(showExchangePanel ? [{ id: 'intercambios', label: 'Comunicaciones y respuestas', title: 'Comunicaciones y respuestas', description: 'Intercambios auditados con el inspeccionado y documentación de cada intervención.', content: <InspectionExchangePanel inspectionId={inspection.id} /> }] : []),
     { id: 'trazabilidad', label: 'Trazabilidad', title: 'Trazabilidad', description: 'Quién hizo cada intervención, cuándo y con qué documentación.', content: <InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Registro actualizado', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Borrador de notificación registrado como no enviado.' : 'Nota interna incorporada.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /> },
     { id: 'verificacion', label: 'Verificación QR', title: 'Verificación QR', description: 'Referencia verificable de la versión registrada en el servidor.', content: <InspectionVerificationBlock verification={inspection.verificacion} /> },
@@ -893,7 +901,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       const scope = evidenceScopeRef.current;
       const fresh = await inspeccionService.get(inspection.id);
       if (!scope || scope !== evidenceScopeRef.current || !canWriteDraft()) throw new Error('El contexto cambió. Volvé a abrir el expediente.');
-      const authorized = currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${fresh.tipoActor}` || (currentUser?.esInspector && String(fresh.inspectorId) === String(currentUser.id));
+      const authorized = currentUser?.esJefeInspecciones || currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${fresh.tipoActor}` || (currentUser?.esInspector && String(fresh.inspectorId) === String(currentUser.id));
       if (!authorized || !['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(fresh.estado)) throw new Error('Este contexto ya no puede editar la visita. Actualizá el expediente.');
       if (fresh.version !== inspection.version) { void query.refetch(); throw new Error('El expediente cambió. Revisá la versión actual antes de recuperar.'); }
     }} onReview={async raw => {

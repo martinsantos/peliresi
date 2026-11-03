@@ -111,6 +111,7 @@ export interface Usuario {
   telefono: string | null;
   activo: boolean;
   esInspector?: boolean;
+  esJefeInspecciones?: boolean;
   dosFaVerificado: boolean;
   createdAt: string;
   updatedAt: string;

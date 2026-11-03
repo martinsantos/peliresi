@@ -42,6 +42,7 @@ export interface User {
   permisos: string[];
   actorId?: string;
   esInspector?: boolean;
+  esJefeInspecciones?: boolean;
 }
 
 export interface AuthContextType {
@@ -121,6 +122,7 @@ function apiUserToUser(u: Usuario): User {
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
     esInspector: u.esInspector ?? false,
+    esJefeInspecciones: u.esJefeInspecciones ?? false,
     training: u.training === true,
   };
 }

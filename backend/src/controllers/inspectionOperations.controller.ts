@@ -66,7 +66,7 @@ export async function listarInspectores(req: AuthRequest, res: Response, next: N
     assertStaff(req);
     const admin = INSPECTION_ADMIN_ROLES.has(req.user.rol);
     const items = await prisma.usuario.findMany({
-      where: { activo: true, ...(admin ? { OR: [{ esInspector: true }, { rol: 'ADMIN' }, ...(req.user.rol === 'ADMIN' ? [{ rol: { in: ['ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] as const } }] : [{ rol: req.user.rol }])] } : { id: req.user.id }) },
+      where: { activo: true, ...(admin ? { OR: [{ esInspector: true }, { rol: 'ADMIN' }, ...((req.user.rol === 'ADMIN' || req.user.esJefeInspecciones) ? [{ rol: { in: ['ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] as const } }] : [{ rol: req.user.rol }])] } : { id: req.user.id }) },
       select: { id: true, nombre: true, apellido: true, rol: true, esInspector: true }, orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     });
     res.json({ success: true, data: items });

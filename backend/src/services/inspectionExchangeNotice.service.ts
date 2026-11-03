@@ -1,3 +1,4 @@
+import { inspectionManagementRecipientIds } from './inspectionManagementRole.service';
 import { ParteIntercambioInspeccion, Prisma, Rol, TipoIntercambioInspeccion } from '@prisma/client';
 import type { InspectionExchangeAccessTarget } from './inspectionExchange.service';
 import { INSPECTION_EXCHANGE_LABELS } from '../domain/inspectionNoticeLabels';
@@ -42,7 +43,8 @@ export async function createInspectionExchangeNotices(
   } else {
     const roles: Rol[] = ['ADMIN'];
     if (inspection.tipoActor) roles.push(`ADMIN_${inspection.tipoActor}` as Rol);
-    recipientWhere = { OR: [{ rol: { in: roles } }, { id: inspection.inspectorId, esInspector: true }] };
+    const managementIds = await inspectionManagementRecipientIds();
+    recipientWhere = { OR: [{ rol: { in: roles } }, { id: inspection.inspectorId, esInspector: true }, ...(managementIds.length ? [{ id: { in: managementIds } }] : [])] };
   }
   const recipients = await tx.usuario.findMany({
     where: { AND: [{ activo: true, id: { not: exchange.autorId } }, recipientWhere] },

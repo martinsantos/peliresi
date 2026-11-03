@@ -35,11 +35,10 @@ export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, act
     {text('detalleInfraestructura', 'Instalaciones y condiciones observadas', true)}
   </>;
   const act = <div data-testid={'inspection-form-' + (actorType || 'HALLAZGO')}>
-    <div className="pb-5">{text('requerimientos', 'Medidas o requerimientos indicados', true)}</div>
+    {(!actData.modeloCampo || actData.requerimientos) && <details className={groupClass}>{groupTitle('Requerimientos anteriores (texto libre)')}<div className="pb-5">{text('requerimientos', 'Medidas o requerimientos ya registrados', true)}</div></details>}
     <details className={groupClass}>{groupTitle(operationalTitle)}<div className={gridClass + ' pb-5'}>{text('motivoInspeccion', 'Motivo de la visita')}{text('generacion', operationalLabel, true)}</div></details>
     <details className={groupClass}>{groupTitle('Personas y lugar')}<div className={gridClass + ' pb-5'}>
-      {text('atendidoPor', actorType ? 'Persona que atendió' : 'Persona presente o denunciante')}
-      {text('cargoAtendido', 'Carácter o cargo')}{text('dniAtendido', 'Documento de identidad')}{text('area', 'Área interviniente')}
+      {!actData.modeloCampo && <>{text('atendidoPor', actorType ? 'Persona que atendió' : 'Persona presente o denunciante')}{text('cargoAtendido', 'Carácter o cargo')}{text('dniAtendido', 'Documento de identidad')}</>}{text('area', 'Área interviniente')}
       {text('departamento', 'Departamento')}{text('calle', 'Calle')}{text('numeroDomicilio', 'Número')}{text('lugarAfectacion', 'Lugar afectado', true)}
     </div></details>
     {(actorType === 'GENERADOR' || actorType === 'OPERADOR') && <details className={groupClass}>{groupTitle(actorType === 'OPERADOR' ? 'Planta y tratamiento' : 'Establecimiento y almacenamiento')}<div className={gridClass + ' pb-5'}>{infrastructure}</div></details>}

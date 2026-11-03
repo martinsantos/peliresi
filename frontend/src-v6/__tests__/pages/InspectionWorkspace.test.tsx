@@ -25,22 +25,22 @@ describe('InspectionWorkspace navigation contract', () => {
     const { onBeforeNavigate } = setup();
     expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
     expect(screen.queryByText('Control de prueba')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Constataciones', exact: true }));
     expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
     expect(screen.queryByRole('progressbar')).toBeNull();
     expect(onBeforeNavigate).toHaveBeenCalledOnce();
-    expect(screen.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Constataciones', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 
   it('numbers section groups without claiming completion or changing accessible destinations', () => {
     setup('#checklist');
     const nav = screen.getByRole('navigation', { name: 'Secciones del expediente' });
-    const current = within(nav).getByRole('link', { name: 'Controles', exact: true });
+    const current = within(nav).getByRole('link', { name: 'Constataciones', exact: true });
     const number = within(current).getByText('2', { exact: true });
     expect(number).toHaveAttribute('aria-hidden', 'true');
     expect(current).toHaveAttribute('aria-current', 'page');
     expect(current).toHaveClass('bg-primary-700', 'text-white', 'hover:text-white', 'focus-visible:text-white', 'transition-none', 'flex-[1_1_auto]');
-    expect(within(nav).getByRole('link', { name: 'Expediente', exact: true })).toHaveTextContent('4');
+    expect(within(nav).getByRole('link', { name: 'Revisar y firmar', exact: true })).toHaveTextContent('4');
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
@@ -49,16 +49,16 @@ describe('InspectionWorkspace navigation contract', () => {
     const note = screen.getByRole('textbox', { name: 'Nota sin enviar' });
     fireEvent.change(note, { target: { value: 'Observación pendiente de registrar' } });
     expect(screen.queryByRole('button', { name: 'Guardar borrador' })).toBeNull();
-    fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visita y lugar', exact: true }));
     expect(note).not.toBeVisible();
-    fireEvent.click(screen.getByRole('link', { name: 'Expediente', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Revisar y firmar', exact: true }));
     expect(screen.getByRole('textbox', { name: 'Nota sin enviar' })).toHaveValue('Observación pendiente de registrar');
   });
 
   it('keeps document anchors and safe fallback for malformed hashes', () => {
     setup('#%E0%A4%A');
     expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('href', '#checklist');
+    expect(screen.getByRole('link', { name: 'Constataciones', exact: true })).toHaveAttribute('href', '#checklist');
     const bar = screen.getByTestId('inspection-action-bar');
     expect(bar.className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
     expect(within(bar).getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
@@ -79,8 +79,8 @@ describe('InspectionWorkspace navigation contract', () => {
   it('does not leave the current section when protecting the draft fails', () => {
     const { onBeforeNavigate } = setup();
     onBeforeNavigate.mockReturnValue(false);
-    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Constataciones', exact: true }));
     expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Visita', exact: true })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Visita y lugar', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 });

@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import { inspectionMeasureText } from '../domain/inspectionFieldModel';
 import PDFDocument from 'pdfkit';
 import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
 import { syntheticPreviewEnabled } from '../config/syntheticPreview';
@@ -318,40 +319,18 @@ function evidenceGallery(doc: PDFKit.PDFDocument, inspection: any, preparedImage
       x + 16, y + 48, { width: imageWidth - 32, align: 'center' },
     );
   };
-  for (let i = 0; i < photos.length; i += 2) {
-    const row = photos.slice(i, i + 2);
-    const rowHeight = Math.max(...row.map((photo: any) => 166 + measureInspectionPdfBlocks(doc, caption(photo), width - 20)), 246);
-    // Very long captions use the full page width and flow across pages with
-    // their persistent identity repeated, rather than clipping a gallery card.
-    if (rowHeight > 450) {
-      row.forEach((photo: any) => {
-        reserve(230);
-        const y = doc.y;
-        drawImage(photo, 44, y, doc.page.width - 88);
-        doc.y = y + 152;
-        drawInspectionPdfBlocks(doc, caption(photo), {
-          x: 54, width: doc.page.width - 108, bottom: doc.page.height - PAGE.bottom,
-          newPage: () => { doc.addPage(); doc.y = PAGE.top; },
-          continuation: `${inspectionEvidenceReference(photo)} - continuación`,
-        });
-        doc.y += 16;
-      });
-      continue;
-    }
-    reserve(rowHeight + 12);
-    const y = doc.y;
-    row.forEach((photo: any, column: number) => {
-      const x = 44 + column * (width + gap);
-      doc.roundedRect(x, y, width, rowHeight, 4).fillAndStroke(C.white, C.line);
-      drawImage(photo, x + 7, y + 7, width - 14);
-      doc.y = y + 154;
-      drawInspectionPdfBlocks(doc, caption(photo), {
-        x: x + 10, width: width - 20, bottom: doc.page.height - PAGE.bottom,
-        newPage: () => { doc.addPage(); doc.y = PAGE.top; },
-        continuation: `${inspectionEvidenceReference(photo)} - continuación`,
-      });
-    });
-    doc.y = y + rowHeight + 10;
+  for (const photo of photos) {
+    doc.addPage(); doc.y = PAGE.top;
+    section(doc, 'Evidencia fotográfica', 'Una fotografía por página, con descripción y referencia al hallazgo', 200);
+    const y = doc.y, imageWidth = doc.page.width - 88;
+    const imageHeight = Math.max(220, doc.page.height - y - PAGE.bottom - Math.min(160, measureInspectionPdfBlocks(doc, caption(photo), imageWidth)) - 20);
+    doc.rect(44, y, imageWidth, imageHeight).fill(C.soft);
+    const prepared = preparedImages.get(photo.id);
+    if (prepared?.buffer) doc.image(prepared.buffer, 44, y, { fit: [imageWidth, imageHeight], align: 'center', valign: 'center' });
+    else doc.font('Helvetica').fontSize(9).fillColor(C.muted).text('Imagen no disponible en esta copia. Se conserva su registro y huella.', 60, y + 50, { width: imageWidth - 32 });
+    doc.y = y + imageHeight + 8;
+    drawInspectionPdfBlocks(doc, caption(photo), { x: 44, width: imageWidth, bottom: doc.page.height - PAGE.bottom,
+      newPage: () => { doc.addPage(); doc.y = PAGE.top; }, continuation: `${inspectionEvidenceReference(photo)} - continuación` });
   }
 }
 
@@ -637,7 +616,10 @@ function unifiedFieldAct(doc: PDFKit.PDFDocument, inspection: any) {
     ['Infraestructura', act.infraestructura ? stateLabel(act.infraestructura) : ''],
     ['Detalle de infraestructura', act.detalleInfraestructura], ['Estado de infraestructura', act.estadoInfraestructura],
     ['Generación / corrientes observadas', act.generacion], ['Acta antecedente', act.actaAnterior],
-    ['Requerimientos consignados', act.requerimientos], ['Observaciones de campo', inspection.observaciones],
+    ['Actividad observada', act.actividadObservada], ['Ampliación respecto de lo declarado', [act.ampliacionEstado, act.ampliacionDetalle].filter(Boolean).join(' · ')],
+    ['Entorno y vecinos', act.entornoObservado], ['Referencia de restricción ambiental', act.restriccionReferencia],
+    ['Receptores cercanos', (act.receptores || []).join(', ')],
+    ['Requerimientos consignados', [act.requerimientos, inspectionMeasureText(act.medidas || [])].filter(Boolean).join('\n')], ['Observaciones de campo', inspection.observaciones],
   ];
   const write = (blocks: InspectionPdfTextBlock[]) => drawInspectionPdfBlocks(doc, blocks, {
     x: 44, width: doc.page.width - 88, bottom: doc.page.height - PAGE.bottom,
@@ -752,6 +734,18 @@ export async function streamInspectionTechnicalReportPdf(
 
   if (!unified || inspection.comparaciones.length) {
   ensureSpace(doc, 150);
+  const location = inspection.datosActa?.ubicacionCampo;
+  if (location) {
+    doc.addPage(); doc.y = PAGE.top;
+    section(doc, 'Ubicación y entorno', 'Punto registrado por el inspector; el mapa no determina por sí solo una restricción ambiental');
+    narrativeBox(doc, `Coordenadas: ${location.latitud}, ${location.longitud} · Fuente: ${location.origen}${location.precisionMetros != null ? ` · Precisión informada: ${location.precisionMetros} m` : ''}`);
+    if (location.mapaImagen) {
+      const y = doc.y; doc.image(Buffer.from(location.mapaImagen.split(',')[1], 'base64'), 44, y, { fit: [507, 300], align: 'center' }); doc.y = y + 310;
+      doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('Mapa guardado durante la visita · © OpenStreetMap contributors', 44, doc.y, { width: 507 });
+    }
+    if (inspection.datosActa.entornoObservado) narrativeBox(doc, inspection.datosActa.entornoObservado);
+    if (inspection.datosActa.restriccionReferencia) narrativeBox(doc, inspection.datosActa.restriccionReferencia);
+  }
   section(doc, 'Declarado y verificado', 'Datos declarados al abrir la inspección y resultado constatado en campo');
   comparisonTable(doc, inspection.comparaciones);
   }

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export const INSPECTION_ADMIN_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']);
 export const INSPECTION_TERMINAL_STATES: EstadoInspeccion[] = ['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'];
-export const isInspectionStaff = (user: any): boolean => Boolean(user?.esInspector) || INSPECTION_ADMIN_ROLES.has(String(user?.rol));
+export const isInspectionStaff = (user: any): boolean => Boolean(user?.esJefeInspecciones || user?.esInspector) || INSPECTION_ADMIN_ROLES.has(String(user?.rol));
 
 export const INSPECTION_TYPES = {
   GENERADOR: { serie: 'GRP', label: 'Generador' },
@@ -35,7 +35,7 @@ export function inspectionTypeFilter(type: InspectionType): Prisma.InspeccionWhe
 }
 
 export function inspectionScopeForUser(user: any): Prisma.InspeccionWhereInput {
-  if (user?.rol === 'ADMIN') return {};
+  if (user?.rol === 'ADMIN' || user?.esJefeInspecciones) return {};
   if (user?.rol === 'ADMIN_GENERADOR') return { tipoActor: 'GENERADOR' };
   if (user?.rol === 'ADMIN_TRANSPORTISTA') return { tipoActor: 'TRANSPORTISTA' };
   if (user?.rol === 'ADMIN_OPERADOR') return { tipoActor: 'OPERADOR' };

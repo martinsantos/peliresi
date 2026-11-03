@@ -1,3 +1,4 @@
+import SharedInspectionActPage from './pages/inspecciones/SharedInspectionActPage';
 import OpenLinkPage from './pages/notificaciones/OpenLinkPage';
 import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
@@ -380,7 +381,8 @@ function App() {
 
         {/* Verificación pública de manifiesto (QR) */}
         <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
-        <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
+        <Route path="/acta-compartida/:accesoId" element={<SharedInspectionActPage />} />
+          <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
         {/* Legacy /v6/ QR redirect — QR codes ya impresos apuntan a /v6/manifiestos/verificar/... */}
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />

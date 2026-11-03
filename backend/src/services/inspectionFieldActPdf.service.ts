@@ -1,3 +1,4 @@
+import { inspectionMeasureText } from '../domain/inspectionFieldModel';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
@@ -658,21 +659,22 @@ function signatureBlock(
     const noteY = doc.y;
     doc.roundedRect(40, noteY, doc.page.width - 80, 42, 4).fill(COLORS.soft);
     doc.font('Helvetica').fontSize(7.2).fillColor(COLORS.ink)
-      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Este PDF no incorpora una firma gráfica ni presume validación cuando el expediente la marca como pendiente.', 50, noteY + 9, { width: doc.page.width - 100, lineGap: 1.2 });
+      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Sólo las firmas identificadas como capturadas incluyen trazo manuscrito. No equivalen a conformidad con los hallazgos ni a firma digital certificada.', 50, noteY + 9, { width: doc.page.width - 100, lineGap: 1.2 });
     doc.y = noteY + 51;
   }
   const actualY = doc.y + 18;
+  const captured: any[] = inspection.firmasCapturadas || [];
   const responsible = value(act.atendidoPor || act.titular || actor.representanteLegalNombre, 'Causante / responsable');
   const inspector = value(`${inspection.inspector?.nombre || ''} ${inspection.inspector?.apellido || ''}`);
   const blocks = [
     {
-      name: responsible,
+      name: captured.find(f => f.tipo === 'INSPECCIONADO')?.nombre || responsible,
       dni: act.dniAtendido || act.dniTitular || actor.representanteLegalDNI,
       role: 'CAUSANTE / RESPONSABLE',
       status: `ESTADO REGISTRADO: ${stateLabel(act.firmaIntervinienteEstado, SIGNATURE_STATES).toUpperCase()}`,
     },
     {
-      name: inspector,
+      name: captured.find(f => f.tipo === 'INSPECTOR')?.nombre || inspector,
       dni: '',
       role: 'INSPECTOR/A INTERVINIENTE',
       status: 'ESPACIO DE FIRMA - SIN FIRMA GRÁFICA INCORPORADA',
@@ -680,6 +682,11 @@ function signatureBlock(
   ];
   blocks.forEach(({ name, dni, role, status }, index) => {
     const x = 40 + index * (width + 12);
+    const signature = captured.find(f => f.tipo === (index === 0 ? 'INSPECCIONADO' : 'INSPECTOR'));
+    if (signature?.imagen?.startsWith('data:image/png;base64,')) {
+      doc.image(Buffer.from(signature.imagen.split(',')[1], 'base64'), x + 10, actualY - 2, { fit: [width - 20, 34], align: 'center' });
+      status = 'FIRMA MANUSCRITA EN PANTALLA · ' + new Date(signature.registradaAt).toLocaleDateString('es-AR');
+    }
     doc.moveTo(x, actualY + 34).lineTo(x + width, actualY + 34).lineWidth(0.7).strokeColor(COLORS.line).stroke();
     doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.ink).text(name, x, actualY + 40, { width, align: 'center' });
     if (dni) doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted).text(`DNI ${dni}`, x, actualY + 52, { width, align: 'center' });
@@ -776,11 +783,10 @@ function photoAnnex(
     ];
     const captionHeight = measureInspectionPdfBlocks(doc, caption, doc.page.width - 76);
     const minimumCaption = Math.min(captionHeight, 90);
-    if (index === 0 || doc.y + 212 + Math.min(captionHeight, doc.page.height - 82 - 150 - 212) > doc.page.height - 82) newPhotoPage();
-    if (doc.y + 212 + minimumCaption > doc.page.height - 82) newPhotoPage();
+    newPhotoPage(); // One full, proportional photograph per page; caption stays attached.
     const y = doc.y;
     // Caption height, not a fixed photograph count, determines page breaks.
-    const imageHeight = 205;
+    const imageHeight = Math.max(205, doc.page.height - doc.y - 92 - Math.min(captionHeight, 160));
     doc.roundedRect(34, y, doc.page.width - 68, imageHeight, 4).fill(COLORS.soft);
     const prepared = preparedImages.get(photo.id);
     if (prepared?.buffer) doc.image(prepared.buffer, 38, y + 4, { fit: [doc.page.width - 76, imageHeight - 8], align: 'center', valign: 'center' });
@@ -808,15 +814,28 @@ export async function streamInspectionActPdf(
   resolveEvidence: (key: string) => string,
 ): Promise<void> {
   const actor = actorOf(inspection);
-  const act = actDataOf(inspection);
+  const originalInspection = inspection;
+  const storedAct = actDataOf(inspection);
+  const extra = inspection.datosActa || {};
+  const act = { ...storedAct, requerimientos: [storedAct.requerimientos, extra.medidas?.length ? inspectionMeasureText(extra.medidas) : ''].filter(Boolean).join('\n\n') };
+  const additional = [
+    extra.actividadObservada && `Actividad observada: ${extra.actividadObservada}`,
+    extra.ampliacionEstado && `Instalaciones respecto de lo declarado: ${({ COINCIDE: 'Coincide', DIFIERE: 'Difiere', NO_VERIFICADO: 'No verificado / sin antecedente suficiente', NO_APLICA: 'No aplica' } as Record<string, string>)[extra.ampliacionEstado] || extra.ampliacionEstado}`,
+    extra.ampliacionDetalle && `Diferencias o ampliaciones: ${extra.ampliacionDetalle}`,
+    extra.entornoObservado && `Entorno: ${extra.entornoObservado}`,
+    extra.receptores?.length && `Receptores considerados: ${extra.receptores.join(', ')}`,
+    extra.restriccionReferencia && `Referencia de restricción o antecedente: ${extra.restriccionReferencia}`,
+    extra.ubicacionCampo && `Ubicación confirmada: ${extra.ubicacionCampo.latitud}, ${extra.ubicacionCampo.longitud} (${extra.ubicacionCampo.origen})${extra.ubicacionCampo.precisionMetros != null ? `; precisión GPS ±${extra.ubicacionCampo.precisionMetros} m` : ''}`,
+  ].filter(Boolean).join('\n');
+  inspection = { ...inspection, datosActa: act, observaciones: [inspection.observaciones, additional].filter(Boolean).join('\n\n') };
   const actNumber = value(inspection.numeroActa, inspection.numero);
   const started = dateParts(inspection.iniciadaAt || inspection.fechaProgramada || inspection.createdAt);
   const presentation = buildInspectionFieldActPresentation(inspection);
-  const fingerprint = buildInspectionFieldActFingerprint(inspection);
+  const fingerprint = buildInspectionFieldActFingerprint(originalInspection);
   // The public QR verifies the complete current dossier, while the field-act
   // footer intentionally preserves the frozen field-act fingerprint.
-  const traceFingerprint = buildInspectionDocumentFingerprint(inspection);
-  const traceQr = await buildInspectionPdfQr({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint: traceFingerprint });
+  const traceFingerprint = buildInspectionDocumentFingerprint(originalInspection);
+  const traceQr = inspection.firmasCapturadas?.length ? null : await buildInspectionPdfQr({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint: traceFingerprint });
   const branding = await loadInspectionPdfBranding();
   const fieldEvidence = (inspection.evidencias || []).filter((evidence: any) => !evidence.intercambioId);
   const preparedImages = await prepareInspectionPdfImages(fieldEvidence, resolveEvidence);
@@ -837,7 +856,7 @@ export async function streamInspectionActPdf(
 
   institutionalHeader(doc, actNumber, branding, `Expediente digital ${inspection.numero}`);
   statusBanner(doc, presentation);
-  doc.y = drawInspectionPdfQrCard(doc, traceQr, traceFingerprint, { y: doc.y, title: 'VERIFICAR TRAZABILIDAD DEL ACTA' }) + 8;
+  if (traceQr) doc.y = drawInspectionPdfQrCard(doc, traceQr, traceFingerprint, { y: doc.y, title: 'VERIFICAR TRAZABILIDAD DEL ACTA' }) + 8;
   const newCoverPage = () => {
     doc.addPage();
     institutionalHeader(doc, actNumber, branding, `CONTINUACIÓN · ${inspection.numero}`);
@@ -939,6 +958,24 @@ export async function streamInspectionActPdf(
   doc.y += 55;
   signatureBlock(doc, inspection, act, branding, actNumber);
 
+  if (inspection.firmasCapturadas?.length) {
+    doc.addPage(); institutionalHeader(doc, actNumber, branding, 'CONSTANCIA DE FIRMA EN PANTALLA');
+    writePaginatedText(doc, inspection.firmasCapturadas.map((f: any) => `${f.nombre} · ${f.caracter} · Documento ${f.documento}\n${f.alcance}\nContenido revisado SHA-256: ${f.contenidoSha256}\nCaptura: ${new Date(f.registradaAt).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })}`).join('\n\n'), actNumber, branding);
+    signatureBlock(doc, inspection, act, branding, actNumber);
+  }
+  const locationMap = (originalInspection.datosActa as any)?.ubicacionCampo;
+  if (locationMap) {
+    doc.addPage(); institutionalHeader(doc, actNumber, branding, 'Lugar y entorno de la visita');
+    band(doc, 'Ubicación registrada');
+    doc.moveDown(); doc.font('Helvetica').fontSize(10).fillColor(COLORS.ink).text(`Coordenadas: ${locationMap.latitud}, ${locationMap.longitud} · Origen: ${locationMap.origen}`, 40, doc.y, { width: 510 });
+    if (locationMap.precisionMetros != null) doc.text(`Precisión GPS informada: ±${Math.round(locationMap.precisionMetros)} m`);
+    doc.moveDown();
+    if (locationMap.mapaImagen) {
+      const y = doc.y; doc.image(Buffer.from(locationMap.mapaImagen.split(',')[1], 'base64'), 40, y, { fit: [515, 350], align: 'center' }); doc.y = y + 365;
+      doc.fontSize(8).text('© OpenStreetMap contributors · Referencia del entorno; no representa el límite del predio ni determina restricciones ambientales.', 40, doc.y, { width: 510 });
+    } else doc.text('Sin imagen de mapa guardada. Las coordenadas identifican el punto registrado.', 40, doc.y, { width: 510 });
+    doc.moveDown(); writePaginatedText(doc, [extra.entornoObservado, extra.restriccionReferencia ? 'Referencia verificada: ' + extra.restriccionReferencia : ''].filter(Boolean).join('\n'), actNumber, branding);
+  }
   photoAnnex(doc, inspection, preparedImages, actNumber, branding);
 
   const pages = doc.bufferedPageRange();

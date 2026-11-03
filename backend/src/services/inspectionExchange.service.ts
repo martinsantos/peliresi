@@ -70,7 +70,7 @@ export function exchangePartyForUser(
   inspection: InspectionExchangeAccessTarget,
 ): ParteIntercambioInspeccion | null {
   const role = String(user?.rol || '');
-  if (role === 'ADMIN') return 'AUTORIDAD';
+  if (role === 'ADMIN' || user?.esJefeInspecciones) return 'AUTORIDAD';
   if (role === `ADMIN_${inspection.tipoActor}`) return 'AUTORIDAD';
   if (user?.esInspector && String(user?.id) === inspection.inspectorId) return 'AUTORIDAD';
   const expectedRole = inspection.tipoActor;
@@ -82,7 +82,7 @@ export function exchangePartyForUser(
 
 export function canDecideInspectionExchange(user: any, inspection: InspectionExchangeAccessTarget): boolean {
   const role = String(user?.rol || '');
-  return role === 'ADMIN' || role === `ADMIN_${inspection.tipoActor}`;
+  return Boolean(user?.esJefeInspecciones) || role === 'ADMIN' || role === `ADMIN_${inspection.tipoActor}`;
 }
 
 export function isInspectionExchangeOpen(estado: EstadoInspeccion): boolean {

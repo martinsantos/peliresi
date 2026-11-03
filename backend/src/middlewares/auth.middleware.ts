@@ -1,3 +1,4 @@
+import { hasInspectionManagementRole } from '../services/inspectionManagementRole.service';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Rol } from '@prisma/client';
@@ -20,6 +21,7 @@ export interface AuthUser {
   rol: Rol;
   activo: boolean;
   esInspector: boolean;
+  esJefeInspecciones?: boolean;
   generador: { id: string; [key: string]: unknown } | null;
   transportista: { id: string; [key: string]: unknown } | null;
   operador: { id: string; [key: string]: unknown } | null;
@@ -124,6 +126,7 @@ export const isAuthenticated = async (
       req.user.rolBase = user.rol;
       req.user.rol = activity;
     }
+    req.user.esJefeInspecciones = !req.user.restricted && !impersonatedBy && !enterprise && !activity && await hasInspectionManagementRole(user.id);
     const operational = isActorActivity(req.user.rol) ? req.user[req.user.rol.toLowerCase() as 'generador'|'transportista'|'operador'] : null;
     if (operational?.activo === false && !['GET','HEAD','OPTIONS'].includes(req.method) && !/^\/api\/(?:auth|solicitudes|empresas|notificaciones|soporte)(?:[/?]|$)/.test(req.originalUrl)) {
       throw new AppError('Esta actividad está inactiva. Podés consultar el historial o elegir otra actividad aprobada desde Mi perfil.', 403);

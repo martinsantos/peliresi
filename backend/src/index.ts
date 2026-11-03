@@ -52,7 +52,7 @@ import empresaRoutes from './routes/empresa.routes';
 const syntheticPreview = syntheticPreviewEnabled();
 if (syntheticPreview) assertSyntheticPreviewRuntime({ platform: process.platform, container: existsSync('/.dockerenv'),
   cpu: readFileSync('/sys/fs/cgroup/cpu.max', 'utf8'), memory: readFileSync('/sys/fs/cgroup/memory.max', 'utf8'),
-  swap: readFileSync('/sys/fs/cgroup/memory.swap.max', 'utf8'), ipv4Routes: readFileSync('/proc/net/route', 'utf8'),
+  swap: readFileSync('/sys/fs/cgroup/memory.swap.max', 'utf8'), swapDevices: readFileSync('/proc/swaps', 'utf8'), ipv4Routes: readFileSync('/proc/net/route', 'utf8'),
   ipv6Routes: existsSync('/proc/net/ipv6_route') ? readFileSync('/proc/net/ipv6_route', 'utf8') : '' });
 const verifySyntheticPreviewDatabase = async () => {
   const rows = await prisma.$queryRaw<Array<{ name: string; port: number; address: string; schema: string; directory: string }>>`

@@ -41,7 +41,36 @@ export interface InspectionActor {
   activo?: boolean;
 }
 
+export interface InspectionMeasure {
+  id: string;
+  detalle: string;
+  responsable: string;
+  finalidad: 'DOCUMENTACION' | 'SUBSANACION' | 'DESCARGO';
+  dias?: number;
+  tipoDias?: 'HABILES' | 'CORRIDOS';
+  inicio?: string;
+  vencimiento?: string;
+}
+export interface InspectionFieldLocation {
+  latitud: number; longitud: number;
+  origen: 'GPS' | 'MAPA' | 'MANUAL'; precisionMetros?: number;
+  registradaAt: string; zoom?: number; mapaImagen?: string; mapaZoom?: number;
+}
 export interface InspectionActData {
+  modeloCampo?: 2;
+  motivoTipo?: 'OFICIO' | 'DENUNCIA' | 'SEGUIMIENTO' | 'INCIDENTE';
+  contactoActa?: string;
+  solicitaCopia?: boolean;
+  actividadObservada?: string;
+  ampliacionEstado?: 'COINCIDE' | 'DIFIERE' | 'NO_VERIFICADO' | 'NO_APLICA';
+  ampliacionDetalle?: string;
+  entornoObservado?: string;
+  restriccionReferencia?: string;
+  receptores?: Array<'POBLACION' | 'SUELO' | 'AGUA' | 'AIRE'>;
+  ubicacionCampo?: InspectionFieldLocation;
+  medidas?: InspectionMeasure[];
+  cointervinientes?: Array<{ nombre: string; cargo?: string }>;
+
   codigoPostal?: string;
   departamento?: string;
   calle?: string;
@@ -108,6 +137,7 @@ export interface InspectionItem {
 }
 
 export interface InspectionEvidence {
+  intercambioId?: string | null;
   id: string;
   clienteId?: string | null;
   tipo: InspectionEvidenceType;

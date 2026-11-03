@@ -462,6 +462,7 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
     const activities = await accountActivities(user);
     const contexts = await companyContexts(req.user);
     res.json({ success: true, data: { user: { ...user, rol: req.user.rolBase ? req.user.rol : user.rol, actividades: activities,
+      esJefeInspecciones: Boolean(req.user.esJefeInspecciones),
       ...(req.user.empresaContexto?{generador:req.user.generador,transportista:req.user.transportista,operador:req.user.operador,esInspector:false,empresaContexto:req.user.empresaContexto}:{}),
       ...(process.env.ENTERPRISE_ENABLED==='true'?{contextosEmpresa:contexts}:{}),...(isTrainingSession() ? { training: true } : {}) } } });
   } catch (error) {

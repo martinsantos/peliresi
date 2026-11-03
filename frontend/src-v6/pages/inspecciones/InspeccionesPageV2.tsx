@@ -1,3 +1,4 @@
+import { InspectionManagementPanel } from './InspectionManagementPanel';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, MapPin, Plus, Search, SlidersHorizontal, UserRound } from 'lucide-react';
@@ -71,7 +72,7 @@ const InspeccionesPageV2: React.FC = () => {
   const { isOnline } = useConnectivity({ enablePing: false, debounceMs: 0 });
   const [findingRequest, setFindingRequest] = useState(0);
 
-  const allowed = Boolean(isAdmin || currentUser?.esInspector || currentUser?.rol.startsWith('ADMIN_'));
+  const allowed = Boolean(isAdmin || currentUser?.esJefeInspecciones || currentUser?.esInspector || currentUser?.rol.startsWith('ADMIN_'));
   const listFilters = { estado: state || undefined, estados: phase ? INSPECTION_PHASES[phase].states : undefined, tipoInspeccion: inspectionFilter || undefined, tipoActor: typeFilter || undefined, actorId: actorFilter || undefined, search: search || undefined };
   const inspections = useInspections({ ...listFilters, page, limit: 25 });
   const generadores = useCatalogoGeneradores(findingActorType === 'GENERADOR' || Boolean(actorFilter && typeFilter === 'GENERADOR'));
@@ -116,6 +117,7 @@ const InspeccionesPageV2: React.FC = () => {
   const resumePoint = resumeInspection && currentUser ? readInspectionResume(currentUser.id, resumeInspection.id, owner) : null;
 
   return <div className="min-w-0 space-y-4" data-operational-page>
+    {isAdmin && import.meta.env.VITE_INSPECTION_FIELD_MODEL_ENABLED === 'true' && <InspectionManagementPanel />}
     <PageToolbar label="Acciones de Inspecciones">
       <h2 className="sr-only">Inspecciones</h2>
       <Button variant="outline" onClick={() => { updateFilters({ vista: '' }); setFindingRequest((value) => value + 1); }} aria-label="Denuncia / hallazgo"><span className="sm:hidden">Hallazgo</span><span className="hidden sm:inline">Denuncia / hallazgo</span></Button>

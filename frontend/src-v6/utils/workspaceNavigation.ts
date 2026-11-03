@@ -14,8 +14,8 @@ export const isActorWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?(
   || /^\/(?:(?:app|mobile)\/)?admin\/(?:generadores|operadores)(?:\/|$)/.test(pathname);
 export const isNoticeWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?notificaciones(?:\/|$)/.test(pathname);
 export const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
-export const isInspectionStaff = (user: Pick<User, 'rol' | 'esInspector'> | null | undefined) =>
-  Boolean(user && (user.esInspector || ADMIN_ROLES.includes(user.rol)));
+export const isInspectionStaff = (user: Pick<User, 'rol' | 'esInspector' | 'esJefeInspecciones'> | null | undefined) =>
+  Boolean(user && (user.esJefeInspecciones || user.esInspector || ADMIN_ROLES.includes(user.rol)));
 const catalog: WorkspaceItem[] = [
   {path:'/dashboard', label:'Inicio', icon:Home, section:'main'},
   {path:'/transporte/perfil', label:'Viajes', icon:Truck, section:'main'},
