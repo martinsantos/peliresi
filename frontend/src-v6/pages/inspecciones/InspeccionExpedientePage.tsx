@@ -483,7 +483,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       const newerChanges = draftFingerprint(latest) !== draftFingerprint(submitted);
       currentDraftRef.current = { ...latest, version: saved.version };
       storeDraft(currentDraftRef.current);
-      if (!fromSync) toast.success('Cambios confirmados en el servidor', newerChanges ? 'Hay cambios posteriores pendientes de guardar.' : canEdit ? 'Se guardó el borrador completo. Las fotos pendientes se indican aparte.' : 'El informe técnico quedó versionado sin modificar el acta de campo.');
+      // The persistent live save status confirms this operation without moving the form.
       return !newerChanges;
     } catch (error: unknown) {
       if (!canWriteDraft() || evidenceScopeRef.current !== evidenceScope) return false;
@@ -762,13 +762,13 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const saveDisabled = !draftReady || !canWriteDraft() || Boolean(staleDraft) || syncingEvidence || changingStage || leavingDraft;
   const draftInspection = { ...inspection, items, comparaciones: comparisons, informeTecnico, datosActa, numeroActa, ubicacion, observaciones };
   const context = <div className="space-y-6">
-    <InspectionOrganizationPanel key={`${inspection.id}:${inspection.version}`} onPendingChange={setOrganizationPending} inspection={inspection} admin={isAdmin} backPath={`${mobile ? '/mobile' : ''}/inspecciones`} disabled={!isOnline || currentFingerprint !== serverFingerprint || Boolean(staleDraft) || pendingEvidence.length > 0 || recording || savingDraft || syncingEvidence || !canWriteDraft()} />
-    <div className="grid gap-5 sm:grid-cols-2"><Meta icon={<ClipboardCheck />} label={environmentalInspection ? INSPECTION_TYPES[inspectionType].label : inspection.tipoActor ? 'Actor inspeccionado' : 'Denuncia / hallazgo'} value={actor?.razonSocial || 'Sin responsable identificado'} to={actorRoute || undefined} onNavigate={flushDraft} returnTo={location.pathname + location.search + location.hash} detail={actor?.cuit ? 'CUIT ' + actor.cuit : undefined} /><Meta icon={<UserRound />} label="Inspector" value={inspection.inspector.nombre + ' ' + (inspection.inspector.apellido || '')} /></div>
+    <p className="text-sm leading-relaxed text-neutral-600"><span className="font-semibold">Inspector:</span> {inspection.inspector.nombre} {inspection.inspector.apellido || ''}{actor?.cuit && <span className="block">CUIT del inspeccionado: {actor.cuit}</span>}</p>
     <div className="grid gap-5 border-t border-neutral-200 pt-5 sm:grid-cols-2">
       <label className="text-sm font-semibold text-neutral-700">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
       <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
     </div>
     <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="visita" />
+    <InspectionOrganizationPanel key={`${inspection.id}:${inspection.version}`} onPendingChange={setOrganizationPending} inspection={inspection} admin={isAdmin} backPath={`${mobile ? '/mobile' : ''}/inspecciones`} disabled={!isOnline || currentFingerprint !== serverFingerprint || Boolean(staleDraft) || pendingEvidence.length > 0 || recording || savingDraft || syncingEvidence || !canWriteDraft()} />
     <dl className="grid gap-4 border-t border-neutral-200 pt-5 text-sm sm:grid-cols-2"><div><dt className="text-xs text-neutral-500">Programada</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.fechaProgramada, true)}</dd></div><div><dt className="text-xs text-neutral-500">Inicio de campo</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.iniciadaAt, true)}</dd></div></dl>
   </div>;
   const observationLabel = environmentalInspection ? `Registro de ${INSPECTION_TYPES[inspectionType].label.toLocaleLowerCase('es-AR')}` : inspection.tipoActor ? 'Registro de lo observado' : 'Descripción de la denuncia o hallazgo';
@@ -868,11 +868,11 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
     <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-3">
         <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2">
-          <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0">{workspaceReturn.label}</Button>
+          <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0 px-2">{workspaceReturn.label}</Button>
           <div className="flex shrink-0 items-center gap-1">
           <Button variant="outline" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="hidden lg:inline-flex" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
-            <DropdownTrigger asChild><Button variant="ghost" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span>Descargas</span></Button></DropdownTrigger>
+            <DropdownTrigger asChild><Button variant="ghost" className="px-2" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span>Descargas</span></Button></DropdownTrigger>
             <DropdownContent className="w-72">
               <DropdownLabel>Versión guardada en el servidor</DropdownLabel>
               <DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('expediente')}>Expediente completo · PDF<span className="block text-[11px] font-normal text-neutral-500">Acta, evaluación y fotos en un documento</span></DropdownItem>
@@ -909,6 +909,10 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       </div>
     </details>}
     {recording && <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"><span>Grabando audio de campo</span><Button variant="danger" size="sm" onClick={toggleRecording} leftIcon={<Square size={14} />}>Detener grabación</Button></div>}
+
+    {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
+    {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
+    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} /></fieldset>
     {fieldEditAllowed && <InspectionLegacyRecovery userId={String(currentUser!.id)} inspectionId={inspection.id} owner={owner} destination={`${currentUser!.nombre || 'Mi cuenta'} · ${workspaceRoleLabel(currentUser!.rol)}${currentUser!.empresaContexto ? ' · ' + currentUser!.empresaContexto.razonSocial + ' · ' + (currentUser!.empresaContexto.establecimiento?.nombre || 'Todas las sedes') : ''} · ${inspection.numero}`} disabled={!canEdit || !isOnline || savingDraft || syncingEvidence || changingStage || recoveringDraft} verifyAccess={async () => {
       const scope = evidenceScopeRef.current;
       const fresh = await inspeccionService.get(inspection.id);
@@ -923,9 +927,6 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       if (!saved || !canWriteDraft()) throw new Error('Primero debe confirmarse la copia del trabajo actual.');
       setStaleDraft(reconcileStoredDraft(JSON.parse(raw), current).draft); setLegacyReview(true);
     }} onRecoveredFile={refreshPendingEvidence} />}
-    {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
-    {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
-    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} /></fieldset>
   </div>
   {fieldSaveAction && steps.some(step => step.id === activeSection) && <footer data-testid="inspection-action-bar" className="shrink-0 border-t border-neutral-200 bg-white px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:px-6">{fieldSaveAction}</footer>}
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
