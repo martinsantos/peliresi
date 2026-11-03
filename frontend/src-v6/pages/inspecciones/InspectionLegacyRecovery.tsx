@@ -10,6 +10,8 @@ interface Props {
   onReview: (raw: string) => Promise<void>; onRecoveredFile: () => Promise<void>;
   /** Rendered inside a workspace task, which already has its own heading. */
   embedded?: boolean;
+  /** Where the recovered content shows up; the caller takes the person there, with its save bar. */
+  afterReview?: () => void; afterRecoveredFile?: () => void;
 }
 export function InspectionLegacyRecovery(props: Props) {
   // A previous activity's result/callback must never be reused in this one.
@@ -54,7 +56,7 @@ function ScopedLegacyRecovery(props: Props) {
   const body = <div className={props.embedded ? 'space-y-3 text-sm' : 'space-y-3 border-t border-neutral-200 py-4'}>
       <div className="space-y-1 text-neutral-600">
         <p className="font-semibold text-neutral-800">Este panel no muestra el borrador actual.</p>
-        <p>Lo que escribís ahora se guarda automáticamente por separado. Comprobá su estado junto a Guardar cambios; para enviarlo al servidor, usá ese botón.</p>
+        <p>Lo que escribís ahora se guarda automáticamente por separado. Al revisar o recuperar una copia volvés al paso donde aparece, con su botón Guardar.</p>
         <p>Esta búsqueda revisa sólo copias de versiones anteriores de esta cuenta y expediente, en este dispositivo y navegador. No identifican la actividad de origen. Buscar no recupera ni envía nada automáticamente.</p>
       </div>
       <p className="break-words font-semibold">Destino: {props.destination}</p>
@@ -63,11 +65,11 @@ function ScopedLegacyRecovery(props: Props) {
       {busy && <p role="status" aria-live="polite" aria-atomic="true">{progress}</p>}
       {error && <div role="alert" className="space-y-1 text-error-800"><p>{error}</p><p>No se confirmó el resultado de esta revisión. No se borraron copias. Comprobá la conexión y volvé a buscar antes de recuperar.</p></div>}
       {result && <p role="status" aria-live="polite" aria-atomic="true" className="text-primary-800">{result}</p>}
-      {copies?.texts.map(copy => <TextCopy key={copy.source} raw={copy.raw} source={copy.source} disabled={props.disabled || busy} onReview={() => void run(async () => { if (active.current) { await props.onReview(copy.raw); if (disclosure.current) disclosure.current.open = false; } })} />)}
+      {copies?.texts.map(copy => <TextCopy key={copy.source} raw={copy.raw} source={copy.source} disabled={props.disabled || busy} onReview={() => void run(async () => { if (active.current) { await props.onReview(copy.raw); if (disclosure.current) disclosure.current.open = false; props.afterReview?.(); } })} />)}
       {copies?.files.map(file => <FileCopy key={file.id} file={file} disabled={props.disabled || busy} onRecover={() => void run(async () => {
         await recoverLegacyFieldEvidence(props.userId, props.inspectionId, props.owner, file.id);
         if (!active.current) return;
-        await props.onRecoveredFile(); await refresh();
+        await props.onRecoveredFile(); await refresh(); props.afterRecoveredFile?.();
         if (active.current) setResult('Archivo recuperado en Evidencias. Revisá el texto y el archivo; elegí Guardar y cargar archivo para enviarlos.');
       })} />)}
     </div>;
