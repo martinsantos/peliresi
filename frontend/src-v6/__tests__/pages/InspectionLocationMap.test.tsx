@@ -5,7 +5,7 @@ import type { InspectionFieldLocation } from '../../types/inspection';
 
 // Leaflet does not run in jsdom: the map is reduced to the click handler and the drawn layers.
 const leaflet = vi.hoisted(() => ({ click: undefined as undefined | ((e: { latlng: { lat: number; lng: number } }) => void) }));
-vi.mock('leaflet', () => ({ DomEvent: { disableClickPropagation: vi.fn() }, divIcon: (o: unknown) => o }));
+vi.mock('leaflet', () => ({ divIcon: (o: unknown) => o }));
 vi.mock('../../utils/map-icons', () => ({ ACTOR_ICONS: { inspeccion: {} } }));
 vi.mock('react-leaflet', () => {
   const map = { getZoom: () => 17, setView: vi.fn(), invalidateSize: vi.fn(), getContainer: () => document.createElement('div'), project: () => ({ x: 0, y: 0 }) };
@@ -80,6 +80,12 @@ describe('mapa de la inspección: punto, sector y referencias', () => {
     tap(-32.8895, -68.8395);
     expect(last).toMatchObject({ latitud: -32.8895, longitud: -68.8395, origen: 'MAPA' });
     expect(last?.perimetro).toHaveLength(3); expect(last?.mapaImagen).toBeUndefined();
+  });
+
+  it('ubica «Guardar vista para el acta» fuera del mapa y lo deshabilita sin punto', () => {
+    render(<Harness />);
+    const save = screen.getByRole('button', { name: 'Guardar vista para el acta' }) as HTMLButtonElement;
+    expect(screen.getByTestId('map').contains(save)).toBe(false); expect(save.disabled).toBe(true);
   });
 
   it('en modo lectura muestra el trazado sin controles de edición', () => {

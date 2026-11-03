@@ -1,6 +1,7 @@
-import { DomEvent, divIcon } from 'leaflet';
+import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { CircleMarker, MapContainer, Marker, Polygon, Polyline, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import { ACTOR_ICONS } from '../../utils/map-icons';
 import type { InspectionFieldLocation } from '../../types/inspection';
@@ -52,9 +53,8 @@ function frame(map: ReturnType<typeof useMap>, value: InspectionFieldLocation, w
   }
   throw new Error('frame');
 }
-function MapSnapshot({ value, disabled, onChange, onStatus }: { value?: InspectionFieldLocation; disabled: boolean; onChange: (v: InspectionFieldLocation) => void; onStatus: (s: string) => void }) {
-  const control = useRef<HTMLDivElement>(null);
-  React.useEffect(() => { if (control.current) DomEvent.disableClickPropagation(control.current); }, []);
+/** Rendered below the map through a portal: on a phone, an in-map control covered the drawing. */
+function MapSnapshot({ value, disabled, onChange, onStatus, slot }: { value?: InspectionFieldLocation; disabled: boolean; onChange: (v: InspectionFieldLocation) => void; onStatus: (s: string) => void; slot: HTMLElement | null }) {
   const map = useMap(); const [busy, setBusy] = useState(false); const latest = useRef(value); latest.current = value;
   const capture = async () => {
     if (!value || busy) return; const original = value; setBusy(true); onStatus('Preparando mapa para el acta…');
@@ -96,11 +96,11 @@ function MapSnapshot({ value, disabled, onChange, onStatus }: { value?: Inspecti
     } catch { onStatus('No se pudo guardar el mapa. Revisá la conexión y reintentá; el punto y el trazado permanecen guardados.'); }
     finally { setBusy(false); }
   };
-  return <div ref={control} className="leaflet-bottom leaflet-left" style={{ pointerEvents: 'auto' }}><button type="button" disabled={disabled || !value || busy} onClick={e => { e.stopPropagation(); void capture(); }} onDoubleClick={e => e.stopPropagation()} className="m-2 min-h-11 rounded-lg border border-green-800 bg-white px-3 font-semibold text-green-900 disabled:opacity-50">{busy ? 'Preparando…' : 'Guardar vista para el acta'}</button></div>;
+  return slot ? createPortal(<button type="button" disabled={disabled || !value || busy} onClick={() => void capture()} className="min-h-11 rounded-lg border border-green-800 bg-white px-4 font-semibold text-green-900 disabled:opacity-50">{busy ? 'Preparando…' : 'Guardar vista para el acta'}</button>, slot) : null;
 }
 
 export default function InspectionLocationMap({ value, disabled, onChange }: { value?: InspectionFieldLocation; disabled: boolean; onChange: (v: InspectionFieldLocation) => void }) {
-  const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const [mode, setMode] = useState<Mode>('PUNTO');
+  const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const [mode, setMode] = useState<Mode>('PUNTO'); const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const activeMode: Mode = value ? mode : 'PUNTO';
   const locate = () => {
     if (!navigator.geolocation) { setMessage('Este dispositivo no ofrece GPS. Marcá el lugar en el mapa.'); return; }
@@ -117,8 +117,8 @@ export default function InspectionLocationMap({ value, disabled, onChange }: { v
         className={`min-h-11 rounded-lg border px-2 text-sm font-semibold disabled:opacity-50 ${activeMode === m ? 'border-green-800 bg-green-800 text-white' : 'border-neutral-300 bg-white text-neutral-800'}`}>{{ PUNTO: 'Punto', SECTOR: 'Sector', REFERENCIA: 'Referencia' }[m]}</button>)}
     </div>}
     {!disabled && <p className="text-sm text-neutral-700">{value ? MODE_HELP[activeMode] : 'Primero ubicá el punto inspeccionado; después podés trazar el sector y marcar referencias.'}</p>}
-    <div className="relative z-0 h-72 overflow-hidden rounded-xl border border-neutral-300 sm:h-96" aria-label="Mapa del lugar inspeccionado"><MapContainer center={value ? [value.latitud, value.longitud] : [-32.89, -68.84]} zoom={value?.zoom || 13} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© OpenStreetMap contributors' crossOrigin="anonymous" /><Drawing value={value} mode={activeMode} disabled={disabled} onChange={onChange} onRejected={setMessage} /><MapSnapshot value={value} disabled={disabled} onChange={onChange} onStatus={setMessage} /></MapContainer></div>
-    {!disabled && <button type="button" disabled={busy} onClick={locate} className="min-h-11 rounded-lg border border-green-700 px-4 font-semibold text-green-900">{busy ? 'Obteniendo ubicación…' : 'Usar mi ubicación'}</button>}
+    <div className="relative z-0 h-72 overflow-hidden rounded-xl border border-neutral-300 sm:h-96" aria-label="Mapa del lugar inspeccionado"><MapContainer center={value ? [value.latitud, value.longitud] : [-32.89, -68.84]} zoom={value?.zoom || 13} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© OpenStreetMap contributors' crossOrigin="anonymous" /><Drawing value={value} mode={activeMode} disabled={disabled} onChange={onChange} onRejected={setMessage} /><MapSnapshot value={value} disabled={disabled} onChange={onChange} onStatus={setMessage} slot={slot} /></MapContainer></div>
+    <div className="flex flex-wrap gap-2">{!disabled && <button type="button" disabled={busy} onClick={locate} className="min-h-11 rounded-lg border border-green-700 px-4 font-semibold text-green-900">{busy ? 'Obteniendo ubicación…' : 'Usar mi ubicación'}</button>}<div ref={setSlot} className="contents" /></div>
     <p role="status" className="text-sm text-neutral-600">{message || (value ? `Punto registrado · ${value.latitud.toFixed(6)}, ${value.longitud.toFixed(6)}${value.precisionMetros != null ? ` · precisión GPS ±${Math.round(value.precisionMetros)} m` : ' · marcado manual'}` : 'Todavía no hay un punto registrado. Tocá el mapa o usá el GPS.')}</p>
     {sector.length > 0 && <div className="space-y-2 rounded-lg border border-neutral-200 p-3 text-sm">
       <p className="font-semibold">Sector observado</p>
@@ -135,7 +135,7 @@ export default function InspectionLocationMap({ value, disabled, onChange }: { v
         {!disabled && <button type="button" className="min-h-11 text-sm font-semibold text-red-800 underline" onClick={() => value && onChange(withoutPicture(value, { referencias: references.filter(x => x.id !== r.id).length ? references.filter(x => x.id !== r.id) : undefined }))}>Quitar referencia {i + 1}</button>}
       </li>)}</ol></div>}
     {value?.mapaImagen ? <figure><img src={value.mapaImagen} alt="Vista guardada del lugar inspeccionado para el acta" className="w-full max-w-xl rounded-lg border" /><figcaption className="mt-1 text-xs text-neutral-600">Vista guardada · se incluirá en el acta con la misma numeración. Si cambiás el punto, el sector o las referencias, guardá otra vista.</figcaption></figure>
-      : value && !disabled && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">{drawn ? 'El acta todavía no tiene la vista con el sector y las referencias actuales. Usá «Guardar vista para el acta» en el mapa.' : 'Para incluir el mapa en el acta, usá «Guardar vista para el acta».'}</p>}
+      : value && !disabled && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">{drawn ? 'El acta todavía no tiene la vista con el sector y las referencias actuales. Usá «Guardar vista para el acta», debajo del mapa.' : 'Para incluir el mapa en el acta, usá «Guardar vista para el acta», debajo del mapa.'}</p>}
     <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Ingresar coordenadas</summary><ManualPoint value={value} disabled={disabled} onChange={onChange} /></details>
     <p className="text-xs text-neutral-500">El mapa necesita conexión; el punto y el trazado se conservan en el borrador. Distancias y superficies son aproximadas: no delimitan el predio ni determinan por sí solas el cumplimiento de una restricción ambiental.</p>
   </div>;
