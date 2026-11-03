@@ -14,11 +14,11 @@
     }
   ],
   "stop": "",
-  "peak": 1865408512,
+  "peak": 1497595904,
   "peakStat": {
-    "anon": 1557217280,
-    "active_file": 49983488,
-    "shmem": 86847488
+    "anon": 1287966720,
+    "active_file": 3780608,
+    "shmem": 27791360
   },
   "production": false,
   "emails": false,

@@ -92,10 +92,44 @@ Registro único de esta tanda: defectos, cobertura y pendientes. Continúa [el c
 
 Sólo preview y datos artificiales. Producción, main, workflows y cuentas reales sin cambios. Correos y push apagados; 0 filas enviadas. Sin migraciones nuevas (la de `ADMIN_INSPECCIONES` de la tanda anterior sigue sin aplicarse fuera del preview). En el laboratorio: vigencia de `lab-secrets.json` extendida 10 h (sin rotar secretos, respaldo `.bak-20261103`), relay y bridge reiniciados, API 3048 reiniciada para cada backend; capacitación 3038 intacta. Para compilar dentro de la guarda se liberó caché de páginas del cgroup del contenedor QA y se detuvo la API aislada durante el build; los límites 1 CPU / 2 GiB / sin swap no se modificaron.
 
+## Mapa: sector observado y referencias del entorno (b0eaa71b)
+
+Pedido del usuario del 03/11: marcar la locación y que el mapa sirva para observar vecinos, zona y ampliaciones, en el formulario y en el informe.
+
+- **Formulario (web y app):** sobre el mapa se elige Punto, Sector o Referencia. El sector es un polígono de 3 a 40 vértices con superficie y perímetro aproximados. Las referencias (hasta 20, numeradas) tienen tipo: vivienda, uso sensible, curso de agua, actividad vecina, sector ampliado o no declarado u otra; una descripción breve; y la distancia en línea recta al punto. Se puede deshacer el último vértice, borrar el sector y quitar referencias.
+- **Vista para el acta:** encuadra punto, sector y referencias, y agrega escala, norte, fecha y atribución. Cualquier cambio del trazado descarta la vista anterior y la pantalla avisa que hay que guardarla de nuevo; el acta nunca muestra un dibujo desactualizado.
+- **Actas y expediente en PDF:** debajo de la imagen va el resumen con la misma numeración. Las distancias y la superficie se recalculan desde las coordenadas guardadas. Coordenadas con 6 decimales y origen legible.
+- **Servidor:** esquema opcional (las actas anteriores siguen siendo válidas), estricto y con marcas a 10 km como máximo del punto. No hay migración: se guarda dentro de `datosActa`.
+- **Límite explícito:** es un trazado aproximado del inspector. No delimita el predio inscripto ni decide por sí solo una restricción ambiental. No hay capas oficiales de zonificación: falta definir con la institución qué fuente usar.
+
+| Verificación | Resultado |
+|---|---|
+| Pruebas | Backend 363 (nuevas: 5 de geometría y esquema, y una aserción de texto del acta con `pdftotext`); frontend 108 (6 del mapa con Leaflet simulado) |
+| Navegador | App a 393 px: punto, sector de 4 vértices, 2 referencias con tipo y descripción, vista guardada y guardado en servidor. A 320 px: sin desborde, botones de 44 px, mapa despejado |
+| PDF | Acta y expediente con imagen, resumen y numeración ([captura](evidence/inspection-p0-20261103/capturas/acta-pdf-pagina-mapa.png)) |
+
+Defectos encontrados y corregidos en la revisión:
+1. **El mapa del formulario no cargaba los estilos de Leaflet:** mosaicos, sector y marcadores se dibujaban fuera de lugar. Ya pasaba antes de este cambio ([antes](evidence/inspection-p0-20261103/capturas/defecto-mapa-sin-estilos-antes.jpg)).
+2. **El símbolo «≈» salía como `"H` en el PDF**, porque la fuente estándar no lo tiene. Ahora dice «aprox.».
+3. **«Guardar vista para el acta» tapaba el dibujo a 320 px:** ahora va debajo del mapa.
+4. **Coordenadas con 15 decimales y origen en código (`MAPA`)** en el acta y el expediente.
+5. **La pantalla decía «marcado manual»** para un punto marcado en el mapa.
+6. **El título del marcador no se actualizaba** al editar la descripción.
+
+### Incidente de laboratorio y cambio de contenedor
+
+El 03/11 a las 22:44 UTC el contenedor `sitrep-training-20261103` se detuvo solo. No fue por falta de memoria: el proceso de la capacitación anterior, que gobernaba el contenedor, cumplió su vencimiento programado de 24 h. Al salir detuvo su API y el PostgreSQL efímero compartido. La capacitación no se reinició ni se modificó.
+
+Para continuar sin tocarla:
+- Se copió el directorio de datos efímero (115 MB) a `inspection-model-20261103/pg-data`. El original `/opt/.../ephemeral-pg` quedó intacto.
+- Se creó el contenedor `sitrep-inspection-20261103`, con la misma imagen y los mismos límites: 1 CPU, 2 GiB, sin swap, sin red, sin privilegios agregados y con `--init`.
+- La copia se monta en la ruta que exige la guarda del preview (`/qa/ephemeral-pg`). No se debilitó ninguna guarda.
+- Cada reinicio de la API cierra la sesión del navegador del preview; hay que volver a ingresar.
+
 ## Estado del laboratorio que queda para continuar
 
 - Copia de trabajo: `/Users/santosma/.codex/visualizations/2026/10/17/01a14c11-b01f-7b40-87c5-1672e1d92833/inspection-p0-20261103/repo` (rama local con estos commits; el bare preservado no se modificó). Scripts auxiliares en `../lab/`.
-- Preview sirviendo `28bf6967` (`candidate.json` del laboratorio). Vigencia de `lab-secrets.json` hasta **2026-11-04 07:41 UTC**; respaldo `lab-secrets.json.bak-20261103`.
+- Preview sirviendo `b0eaa71b` (`candidate.json` del laboratorio) desde el contenedor `sitrep-inspection-20261103` (el anterior, `sitrep-training-20261103`, quedó detenido por su vencimiento). Vigencia de `lab-secrets.json` hasta **2026-11-04 07:41 UTC**; respaldo `lab-secrets.json.bak-20261103`.
 - En `/opt/sitrep-qa-isolated-16218-20261101/inspection-model-20261103`: `qa-p0.mjs` (tipos/pruebas/builds), `flow-p0.mjs` (circuito P0), `backend-cycle.sh`, `rebuild-all.sh` (detiene la API, compila y reinicia API y relay), `revoke-live.mjs`, `candidate-76f2c470.json`, copia `build.bak-76f2c470/`.
 - `build/web/qa-correos/` publica en el preview los correos renderizados del último circuito (sólo laboratorio).
 - `results/p0-accounts.json` (contraseña de la cuenta artificial de jefatura) y `results/p0-live-link.json` (enlace artificial vigente), modo 600. No copiarlos al repositorio.
