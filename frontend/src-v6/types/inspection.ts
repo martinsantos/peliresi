@@ -1,3 +1,4 @@
+import type { MapPoint, MapReference } from '../utils/inspectionMapGeometry';
 export type InspectionActorType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
 export type InspectionType = InspectionActorType | 'PETROLEO' | 'AIRE' | 'ESPONTANEA';
 export const INSPECTION_TYPES: Record<InspectionType, { label: string; serie: string }> = {
@@ -55,6 +56,7 @@ export interface InspectionFieldLocation {
   latitud: number; longitud: number;
   origen: 'GPS' | 'MAPA' | 'MANUAL'; precisionMetros?: number;
   registradaAt: string; zoom?: number; mapaImagen?: string; mapaZoom?: number;
+  perimetro?: MapPoint[]; referencias?: MapReference[];
 }
 export interface InspectionActData {
   modeloCampo?: 2;

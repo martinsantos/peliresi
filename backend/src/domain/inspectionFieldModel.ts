@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { distanceMeters, MAP_MAX_DISTANCE_M, MAP_REFERENCE_TYPES } from './inspectionMapGeometry';
 
 /** Versioned, optional additions. Historical acts remain readable without invented defaults. */
 export const inspectionMeasureSchema = z.object({
@@ -11,13 +12,20 @@ export const inspectionMeasureSchema = z.object({
   inicio: z.string().trim().max(300).optional(),
   vencimiento: z.string().datetime().optional(),
 }).strict();
+const mapPointSchema = z.object({ latitud: z.number().finite().min(-90).max(90), longitud: z.number().finite().min(-180).max(180) }).strict();
 export const inspectionLocationSchema = z.object({
   latitud: z.number().finite().min(-90).max(90), longitud: z.number().finite().min(-180).max(180),
   origen: z.enum(['GPS', 'MAPA', 'MANUAL']), precisionMetros: z.number().finite().min(0).max(100000).optional(),
   mapaImagen: z.string().max(1100000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/).optional(),
   mapaZoom: z.number().int().min(2).max(19).optional(),
   registradaAt: z.string().datetime(), zoom: z.number().int().min(2).max(19).optional(),
-}).strict();
+  // Optional approximate drawing; older acts without it stay valid.
+  perimetro: z.array(mapPointSchema).min(3).max(40).optional(),
+  referencias: z.array(mapPointSchema.extend({ id: z.string().min(1).max(100), tipo: z.enum(MAP_REFERENCE_TYPES), etiqueta: z.string().trim().max(160).optional() }).strict()).max(20).optional(),
+}).strict().superRefine((value, ctx) => {
+  for (const [path, points] of [['perimetro', value.perimetro || []], ['referencias', value.referencias || []]] as const)
+    points.forEach((point, index) => { if (distanceMeters(value, point) > MAP_MAX_DISTANCE_M) ctx.addIssue({ code: 'custom', path: [path, index], message: 'El trazado está a más de 10 km del punto inspeccionado. Revisá el mapa.' }); });
+});
 export const inspectionFieldExtensions = {
   modeloCampo: z.literal(2).optional(),
   motivoTipo: z.enum(['OFICIO', 'DENUNCIA', 'SEGUIMIENTO', 'INCIDENTE']).optional(),

@@ -1,5 +1,6 @@
 import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { inspectionMeasureText } from '../domain/inspectionFieldModel';
+import { inspectionMapSummary } from '../domain/inspectionMapGeometry';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
@@ -976,7 +977,8 @@ export async function streamInspectionActPdf(
       const y = doc.y; doc.image(Buffer.from(locationMap.mapaImagen.split(',')[1], 'base64'), 40, y, { fit: [515, 350], align: 'center' }); doc.y = y + 365;
       doc.fontSize(8).text('© OpenStreetMap contributors · Referencia del entorno; no representa el límite del predio ni determina restricciones ambientales.', 40, doc.y, { width: 510 });
     } else doc.text('Sin imagen de mapa guardada. Las coordenadas identifican el punto registrado.', 40, doc.y, { width: 510 });
-    doc.moveDown(); writePaginatedText(doc, [extra.entornoObservado, extra.restriccionReferencia ? 'Referencia verificada: ' + extra.restriccionReferencia : ''].filter(Boolean).join('\n'), actNumber, branding);
+    // Numbering matches the saved image; distances are recomputed from stored coordinates.
+    doc.moveDown(); writePaginatedText(doc, [...inspectionMapSummary(locationMap), extra.entornoObservado, extra.restriccionReferencia ? 'Referencia verificada: ' + extra.restriccionReferencia : ''].filter(Boolean).join('\n'), actNumber, branding);
   }
   photoAnnex(doc, inspection, preparedImages, actNumber, branding);
 
@@ -1036,6 +1038,7 @@ async function streamTypicalInspectionAct(res: Response, inspection: any, resolv
   if(location || act.entornoObservado || act.restriccionReferencia){
     newPage();write('Lugar y entorno',location ? `${location.latitud}, ${location.longitud} · ${location.origen}${location.precisionMetros!=null ? ' · Precisión ±'+location.precisionMetros+' m' : ''}` : inspection.ubicacion);
     if(location?.mapaImagen){const y=doc.y;doc.image(Buffer.from(location.mapaImagen.split(',')[1],'base64'),40,y,{fit:[515,300],align:'center'});doc.y=y+312;}
+    if(location)write('Sector y referencias del entorno',inspectionMapSummary(location).join('\n'));
     write('Referencia cartográfica',location?.mapaImagen?'© OpenStreetMap contributors. La vista guardada no delimita el predio ni determina por sí sola restricciones ambientales.':'No se guardó una imagen de mapa. Las coordenadas identifican el punto registrado.');
     write('Entorno observado',act.entornoObservado);write('Receptores considerados',(act.receptores || []).join(', '));write('Restricción o antecedente identificado',act.restriccionReferencia);
   }
