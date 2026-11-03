@@ -83,4 +83,36 @@ describe('InspectionWorkspace navigation contract', () => {
     expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Visita y lugar', exact: true })).toHaveAttribute('aria-current', 'page');
   });
+  it('offers a visible continuation and keeps unsaved fields mounted across steps', () => {
+    const { onBeforeNavigate } = setup();
+    fireEvent.change(screen.getByLabelText('Ubicación QA'), { target: { value: 'Texto protegido' } });
+    const navigation = screen.getByRole('navigation', { name: 'Continuar el recorrido' });
+    fireEvent.click(within(navigation).getByRole('link', { name: /Continuar:/ }));
+    expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
+    expect(onBeforeNavigate).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('link', { name: 'Visita y lugar', exact: true }));
+    expect(screen.getByLabelText('Ubicación QA')).toHaveValue('Texto protegido');
+  });
+
+  it('protects the draft when continuing from the end of a form', () => {
+    const { onBeforeNavigate } = setup();
+    onBeforeNavigate.mockReturnValue(false);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Continuar el recorrido' })).getByRole('link', { name: /Continuar:/ }));
+    expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
+  });
+
+  it('exposes every review destination without a sideways-only navigation strip', () => {
+    render(<MemoryRouter initialEntries={['/inspecciones/qa#firma']}>
+      <InspectionWorkspace pageScroll guided defaultStep="firma" onBeforeNavigate={() => true}
+        steps={[{ id: 'revision', label: 'Resumen', title: 'Revisión', description: '', content: <p>Resumen del acta</p> }]}
+        reference={['firma', 'informe-tecnico', 'trazabilidad', 'verificacion'].map(id => ({ id, label: id, title: id, description: '', content: <p>{id}</p> }))} />
+    </MemoryRouter>);
+    const nav = screen.getByRole('navigation', { name: 'Apartados de Revisar y firmar' });
+    expect(within(nav).getAllByRole('link')).toHaveLength(5);
+    expect(nav.className).not.toContain('overflow-x-auto');
+    fireEvent.click(within(nav).getByRole('link', { name: 'Verificación', exact: true }));
+    expect(screen.getByRole('region', { name: 'verificacion' })).toBeVisible();
+    expect(screen.getByTestId('inspection-navigation')).not.toHaveClass('sticky');
+  });
+
 });

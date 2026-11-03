@@ -854,14 +854,25 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     }
     returnToWorkspace();
   };
-  return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
+  const defaultSection = reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen';
+  const activeSection = [...steps, ...reference].find(step => step.id === location.hash.slice(1).split('/')[0])?.id || defaultSection;
+  const fieldSaveAction = guided && canWriteDraft() ?
+      <div data-testid="inspection-field-save-bar" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4">
+        <div className="flex min-w-0 basis-full flex-col justify-center sm:min-h-11 sm:flex-1 sm:basis-auto"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
+        {/* Keep the Android editor/keyboard in place until the ordinary click;
+            moving focus on touch-down can move this footer before touch-up. */}
+        <Button aria-label={fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
+        <Button variant="ghost" title="Salir y retomar" className="min-h-11 shrink-0 px-3" aria-label="Guardar y salir de la inspección" leftIcon={<ArrowLeft size={18} />} disabled={!draftReady || recording || dictating || uploadingItemId !== null || syncingEvidence || savingDraft || leavingDraft || changingStage || pendingEvidenceReadFailed} onClick={pauseFieldWork}><span>Salir y retomar</span></Button>
+      </div> : undefined;
+  return <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="inspection-page-frame">
+  <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
     <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-3">
-        <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 items-center justify-between gap-2">
+        <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0">{workspaceReturn.label}</Button>
           <div className="flex shrink-0 items-center gap-1">
-          <Button variant="outline" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
+          <Button variant="outline" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="hidden lg:inline-flex" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
-            <DropdownTrigger asChild><Button variant="ghost" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span className="sr-only">Documentos por separado</span></Button></DropdownTrigger>
+            <DropdownTrigger asChild><Button variant="ghost" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span>Descargas</span></Button></DropdownTrigger>
             <DropdownContent className="w-72">
               <DropdownLabel>Versión guardada en el servidor</DropdownLabel>
               <DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('expediente')}>Expediente completo · PDF<span className="block text-[11px] font-normal text-neutral-500">Acta, evaluación y fotos en un documento</span></DropdownItem>
@@ -914,14 +925,9 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     }} onRecoveredFile={refreshPendingEvidence} />}
     {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
     {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
-    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && canWriteDraft() ?
-      <div data-testid="inspection-field-save-bar" className="flex min-w-0 items-center gap-2 sm:gap-4">
-        <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
-        {/* Keep the Android editor/keyboard in place until the ordinary click;
-            moving focus on touch-down can move this footer before touch-up. */}
-        <Button aria-label={fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
-        <Button variant="ghost" title="Salir y retomar" className="h-11 w-11 shrink-0 px-0 sm:w-auto sm:px-3" aria-label="Guardar y salir de la inspección" leftIcon={<ArrowLeft size={18} />} disabled={!draftReady || recording || dictating || uploadingItemId !== null || syncingEvidence || savingDraft || leavingDraft || changingStage || pendingEvidenceReadFailed} onClick={pauseFieldWork}><span className="hidden sm:inline">Salir y retomar</span></Button>
-      </div> : undefined} /></fieldset>
+    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} /></fieldset>
+  </div>
+  {fieldSaveAction && steps.some(step => step.id === activeSection) && <footer data-testid="inspection-action-bar" className="shrink-0 border-t border-neutral-200 bg-white px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:px-6">{fieldSaveAction}</footer>}
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
     <input ref={fileRef} aria-label="Adjuntar archivo general" type="file" accept={INSPECTION_EVIDENCE_ACCEPT} className="hidden" onChange={uploadFromInput} />
   </div>;
