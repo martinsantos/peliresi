@@ -63,7 +63,7 @@ describe('staff reply to a limited-link presentation', () => {
   it('drops a stored reply that already appears published', () => {
     localStorage.setItem(`sitrep_acta_reply_draft_v1:${ctx()}`, JSON.stringify({ v: 1, replies: { 'pres-1': { texto: reply, clienteId: '', savedAt: new Date().toISOString() } } }));
     open(inspection([presentation, { id: 'ans', tipo: 'ACTA_PRESENTACION_RESPONDIDA', detalle: reply, metadata: { respondeAId: 'pres-1' }, createdAt: new Date().toISOString() }]));
-    expect(box().value).toBe('');
+    expect(screen.queryByLabelText('Respuesta al inspeccionado')).toBeNull();
     expect(readReplyDrafts(ctx())['pres-1']).toBeUndefined();
   });
 
@@ -74,6 +74,13 @@ describe('staff reply to a limited-link presentation', () => {
     expect(screen.getByText('1 presentación pendiente de respuesta · 1 respondidas')).toBeTruthy();
     const order = screen.getAllByText(/Consulta (antigua|reciente)/).map(node => node.textContent);
     expect(order).toEqual(['Consulta antigua sin respuesta.', 'Consulta reciente ya respondida.']);
+  });
+
+  it('folds the follow-up form of an answered presentation', () => {
+    open(inspection([presentation, { id: 'ans', tipo: 'ACTA_PRESENTACION_RESPONDIDA', detalle: 'Respuesta.', metadata: { respondeAId: 'pres-1' }, createdAt: new Date().toISOString() }]));
+    expect(screen.queryByLabelText('Respuesta al inspeccionado')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar otra respuesta' }));
+    expect(box()).toBeTruthy();
   });
 
   it('shows what mail was prepared and that it was not sent', async () => {
