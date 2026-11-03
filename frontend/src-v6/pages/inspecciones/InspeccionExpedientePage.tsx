@@ -890,7 +890,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       </div> : undefined;
   return <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="inspection-page-frame">
   <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
-    <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-3">
+    <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-1.5 sm:gap-3">
         <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0 px-2">{workspaceReturn.label}</Button>
           <div className="flex shrink-0 items-center gap-1">
@@ -1006,8 +1006,9 @@ function DossierReadinessPanel({ readiness }: { readiness: InspectionDossierRead
 function Meta({ icon, label, value, detail, to, onNavigate, returnTo }: { icon: React.ReactNode; label: string; value: string; detail?: string; to?: string; onNavigate?: () => boolean; returnTo?: string }) { return <div className="flex gap-3"><span className="mt-0.5 shrink-0 text-neutral-500 [&>svg]:h-[19px] [&>svg]:w-[19px]">{icon}</span><div className="min-w-0"><p className="text-xs text-neutral-500">{label}</p>{to ? <Link to={to} state={{ inspectionReturn: returnTo }} onClick={event => { if (onNavigate?.() === false) event.preventDefault(); }} className="rounded-sm font-bold text-[#10213A] transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label={`Abrir ${label.toLowerCase()}: ${value}`}>{value}</Link> : <p className="font-bold text-[#10213A]">{value}</p>}{detail && <p className="text-xs text-neutral-500">{detail}</p>}</div></div>; }
 function DraftSaveFeedback({ status }: { status: DraftSaveStatus }) {
   const color = status.tone === 'error' ? 'text-error-800' : status.tone === 'success' ? 'text-success-800' : 'text-neutral-700';
-  const compact = status.tone === 'success' ? 'Guardado en SITREP' : status.message === 'Guardando cambios en el servidor…' ? 'Guardando…' : status.message.startsWith('Solo en este dispositivo') ? 'Sin guardar en SITREP' : status.message === 'Falta guardar en servidor.' ? 'Cambios sin confirmar' : status.message;
-  return <p role="status" aria-label={status.message} aria-live="polite" className={'text-sm font-medium leading-snug ' + color}>{compact !== status.message ? <><span className="sm:hidden" aria-hidden="true">{compact}</span><span className="max-sm:sr-only">{status.message}</span></> : status.message}</p>;
+  // On a phone the status shares one row with two buttons: one or two words, never a sentence.
+  const compact = status.tone === 'success' ? 'Guardado' : status.message === 'Guardando cambios en el servidor…' ? 'Guardando…' : status.message.startsWith('Solo en este dispositivo') || status.message === 'Falta guardar en servidor.' ? 'Sin guardar' : status.message;
+  return <p role="status" aria-label={status.message} aria-live="polite" className={'text-sm font-medium leading-snug max-sm:text-xs max-sm:line-clamp-2 ' + color}>{compact !== status.message ? <><span className="sm:hidden" aria-hidden="true">{compact}</span><span className="max-sm:sr-only">{status.message}</span></> : status.message}</p>;
 }
 
 function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionItem[]; activeId?: string; onSelect: (item: InspectionItem) => void }) {
