@@ -371,7 +371,7 @@ function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any, unified = f
       target,
       `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)}`,
       evidence.creadoPor ? `Incorporada por ${`${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim()}` : 'Autor sin informar',
-      evidence.latitud != null && evidence.longitud != null ? `Coordenadas ${evidence.latitud}, ${evidence.longitud}` : '',
+      evidence.latitud != null && evidence.longitud != null ? `Coordenadas ${Number(evidence.latitud).toFixed(6)}, ${Number(evidence.longitud).toFixed(6)}` : '',
     ].filter(Boolean).join(' · ');
     const details = [
       evidence.descripcion && !(unified && evidence.tipo === 'FOTO' && !evidence.anuladaAt && !evidence.intercambioId) ? `Descripción: ${evidence.descripcion}` : '',
@@ -609,7 +609,7 @@ function unifiedFieldAct(doc: PDFKit.PDFDocument, inspection: any) {
   const fields = [
     ['Código postal', act.codigoPostal], ['Departamento', act.departamento],
     ['Domicilio constatado', [act.calle || inspection.ubicacion || actor.domicilio, act.numeroDomicilio].filter(Boolean).join(' ')],
-    ['Coordenadas', inspection.latitud != null && inspection.longitud != null ? `${inspection.latitud}, ${inspection.longitud}` : ''],
+    ['Coordenadas', inspection.latitud != null && inspection.longitud != null ? `${Number(inspection.latitud).toFixed(6)}, ${Number(inspection.longitud).toFixed(6)}` : ''],
     ['Titular', act.titular || actor.representanteLegalNombre], ['DNI del titular', act.dniTitular || actor.representanteLegalDNI],
     ['Teléfono', actor.telefono], ['Correo', actor.email],
     ['Atendido por', act.atendidoPor], ['DNI del interviniente', act.dniAtendido], ['Cargo', act.cargoAtendido],
