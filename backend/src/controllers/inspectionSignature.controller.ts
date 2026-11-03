@@ -41,7 +41,7 @@ export async function signInspectionAct(req: AuthRequest, res: Response, next: N
         if (previous.usuarioId !== req.user.id || meta.contenidoSha256 !== input.contenidoSha256 || meta.firma.sha256 !== signature.sha256 || meta.firma.nombre !== input.nombre || meta.firma.documento !== input.documento || meta.firma.caracter !== input.caracter || meta.firma.tipo !== input.tipo) throw new AppError('El identificador de firma ya corresponde a otra operación.', 409);
         return { id: previous.id, contenidoSha256: meta.contenidoSha256, version: meta.version };
       }
-      const reserved = await tx.inspeccion.updateMany({ where: { id: initial.id, version: input.version, estado: { in: ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'] } }, data: { version: { increment: 1 } } });
+      const reserved = await tx.inspeccion.updateMany({ where: { id: initial.id, version: input.version, estado: { in: ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'] } }, data: { version: { increment: 1 }, ...(input.tipo === 'INSPECCIONADO' ? { datosActa: { ...((initial.datosActa || {}) as Record<string, unknown>), firmaIntervinienteEstado: 'FIRMADA', firmaIntervinienteDetalle: `Firma manuscrita registrada de ${input.nombre}; lectura y recepción, sin conformidad con los hallazgos.` } as Prisma.InputJsonValue } : {}) } });
       if (reserved.count !== 1) throw new AppError('El acta cambió. Revisá la versión actual antes de volver a firmar.', 409);
       const current = await tx.inspeccion.findUniqueOrThrow({ where: { id: initial.id }, include: inspectionInclude });
       if (!canAccessInspection(req.user, current)) throw new AppError('La asignación del expediente cambió.', 403);

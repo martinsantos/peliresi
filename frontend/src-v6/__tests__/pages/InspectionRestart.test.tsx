@@ -1,3 +1,4 @@
+vi.mock('../../pages/inspecciones/InspectionLocationMap', () => ({ default: () => <div>Mapa de prueba</div> }));
 import { inspectionFieldDraftKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -208,12 +209,13 @@ describe('inspection process restart with real asynchronous draft ownership', ()
     fireEvent(window, new Event('pagehide'));
     const durableCopy = localStorage.getItem(key)!;
     expect(JSON.parse(durableCopy)).toMatchObject({ version: 1, observaciones: 'Descripción inicial QA' });
-    fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visita y lugar', exact: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Iniciar visita', exact: true }));
     await waitFor(() => expect(server.estado).toBe('EN_CAMPO'));
     fireEvent.change(await editor(), { target: { value: 'Comentario confirmado después de iniciar' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios', exact: true }));
-    await waitFor(() => expect(toasts.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+    await waitFor(() => expect(server.observaciones).toBe('Comentario confirmado después de iniciar'));
+    expect(screen.getByRole('button', { name: 'Guardar cambios', exact: true })).toBeDisabled();
     expect(server.version).toBe(4);
     expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ version: 4, observaciones: server.observaciones });
     await reopen(tree, durableCopy);

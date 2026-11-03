@@ -31,3 +31,21 @@
 
 ## Seguridad operativa
 Producción, main y workflows intactos. CAP directo cerrado. Base nueva y aislada inspection_field_20261103 en PostgreSQL efímero de QA; todos los registros artificiales. API 3048 y relay privado propios, sin alterar las cuentas/servicios de capacitación existentes. Trabajos automáticos y canales salientes pausados. QA remota, un worker por suite y contenedores limitados a 1 CPU/2 GiB sin swap; hubo un solapamiento breve entre la comprobación final de tipos/tests y una compilación, documentado sin presentarlo como ejecución serial completa.
+
+## Refactor del recorrido — 03/11, segunda revisión
+
+- Cuatro pasos visibles: Visita, Constatar, Evidencias y Finalizar. Una tarea abierta; formularios visitados conservados, sin una segunda fila de pestañas.
+- Encabezado y tareas se desplazan; la barra inferior ocupa espacio propio. Más ancho útil en móviles de 320 px.
+- Guardar y continuar confirma el servidor antes de avanzar. Fallo y reintento cubiertos sin perder texto ni navegar prematuramente.
+- Expediente, historial y verificación quedan bajo Expediente y seguimiento. Lectura posterior al cierre separada del formulario editable.
+- Pendientes administrativos agrupados con destino concreto. Firma del inspeccionado sincroniza la constancia administrativa; firma del inspector no la sustituye. No se quitaron requisitos administrativos existentes.
+- Valores técnicos de lectura del acta traducidos a etiquetas humanas.
+
+### Evidencia técnica de esta revisión
+- Tipos backend y frontend: aprobados. Backend 158 pruebas únicas/12 archivos; frontend 86 pruebas únicas/9 archivos. Las repeticiones no suman cobertura.
+- Compilaciones backend, web y app aprobadas; nueva compilación final de web/app registrada en results/front.json.
+- Navegador app: visita → cerrar/reabrir y recuperar → hechos → control → contraste Y8/Y12 → foto y descripción → lectura/firma sintética → enlace sin enviar → consulta del destinatario → respuesta del inspector visible al destinatario → envío a revisión.
+- Navegador web: devolución a campo, edición y guardado, controles/contraste/evidencias compartidas con app, firma sintética, cierre de campo, informe técnico, plazo y aprobación administrativa del caso artificial.
+- Creación web de un segundo expediente artificial; recuperación de Persona que atiende tras cerrar/reabrir. Inicio de visita comprobado.
+- Caso completo QA-CAMPO-0001; segunda práctica GRP-2026-00001. Son datos artificiales exclusivos del esquema de QA.
+- No se valida Android físico ni comprensión con participantes. Los pendientes de correo automático y recuperación de presentaciones/respuestas del apartado anterior siguen abiertos: no confundirlos con la recuperación del acta probada aquí.

@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { saveInspectionResume } from '../../services/inspectionResume';
-import { Eye, FileSearch } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, FolderOpen } from 'lucide-react';
+import { inspectionJourney, inspectionTaskLabel } from './inspectionJourney';
 
 export interface InspectionWorkspaceStep {
   id: string;
@@ -21,25 +22,14 @@ interface Props {
   guided: boolean;
   defaultStep: string;
   pageScroll?: boolean;
+  continuationManaged?: boolean;
   saveAction?: React.ReactNode;
   onBeforeNavigate: () => boolean | void;
   resumeIdentity?: { userId: string | number; inspectionId: string; owner: string };
 }
 
-const sections = [
-  { label: 'Visita y lugar', mobileLabel: 'Visita', ids: ['resumen', 'contexto'] },
-  { label: 'Constataciones', mobileLabel: 'Controles', ids: ['acta', 'checklist', 'declaracion'] },
-  { label: 'Evidencias', mobileLabel: 'Evidencias', ids: ['evidencias'] },
-  { label: 'Revisar y firmar', mobileLabel: 'Revisión', ids: ['revision', 'firma', 'informe-tecnico', 'intercambios', 'trazabilidad', 'verificacion'] },
-];
-const labels: Record<string, string> = {
-  checklist: 'En campo', declaracion: 'Datos declarados', acta: 'Lo observado',
-  firma: 'Leer y firmar', evidencias: 'Fotos y archivos', revision: 'Resumen y cierre', 'informe-tecnico': 'Evaluación técnica',
-  intercambios: 'Comunicaciones', trazabilidad: 'Historial', verificacion: 'Verificación',
-};
-
 /** Direct navigation. Existing deep links, drafts and file selections remain valid. */
-export function InspectionWorkspace({ steps, reference, defaultStep, saveAction, onBeforeNavigate, resumeIdentity, pageScroll = false }: Props) {
+export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate, resumeIdentity, pageScroll = false, continuationManaged = false }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -47,7 +37,11 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   const scrollRef = useRef<HTMLDivElement>(null);
   const [constrainedViewport, setConstrainedViewport] = useState(false);
   const scrollPositions = useRef(new Map<string, number>());
-  const all = [...steps, ...reference];
+  const orderedIds = inspectionJourney.flatMap(section => section.ids);
+  const all = [...steps, ...reference].sort((a, b) => {
+    const ai = orderedIds.indexOf(a.id), bi = orderedIds.indexOf(b.id);
+    return (ai < 0 ? 100 : ai) - (bi < 0 ? 100 : bi);
+  });
   let hash = location.hash.slice(1);
   try { hash = decodeURIComponent(hash); } catch { /* Invalid links fall back safely. */ }
   const active = all.find((step) => step.id === hash.split('/')[0])
@@ -55,7 +49,8 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   const scrollStepRef = useRef(active.id);
   const [visited, setVisited] = useState<Set<string>>(() => new Set([active.id]));
   if (!visited.has(active.id)) setVisited(new Set([...visited, active.id]));
-  const availableSections = sections.map((section) => ({ ...section, entries: section.ids.flatMap((id) => all.filter((step) => step.id === id)) })).filter((section) => section.entries.length);
+  const availableSections = inspectionJourney.map((section) => ({ ...section, entries: section.ids.flatMap((id) => all.filter((step) => step.id === id)) })).filter((section) => section.entries.length);
+  const supplemental = all.filter(step => !inspectionJourney.some(section => section.ids.includes(step.id)));
   const selectedSection = availableSections.find((section) => section.ids.includes(active.id));
   const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
   const resumeLabel = selectedAnchor ? active.label + ' · ' + selectedAnchor.label : active.label;
@@ -165,32 +160,56 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   };
 
   return <div ref={workspaceRef} data-testid="inspection-workspace" data-inspection-scroll={!pageScroll && constrainedViewport ? '' : undefined} data-constrained-viewport={constrainedViewport || undefined} className={(pageScroll ? 'shrink-0 ' : 'h-full ') + 'flex min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]' + (!pageScroll && constrainedViewport ? ' overflow-y-auto overscroll-contain [overflow-anchor:none]' : '')} onScroll={(event) => { if (!pageScroll && constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
-    <div data-testid="inspection-navigation" className={(pageScroll || constrainedViewport ? 'relative' : 'sticky top-0') + ' z-20 shrink-0 rounded-t-xl bg-white'}>
-      <nav aria-label="Secciones del expediente" className="flex gap-1 border-b border-neutral-200 bg-neutral-100 p-2">
-        {availableSections.map((section) => <a key={section.label} aria-label={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'page' : undefined} onClick={(event) => go(event, section.entries[0])}
-          className={'flex min-h-[68px] [@media(max-height:500px)]:min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-lg px-1 text-xs font-semibold !no-underline transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-14 sm:flex-row sm:gap-3 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white focus-visible:text-white' : 'text-neutral-700 hover:bg-white hover:text-neutral-900')}><span aria-hidden="true" className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold leading-none tabular-nums ' + (selectedSection === section ? 'bg-white/20 text-white' : 'bg-white text-neutral-600')}>{sections.findIndex(entry => entry.label === section.label) + 1}</span><span className="text-center text-[11px] leading-4 sm:hidden">{section.mobileLabel}</span><span className="hidden leading-5 sm:inline">{section.label}</span></a>)}
+    <div data-testid="inspection-navigation" className="relative shrink-0 rounded-t-xl bg-white">
+      <nav aria-label="Secciones del expediente" className="grid grid-cols-4 gap-1 border-b border-neutral-200 p-2">
+        {availableSections.map(section => <a key={section.label} aria-label={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'step' : undefined} onClick={event => go(event, section.entries[0])}
+          className={'flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-lg px-1 py-2 text-xs font-semibold !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white' : 'text-neutral-600 hover:bg-neutral-100')}>
+          <span aria-hidden="true" className="hidden sm:inline">{inspectionJourney.indexOf(inspectionJourney.find(entry => entry.label === section.label)!) + 1}.</span>
+          <span className="text-center leading-4 sm:hidden">{section.mobileLabel}</span><span className="hidden sm:inline">{section.label}</span>
+        </a>)}
       </nav>
-      {selectedSection && selectedSection.entries.length > 1 && <nav aria-label={'Apartados de ' + selectedSection.label} className="grid grid-cols-2 gap-1 border-b border-primary-200 bg-primary-50 p-2 sm:flex sm:flex-wrap">
-        {selectedSection.entries.map((step) => <a key={step.id} href={'#' + step.id} aria-current={active.id === step.id ? 'page' : undefined} onClick={(event) => go(event, step)}
-          className={'flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-md border px-2 py-2 text-center text-sm !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-3 ' + (active.id === step.id ? 'border-primary-300 bg-white font-bold text-primary-900' : 'border-transparent text-neutral-700 hover:bg-white')}>{step.id === 'checklist' && <Eye size={18} aria-hidden="true" />}{step.id === 'declaracion' && <FileSearch size={18} aria-hidden="true" />}{labels[step.id] || step.label}</a>)}
-      </nav>}
+      <div className="px-4 py-4 sm:px-6">
+        <p className="text-xs font-medium text-primary-800">{guided && selectedSection ? 'Paso ' + (inspectionJourney.findIndex(section => section.label === selectedSection.label) + 1) + ' de 4' : 'Consulta del expediente'}</p>
+        <h2 className="mt-1 text-xl font-bold text-neutral-900">{guided ? selectedSection?.title || active.title : active.title}</h2>
+        <p className="mt-1 text-sm leading-relaxed text-neutral-600">{guided ? selectedSection?.description || active.description : active.description}</p>
+      </div>
     </div>
-    <div ref={contentRef} data-inspection-scroll={pageScroll || constrainedViewport ? undefined : ''} data-testid="inspection-scroll-region" className={`min-h-0 scroll-pt-14 scroll-pb-4 rounded-b-xl [overflow-anchor:none] after:block after:h-[var(--inspection-scroll-reserve,0px)] after:content-[''] ${pageScroll || constrainedViewport ? 'shrink-0 overflow-visible' : 'flex-1 overflow-y-auto overscroll-contain'}`} onScroll={(event) => { if (!pageScroll && !constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
-    {active.nextAction && <div data-testid="inspection-start" className="border-b border-primary-200 bg-primary-50 p-4 sm:p-6"><h2 className="mb-1 text-lg font-bold text-primary-900">Comenzar el recorrido</h2><p className="mb-3 text-sm leading-relaxed text-neutral-800">Al iniciar se registra la hora y se abre el trabajo de campo.</p>{active.nextAction}</div>}
-    {/* Hidden sections remain mounted to protect local drafts and selected files. */}
-    {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className={`min-w-0 space-y-6 ${step.id === 'intercambios' ? 'p-0 sm:p-6' : 'p-4 sm:p-6'} [&>section]:shadow-none [&>div]:shadow-none`}>
-      {(step.id === active.id || visited.has(step.id)) && step.content}
-    </section>)}
-    {(() => {
-      const ordered = availableSections.flatMap(section => section.entries);
-      const index = ordered.findIndex(step => step.id === active.id);
-      const previous = ordered[index - 1], next = ordered[index + 1];
-      return <nav aria-label="Continuar el recorrido" className="flex flex-wrap justify-between gap-3 border-t border-neutral-200 p-4">
-        {previous && <a href={'#' + previous.id} onClick={event => go(event, previous)} className="flex min-h-11 min-w-0 items-center rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-primary-800 !no-underline">← {labels[previous.id] || previous.label}</a>}
-        {next && <a href={'#' + next.id} onClick={event => go(event, next)} className="ml-auto flex min-h-11 min-w-0 items-center rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-900 !no-underline">Continuar: {labels[next.id] || next.label} →</a>}
-      </nav>;
-    })()}
+    <div ref={contentRef} data-inspection-scroll={pageScroll || constrainedViewport ? undefined : ''} data-testid="inspection-scroll-region" className={`min-h-0 scroll-pt-4 scroll-pb-4 rounded-b-xl [overflow-anchor:none] ${pageScroll || constrainedViewport ? 'shrink-0 overflow-visible' : 'flex-1 overflow-y-auto overscroll-contain'}`} onScroll={event => { if (!pageScroll && !constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
+      {active.nextAction && <div data-testid="inspection-start" className="mx-4 mb-4 rounded-lg border border-primary-200 bg-primary-50 p-4 sm:mx-6"><p className="mb-3 text-sm">Iniciá la visita para registrar el trabajo en campo.</p>{active.nextAction}</div>}
+      {/* One task expands at a time. Visited forms stay mounted, including file selections. */}
+      {all.map(step => {
+        const inGroup = selectedSection?.ids.includes(step.id);
+        const visible = inGroup || step.id === active.id;
+        const expanded = step.id === active.id;
+        return <div key={step.id} hidden={!visible} className="mb-3 min-w-0 border-y border-neutral-200 sm:mx-6 sm:rounded-lg sm:border">
+          {selectedSection && selectedSection.entries.length > 1 && <a href={'#' + step.id} onClick={event => go(event, step)} aria-expanded={expanded} aria-controls={'inspection-task-' + step.id} className={'flex min-h-14 items-center justify-between gap-3 rounded-t-lg px-4 py-3 !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 ' + (expanded ? 'bg-primary-50 text-primary-900' : 'text-neutral-800 hover:bg-neutral-50')}>
+            <span className="min-w-0"><span className="block text-sm font-bold">{inspectionTaskLabel(step)}</span>{step.detail && <span className="mt-0.5 block text-xs font-normal text-neutral-600">{step.detail}</span>}</span>
+            <ChevronDown size={18} aria-hidden="true" className={'shrink-0 ' + (expanded ? 'rotate-180' : '')} />
+          </a>}
+          <div id={'inspection-task-' + step.id} hidden={!expanded}>
+            <section aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={expanded ? 'inspection-step-content' : undefined} className="min-w-0 space-y-6 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
+              {(expanded || visited.has(step.id)) && step.content}
+            </section>
+          </div>
+        </div>;
+      })}
+      {!continuationManaged && (() => {
+        const ordered = availableSections.flatMap(section => section.entries);
+        const index = ordered.findIndex(step => step.id === active.id);
+        if (index < 0) return null;
+        const previous = ordered[index - 1], next = ordered[index + 1];
+        return <nav aria-label="Continuar el recorrido" className="flex flex-wrap justify-between gap-3 border-t border-neutral-200 p-4">
+          {previous && <a href={'#' + previous.id} onClick={event => go(event, previous)} className="flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold !no-underline"><ArrowLeft size={16} />{inspectionTaskLabel(previous)}</a>}
+          {next && <a href={'#' + next.id} onClick={event => go(event, next)} className="ml-auto flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-3 py-2 text-sm font-semibold text-white !no-underline">Continuar: {inspectionTaskLabel(next)}<ArrowRight size={16} /></a>}
+        </nav>;
+      })()}
+      {supplemental.length > 0 && <details open={!selectedSection || undefined} className="border-t border-neutral-200 px-4 py-2 sm:px-6">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-neutral-700"><FolderOpen size={18} />Expediente y seguimiento<ChevronDown size={16} className="ml-auto" /></summary>
+        <nav aria-label="Expediente y seguimiento" className="grid gap-2 pb-3 sm:grid-cols-2">
+          {supplemental.map(step => <a key={step.id} href={'#' + step.id} onClick={event => go(event, step)} aria-current={active.id === step.id ? 'page' : undefined} className="flex min-h-11 items-center rounded-lg border border-neutral-200 px-3 py-2 text-sm font-semibold text-primary-800 !no-underline">{inspectionTaskLabel(step)}</a>)}
+        </nav>
+      </details>}
     </div>
-    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className={'shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6' + (pageScroll || constrainedViewport ? ' sticky bottom-0 z-20' : '')}>{saveAction}</footer>}
+    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className="shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6">{saveAction}</footer>}
   </div>;
 }

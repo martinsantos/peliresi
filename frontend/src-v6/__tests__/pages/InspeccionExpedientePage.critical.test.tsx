@@ -1,3 +1,4 @@
+vi.mock('../../pages/inspecciones/InspectionLocationMap', () => ({ default: () => <div>Mapa de prueba</div> }));
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -214,7 +215,23 @@ describe('InspeccionExpedientePage critical review UX', () => {
     fireEvent.click(button);
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
     expect(inspeccionService.saveDraft).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ observaciones: 'Comentario de campo confirmado por una acción explícita.' }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Guardado en servidor.' })).toBeVisible());
+  });
+
+  it('does not continue when the server fails to confirm saving, then retries successfully', async () => {
+    const { inspeccionService } = await import('../../services/inspeccion.service');
+    vi.mocked(inspeccionService.saveDraft).mockRejectedValueOnce(new Error('offline'));
+    const view = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#acta');
+    const editor = await waitFor(() => { const field = view.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
+    fireEvent.change(editor, { target: { value: 'Este texto debe sobrevivir a un fallo al continuar.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar a Controles en campo' }));
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar y continuar a Controles en campo' })).toBeEnabled());
+    expect(editor).toBeVisible();
+    expect(editor).toHaveValue('Este texto debe sobrevivir a un fallo al continuar.');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar a Controles en campo' }));
+    expect(await screen.findByRole('region', { name: 'Recorrido de campo' })).toBeVisible();
+    expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(2);
   });
 
   it('retains ordinary keyboard activation of save', async () => {
@@ -229,18 +246,16 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(button).toHaveFocus();
     fireEvent.click(button, { detail: 0 });
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Guardado en servidor.' })).toBeVisible());
   });
 
-  it('prioritizes the editable technical report in its own step during review', async () => {
+  it('opens review first and keeps the technical report available separately', async () => {
     renderPage(inspectionFixture());
-
-    const editor = await screen.findByRole('region', { name: /informe técnico para legales/i });
-    expect(editor).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /vista consolidada del expediente/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('link', { name: 'Resumen y cierre', exact: true }));
-    expect(await screen.findByRole('heading', { name: /vista consolidada del expediente/i })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: /informe técnico para legales/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Revisar y enviar' })).toBeVisible();
+    fireEvent.click(screen.getByText('Expediente y seguimiento', { selector: 'summary' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Informe técnico', exact: true }));
+    expect(await screen.findByRole('region', { name: /informe técnico para legales/i })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: /vista consolidada del expediente/i })).toBeNull();
   });
 
   it('lists approval blockers and disables approval while the dossier is incomplete', async () => {
@@ -262,7 +277,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     }), false, '#revision');
 
     const readiness = await screen.findByTestId('inspection-dossier-readiness');
-    expect(within(readiness).getByRole('heading', { name: /preparación para aprobar/i })).toBeInTheDocument();
+    expect(within(readiness).getByRole('heading', { name: /pendientes de revisión administrativa/i })).toBeInTheDocument();
     expect(within(readiness).getByText(/número de acta/i)).toBeInTheDocument();
     expect(within(readiness).getByText(/objetivo(?: del informe)? técnico/i)).toBeInTheDocument();
     expect(within(readiness).getByText(/plazo de respuesta/i)).toBeInTheDocument();
@@ -270,6 +285,8 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(within(readiness).getByText(/libro de registro de operaciones/i)).toBeInTheDocument();
     expect(within(readiness).getByText(/notificación y domicilio legal/i)).toBeInTheDocument();
 
+    expect(within(readiness).getByRole('link', { name: 'Completar informe técnico' })).toHaveAttribute('href', '#informe-tecnico');
+    expect(within(readiness).getByRole('link', { name: 'Consultar constancias de campo' })).toHaveAttribute('href', '#acta');
     const approve = screen.getByRole('button', { name: /aprobar expediente/i });
     expect(approve).toBeDisabled();
     fireEvent.click(approve);
@@ -316,7 +333,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     };
     localStorage.setItem(key, JSON.stringify(olderDraft));
 
-    renderPage(inspection);
+    renderPage(inspection, false, '#informe-tecnico');
 
     const objectiveConflict = await screen.findByRole('checkbox', { name: /Informe · objetivo/i });
     expect(screen.getByRole('button', { name: /descartar borrador anterior/i })).toBeInTheDocument();
@@ -395,10 +412,11 @@ describe('InspeccionExpedientePage critical review UX', () => {
     if (!actionBar) { expect(screen.queryByRole('progressbar', { name: 'Paso actual del recorrido' })).toBeNull(); return; }
     const positioningContract = `${actionBar.className} ${actionBar.getAttribute('style') || ''}`;
     expect(positioningContract).not.toMatch(/\b(?:fixed|absolute)\b/);
-    expect(actionBar.className).toContain('sticky bottom-0');
+    expect(actionBar.className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
     const page = content.closest('[data-inspection-page-scroll]');
     expect(page).not.toBeNull();
-    expect(page?.contains(actionBar)).toBe(true);
+    expect(page?.contains(actionBar)).toBe(false);
+    expect(page?.parentElement).toContainElement(actionBar);
     expect(screen.getByTestId('inspection-scroll-region')).not.toHaveAttribute('data-inspection-scroll');
     expect(screen.getByTestId('inspection-navigation').className).not.toMatch(/\bsticky\b/);
     expect(content.compareDocumentPosition(actionBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -445,13 +463,13 @@ describe('InspeccionExpedientePage critical review UX', () => {
   it('flushes the field draft before step navigation and restores it when returning', async () => {
     const inspection = inspectionFixture({ estado: 'EN_CAMPO' });
     renderPage(inspection);
-    fireEvent.click(await screen.findByRole('link', { name: 'Visita', exact: true }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Visita y lugar', exact: true }));
     fireEvent.change(await screen.findByLabelText('Ubicación', { exact: true }), { target: { value: 'Ubicación validada en campo' } });
-    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
-    fireEvent.click(screen.getByRole('link', { name: 'Datos declarados', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Constataciones', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: /Comparar con lo declarado/ }));
     expect(await screen.findByTestId('comparison-editor')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), 'inspection-1')) || '{}')).toMatchObject({ ubicacion: 'Ubicación validada en campo' });
-    fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visita y lugar', exact: true }));
     expect(await screen.findByLabelText('Ubicación', { exact: true })).toHaveValue('Ubicación validada en campo');
     expect(screen.getByTestId('comparison-editor')).not.toBeVisible();
   });
@@ -461,13 +479,13 @@ describe('InspeccionExpedientePage critical review UX', () => {
     const inspection = { ...base, generador: { ...base.generador!, domicilio: 'Registro actualizado 999' },
       comparaciones: [{ ...base.comparaciones[0], codigo: 'CON-DOMICILIO', valorDeclarado: 'Registro fotografiado 100' }] };
     renderPage(inspection);
-    fireEvent.click(await screen.findByRole('link', { name: 'Visita', exact: true }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Visita y lugar', exact: true }));
     const location = await screen.findByLabelText('Ubicación', { exact: true });
     expect(location).toHaveValue('Parque Industrial, Mendoza');
     expect(screen.queryByRole('button', { name: /Registro actualizado 999/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Usar domicilio declarado: Registro fotografiado 100' }));
     expect(location).toHaveValue('Registro fotografiado 100');
-    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Constataciones', exact: true }));
     expect(JSON.parse(localStorage.getItem(inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), 'inspection-1')) || '{}')).toMatchObject({ ubicacion: 'Registro fotografiado 100' });
   });
 });

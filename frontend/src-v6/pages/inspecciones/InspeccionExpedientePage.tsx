@@ -1,3 +1,4 @@
+import { nextInspectionTask, inspectionTaskLabel } from './inspectionJourney';
 import { canonicalInspectionValue } from './canonicalInspectionValue';
 import { InspectionActAccessPanel } from './InspectionActAccessPanel';
 import { InspectionPhotoDescriptions } from './InspectionPhotoDescriptions';
@@ -10,7 +11,7 @@ import { warmInspectionShell } from '../../services/warmInspectionShell';
 
 import { isAxiosError } from 'axios';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArchiveX, ArrowLeft, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, Eye, FileAudio, FileText, History, Loader2, Mic, Paperclip, Play, RotateCcw, Save, Search, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, ArchiveX, ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, Eye, FileAudio, FileText, History, Loader2, Mic, Paperclip, Play, RotateCcw, Save, Search, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
@@ -768,7 +769,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
     </div>
     <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="visita" />
-    <InspectionOrganizationPanel key={`${inspection.id}:${inspection.version}`} onPendingChange={setOrganizationPending} inspection={inspection} admin={isAdmin} backPath={`${mobile ? '/mobile' : ''}/inspecciones`} disabled={!isOnline || currentFingerprint !== serverFingerprint || Boolean(staleDraft) || pendingEvidence.length > 0 || recording || savingDraft || syncingEvidence || !canWriteDraft()} />
+    <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Asignación y programación</summary><InspectionOrganizationPanel key={`${inspection.id}:${inspection.version}`} onPendingChange={setOrganizationPending} inspection={inspection} admin={isAdmin} backPath={`${mobile ? '/mobile' : ''}/inspecciones`} disabled={!isOnline || currentFingerprint !== serverFingerprint || Boolean(staleDraft) || pendingEvidence.length > 0 || recording || savingDraft || syncingEvidence || !canWriteDraft()} /></details>
     <dl className="grid gap-4 border-t border-neutral-200 pt-5 text-sm sm:grid-cols-2"><div><dt className="text-xs text-neutral-500">Programada</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.fechaProgramada, true)}</dd></div><div><dt className="text-xs text-neutral-500">Inicio de campo</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.iniciadaAt, true)}</dd></div></dl>
   </div>;
   const observationLabel = environmentalInspection ? `Registro de ${INSPECTION_TYPES[inspectionType].label.toLocaleLowerCase('es-AR')}` : inspection.tipoActor ? 'Registro de lo observado' : 'Descripción de la denuncia o hallazgo';
@@ -784,15 +785,15 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="medidas" />
     <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Constancias y datos complementarios</summary><InspectionDocumentsPanel actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></details>
   </div>;
-  const evidence = <><InspectionPhotoDescriptions inspection={inspection} actions={photo => canEdit ? <EvidenceAnnulControl evidence={photo} onAnnul={annulEvidence} /> : null} editable={Boolean(canEdit && currentFingerprint === serverFingerprint && !savingDraft && !pendingEvidence.length && !organizationPending)} /><EvidenceCard separatePhotos inspection={inspection} pendingEvidence={pendingEvidence} pendingActions={canEdit ? pendingEvidenceActions : undefined} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /></>;
+  const evidence = <><EvidenceCard separatePhotos inspection={inspection} pendingEvidence={pendingEvidence} pendingActions={canEdit ? pendingEvidenceActions : undefined} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /><InspectionPhotoDescriptions inspection={inspection} actions={photo => canEdit ? <EvidenceAnnulControl evidence={photo} onAnnul={annulEvidence} /> : null} editable={Boolean(canEdit && currentFingerprint === serverFingerprint && !savingDraft && !pendingEvidence.length && !organizationPending)} /></>;
   const report = <InspectionDocumentsPanel section="informe" actData={datosActa} report={informeTecnico} actEditable={false} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />;
   const readiness = <>{fieldEditAllowed ? <FieldReadinessPanel requiresComparison={Boolean(inspection.tipoActor)} state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /> : inspection.tipoActor && dossierReadiness ? <DossierReadinessPanel readiness={dossierReadiness} /> : null}
     {inspection.tipoActor && (inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <label className="block text-sm font-semibold text-neutral-700">Plazo de respuesta<input aria-label="Plazo de respuesta" type="datetime-local" value={plazoRespuestaAt} onChange={(event) => setPlazoRespuestaAt(event.target.value)} className="mt-2 h-11 w-full max-w-sm rounded-lg border border-neutral-300 px-3 text-sm" /><span className="mt-2 block text-xs font-normal text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</span></label>}
     {guided && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4"><h3 className="text-sm font-bold text-neutral-900">{inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'Hallazgo en revisión · sin responsable identificado' : 'Cambio de etapa'}</h3><p role={inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'status' : undefined} className="mt-2 text-sm leading-relaxed text-neutral-600">{fieldEditAllowed ? 'Enviar a revisión cierra la edición de campo. Los cambios y las evidencias deben estar guardados antes de continuar.' : inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'No hay destinatario para notificar ni plazo que fijar. Podés completar el informe técnico. Si identificás al responsable, devolvé a campo, vinculalo en Visita y contrastá sus datos antes de aprobar.' : 'El acta de campo está cerrada. Podés completar el informe técnico; los datos de campo requieren una devolución expresa.'}</p><div className="mt-4 flex flex-wrap gap-3">
       {inspection.estado === 'EN_REVISION' && isAdmin && canWriteDraft() && <Button variant="outline" onClick={() => transition('EN_CAMPO')} disabled={!isOnline || Boolean(staleDraft) || transitionMutation.isPending}>Devolver a campo</Button>}
-      {primaryAction && canWriteDraft() && <Button aria-label={primaryAction.label} aria-describedby={primaryAction.state === 'NOTIFICADA' ? 'approval-readiness-hint' : undefined} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft) || (primaryAction.state === 'NOTIFICADA' && (!plazoRespuestaAt || approvalBlocked))}>{primaryAction.label}</Button>}
+      {primaryAction && canWriteDraft() && <Button aria-label={primaryAction.label} aria-describedby={primaryAction.state === 'NOTIFICADA' ? 'approval-readiness-hint' : undefined} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft) || (primaryAction.state === 'EN_REVISION' && (!items.every(item => !item.obligatorio || item.resultado !== 'PENDIENTE') || Boolean(inspection.tipoActor && (!comparisons.length || comparisons.some(row => row.resultado === 'PENDIENTE'))))) || (primaryAction.state === 'NOTIFICADA' && (!plazoRespuestaAt || approvalBlocked))}>{primaryAction.label}</Button>}
     </div></div>}
-    <InspectionReport inspection={draftInspection} readiness={canEdit || !inspection.tipoActor ? undefined : dossierReadiness || undefined} />
+    <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Consultar el expediente completo</summary><InspectionReport inspection={draftInspection} readiness={canEdit || !inspection.tipoActor ? undefined : dossierReadiness || undefined} /></details>
   </>;
   const steps: InspectionWorkspaceStep[] = guided ? [
     { id: 'resumen', label: 'Preparar la inspección', title: 'Preparar la inspección', description: 'Confirmá a quién vas a inspeccionar, dónde y con qué número de acta.', detail: numeroActa || 'Acta sin numerar', complete: Boolean(numeroActa.trim() && ubicacion.trim()), content: context, nextAction: primaryAction?.state === 'EN_CAMPO' && canWriteDraft() ? <Button size="lg" className="min-h-14 w-full sm:w-auto" leftIcon={<Play size={22} aria-hidden="true" />} isLoading={changingStage} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft)} onClick={async () => { if (await transition('EN_CAMPO')) navigate({ pathname: location.pathname, search: location.search, hash: inspection.tipoActor ? '#checklist' : '#acta' }); }}>Iniciar visita</Button> : undefined },
@@ -803,7 +804,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     { id: 'informe-tecnico', label: 'Informe técnico para Legales', title: 'Informe técnico para Legales', description: 'Fundamentá la evaluación. Este documento complementa el acta de campo y no la reemplaza.', detail: reportCompleted + ' de 5 apartados' + (reportCompleted === 5 && !informeTecnico.expedienteElectronico?.trim() ? ' · falta expediente electrónico' : ''), complete: reportCompleted === 5 && Boolean(informeTecnico.expedienteElectronico?.trim()), content: report },
     { id: 'revision', label: inspection.tipoActor ? 'Revisar y enviar' : 'Revisar hallazgo', title: inspection.tipoActor ? 'Revisar y enviar' : 'Revisar hallazgo', description: inspection.tipoActor ? 'Verificá los pendientes y el informe consolidado antes de cambiar de etapa. Recorrer los pasos no aprueba ni envía la inspección.' : 'Conservá el informe y las evidencias. La notificación requiere identificar primero a un destinatario.', detail: LABELS[inspection.estado], complete: Boolean(inspection.tipoActor && dossierReadiness?.ready), content: readiness },
   ] : [
-    { id: 'resumen', label: 'Resultado de la inspección', title: 'Resultado de la inspección', description: 'Hallazgos, controles y documentación del expediente.', detail: LABELS[inspection.estado], content: <>{context}<InspectionReport inspection={draftInspection} readiness={dossierReadiness || undefined} /></> },
+    { id: 'resumen', label: 'Resultado de la inspección', title: 'Resultado de la inspección', description: 'Hallazgos, controles y documentación del expediente.', detail: LABELS[inspection.estado], content: <><p className="text-sm text-neutral-600">La visita está cerrada. Consultá el acta registrada, las evidencias o las presentaciones del inspeccionado.</p><p className="whitespace-pre-wrap leading-relaxed">{inspection.observaciones}</p><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-neutral-500">Acta</dt><dd className="font-semibold">{inspection.numeroActa || inspection.numero}</dd></div><div><dt className="text-neutral-500">Lugar registrado</dt><dd>{inspection.ubicacion || 'Sin lugar consignado'}</dd></div></dl><details className="rounded-lg border px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver expediente completo</summary><InspectionReport inspection={draftInspection} readiness={dossierReadiness || undefined} /></details></> },
     { id: 'acta', label: 'Acta de campo', title: 'Acta de campo', description: 'Registro de campo cerrado. Consulta de los hechos y formalidades.', content: act },
     { id: 'informe-tecnico', label: 'Informe técnico para Legales', title: 'Informe técnico para Legales', description: 'Evaluación técnica que acompaña el acta.', content: report },
     { id: 'evidencias', label: 'Evidencias', title: 'Evidencias', description: 'Archivos y fotografías, conservando su relación con los hallazgos.', content: evidence },
@@ -813,7 +814,8 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     if (declaration >= 0) steps.splice(declaration, 1);
   }
   const reference: InspectionWorkspaceStep[] = [
-    { id: 'firma', label: 'Leer y firmar', title: 'Leer y firmar el acta', description: 'Presentá el contenido al inspeccionado y conservá su firma con la versión revisada.', content: <><InspectionSignaturePanel inspectionId={inspection.id} saved={currentFingerprint === serverFingerprint && !pendingEvidence.length && !savingDraft && !organizationPending && !pendingEvidenceReadFailed && !staleDraft && !syncingEvidence && !changingStage && canWriteDraft()} editable={Boolean(canEdit && isOnline)} /><InspectionActAccessPanel inspection={inspection} /></> },
+    { id: 'firma', label: 'Leer y firmar', title: 'Leer y firmar el acta', description: 'Presentá el contenido al inspeccionado y conservá su firma con la versión revisada.', content: <><InspectionSignaturePanel inspectionId={inspection.id} saved={currentFingerprint === serverFingerprint && !pendingEvidence.length && !savingDraft && !organizationPending && !pendingEvidenceReadFailed && !staleDraft && !syncingEvidence && !changingStage && canWriteDraft()} editable={Boolean(canEdit && isOnline)} /></> },
+    { id: 'entrega', label: 'Copia del acta y respuestas', title: 'Copia del acta y respuestas', description: 'Acceso limitado al acta y sus presentaciones.', content: <InspectionActAccessPanel inspection={inspection} /> },
     ...(showExchangePanel ? [{ id: 'intercambios', label: 'Comunicaciones y respuestas', title: 'Comunicaciones y respuestas', description: 'Intercambios auditados con el inspeccionado y documentación de cada intervención.', content: <InspectionExchangePanel inspectionId={inspection.id} /> }] : []),
     { id: 'trazabilidad', label: 'Trazabilidad', title: 'Trazabilidad', description: 'Quién hizo cada intervención, cuándo y con qué documentación.', content: <InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Registro actualizado', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Borrador de notificación registrado como no enviado.' : 'Nota interna incorporada.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /> },
     { id: 'verificacion', label: 'Verificación QR', title: 'Verificación QR', description: 'Referencia verificable de la versión registrada en el servidor.', content: <InspectionVerificationBlock verification={inspection.verificacion} /> },
@@ -854,15 +856,23 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     }
     returnToWorkspace();
   };
-  const defaultSection = reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen';
+  const defaultSection = reportEditAllowed && !fieldEditAllowed ? 'revision' : 'resumen';
   const activeSection = [...steps, ...reference].find(step => step.id === location.hash.slice(1).split('/')[0])?.id || defaultSection;
+  const nextTaskId = nextInspectionTask(activeSection, [...steps, ...reference].map(step => step.id));
+  const nextTask = [...steps, ...reference].find(step => step.id === nextTaskId);
+  const continueJourney = async () => {
+    if (!nextTask || saveDisabled || dictating || recording) return;
+    if (currentFingerprint !== serverFingerprint && !await save()) return;
+    if (!flushDraft()) return;
+    navigate({ pathname: location.pathname, search: location.search, hash: '#' + nextTask.id });
+  };
   const fieldSaveAction = guided && canWriteDraft() ?
       <div data-testid="inspection-field-save-bar" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4">
         <div className="flex min-w-0 basis-full flex-col justify-center sm:min-h-11 sm:flex-1 sm:basis-auto"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
         {/* Keep the Android editor/keyboard in place until the ordinary click;
             moving focus on touch-down can move this footer before touch-up. */}
-        <Button aria-label={fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
-        <Button variant="ghost" title="Salir y retomar" className="min-h-11 shrink-0 px-3" aria-label="Guardar y salir de la inspección" leftIcon={<ArrowLeft size={18} />} disabled={!draftReady || recording || dictating || uploadingItemId !== null || syncingEvidence || savingDraft || leavingDraft || changingStage || pendingEvidenceReadFailed} onClick={pauseFieldWork}><span>Salir y retomar</span></Button>
+        <Button variant={nextTask ? 'outline' : 'primary'} aria-label={fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
+        {nextTask && <Button variant="primary" className="ml-auto min-h-11 max-w-full" rightIcon={<ArrowRight size={17} />} aria-label={(currentFingerprint === serverFingerprint ? 'Continuar a ' : 'Guardar y continuar a ') + inspectionTaskLabel(nextTask)} disabled={saveDisabled || dictating || recording || savingDraft} isLoading={savingDraft} onClick={() => void continueJourney()}>{currentFingerprint === serverFingerprint ? 'Continuar' : 'Guardar y continuar'}</Button>}
       </div> : undefined;
   return <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="inspection-page-frame">
   <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
@@ -912,7 +922,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
 
     {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
     {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
-    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} /></fieldset>
+    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll continuationManaged={Boolean(fieldSaveAction)} key={id} steps={steps} reference={reference} guided={guided} defaultStep={defaultSection} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} /></fieldset>
     {fieldEditAllowed && <InspectionLegacyRecovery userId={String(currentUser!.id)} inspectionId={inspection.id} owner={owner} destination={`${currentUser!.nombre || 'Mi cuenta'} · ${workspaceRoleLabel(currentUser!.rol)}${currentUser!.empresaContexto ? ' · ' + currentUser!.empresaContexto.razonSocial + ' · ' + (currentUser!.empresaContexto.establecimiento?.nombre || 'Todas las sedes') : ''} · ${inspection.numero}`} disabled={!canEdit || !isOnline || savingDraft || syncingEvidence || changingStage || recoveringDraft} verifyAccess={async () => {
       const scope = evidenceScopeRef.current;
       const fresh = await inspeccionService.get(inspection.id);
@@ -928,7 +938,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       setStaleDraft(reconcileStoredDraft(JSON.parse(raw), current).draft); setLegacyReview(true);
     }} onRecoveredFile={refreshPendingEvidence} />}
   </div>
-  {fieldSaveAction && steps.some(step => step.id === activeSection) && <footer data-testid="inspection-action-bar" className="shrink-0 border-t border-neutral-200 bg-white px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:px-6">{fieldSaveAction}</footer>}
+  {fieldSaveAction && (steps.some(step => step.id === activeSection) || ['firma', 'entrega'].includes(activeSection)) && <footer data-testid="inspection-action-bar" className="shrink-0 border-t border-neutral-200 bg-white px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:px-6">{fieldSaveAction}</footer>}
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
     <input ref={fileRef} aria-label="Adjuntar archivo general" type="file" accept={INSPECTION_EVIDENCE_ACCEPT} className="hidden" onChange={uploadFromInput} />
   </div>;
@@ -964,34 +974,33 @@ export function FieldReadinessPanel({ state, items, comparisons, pendingEvidence
   pendingEvidenceCount: number;
   requiresComparison?: boolean;
 }) {
+  const pendingControls = items.filter(item => item.obligatorio && item.resultado === 'PENDIENTE').length;
+  const pendingComparisons = comparisons.filter(row => row.resultado === 'PENDIENTE').length;
   const checks = [
-    { ready: state === 'EN_CAMPO', label: 'Inspección iniciada en campo' },
-    { ready: items.every((item) => !item.obligatorio || item.resultado !== 'PENDIENTE'), label: 'Checklist obligatorio completo' },
-    { ready: !requiresComparison || (comparisons.length > 0 && comparisons.every((row) => row.resultado !== 'PENDIENTE')), label: requiresComparison ? 'Todos los datos declarados contrastados' : 'Sin sujeto identificado: no hay declaración para contrastar' },
-    { ready: pendingEvidenceCount === 0, label: 'Sin capturas pendientes de sincronizar' },
+    { ready: state === 'EN_CAMPO', label: 'Iniciar la visita', target: 'resumen' },
+    { ready: pendingControls === 0, label: pendingControls + ' controles obligatorios pendientes', target: 'checklist' },
+    { ready: !requiresComparison || (comparisons.length > 0 && pendingComparisons === 0), label: comparisons.length ? pendingComparisons + ' datos declarados por contrastar' : 'Revisar la declaración del actor', target: 'declaracion' },
+    { ready: pendingEvidenceCount === 0, label: pendingEvidenceCount + ' capturas por sincronizar', target: 'evidencias' },
   ];
-  const complete = checks.filter((check) => check.ready).length;
-  const ready = complete === checks.length;
-  return <section data-testid="inspection-field-readiness" aria-live="polite" className={`rounded-xl border p-4 sm:p-5 ${ready ? 'border-success-200 bg-success-50' : 'border-amber-300 bg-amber-50'}`}>
-    <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><h3 className="font-extrabold text-[#10213A]">Preparación para enviar a revisión</h3><p className="mt-2 text-sm leading-relaxed text-neutral-700">{ready ? 'Los controles previos al envío están completos. Revisá el acta y sus evidencias antes de cerrar la edición de campo.' : 'Completá estos controles para enviar el trabajo de campo a revisión administrativa.'}</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-800">{complete}/{checks.length} completos</span></div>
-    <ul className="mt-4 grid gap-2 sm:grid-cols-2">{checks.map((check) => <li key={check.label} className="flex items-start gap-2 rounded-lg bg-white/80 p-3 text-xs font-semibold text-neutral-800">{check.ready ? <Check size={15} className="shrink-0 text-success-700" /> : <CircleMinus size={15} className="shrink-0 text-amber-700" />}<span>{check.label}</span></li>)}</ul>
-    <p className="mt-3 text-xs leading-relaxed text-neutral-700">El cierre de campo se registra al confirmar el envío. El plazo de respuesta y la aprobación documental corresponden a la etapa siguiente; enviar a revisión no notifica al inspeccionado.</p>
+  const missing = checks.filter(check => !check.ready);
+  return <section data-testid="inspection-field-readiness" aria-live="polite" className={'rounded-lg border p-4 ' + (missing.length ? 'border-amber-300 bg-amber-50' : 'border-success-200 bg-success-50')}>
+    <h3 className="font-bold text-neutral-900">{missing.length ? 'Antes de enviar a revisión' : 'Listo para enviar a revisión'}</h3>
+    {missing.length ? <><p className="mt-2 text-sm text-neutral-700">Abrí cada pendiente para resolverlo.</p><ul className="mt-3 space-y-2">{missing.map(check => <li key={check.target}><a href={'#' + check.target} className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-950 !no-underline">{check.label}<ArrowRight size={17} className="shrink-0" /></a></li>)}</ul></> : <p className="mt-2 text-sm text-neutral-700">Los controles obligatorios, el contraste y las capturas están completos. Revisá el contenido y la firma antes de cerrar el trabajo de campo.</p>}
+    <p className="mt-3 text-xs leading-relaxed text-neutral-600">Enviar a revisión cierra el trabajo de campo. No aprueba la inspección ni notifica al inspeccionado.</p>
   </section>;
 }
 
 function DossierReadinessPanel({ readiness }: { readiness: InspectionDossierReadiness }) {
-  return <section data-testid="inspection-dossier-readiness" aria-live="polite" className={`rounded-2xl border px-4 py-4 sm:px-5 ${readiness.ready ? 'border-success-200 bg-success-50' : 'border-amber-300 bg-amber-50'}`}>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${readiness.ready ? 'bg-success-100 text-success-800' : 'bg-amber-100 text-amber-900'}`}>{readiness.ready ? <ShieldCheck size={19} /> : <AlertTriangle size={19} />}</span>
-        <div>
-          <h3 className="font-extrabold text-[#10213A]">Preparación para aprobar</h3>
-          <p id="approval-readiness-hint" className="mt-1 text-xs leading-relaxed text-neutral-700">{readiness.ready ? 'El dossier reúne los controles documentales definidos para esta etapa. La aprobación administrativa no reemplaza el dictamen de Legales.' : 'El expediente todavía no debe presentarse como final. Completá o devolvé a campo los puntos pendientes.'}</p>
-        </div>
-      </div>
-      <span className={`w-fit shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ${readiness.ready ? 'bg-success-100 text-success-800' : 'bg-white text-amber-900 ring-1 ring-amber-300'}`}>{readiness.completed}/{readiness.total} completos</span>
-    </div>
-    {!readiness.ready && <div className="mt-3 border-t border-amber-200 pt-3"><p className="text-[11px] font-bold uppercase tracking-wider text-amber-900">Falta completar</p><ul className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{readiness.missing.map((item) => <li key={item} className="flex items-start gap-2 rounded-lg bg-white/80 px-3 py-2 text-xs font-semibold text-neutral-800"><CircleMinus size={14} className="mt-0.5 shrink-0 text-amber-700" />{item}</li>)}</ul></div>}
+  const technical = new Set(['Expediente electrónico', 'Objetivo técnico', 'Antecedentes', 'Evaluación técnica', 'Conclusión técnica', 'Recomendación técnica']);
+  const groups = [
+    { title: 'Informe técnico', target: 'informe-tecnico', items: readiness.missing.filter(item => technical.has(item)), action: 'Completar informe técnico' },
+    { title: 'Constancias del trabajo de campo', target: 'acta', items: readiness.missing.filter(item => !technical.has(item) && item !== 'Plazo de respuesta'), action: 'Consultar constancias de campo' },
+  ];
+  return <section data-testid="inspection-dossier-readiness" aria-live="polite" className="space-y-4">
+    <h3 className="font-bold text-neutral-900">{readiness.ready ? 'Listo para la decisión administrativa' : 'Pendientes de revisión administrativa'}</h3>
+    <p id="approval-readiness-hint" className="text-sm text-neutral-700">{readiness.ready ? 'Los controles documentales están completos. La aprobación administrativa no reemplaza el dictamen de Legales.' : 'El equipo revisor completa el informe. Si faltan constancias de la visita, debe devolver el acta a campo para que el inspector las registre.'}</p>
+    {readiness.missing.includes('Plazo de respuesta') && <p className="rounded-lg bg-amber-50 p-3 text-sm">Definí el plazo de respuesta en el campo de abajo.</p>}
+    {groups.filter(group => group.items.length).map(group => <div key={group.target} className="rounded-lg border border-amber-200 p-3"><h4 className="text-sm font-semibold">{group.title}</h4><ul className="mt-2 space-y-1 text-sm text-neutral-700">{group.items.map(item => <li key={item}>{item}</li>)}</ul><a href={'#' + group.target} className="mt-2 inline-flex min-h-11 items-center gap-2 font-semibold text-primary-800 underline">{group.action}<ArrowRight size={16} /></a></div>)}
   </section>;
 }
 

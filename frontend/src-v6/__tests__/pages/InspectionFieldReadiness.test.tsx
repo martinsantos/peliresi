@@ -1,29 +1,26 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { FieldReadinessPanel } from '../../pages/inspecciones/InspeccionExpedientePage';
-
 describe('field review readiness', () => {
-  it('accepts completed field controls without demanding the next-stage deadline or closure timestamp', () => {
+  it('does not demand optional controls or next-stage administrative deadlines', () => {
     render(<FieldReadinessPanel state="EN_CAMPO" items={[{ obligatorio: true, resultado: 'CUMPLE' }, { obligatorio: false, resultado: 'PENDIENTE' }]} comparisons={[{ resultado: 'COINCIDE' }]} pendingEvidenceCount={0} />);
-    expect(screen.getByText('4/4 completos')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Preparación para enviar a revisión' })).toBeInTheDocument();
-    expect(screen.queryByText('Plazo de respuesta')).not.toBeInTheDocument();
-    expect(screen.queryByText('Cierre de campo confirmado')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Listo para enviar a revisión' })).toBeVisible();
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByText('Plazo de respuesta')).toBeNull();
   });
-
-  it('requires a nonempty declared comparison, as the server does', () => {
-    render(<FieldReadinessPanel state="EN_CAMPO" items={[{ obligatorio: true, resultado: 'CUMPLE' }]} comparisons={[]} pendingEvidenceCount={0} />);
-    expect(screen.getByText('3/4 completos')).toBeInTheDocument();
+  it('links a missing declaration to its actionable task', () => {
+    render(<FieldReadinessPanel state="EN_CAMPO" items={[]} comparisons={[]} pendingEvidenceCount={0} />);
+    expect(screen.getByRole('link', { name: 'Revisar la declaración del actor' })).toHaveAttribute('href', '#declaracion');
   });
-
-  it('reports pending required controls and unsynchronized captures', () => {
+  it('counts only unresolved required items and links every blocker', () => {
     render(<FieldReadinessPanel state="EN_CAMPO" items={[{ obligatorio: true, resultado: 'PENDIENTE' }]} comparisons={[{ resultado: 'PENDIENTE' }]} pendingEvidenceCount={1} />);
-    expect(screen.getByText('1/4 completos')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '1 controles obligatorios pendientes' })).toHaveAttribute('href', '#checklist');
+    expect(screen.getByRole('link', { name: '1 datos declarados por contrastar' })).toHaveAttribute('href', '#declaracion');
+    expect(screen.getByRole('link', { name: '1 capturas por sincronizar' })).toHaveAttribute('href', '#evidencias');
+    expect(screen.queryByText('Listo para enviar a revisión')).toBeNull();
   });
-
-  it('does not call a planned inspection ready to submit before field work starts', () => {
-    render(<FieldReadinessPanel state="PLANIFICADA" items={[{ obligatorio: true, resultado: 'CUMPLE' }]} comparisons={[{ resultado: 'COINCIDE' }]} pendingEvidenceCount={0} />);
-    expect(screen.getByText('3/4 completos')).toBeInTheDocument();
-    expect(screen.getByText('Inspección iniciada en campo')).toBeInTheDocument();
+  it('cannot call a planned visit ready for review', () => {
+    render(<FieldReadinessPanel state="PLANIFICADA" items={[]} comparisons={[{ resultado: 'COINCIDE' }]} pendingEvidenceCount={0} />);
+    expect(screen.getByRole('link', { name: 'Iniciar la visita' })).toHaveAttribute('href', '#resumen');
   });
 });
