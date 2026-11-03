@@ -137,7 +137,7 @@ export default function InspectionLocationMap({ value, disabled, onChange }: { v
     {value?.mapaImagen ? <figure><img src={value.mapaImagen} alt="Vista guardada del lugar inspeccionado para el acta" className="w-full max-w-xl rounded-lg border" /><figcaption className="mt-1 text-xs text-neutral-600">Vista guardada · se incluirá en el acta con la misma numeración. Si cambiás el punto, el sector o las referencias, guardá otra vista.</figcaption></figure>
       : value && !disabled && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">{drawn ? 'El acta todavía no tiene la vista con el sector y las referencias actuales. Usá «Guardar vista para el acta», debajo del mapa.' : 'Para incluir el mapa en el acta, usá «Guardar vista para el acta», debajo del mapa.'}</p>}
     <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Ingresar coordenadas</summary><ManualPoint value={value} disabled={disabled} onChange={onChange} /></details>
-    <p className="text-xs text-neutral-500">El mapa necesita conexión; el punto y el trazado se conservan en el borrador. Distancias y superficies son aproximadas: no delimitan el predio ni determinan por sí solas el cumplimiento de una restricción ambiental.</p>
+    <p className="text-xs text-neutral-500">Trazado aproximado del inspector: no delimita el predio ni define por sí solo una restricción ambiental. Sin conexión, el punto y el trazado se conservan.</p>
   </div>;
 }
 function ManualPoint({ value, disabled, onChange }: { value?: InspectionFieldLocation; disabled: boolean; onChange: (v: InspectionFieldLocation) => void }) {

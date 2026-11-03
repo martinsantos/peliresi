@@ -163,15 +163,15 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     <div data-testid="inspection-navigation" className="relative shrink-0 rounded-t-xl bg-white">
       <nav aria-label="Secciones del expediente" className="grid grid-cols-4 gap-1 border-b border-neutral-200 p-2">
         {availableSections.map(section => <a key={section.label} aria-label={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'step' : undefined} onClick={event => go(event, section.entries[0])}
-          className={'flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-lg px-1 py-2 text-xs font-semibold !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white' : 'text-neutral-600 hover:bg-neutral-100')}>
+          className={'flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-1 py-1.5 text-xs font-semibold !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white' : 'text-neutral-600 hover:bg-neutral-100')}>
           <span aria-hidden="true" className="hidden sm:inline">{inspectionJourney.indexOf(inspectionJourney.find(entry => entry.label === section.label)!) + 1}.</span>
           <span className="text-center leading-4 sm:hidden">{section.mobileLabel}</span><span className="hidden sm:inline">{section.label}</span>
         </a>)}
       </nav>
-      <div className="px-4 py-4 sm:px-6">
-        <p className="text-xs font-medium text-primary-800">{guided && selectedSection ? 'Paso ' + (inspectionJourney.findIndex(section => section.label === selectedSection.label) + 1) + ' de 4' : 'Consulta del expediente'}</p>
-        <h2 className="mt-1 text-xl font-bold text-neutral-900">{guided ? selectedSection?.title || active.title : active.title}</h2>
-        <p className="mt-1 text-sm leading-relaxed text-neutral-600">{guided ? selectedSection?.description || active.description : active.description}</p>
+      {/* One line on a phone: the step tabs already say where the person is. */}
+      <div className="px-4 py-2.5 sm:px-6 sm:py-4">
+        <div className="flex flex-wrap items-baseline gap-x-2"><p className="text-xs font-medium text-primary-800">{guided && selectedSection ? 'Paso ' + (inspectionJourney.findIndex(section => section.label === selectedSection.label) + 1) + ' de 4' : 'Consulta del expediente'}</p><h2 className="text-lg font-bold text-neutral-900 sm:text-xl">{guided ? selectedSection?.title || active.title : active.title}</h2></div>
+        <p className="mt-1 hidden text-sm leading-relaxed text-neutral-600 sm:block">{guided ? selectedSection?.description || active.description : active.description}</p>
       </div>
     </div>
     <div ref={contentRef} data-inspection-scroll={pageScroll || constrainedViewport ? undefined : ''} data-testid="inspection-scroll-region" className={`min-h-0 scroll-pt-4 scroll-pb-4 rounded-b-xl [overflow-anchor:none] ${pageScroll || constrainedViewport ? 'shrink-0 overflow-visible' : 'flex-1 overflow-y-auto overscroll-contain'}`} onScroll={event => { if (!pageScroll && !constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>

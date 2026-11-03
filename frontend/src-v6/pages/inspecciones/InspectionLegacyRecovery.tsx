@@ -8,6 +8,8 @@ interface Props {
   userId: string; inspectionId: string; owner: string; destination: string;
   disabled: boolean; verifyAccess: () => Promise<void>;
   onReview: (raw: string) => Promise<void>; onRecoveredFile: () => Promise<void>;
+  /** Rendered inside a workspace task, which already has its own heading. */
+  embedded?: boolean;
 }
 export function InspectionLegacyRecovery(props: Props) {
   // A previous activity's result/callback must never be reused in this one.
@@ -49,9 +51,7 @@ function ScopedLegacyRecovery(props: Props) {
       ? `Búsqueda ${attempt} finalizada: ${found.texts.length} ${found.texts.length === 1 ? 'copia de texto' : 'copias de texto'} y ${found.files.length} ${found.files.length === 1 ? 'archivo' : 'archivos'} para revisar. Todavía no se recuperó ni envió nada.`
       : `Búsqueda ${attempt} finalizada: no se encontraron copias de versiones anteriores en este dispositivo. El borrador actual se consulta por separado; este resultado no indica que se haya perdido.`);
   };
-  return <details ref={disclosure} className="rounded-lg border border-neutral-200 bg-white px-4 text-sm">
-    <summary className="flex min-h-12 cursor-pointer items-center gap-2 font-medium text-neutral-700"><History size={18} aria-hidden="true" />Copias de versiones anteriores</summary>
-    <div className="space-y-3 border-t border-neutral-200 py-4">
+  const body = <div className={props.embedded ? 'space-y-3 text-sm' : 'space-y-3 border-t border-neutral-200 py-4'}>
       <div className="space-y-1 text-neutral-600">
         <p className="font-semibold text-neutral-800">Este panel no muestra el borrador actual.</p>
         <p>Lo que escribís ahora se guarda automáticamente por separado. Comprobá su estado junto a Guardar cambios; para enviarlo al servidor, usá ese botón.</p>
@@ -70,7 +70,11 @@ function ScopedLegacyRecovery(props: Props) {
         await props.onRecoveredFile(); await refresh();
         if (active.current) setResult('Archivo recuperado en Evidencias. Revisá el texto y el archivo; elegí Guardar y cargar archivo para enviarlos.');
       })} />)}
-    </div>
+    </div>;
+  if (props.embedded) return body;
+  return <details ref={disclosure} className="rounded-lg border border-neutral-200 bg-white px-4 text-sm">
+    <summary className="flex min-h-12 cursor-pointer items-center gap-2 font-medium text-neutral-700"><History size={18} aria-hidden="true" />Copias de versiones anteriores</summary>
+    {body}
   </details>;
 }
 

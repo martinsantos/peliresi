@@ -117,7 +117,7 @@ describe('inspection process restart with real asynchronous draft ownership', ()
     mount();
     const input = await editor();
     fireEvent.change(input, { target: { value: 'Trabajo de esta actividad' } });
-    fireEvent.click(screen.getByText('Copias de versiones anteriores'));
+    fireEvent.click(screen.getByRole('link', { name: 'Copias de versiones anteriores' }));
     const search = screen.getByRole('button', { name: 'Buscar copias anteriores' });
     await waitFor(() => expect(search).toBeEnabled());
     fireEvent.click(search);

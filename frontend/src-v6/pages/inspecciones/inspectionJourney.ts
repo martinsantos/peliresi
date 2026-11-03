@@ -12,6 +12,7 @@ const taskLabels: Record<string, string> = {
   entrega: 'Copia del acta y respuestas', revision: 'Pendientes y envío a revisión',
   'informe-tecnico': 'Informe técnico', intercambios: 'Requerimientos y respuestas',
   trazabilidad: 'Historial de intervenciones', verificacion: 'Verificación QR',
+  organizacion: 'Asignación y programación', copias: 'Copias de versiones anteriores',
 };
 export const inspectionTaskLabel = (step: { id: string; label: string }) => taskLabels[step.id] || step.label;
 export function nextInspectionTask(active: string, available: string[]): string | undefined {

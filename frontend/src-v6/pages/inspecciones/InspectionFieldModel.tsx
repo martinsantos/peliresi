@@ -12,7 +12,6 @@ export function InspectionFieldModel({ value, onChange, disabled, section }: { v
     <div className="grid gap-4 sm:grid-cols-2">{([['atendidoPor', 'Persona que atiende'], ['cargoAtendido', 'Carácter o cargo'], ['dniAtendido', 'Documento de identidad']] as const).map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={input} disabled={disabled} value={value[key] || ''} onChange={e => update(key, e.target.value)} /></label>)}</div>
     <label className="block text-sm font-medium">Correo declarado para recibir el acta<input type="email" autoComplete="email" className={input} disabled={disabled} value={value.contactoActa || ''} onChange={e => update('contactoActa', e.target.value || undefined)} /></label>
     <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" disabled={disabled} checked={Boolean(value.solicitaCopia)} onChange={e => update('solicitaCopia', e.target.checked)} />La persona solicita una copia del acta</label>
-    <p className="text-sm text-neutral-600">Registrar el contacto no envía correos ni concede acceso al expediente.</p>
     <div><h3 className="mb-3 flex items-center gap-2 font-semibold"><MapPin size={20} />Lugar de la inspección</h3><Suspense fallback={<p role="status">Cargando mapa…</p>}><LocationMap value={value.ubicacionCampo} disabled={disabled} onChange={v => update('ubicacionCampo', v)} /></Suspense></div>
   </section>;
   if (section === 'constatacion') return <section aria-label="Actividad y entorno" className="space-y-5">
