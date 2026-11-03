@@ -14,6 +14,20 @@ const oldKey = 'sitrep_inspection_draft_inspector_case';
 const entry = (overrides = {}) => ({ id: 'file', userId: 'inspector', inspectionId: 'case', file: new Blob(['original']), sha256: 'original-sha', attempts: 2, ...overrides });
 describe('explicit recovery of unscoped field copies', () => {
   beforeEach(() => { state.records.clear(); localStorage.clear(); state.abort = false; state.checkpoint.mockResolvedValue(undefined); });
+  it('does not turn a failed checkpoint read into a successful empty search', async () => {
+    state.checkpoint.mockRejectedValueOnce(new Error('IDB unavailable'));
+    localStorage.setItem(oldKey, '{"observaciones":"keep original"}');
+    await expect(readLegacyFieldCopies('inspector', 'case')).rejects.toThrow('No se pudo completar la búsqueda');
+    expect(localStorage.getItem(oldKey)).toBe('{"observaciones":"keep original"}');
+  });
+  it('reports a denied typing-journal read without clearing any existing original', async () => {
+    localStorage.setItem(oldKey, '{"observaciones":"keep original"}');
+    const get = vi.spyOn(Storage.prototype, 'getItem').mockImplementationOnce(() => { throw new Error('denied'); });
+    try {
+      await expect(readLegacyFieldCopies('inspector', 'case')).rejects.toThrow('No se pudo completar la búsqueda');
+    } finally { get.mockRestore(); }
+    expect(localStorage.getItem(oldKey)).toBe('{"observaciones":"keep original"}');
+  });
   it('preserves both unequal text snapshots, including unreadable bytes, without rewriting them', async () => {
     state.checkpoint.mockResolvedValue('{"observaciones":"confirmed"}'); localStorage.setItem(oldKey, '{unfinished');
     const result = await readLegacyFieldCopies('inspector', 'case');

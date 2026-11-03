@@ -20,6 +20,7 @@ interface Props {
   reference: InspectionWorkspaceStep[];
   guided: boolean;
   defaultStep: string;
+  pageScroll?: boolean;
   saveAction?: React.ReactNode;
   onBeforeNavigate: () => boolean | void;
   resumeIdentity?: { userId: string | number; inspectionId: string; owner: string };
@@ -38,7 +39,7 @@ const labels: Record<string, string> = {
 };
 
 /** Direct navigation. Existing deep links, drafts and file selections remain valid. */
-export function InspectionWorkspace({ steps, reference, defaultStep, saveAction, onBeforeNavigate, resumeIdentity }: Props) {
+export function InspectionWorkspace({ steps, reference, defaultStep, saveAction, onBeforeNavigate, resumeIdentity, pageScroll = false }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -71,13 +72,14 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   useLayoutEffect(() => {
     const workspace = workspaceRef.current, viewport = window.visualViewport;
     if (!workspace || !viewport) return;
+    const surface = pageScroll ? workspace.closest<HTMLElement>('[data-inspection-page-scroll]') || workspace : workspace;
     let frame = 0;
     const measure = () => {
-      const top = workspace.getBoundingClientRect().top;
+      const top = surface.getBoundingClientRect().top;
       if (!Number.isFinite(top) || !Number.isFinite(viewport.height) || viewport.height <= 0 || !Number.isFinite(viewport.offsetTop)) return;
       const height = Math.max(0, Math.floor(viewport.offsetTop + viewport.height - top - 12));
-      workspace.style.maxHeight = height + 'px';
-      const parentHeight = workspace.parentElement?.getBoundingClientRect().height;
+      surface.style.maxHeight = height + 'px';
+      const parentHeight = surface.parentElement?.getBoundingClientRect().height;
       const room = Number.isFinite(parentHeight) && parentHeight! > 0 ? Math.min(height, parentHeight!) : height;
       const navigation = workspace.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
       const footer = workspace.querySelector<HTMLElement>('[data-testid="inspection-action-bar"]');
@@ -92,7 +94,7 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
     workspace.addEventListener('focusin', schedule);
     workspace.addEventListener('focusout', schedule);
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : undefined;
-    if (workspace.parentElement) observer?.observe(workspace.parentElement);
+    if (surface.parentElement) observer?.observe(surface.parentElement);
     for (const element of workspace.querySelectorAll('[data-testid="inspection-navigation"], [data-testid="inspection-action-bar"]')) observer?.observe(element);
     return () => {
       cancelAnimationFrame(frame); observer?.disconnect();
@@ -101,18 +103,18 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
       window.removeEventListener('resize', schedule);
       workspace.removeEventListener('focusin', schedule);
       workspace.removeEventListener('focusout', schedule);
-      workspace.style.removeProperty('max-height');
+      surface.style.removeProperty('max-height');
     };
-  }, []);
+  }, [pageScroll]);
 
   useEffect(() => {
     if (!resumeUserId || !resumeInspectionId || !resumeOwner) return;
     saveInspectionResume(resumeUserId, resumeInspectionId, location.hash || '#' + active.id, resumeLabel, resumeOwner);
   }, [resumeUserId, resumeInspectionId, resumeOwner, location.hash, active.id, resumeLabel]);
 
-  // Each section owns its reading position; the shell and tabs never scroll.
+  // Preserve section positions on the same page surface; identity and tabs scroll away together.
   useLayoutEffect(() => {
-    const region = constrainedViewport ? workspaceRef.current : contentRef.current;
+    const region = pageScroll ? workspaceRef.current?.closest<HTMLDivElement>('[data-inspection-page-scroll]') || workspaceRef.current : constrainedViewport ? workspaceRef.current : contentRef.current;
     const previous = scrollRef.current;
     if (region) {
       region.style.removeProperty('--inspection-scroll-reserve');
@@ -120,7 +122,15 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
     }
     scrollRef.current = region;
     scrollStepRef.current = active.id;
-  }, [active.id, constrainedViewport]);
+  }, [active.id, constrainedViewport, pageScroll]);
+
+  useEffect(() => {
+    if (!pageScroll) return;
+    const region = scrollRef.current;
+    const rememberPosition = () => { if (region) scrollPositions.current.set(active.id, region.scrollTop); };
+    region?.addEventListener('scroll', rememberPosition, { passive: true });
+    return () => region?.removeEventListener('scroll', rememberPosition);
+  }, [active.id, pageScroll]);
 
   // Remember the actual visible field, without changing browser history or
   // adding another navigation bar. This also covers manual long-list scrolling.
@@ -144,7 +154,7 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
     const region = scrollRef.current;
     region?.addEventListener('scroll', remember);
     return () => { region?.removeEventListener('scroll', remember); cancelAnimationFrame(frame); };
-  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, resumeOwner, constrainedViewport]);
+  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, resumeOwner, constrainedViewport, pageScroll]);
 
   const go = (event: React.MouseEvent<HTMLAnchorElement>, step: InspectionWorkspaceStep) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
@@ -154,8 +164,8 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
     navigate({ pathname: location.pathname, search: location.search, hash: '#' + step.id });
   };
 
-  return <div ref={workspaceRef} data-testid="inspection-workspace" data-inspection-scroll={constrainedViewport ? '' : undefined} data-constrained-viewport={constrainedViewport || undefined} className={'flex h-full min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]' + (constrainedViewport ? ' overflow-y-auto overscroll-contain [overflow-anchor:none]' : '')} onScroll={(event) => { if (constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
-    <div data-testid="inspection-navigation" className={(constrainedViewport ? 'relative' : 'sticky top-0') + ' z-20 shrink-0 rounded-t-xl bg-white'}>
+  return <div ref={workspaceRef} data-testid="inspection-workspace" data-inspection-scroll={!pageScroll && constrainedViewport ? '' : undefined} data-constrained-viewport={constrainedViewport || undefined} className={(pageScroll ? 'shrink-0 ' : 'h-full ') + 'flex min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]' + (!pageScroll && constrainedViewport ? ' overflow-y-auto overscroll-contain [overflow-anchor:none]' : '')} onScroll={(event) => { if (!pageScroll && constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
+    <div data-testid="inspection-navigation" className={(pageScroll || constrainedViewport ? 'relative' : 'sticky top-0') + ' z-20 shrink-0 rounded-t-xl bg-white'}>
       <nav aria-label="Secciones del expediente" className="flex gap-1 border-b border-neutral-200 bg-neutral-100 p-2">
         {availableSections.map((section) => <a key={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'page' : undefined} onClick={(event) => go(event, section.entries[0])}
           className={'flex min-h-[68px] [@media(max-height:500px)]:min-h-14 min-w-0 flex-[1_1_auto] flex-col items-center justify-center gap-1.5 rounded-lg px-1 text-xs font-semibold !no-underline transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-14 sm:flex-row sm:gap-3 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white focus-visible:text-white' : 'text-neutral-700 hover:bg-white hover:text-neutral-900')}><span aria-hidden="true" className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold leading-none tabular-nums ' + (selectedSection === section ? 'bg-white/20 text-white' : 'bg-white text-neutral-600')}>{sections.findIndex(entry => entry.label === section.label) + 1}</span><span className="leading-4 sm:leading-5">{section.label}</span></a>)}
@@ -165,13 +175,13 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
           className={'flex min-h-11 shrink-0 items-center gap-2 rounded-md border px-2 text-sm !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-3 ' + (active.id === step.id ? 'border-primary-300 bg-white font-bold text-primary-900' : 'border-transparent text-neutral-700 hover:bg-white')}>{step.id === 'checklist' && <Eye size={18} aria-hidden="true" />}{step.id === 'declaracion' && <FileSearch size={18} aria-hidden="true" />}{labels[step.id] || step.label}</a>)}
       </nav>}
     </div>
-    <div ref={contentRef} data-inspection-scroll={constrainedViewport ? undefined : ''} data-testid="inspection-scroll-region" className={`min-h-0 scroll-pt-14 scroll-pb-4 rounded-b-xl [overflow-anchor:none] after:block after:h-[var(--inspection-scroll-reserve,0px)] after:content-[''] ${constrainedViewport ? 'shrink-0 overflow-visible' : 'flex-1 overflow-y-auto overscroll-contain'}`} onScroll={(event) => { if (!constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
+    <div ref={contentRef} data-inspection-scroll={pageScroll || constrainedViewport ? undefined : ''} data-testid="inspection-scroll-region" className={`min-h-0 scroll-pt-14 scroll-pb-4 rounded-b-xl [overflow-anchor:none] after:block after:h-[var(--inspection-scroll-reserve,0px)] after:content-[''] ${pageScroll || constrainedViewport ? 'shrink-0 overflow-visible' : 'flex-1 overflow-y-auto overscroll-contain'}`} onScroll={(event) => { if (!pageScroll && !constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
     {active.nextAction && <div data-testid="inspection-start" className="border-b border-primary-200 bg-primary-50 p-4 sm:p-6"><h2 className="mb-1 text-lg font-bold text-primary-900">Comenzar el recorrido</h2><p className="mb-3 text-sm leading-relaxed text-neutral-800">Al iniciar se registra la hora y se abre el trabajo de campo.</p>{active.nextAction}</div>}
     {/* Hidden sections remain mounted to protect local drafts and selected files. */}
     {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className={`min-w-0 space-y-6 ${step.id === 'intercambios' ? 'p-0 sm:p-6' : 'p-4 sm:p-6'} [&>section]:shadow-none [&>div]:shadow-none`}>
       {(step.id === active.id || visited.has(step.id)) && step.content}
     </section>)}
     </div>
-    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className={'shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6' + (constrainedViewport ? ' sticky bottom-0 z-20' : '')}>{saveAction}</footer>}
+    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className={'shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6' + (pageScroll || constrainedViewport ? ' sticky bottom-0 z-20' : '')}>{saveAction}</footer>}
   </div>;
 }

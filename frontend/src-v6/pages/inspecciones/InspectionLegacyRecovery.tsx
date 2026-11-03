@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Download, History } from 'lucide-react';
 import { readLegacyFieldCopies, recoverLegacyFieldEvidence, type LegacyFieldCopies } from '../../services/inspectionLegacyRecovery';
 import type { PendingInspectionEvidence } from '../../services/inspectionOfflineEvidence';
@@ -10,36 +10,59 @@ interface Props {
   onReview: (raw: string) => Promise<void>; onRecoveredFile: () => Promise<void>;
 }
 export function InspectionLegacyRecovery(props: Props) {
+  // A previous activity's result/callback must never be reused in this one.
+  const identity = JSON.stringify([props.userId, props.inspectionId, props.owner]);
+  return <ScopedLegacyRecovery key={identity} {...props} />;
+}
+function ScopedLegacyRecovery(props: Props) {
   const [copies, setCopies] = useState<LegacyFieldCopies | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState('');
+  const [progress, setProgress] = useState('');
+  const searchAttempt = useRef(0);
   const active = useRef(true);
   const inFlight = useRef(false);
   const disclosure = useRef<HTMLDetailsElement>(null);
-  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
-  const run = async (action: () => Promise<void>) => {
+  useLayoutEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const run = async (action: () => Promise<void>, pending = 'Comprobando permiso para recuperar la copia…') => {
     if (inFlight.current || props.disabled) return;
     inFlight.current = true;
-    setBusy(true); setError(''); setResult('');
+    setBusy(true); setError(''); setResult(''); setProgress(pending);
     try { await props.verifyAccess(); if (active.current) await action(); }
     catch (failure) {
       if (active.current) { setCopies(null); setError(failure instanceof Error ? failure.message : 'No se pudieron revisar las copias. Reintentá con conexión.'); }
-    } finally { inFlight.current = false; if (active.current) setBusy(false); }
+    } finally { inFlight.current = false; if (active.current) { setBusy(false); setProgress(''); } }
   };
   const refresh = async () => {
     const found = await readLegacyFieldCopies(props.userId, props.inspectionId);
     if (active.current) setCopies(found);
+    return found;
+  };
+  const search = async () => {
+    if (active.current) { setCopies(null); setProgress('Buscando copias anteriores en este dispositivo…'); }
+    const found = await refresh();
+    if (!active.current) return;
+    const attempt = ++searchAttempt.current;
+    const total = found.texts.length + found.files.length;
+    setResult(total
+      ? `Búsqueda ${attempt} finalizada: ${found.texts.length} ${found.texts.length === 1 ? 'copia de texto' : 'copias de texto'} y ${found.files.length} ${found.files.length === 1 ? 'archivo' : 'archivos'} para revisar. Todavía no se recuperó ni envió nada.`
+      : `Búsqueda ${attempt} finalizada: no se encontraron copias de versiones anteriores en este dispositivo. El borrador actual se consulta por separado; este resultado no indica que se haya perdido.`);
   };
   return <details ref={disclosure} className="rounded-lg border border-neutral-200 bg-white px-4 text-sm">
     <summary className="flex min-h-12 cursor-pointer items-center gap-2 font-medium text-neutral-700"><History size={18} aria-hidden="true" />Copias de versiones anteriores</summary>
     <div className="space-y-3 border-t border-neutral-200 py-4">
-      <p className="text-neutral-600">Sólo de esta cuenta y expediente. No identifican la actividad de origen. Revisá el contenido antes de recuperarlo.</p>
+      <div className="space-y-1 text-neutral-600">
+        <p className="font-semibold text-neutral-800">Este panel no muestra el borrador actual.</p>
+        <p>Lo que escribís ahora se guarda automáticamente por separado. Comprobá su estado junto a Guardar cambios; para enviarlo al servidor, usá ese botón.</p>
+        <p>Esta búsqueda revisa sólo copias de versiones anteriores de esta cuenta y expediente, en este dispositivo y navegador. No identifican la actividad de origen. Buscar no recupera ni envía nada automáticamente.</p>
+      </div>
       <p className="break-words font-semibold">Destino: {props.destination}</p>
-      <Button variant="outline" disabled={props.disabled || busy} isLoading={busy} onClick={() => void run(refresh)}>Buscar copias anteriores</Button>
-      {error && <p role="alert" className="text-error-800">{error}</p>}
-      {result && <p role="status" className="text-primary-800">{result}</p>}
-      {copies && !copies.texts.length && !copies.files.length && <p role="status">No hay copias anteriores pendientes en este dispositivo.</p>}
+      <Button variant="outline" disabled={props.disabled || busy} isLoading={busy} onClick={() => void run(search, 'Comprobando permiso para buscar copias anteriores…')}>Buscar copias anteriores</Button>
+      {props.disabled && <p className="text-neutral-600">La búsqueda y la recuperación requieren conexión y permiso de edición en esta actividad. Esperá a que termine cualquier guardado en curso.</p>}
+      {busy && <p role="status" aria-live="polite" aria-atomic="true">{progress}</p>}
+      {error && <div role="alert" className="space-y-1 text-error-800"><p>{error}</p><p>No se confirmó el resultado de esta revisión. No se borraron copias. Comprobá la conexión y volvé a buscar antes de recuperar.</p></div>}
+      {result && <p role="status" aria-live="polite" aria-atomic="true" className="text-primary-800">{result}</p>}
       {copies?.texts.map(copy => <TextCopy key={copy.source} raw={copy.raw} source={copy.source} disabled={props.disabled || busy} onReview={() => void run(async () => { if (active.current) { await props.onReview(copy.raw); if (disclosure.current) disclosure.current.open = false; } })} />)}
       {copies?.files.map(file => <FileCopy key={file.id} file={file} disabled={props.disabled || busy} onRecover={() => void run(async () => {
         await recoverLegacyFieldEvidence(props.userId, props.inspectionId, props.owner, file.id);

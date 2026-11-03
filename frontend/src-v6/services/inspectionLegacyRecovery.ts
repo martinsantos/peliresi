@@ -22,16 +22,21 @@ function sameText(left: string, right: string): boolean {
  * from a legacy key: the inspector must choose the destination explicitly. */
 export async function readLegacyFieldCopies(userId: string, inspectionId: string): Promise<LegacyFieldCopies> {
   if (!userId || !inspectionId) throw new Error('No se identificó la cuenta y el expediente.');
-  const key = `sitrep_inspection_draft_${userId}_${inspectionId}`;
-  const checkpoint = await readInspectionFieldCheckpoint(key);
-  const journal = localStorage.getItem(key);
-  const texts: LegacyFieldCopy[] = [];
-  if (checkpoint) texts.push({ source: 'checkpoint', raw: checkpoint });
-  // Keep both versions, including malformed bytes, available for download.
-  if (journal && (!checkpoint || !sameText(journal, checkpoint))) texts.push({ source: 'journal', raw: journal });
-  const files = (await getAllOffline<PendingInspectionEvidence>('inspection_evidence_queue'))
-    .filter(entry => entry.userId === userId && entry.inspectionId === inspectionId && !entry.owner);
-  return { texts, files };
+  try {
+    const key = `sitrep_inspection_draft_${userId}_${inspectionId}`;
+    const checkpoint = await readInspectionFieldCheckpoint(key);
+    const journal = localStorage.getItem(key);
+    const texts: LegacyFieldCopy[] = [];
+    if (checkpoint) texts.push({ source: 'checkpoint', raw: checkpoint });
+    // Keep both versions, including malformed bytes, available for download.
+    if (journal && (!checkpoint || !sameText(journal, checkpoint))) texts.push({ source: 'journal', raw: journal });
+    const files = (await getAllOffline<PendingInspectionEvidence>('inspection_evidence_queue'))
+      .filter(entry => entry.userId === userId && entry.inspectionId === inspectionId && !entry.owner);
+    return { texts, files };
+  } catch {
+    // An unavailable local store is not proof that no previous copies exist.
+    throw new Error('No se pudo completar la búsqueda en el almacenamiento de este dispositivo. Conservá esta pantalla y volvé a buscar; no se borró ninguna copia.');
+  }
 }
 
 /** One IDB transaction claims the existing capture, preserving bytes, hash and

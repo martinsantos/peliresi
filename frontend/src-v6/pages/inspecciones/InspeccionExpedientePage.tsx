@@ -845,7 +845,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     }
     returnToWorkspace();
   };
-  return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-4" data-operational-page>
+  return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
     <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-3">
         <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 items-center justify-between gap-2">
           <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0">{workspaceReturn.label}</Button>
@@ -905,7 +905,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     }} onRecoveredFile={refreshPendingEvidence} />}
     {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
     {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
-    <fieldset disabled={changingStage} className="min-h-0 min-w-0 flex-1"><InspectionWorkspace key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && canWriteDraft() ?
+    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && canWriteDraft() ?
       <div data-testid="inspection-field-save-bar" className="flex min-w-0 items-center gap-2 sm:gap-4">
         <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
         {/* Keep the Android editor/keyboard in place until the ordinary click;

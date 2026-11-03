@@ -14,6 +14,38 @@ function setup() {
 describe('inspection workspace follows the keyboard without floating save controls', () => {
   beforeEach(() => { vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; }); });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  it('scrolls identity, recovery and navigation with the page and preserves each section position', () => {
+    const viewport = new VisibleViewport(); vi.stubGlobal('visualViewport', viewport);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return { top: this.hasAttribute('data-inspection-page-scroll') ? 80 : 380, height: 600 } as DOMRect;
+    });
+    render(<MemoryRouter><div data-testid="page" data-inspection-page-scroll data-inspection-scroll>
+      <header>Identidad y copias anteriores</header>
+      <InspectionWorkspace pageScroll guided defaultStep="acta" onBeforeNavigate={() => true}
+        steps={[
+          { id: 'acta', label: 'Registro', title: 'Observaciones', description: '', content: <textarea aria-label="Nota" /> },
+          { id: 'resumen', label: 'Visita', title: 'Visita', description: '', content: <p>Datos de visita</p> },
+        ]} reference={[]} saveAction={<button>Guardar cambios</button>} />
+    </div></MemoryRouter>);
+    const page = screen.getByTestId('page'), content = screen.getByTestId('inspection-scroll-region');
+    expect(page.style.maxHeight).toBe('691px');
+    expect(screen.getByTestId('inspection-workspace').style.maxHeight).toBe('');
+    expect(content).not.toHaveAttribute('data-inspection-scroll');
+    expect(content.className).not.toContain('overflow-y-auto');
+    expect(screen.getByTestId('inspection-navigation').className).not.toContain('sticky');
+    const note = screen.getByRole('textbox', { name: 'Nota' });
+    fireEvent.change(note, { target: { value: 'Texto conservado' } });
+    page.scrollTop = 240; fireEvent.scroll(page);
+    fireEvent.click(screen.getByRole('link', { name: 'Visita' }));
+    expect(page.scrollTop).toBe(0);
+    fireEvent.click(screen.getByRole('link', { name: 'Registro' }));
+    expect(page.scrollTop).toBe(240);
+    expect(screen.getByRole('textbox', { name: 'Nota' })).toBe(note);
+    expect(note).toHaveValue('Texto conservado');
+    act(() => { viewport.height = 400; viewport.dispatchEvent(new Event('resize')); });
+    expect(page.style.maxHeight).toBe('308px');
+    expect(note).toHaveValue('Texto conservado');
+  });
   it('caps the complete panel at the actual visible bottom, including viewport panning', () => {
     const viewport = new VisibleViewport(); vi.stubGlobal('visualViewport', viewport);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 100 } as DOMRect);
