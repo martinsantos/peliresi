@@ -462,6 +462,13 @@ test('workflow prunes only candidate modules and requires sealed runtime smoke b
   assert.match(workflow,/streamTransport:true/);assert.match(workflow,/Private runtime smoke passed/);
   assert.match(workflow,/SITREP-HOSTINGER-SCHEMA-DEPS/);
 });
+test('prepare scopes the fixture API to frontend tests and preserves the production build URL',()=>{
+  const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
+  const block=workflow.slice(workflow.indexOf('      - name: Build and test only'),workflow.indexOf('      - name: Prune candidate-only'));
+  assert.match(block,/VITE_API_URL: https:\/\/sitrep\.ultimamilla\.com\.ar\/api/);
+  assert.match(block,/VITE_API_URL=\/api npm test -- --maxWorkers=1\s+npm run build\s+npx vite build --config vite.config.app.ts/);
+  assert.doesNotMatch(block,/export VITE_API_URL|VITE_API_URL=\/api npm run build/);
+});
 test('prepare installs PDF inspection tools before tests without installing on Hostinger',()=>{
   const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
   const start=workflow.indexOf('      - name: Install PDF verification tools');
