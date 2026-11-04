@@ -65,10 +65,40 @@ Nota sobre la medición: una primera versión del script elegía «la primera ta
 
 Capturas: `hoja-344-arriba.jpg` (bloque 1 con el mapa y la cruz), `hoja-344-controles.jpg` (lista plana), `hoja-344-control-respondido.jpg` (hallazgo abierto debajo del control, sin mover la página), `hoja-344-pie.jpg` (estado de guardado, pendientes y el único botón), `hoja-web-1365.jpg` (escritorio, con la barra lateral de administración que no se tocó).
 
+## Segunda vuelta · 04/11, tarde (commits `347988ad`, `54473795`)
+
+Prueba del usuario sobre la primera hoja: el mapa seguía siendo impracticable («el punto puede ser una zona», «marco un vértice y tengo que bajar a describirlo»), no había una referencia fija de dónde está uno, los campos no se distinguían de la página y «al final agrega 15 campos más, todos obligatorios».
+
+Inventario previo: unas 60 entradas visibles en el caso GRP. Sólo los 11 controles y los 6 datos del contraste son obligatorios para enviar a revisión; seis constancias (daños, testigos, firma, copia, libro, comunicación) las exige después la aprobación.
+
+Qué cambió:
+
+- **Mapa «Estoy acá».** Un botón toma el GPS y marca el punto; con eso alcanza. Si no hay señal, la cruz y «Marcar el punto aquí». Debajo, «¿El predio es más grande que un punto?» con radios de 50 m a 1 km u otro valor: el punto crece a un círculo (`radioMetros`, guardado también como polígono de 24 vértices para que el acta y el PDF sigan igual; el PDF lo resume como «radio de X m»). Las referencias se marcan con la cruz y su tipo y descripción aparecen pegados al mapa, no al final. Desaparecieron los modos Punto/Sector/Referencias y el trazado por vértices; un trazado anterior se muestra hasta que se lo reemplaza o se lo quita.
+- **Barra fija.** Una línea pegada arriba dice el bloque bajo el dedo («3 · Controles · 3 de 4») y al tocarla lista los cuatro para saltar. Sólo lee la posición; nunca escribe el scroll.
+- **Recorte de campos.** Bloque 1: mapa, número de acta, quién atiende (nombre, cargo) y motivo; DNI, correo, pedido de copia, dirección e inspector plegados en «Más datos». Bloque 2: texto con dictado y fotos; actividad, instalaciones y entorno plegados en «Más detalle del lugar». Bloque 3: controles, contraste y requerimientos (tres campos cada uno; responsable y cómputo por defecto). Bloque 4 «Cerrar la visita»: las seis constancias como preguntas de un toque (`InspectionClosingQuestions.tsx`) que abren un detalle sólo si la respuesta lo pide; el resto de los datos administrativos del acta plegado y sin repetir esas seis. La dirección declarada y el domicilio legal se completan solos una vez.
+- **Contraste visual.** Campos con borde oscuro y fondo blanco, etiquetas en negrita, tarjetas de bloque sobre la página (`index.css`, `.inspection-field-sheet`). Tarjetas de control sin la etiqueta «Revisado · Cumple», redundante con el botón marcado.
+
+Pruebas en el laboratorio: tipos de frontend y backend limpios; backend 16/16 (modelo, geometría, mapa, PDF del acta); frontend 58/58 en mapa, preguntas de cierre, expediente, reinicio, panel de documentos y contraste.
+
+Mediciones (`measurements.json`, capturas `hoja-344-*.jpg`, `hoja-web-1365.jpg`), caso GRP-2026-00001:
+
+| Métrica | Mañana | Tarde, app 344 | Tarde, web 1365 |
+|---|---|---|---|
+| Entradas visibles sin abrir desplegables | ~60 | 20 (incluye los detalles ya cargados en el caso) | 20 |
+| Acordeones | 0 | 0 (sólo los dos índices de búsqueda) | 0 |
+| Barra fija de bloque | no | sí | sí |
+| Radio del predio | no | 6 opciones + otro | igual |
+| Al marcar «No cumple» | 0 px | 0 px | — |
+| Bloqueo táctil del mapa | verificado | verificado | — |
+| Alto total | 12 999 px | 14 451 px: Estoy acá 2 948 (el caso tiene 5 referencias y un trazado anterior), Qué encontré 1 254, Controles 7 901, Cerrar 1 660 | 12 398 px |
+
+El alto no bajó: lo que domina es el bloque Controles (11 controles y 6 datos del contraste con su detalle abierto), que es el trabajo de campo en sí; las preguntas de cierre y las referencias inline agregan lo que los desplegables ahorran.
+
 ## Límites y pendientes
 
 - La barra lateral de administración en la web de escritorio no se tocó: pertenece al trabajo de Inicio y lista por rol de la sesión paralela.
 - Los enlaces de la lista de pendientes («1 controles obligatorios pendientes») llevan al comienzo del bloque, no a la tarjeta pendiente; con 11 controles el inspector la busca. Próximo paso: que el enlace apunte a la primera tarjeta pendiente.
+- El alto de la hoja (unas 19 pantallas a 344 px) sigue siendo el de la lista de controles y el contraste. Si en campo pesa, el próximo paso es una tarjeta de control de una sola línea (título y tres botones) y el contraste con el valor declarado plegado.
 - Las descripciones de foto se deshabilitan mientras se guarda el borrador (cada 1,5 s tras un cambio); escribir allí durante un guardado puede perder teclas. Baja frecuencia; pendiente.
 - Cada vértice nuevo dispara, 2,5 s después, la descarga de unas 12 teselas y la preparación de la imagen del acta, más el guardado automático. En campo con señal débil conviene observarlo.
 - Los dos archivos de prueba que ya fallaban antes (`InspectionInlineSave.test.tsx`, «Guardar y salir de la inspección»; `InspectionWorkspace.keyboard.test.tsx`, barra fija) ahora contradicen el diseño aprobado. Siguen fuera del arnés. Decisión pendiente: actualizarlos o retirarlos.

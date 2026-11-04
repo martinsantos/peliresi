@@ -1,27 +1,48 @@
 {
-  "at": "2026-11-04T10:28:37.005Z",
+  "at": "2026-11-04T11:05:39.051Z",
   "caseId": "cmw1372qv000kl0b983xbgc40",
   "pages": {
     "app344": {
       "sheet": true,
       "tabs": 0,
-      "accordions": 1,
+      "accordions": 2,
       "blocks": [
-        "1.Dónde estoy y con quién",
+        "1.Estoy acá",
         "2.Qué encontré",
         "3.Controles",
-        "4.Declaración y firma"
+        "4.Cerrar la visita"
       ],
       "saveButtons": 0,
       "stageButtons": [
         "Enviar a revisión"
       ],
-      "firstFieldTop": 1101,
-      "mapTop": 420,
-      "crosshair": true,
+      "firstFieldTop": 993,
+      "mapTop": 425,
+      "crosshair": false,
       "markButton": true,
-      "status": "Guardado 07:18",
-      "contentHeight": 12999,
+      "radiusChips": 6,
+      "stickyBar": true,
+      "fieldsVisible": 20,
+      "status": "Guardado 08:00",
+      "contentHeight": 14451,
+      "blockHeights": [
+        {
+          "id": "resumen",
+          "height": 2948
+        },
+        {
+          "id": "acta",
+          "height": 1254
+        },
+        {
+          "id": "checklist",
+          "height": 7901
+        },
+        {
+          "id": "firma",
+          "height": 1660
+        }
+      ],
       "scrollTop": 0,
       "viewportHeight": 760,
       "mapLock": {
@@ -43,33 +64,54 @@
       },
       "answerJump": {
         "card": "control-cmw1372qv000tl0b92x603san",
-        "scrollBeforeTap": 4499,
-        "scrollAfterTap": 4499,
+        "scrollBeforeTap": 4458,
+        "scrollAfterTap": 4458,
         "delta": 0,
-        "scrollAfterRestore": 4499
+        "scrollAfterRestore": 4458
       },
-      "scrollAtChecklist": 4499
+      "scrollAtChecklist": 4458
     },
     "web1365": {
       "sheet": true,
       "tabs": 0,
-      "accordions": 1,
+      "accordions": 2,
       "blocks": [
-        "1.Dónde estoy y con quién",
+        "1.Estoy acá",
         "2.Qué encontré",
         "3.Controles",
-        "4.Declaración y firma"
+        "4.Cerrar la visita"
       ],
       "saveButtons": 0,
       "stageButtons": [
         "Enviar a revisión"
       ],
-      "firstFieldTop": 1070,
-      "mapTop": 431,
-      "crosshair": true,
+      "firstFieldTop": 952,
+      "mapTop": 436,
+      "crosshair": false,
       "markButton": true,
-      "status": "Guardado 07:18",
-      "contentHeight": 11468,
+      "radiusChips": 6,
+      "stickyBar": true,
+      "fieldsVisible": 20,
+      "status": "Guardado 08:00",
+      "contentHeight": 12398,
+      "blockHeights": [
+        {
+          "id": "resumen",
+          "height": 2646
+        },
+        {
+          "id": "acta",
+          "height": 1125
+        },
+        {
+          "id": "checklist",
+          "height": 6845
+        },
+        {
+          "id": "firma",
+          "height": 1147
+        }
+      ],
       "scrollTop": 0,
       "viewportHeight": 900
     }

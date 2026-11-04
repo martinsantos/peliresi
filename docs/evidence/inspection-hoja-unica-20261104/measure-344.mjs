@@ -46,6 +46,7 @@ const probe = () => {
     fieldsVisible: [...(sheet || document).querySelectorAll('input:not([type=hidden]):not([type=file]),textarea,select')].filter(visible).length,
     status: document.querySelector('[data-testid="inspection-field-status"]')?.textContent.trim() || null,
     contentHeight: region.scrollHeight,
+    blockHeights: [...document.querySelectorAll('[data-sheet-block]')].map((el) => ({ id: el.id, height: Math.round(el.getBoundingClientRect().height) })),
     scrollTop: Math.round(region.scrollTop),
     viewportHeight: innerHeight,
   };
