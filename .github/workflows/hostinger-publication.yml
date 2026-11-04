@@ -19,8 +19,12 @@ on:
       expected_active_revision:
         type: string
         required: true
-        default: 8fb6277ecabaace83671a9dfb251147a43c9ccbf
-        description: Exact currently deployed runtime revision, independent of GitHub branch names
+        default: 3245f36573a6b18a74d26887cdaa34e453d19d9e
+        description: Exact runtime identity; initial mixed baseline is web/app 3245f365 and backend/manual 6bc08a7c
+      database_migrations:
+        type: string
+        default: ''
+        description: Prepare only; explicitly enter 20261103160000_inspection_management_role for the reviewed additive schema change
       bundle_sha256:
         type: string
         default: ''
@@ -28,7 +32,7 @@ on:
       acknowledgement:
         type: string
         default: ''
-        description: Enter SITREP-HOSTINGER only after reviewing the preparation receipt
+        description: Enter SITREP-HOSTINGER-SCHEMA for a migration bundle, otherwise SITREP-HOSTINGER; only after reviewing its receipt
 permissions:
   contents: read
 concurrency:
@@ -71,6 +75,7 @@ jobs:
       RELEASE_COMMIT: ${{ inputs.release_commit }}
       EXPECTED_ACTIVE: ${{ inputs.expected_active_revision }}
       REVIEWED_BUNDLE: ${{ inputs.bundle_sha256 }}
+      DATABASE_MIGRATIONS: ${{ inputs.database_migrations }}
       ACKNOWLEDGEMENT: ${{ inputs.acknowledgement }}
     steps:
       - uses: actions/checkout@v6
@@ -83,12 +88,17 @@ jobs:
           [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish ]]
           [[ "$EXPECTED_ACTIVE" =~ ^[0-9a-f]{40}$ ]]
           if [[ "$OPERATION" == preflight ]]; then
-            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" ]]
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" && -z "$DATABASE_MIGRATIONS" ]]
           else
             [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           fi
           if [[ "$OPERATION" == publish ]]; then
-            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER && "$REVIEWED_BUNDLE" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER || "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-SCHEMA ]]
+            [[ "$REVIEWED_BUNDLE" =~ ^[0-9a-f]{64}$ && -z "$DATABASE_MIGRATIONS" ]]
+          fi
+          if [[ "$OPERATION" == prepare ]]; then
+            [[ -z "$ACKNOWLEDGEMENT" && -z "$REVIEWED_BUNDLE" ]]
+            [[ -z "$DATABASE_MIGRATIONS" || "$DATABASE_MIGRATIONS" == 20261103160000_inspection_management_role ]]
           fi
       - uses: actions/checkout@v6
         if: inputs.operation == 'prepare'
@@ -124,6 +134,7 @@ jobs:
           cd candidate/backend
           npm ci
           npm audit --omit=dev --audit-level=high
+          npx --no-install prisma generate --schema prisma/schema.prisma
           npm test -- --maxWorkers=1
           npm run build
           cd ../frontend
@@ -147,7 +158,7 @@ jobs:
           JS
           node --check "$RUNNER_TEMP/publisher.mjs"
           if [[ "$OPERATION" == prepare ]]; then
-            node --experimental-strip-types publisher/scripts/cicd/hostinger/package.ts "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/bundle" "$RELEASE_COMMIT"
+            node --experimental-strip-types publisher/scripts/cicd/hostinger/package.ts "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/bundle" "$RELEASE_COMMIT" "$DATABASE_MIGRATIONS"
             echo "BUNDLE_SHA=$(sha256sum "$RUNNER_TEMP/bundle/release.tar.gz" | cut -d ' ' -f1)" >> "$GITHUB_ENV"
           elif [[ "$OPERATION" == publish ]]; then
             echo "BUNDLE_SHA=$REVIEWED_BUNDLE" >> "$GITHUB_ENV"
@@ -179,4 +190,4 @@ jobs:
           if [[ "$OPERATION" == prepare ]]; then
             scp "${opts[@]}" "$RUNNER_TEMP/bundle/release.tar.gz" "$RUNNER_TEMP/bundle/release.json" "$target:$incoming/"
           fi
-          ssh "${opts[@]}" "$target" "flock --nonblock /run/lock/umsa-sitrep-publisher.lock /usr/bin/node $incoming/publisher.mjs $OPERATION $RELEASE_COMMIT $EXPECTED_ACTIVE $BUNDLE_SHA $id"
+          ssh "${opts[@]}" "$target" "flock --nonblock /run/lock/umsa-sitrep-publisher.lock /usr/bin/node $incoming/publisher.mjs $OPERATION $RELEASE_COMMIT $EXPECTED_ACTIVE $BUNDLE_SHA $id $ACKNOWLEDGEMENT"
