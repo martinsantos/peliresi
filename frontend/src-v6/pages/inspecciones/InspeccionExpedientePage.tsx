@@ -44,6 +44,7 @@ import { InspectionReport } from './InspectionReport';
 import { InspectionTimeline } from './InspectionTimeline';
 import { InspectionExchangePanel } from './InspectionExchangePanel';
 import { InspectionWorkspace, type InspectionWorkspaceStep } from './InspectionWorkspace';
+import { InspectionFieldSheet, type InspectionFieldBlock } from './InspectionFieldSheet';
 import { revealInspectionAnchor, preserveInspectionAnchor } from './inspectionScroll';
 import { InspectionOrganizationPanel } from './InspectionOrganizationPanel';
 import { InspectionVerificationBlock } from './InspectionVerificationBlock';
@@ -71,6 +72,7 @@ type DraftSaveStatus = { tone: 'neutral' | 'warning' | 'success' | 'error'; mess
 const orderedDraftFields = canonicalInspectionValue;
 // Compare only fields that this form persists; evidence metadata can refresh independently.
 const draftFingerprint = (draft: Draft) => JSON.stringify({ observaciones: draft.observaciones, numeroActa: draft.numeroActa, ubicacion: draft.ubicacion, plazoRespuestaAt: draft.plazoRespuestaAt, datosActa: orderedDraftFields(draft.datosActa), informeTecnico: orderedDraftFields(draft.informeTecnico), items: draft.items.map(({ id, resultado, observacion }) => ({ id, resultado, observacion: observacion || null })), comparaciones: draft.comparaciones.map(({ id, resultado, valorObservado, observacion }) => ({ id, resultado, valorObservado: valorObservado || null, observacion: observacion || null })) });
+const AUTOSAVE_DELAY_MS = 1500;
 const localDate = (value?: string | null) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : '';
 const draftFromInspection = (inspection: Inspection): Draft => ({ version: inspection.version, observaciones: inspection.observaciones || '', numeroActa: inspection.numeroActa || '', ubicacion: inspection.ubicacion || '', plazoRespuestaAt: localDate(inspection.plazoRespuestaAt), datosActa: inspection.datosActa || {}, informeTecnico: inspection.informeTecnico || {}, items: inspection.items, comparaciones: inspection.comparaciones || [] });
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -214,6 +216,9 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const isAssignedInspector = Boolean(inspection && currentUser?.esInspector && String(inspection.inspectorId) === String(currentUser.id));
   const fieldEditAllowed = Boolean(!query.isError && inspection && ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(inspection.estado) && (isAdmin || isAssignedInspector));
   const reportEditAllowed = Boolean(!query.isError && inspection && (fieldEditAllowed || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
+  // Field states open as one page, the field sheet. The full dossier stays one explicit link away.
+  const dossierView = new URLSearchParams(location.search).get('vista') === 'expediente';
+  const sheet = fieldEditAllowed && !dossierView;
   const draftOwnership = useInspectionDraftOwnership(draftKey, fieldEditAllowed || reportEditAllowed);
   const canWriteDraft = draftOwnership.canWrite;
   const hydrationKey = `${draftKey}:${inspection?.id || ''}:${inspection?.version || 0}:${draftOwnership.status}`;
@@ -502,6 +507,21 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     } finally { savingDraftRef.current = false; setSavingDraft(false); }
   };
   saveForSyncRef.current = () => save(true);
+  // The field sheet saves itself. After a refused save it waits for the next edit or for the
+  // connection to return instead of retrying every few seconds.
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const autosaveLatchRef = useRef('');
+  const saveFailedRef = useRef(false); saveFailedRef.current = saveFailed;
+  const autosaveDirty = sheet && draftReady && currentFingerprint !== serverFingerprint;
+  const autosaveBlocked = !isOnline || !canWriteDraft() || Boolean(staleDraft) || dictating || recording || syncingEvidence || savingDraft || changingStage || leavingDraft;
+  useEffect(() => { if (isOnline) autosaveLatchRef.current = ''; }, [isOnline]);
+  useEffect(() => {
+    if (!autosaveDirty || autosaveBlocked || autosaveLatchRef.current === currentFingerprint) return;
+    const attempt = currentFingerprint;
+    const timer = window.setTimeout(() => { void save().then((saved) => { if (saveFailedRef.current) autosaveLatchRef.current = attempt; else if (saved) setLastSavedAt(Date.now()); }); }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autosaveDirty, autosaveBlocked, currentFingerprint]);
   const transition = async (next: InspectionState) => {
     if (!canWriteDraft() || syncingRef.current || savingDraftRef.current || staleDraft) return false;
     if (!isOnline) { toast.warning('Conexión requerida', 'El cambio de etapa requiere confirmación del servidor.'); return false; }
@@ -771,14 +791,15 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="visita" />
   </div>;
   const observationLabel = environmentalInspection ? `Registro de ${INSPECTION_TYPES[inspectionType].label.toLocaleLowerCase('es-AR')}` : inspection.tipoActor ? 'Registro de lo observado' : 'Descripción de la denuncia o hallazgo';
-  const act = <div className="mx-auto max-w-3xl space-y-6">
-    <div className="space-y-3">
+  const observationEditor = <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label htmlFor="inspection-observations" className="text-base font-bold text-neutral-900">{observationLabel}</label>
-        {canEdit && <OfflineDictation compact active={location.hash.startsWith('#acta')} onActiveChange={setDictating} onText={(text) => { const current = currentDraftRef.current; if (!current) return; const next = { ...current, observaciones: appendDictatedText(current.observaciones, text) }; currentDraftRef.current = next; setObservaciones(next.observaciones); storeDraft(next); }} />}
+        {canEdit && <OfflineDictation compact active={sheet || location.hash.startsWith('#acta')} onActiveChange={setDictating} onText={(text) => { const current = currentDraftRef.current; if (!current) return; const next = { ...current, observaciones: appendDictatedText(current.observaciones, text) }; currentDraftRef.current = next; setObservaciones(next.observaciones); storeDraft(next); }} />}
       </div>
       <textarea id="inspection-observations" disabled={!canEdit} value={observaciones} onChange={(event) => setObservaciones(event.target.value)} rows={4} placeholder="Qué observaste, dónde y en qué condiciones. Podés escribir o dictar." className="block w-full resize-y rounded-lg border border-neutral-400 p-3 text-base font-normal leading-relaxed text-neutral-900 focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50" />
-    </div>
+    </div>;
+  const act = <div className="mx-auto max-w-3xl space-y-6">
+    {observationEditor}
     <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="constatacion" />
     <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="medidas" />
     <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Constancias y datos complementarios</summary><InspectionDocumentsPanel actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></details>
@@ -793,9 +814,11 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     </div></div>}
     <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Consultar el expediente completo</summary><InspectionReport inspection={draftInspection} readiness={canEdit || !inspection.tipoActor ? undefined : dossierReadiness || undefined} /></details>
   </>;
+  const checklist = <Checklist flat={sheet} inspectionId={inspection.id} groups={fieldGroups} items={items} completed={completed} editable={canEdit} setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || 'Evidencia vinculada al control ' + item.codigo })} onAnnul={annulEvidence} onDictationActiveChange={setDictating} onDictatedText={(itemId, text) => { const current = currentDraftRef.current; if (!current) return; const next = { ...current, items: current.items.map((item) => item.id === itemId ? { ...item, observacion: appendDictatedText(item.observacion || '', text) } : item) }; currentDraftRef.current = next; setItems(next.items); storeDraft(next); }} />;
+  const signatureReady = currentFingerprint === serverFingerprint && !pendingEvidence.length && !savingDraft && !organizationPending && !pendingEvidenceReadFailed && !staleDraft && !syncingEvidence && !changingStage && canWriteDraft();
   const steps: InspectionWorkspaceStep[] = guided ? [
     { id: 'resumen', label: 'Preparar la inspección', title: 'Preparar la inspección', description: 'Confirmá a quién vas a inspeccionar, dónde y con qué número de acta.', detail: numeroActa || 'Acta sin numerar', complete: Boolean(numeroActa.trim() && ubicacion.trim()), content: context, nextAction: primaryAction?.state === 'EN_CAMPO' && canWriteDraft() ? <Button size="lg" className="min-h-14 w-full sm:w-auto" leftIcon={<Play size={22} aria-hidden="true" />} isLoading={changingStage} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft)} onClick={async () => { if (await transition('EN_CAMPO')) navigate({ pathname: location.pathname, search: location.search, hash: inspection.tipoActor ? '#checklist' : '#acta' }); }}>Iniciar visita</Button> : undefined },
-    { id: 'checklist', label: 'Recorrido de campo', title: 'Recorrido de campo', description: 'Empezá por instalaciones, residuos u operación; registrá cada hallazgo y su evidencia en el lugar.', detail: completed + ' de ' + items.length + ' controles', complete: items.length > 0 && completed === items.length, anchors: orderedItems.map((item) => ({ id: item.codigo, label: item.etiqueta, group: item.categoria, reviewed: item.resultado !== 'PENDIENTE', detail: item.resultado === 'PENDIENTE' ? 'Pendiente' : 'Revisado · ' + (RESULTS.find((result) => result.value === item.resultado)?.label || item.resultado) })), content: <Checklist inspectionId={inspection.id} groups={fieldGroups} items={items} completed={completed} editable={canEdit} setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || 'Evidencia vinculada al control ' + item.codigo })} onAnnul={annulEvidence} onDictationActiveChange={setDictating} onDictatedText={(itemId, text) => { const current = currentDraftRef.current; if (!current) return; const next = { ...current, items: current.items.map((item) => item.id === itemId ? { ...item, observacion: appendDictatedText(item.observacion || '', text) } : item) }; currentDraftRef.current = next; setItems(next.items); storeDraft(next); }} /> },
+    { id: 'checklist', label: 'Recorrido de campo', title: 'Recorrido de campo', description: 'Empezá por instalaciones, residuos u operación; registrá cada hallazgo y su evidencia en el lugar.', detail: completed + ' de ' + items.length + ' controles', complete: items.length > 0 && completed === items.length, anchors: orderedItems.map((item) => ({ id: item.codigo, label: item.etiqueta, group: item.categoria, reviewed: item.resultado !== 'PENDIENTE', detail: item.resultado === 'PENDIENTE' ? 'Pendiente' : 'Revisado · ' + (RESULTS.find((result) => result.value === item.resultado)?.label || item.resultado) })), content: checklist },
     { id: 'declaracion', label: 'Contraste con registros', title: 'Contraste con registros', description: 'Contrastá lo observado con la fotografía declarada. Los datos administrativos quedan al final como contexto.', detail: inspection.tipoActor ? reviewedComparisons + ' de ' + comparisons.length + ' contrastados' : 'Sin declaración vinculada', complete: !inspection.tipoActor || (comparisons.length > 0 && reviewedComparisons === comparisons.length), anchors: orderedComparisons.map((row) => ({ id: row.codigo, label: row.etiqueta, group: row.categoria, reviewed: row.resultado !== 'PENDIENTE', detail: row.resultado === 'PENDIENTE' ? 'Pendiente' : 'Revisado · ' + (COMPARISON_RESULT_LABELS[row.resultado] || row.resultado) })), content: !inspection.tipoActor ? <p className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm leading-relaxed">Este hallazgo todavía no tiene responsable identificado. Podés registrar lo observado y enviarlo a revisión sin contrastar una declaración. Si identificás al responsable, vinculalo desde «Preparar la inspección»; se incorporarán sus datos declarados.</p> : <InspectionComparisonPanel embedded inspectionId={inspection.id} comparisons={orderedComparisons} declaredDocuments={inspection.declaradoSnapshot?.documents} editable={canEdit} onSave={save} saving={savingDraft} saveStatus={saveStatus} saveDisabled={saveDisabled} onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} /> },
     { id: 'evidencias', label: 'Evidencias', title: 'Evidencias', description: 'Todas las evidencias del expediente. Las fotos de un hallazgo se agregan desde su control.', detail: pendingEvidence.length ? pendingEvidence.length + ' por sincronizar' : inspection.evidencias.filter((entry) => !entry.anuladaAt).length + ' archivos', content: evidence },
     { id: 'acta', label: 'Acta de campo', title: 'Acta de campo', description: 'Registrá lo constatado, quién intervino y las formalidades. Una negativa o imposibilidad se documenta; no se presume.', detail: fieldEditAllowed ? (observaciones.trim() ? 'Con registro' : 'Sin registrar') : 'Campo cerrado · consulta', content: act },
@@ -814,7 +837,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const reference: InspectionWorkspaceStep[] = [
     // Scheduling and device recovery are dossier tools, not field tasks: they live under «Expediente y seguimiento».
     { id: 'organizacion', label: 'Asignación y programación', title: 'Asignación y programación', description: 'Inspector asignado, fecha prevista e inicio de la visita.', content: <div className="space-y-5"><InspectionOrganizationPanel key={`${inspection.id}:${inspection.version}`} onPendingChange={setOrganizationPending} inspection={inspection} admin={isAdmin} backPath={`${mobile ? '/mobile' : ''}/inspecciones`} disabled={!isOnline || currentFingerprint !== serverFingerprint || Boolean(staleDraft) || pendingEvidence.length > 0 || recording || savingDraft || syncingEvidence || !canWriteDraft()} /><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs text-neutral-500">Programada</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.fechaProgramada, true)}</dd></div><div><dt className="text-xs text-neutral-500">Inicio de campo</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.iniciadaAt, true)}</dd></div></dl></div> },
-    { id: 'firma', label: 'Leer y firmar', title: 'Leer y firmar el acta', description: 'Presentá el contenido al inspeccionado y conservá su firma con la versión revisada.', content: <><InspectionSignaturePanel inspectionId={inspection.id} saved={currentFingerprint === serverFingerprint && !pendingEvidence.length && !savingDraft && !organizationPending && !pendingEvidenceReadFailed && !staleDraft && !syncingEvidence && !changingStage && canWriteDraft()} editable={Boolean(canEdit && isOnline)} /></> },
+    { id: 'firma', label: 'Leer y firmar', title: 'Leer y firmar el acta', description: 'Presentá el contenido al inspeccionado y conservá su firma con la versión revisada.', content: <><InspectionSignaturePanel inspectionId={inspection.id} saved={signatureReady} editable={Boolean(canEdit && isOnline)} /></> },
     { id: 'entrega', label: 'Copia del acta y respuestas', title: 'Copia del acta y respuestas', description: 'Acceso limitado al acta y sus presentaciones.', content: <InspectionActAccessPanel inspection={inspection} /> },
     ...(showExchangePanel ? [{ id: 'intercambios', label: 'Comunicaciones y respuestas', title: 'Comunicaciones y respuestas', description: 'Intercambios auditados con el inspeccionado y documentación de cada intervención.', content: <InspectionExchangePanel inspectionId={inspection.id} /> }] : []),
     { id: 'trazabilidad', label: 'Trazabilidad', title: 'Trazabilidad', description: 'Quién hizo cada intervención, cuándo y con qué documentación.', content: <InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Registro actualizado', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Borrador de notificación registrado como no enviado.' : 'Nota interna incorporada.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /> },
@@ -843,9 +866,37 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     : pendingEvidence.length ? `${pendingEvidence.length} ${pendingEvidence.length === 1 ? 'captura por enviar' : 'capturas por enviar'}${!isOnline ? ' · sin conexión' : ''}`
       : !isOnline ? 'Sin conexión · podés seguir registrando.'
         : '';
+  const clock = (value: number | string) => new Date(value).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const sheetStatusText = savingDraft ? 'Guardando…'
+    : staleDraft || storageFailed || saveFailed || draftOwnership.status !== 'owned' || leavingDraft ? saveStatus.message
+    : currentFingerprint !== serverFingerprint ? (dictating ? 'Dictado en curso · se guarda al terminar' : recording ? 'Grabando audio · se guarda al terminar' : isOnline ? 'Guardando…' : 'Sin conexión · guardado en este dispositivo')
+    : 'Guardado ' + clock(lastSavedAt ?? inspection.updatedAt);
+  const sheetStatus = <p role="status" data-testid="inspection-field-status" className={saveStatus.tone === 'error' ? 'text-error-800' : undefined}>{sheetStatusText}{fieldSaveDetail && <span className="block text-xs text-neutral-600">{fieldSaveDetail}</span>}</p>;
+  const sheetStart = sheet && canWriteDraft() && (inspection.estado === 'BORRADOR' || inspection.estado === 'PLANIFICADA') ? <><p className="mb-3 text-sm text-neutral-800">Al llegar, iniciá la visita. El formulario ya se puede completar.</p><Button size="lg" className="min-h-14 w-full sm:w-auto" leftIcon={<Play size={22} aria-hidden="true" />} isLoading={changingStage} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft)} onClick={() => void transition('EN_CAMPO')}>Iniciar visita</Button></> : undefined;
+  const sendBlocked = !isOnline || pendingEvidence.length > 0 || Boolean(staleDraft) || !items.every(item => !item.obligatorio || item.resultado !== 'PENDIENTE') || Boolean(inspection.tipoActor && (!comparisons.length || comparisons.some(row => row.resultado === 'PENDIENTE')));
+  const sheetAction = sheet && canWriteDraft() && inspection.estado === 'EN_CAMPO' ? <><FieldReadinessPanel requiresComparison={Boolean(inspection.tipoActor)} state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /><Button aria-label="Enviar a revisión" size="lg" className="min-h-14 w-full" leftIcon={<Send size={18} />} isLoading={transitionMutation.isPending} disabled={sendBlocked} onClick={() => void transition('EN_REVISION')}>Enviar a revisión</Button><p className="text-xs text-neutral-600">Cierra el trabajo de campo con lo guardado. No aprueba la inspección ni avisa al inspeccionado.</p></> : undefined;
+  // One page in the order of the visit. Anchors keep the ids the readiness list links to.
+  const fieldBlocks: InspectionFieldBlock[] = [
+    { id: 'resumen', title: 'Dónde estoy y con quién', content: <>
+      <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="lugar" />
+      <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
+      <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="visita" />
+      <label className="block text-sm font-medium">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-1 min-h-11 w-full rounded-lg border border-neutral-300 bg-white p-3 text-base text-neutral-900 disabled:bg-neutral-50" /></label>
+      <p className="text-sm text-neutral-600">Inspector: {inspection.inspector.nombre} {inspection.inspector.apellido || ''}{actor?.cuit ? ` · CUIT del inspeccionado ${actor.cuit}` : ''}</p>
+    </> },
+    { id: 'acta', title: 'Qué encontré', content: <>{observationEditor}<div id="evidencias">{evidence}</div><InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="constatacion" /></> },
+    { id: 'checklist', title: 'Controles', content: <>{checklist}{inspection.tipoActor && <div id="declaracion"><h3 className="mb-3 font-semibold">Comparar con lo declarado</h3><InspectionComparisonPanel embedded inspectionId={inspection.id} comparisons={orderedComparisons} declaredDocuments={inspection.declaradoSnapshot?.documents} editable={canEdit} onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} /></div>}<InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="medidas" /></> },
+    { id: 'firma', title: 'Declaración y firma', content: <>
+      <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Constancias y datos complementarios</summary><InspectionDocumentsPanel actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></details>
+      <InspectionSignaturePanel inspectionId={inspection.id} saved={signatureReady} editable={Boolean(canEdit && isOnline)} />
+      <InspectionActAccessPanel inspection={inspection} />
+    </> },
+  ];
   const pauseFieldWork = async () => {
     if (recording || dictating || uploadingItemId || syncingEvidence || savingDraftRef.current || changingStage || pendingEvidenceReadFailed) return;
     if (organizationPending && !window.confirm('Los cambios de organización todavía no están guardados. ¿Salir sin confirmarlos? Los datos de campo se conservan por separado.')) return;
+    // No Guardar button on the field sheet: leaving sends what is still unsaved.
+    if (sheet && isOnline && !staleDraft && canWriteDraft() && currentDraftRef.current && draftFingerprint(currentDraftRef.current) !== serverFingerprintRef.current) await save();
     if (!staleDraft && currentDraftRef.current && canWriteDraft()) {
       const departing = draftFingerprint(currentDraftRef.current);
       const journaled = storeDraft(currentDraftRef.current);
@@ -890,11 +941,12 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
         {nextTask && <Button variant="primary" className="ml-auto min-h-11 max-w-full shrink-0 max-sm:flex-1 max-sm:px-3" rightIcon={<ArrowRight size={17} />} aria-label={(currentFingerprint === serverFingerprint ? 'Continuar a ' : 'Guardar y continuar a ') + inspectionTaskLabel(nextTask)} disabled={saveDisabled || dictating || recording || savingDraft} isLoading={savingDraft} onClick={() => void continueJourney()}>{currentFingerprint === serverFingerprint ? 'Continuar' : 'Guardar y continuar'}</Button>}
       </div> : undefined;
   return <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="inspection-page-frame">
-  <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll data-inspection-scroll>
+  <div className="inspection-case flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [overflow-anchor:none]" data-operational-page data-inspection-page-scroll {...(sheet ? {} : { 'data-inspection-scroll': '' })}>
     <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-1.5 sm:gap-3">
         <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0 px-2">{workspaceReturn.label}</Button>
           <div className="flex shrink-0 items-center gap-1">
+          {fieldEditAllowed && <Link to={{ pathname: location.pathname, search: dossierView ? '' : '?vista=expediente', hash: location.hash }} onClick={(event) => { if (dictating || !flushDraft()) event.preventDefault(); }} className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-primary-800 !no-underline hover:bg-primary-50">{dossierView ? 'Formulario de campo' : 'Expediente completo'}</Link>}
           <Button variant="outline" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="hidden lg:inline-flex" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
             <DropdownTrigger asChild><Button variant="ghost" className="px-2" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span>Descargas</span></Button></DropdownTrigger>
@@ -937,9 +989,9 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
 
     {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
     {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
-    <fieldset disabled={changingStage} className="min-w-0 shrink-0"><InspectionWorkspace pageScroll continuationManaged={Boolean(fieldSaveAction)} key={id} steps={steps} reference={reference} guided={guided} defaultStep={defaultSection} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} /></fieldset>
+    <fieldset disabled={changingStage} className="min-w-0 shrink-0">{sheet ? <InspectionFieldSheet blocks={fieldBlocks} start={sheetStart} status={sheetStatus} action={sheetAction} /> : <InspectionWorkspace pageScroll continuationManaged={Boolean(fieldSaveAction)} key={id} steps={steps} reference={reference} guided={guided} defaultStep={defaultSection} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} />}</fieldset>
   </div>
-  {fieldSaveAction && (steps.some(step => step.id === activeSection) || ['firma', 'entrega'].includes(activeSection)) && <footer data-testid="inspection-action-bar" className="shrink-0 border-t border-neutral-200 bg-white px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:px-6">{fieldSaveAction}</footer>}
+  {!sheet && fieldSaveAction && (steps.some(step => step.id === activeSection) || ['firma', 'entrega'].includes(activeSection)) && <footer data-testid="inspection-action-bar" className="shrink-0 border-t border-neutral-200 bg-white px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:px-6">{fieldSaveAction}</footer>}
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
     <input ref={fileRef} aria-label="Adjuntar archivo general" type="file" accept={INSPECTION_EVIDENCE_ACCEPT} className="hidden" onChange={uploadFromInput} />
   </div>;
@@ -1047,12 +1099,13 @@ function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionIt
   </div>;
 }
 
-function Checklist({ inspectionId, groups, items, completed, editable, setItems, uploadingItemId, pendingEvidence, onEvidence, onAnnul, onDictatedText, onDictationActiveChange }: { inspectionId: string; groups: string[]; items: InspectionItem[]; completed: number; editable: boolean; setItems: React.Dispatch<React.SetStateAction<InspectionItem[]>>; uploadingItemId: string | null; pendingEvidence: PendingInspectionEvidence[]; onEvidence: (file: File, item: InspectionItem) => void; onAnnul: (evidenceId: string, reason: string) => Promise<void>; onDictatedText: (itemId: string, text: string) => void; onDictationActiveChange: (active: boolean) => void }) {
+function Checklist({ inspectionId, groups, items, completed, editable, setItems, uploadingItemId, pendingEvidence, onEvidence, onAnnul, onDictatedText, onDictationActiveChange, flat = false }: { flat?: boolean; inspectionId: string; groups: string[]; items: InspectionItem[]; completed: number; editable: boolean; setItems: React.Dispatch<React.SetStateAction<InspectionItem[]>>; uploadingItemId: string | null; pendingEvidence: PendingInspectionEvidence[]; onEvidence: (file: File, item: InspectionItem) => void; onAnnul: (evidenceId: string, reason: string) => Promise<void>; onDictatedText: (itemId: string, text: string) => void; onDictationActiveChange: (active: boolean) => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const nonCompliant = items.filter((item) => item.resultado === 'NO_CUMPLE').length;
   const orderedItems = groups.flatMap((group) => items.filter((item) => item.categoria === group));
   const [expandedItem, setExpandedItem] = useState<string>();
+  const [manuallyOpened, setManuallyOpened] = useState<Set<string>>(() => new Set());
   let linkedCode = '';
   try { linkedCode = decodeURIComponent(location.hash.split('/')[1] || ''); } catch { /* invalid anchors do not discard the draft */ }
   const linkedItem = location.hash.startsWith('#checklist/') ? items.find((item) => item.codigo === linkedCode) : undefined;
@@ -1069,6 +1122,8 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
   const pendingScrollHash = useRef<string | null>(null);
   const handledScrollHash = useRef<string | null>(null);
   const openControl = (item?: InspectionItem, align = true) => {
+    // Flat list: the index scrolls to the card (the inspector asked for it); nothing else moves.
+    if (flat) { if (!item) return; setManuallyOpened((current) => new Set(current).add(item.id)); document.getElementById('control-' + item.id)?.scrollIntoView?.({ block: 'start' }); return; }
     preserveAnchor.current = !align ? preserveInspectionAnchor(document.getElementById('control-' + (item?.id || activeItem))) : null;
     pendingScrollHash.current = item ? '#checklist/' + encodeURIComponent(item.codigo) : '#checklist';
     setExpandedItem(item?.id || '');
@@ -1077,6 +1132,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
     navigate({ pathname: location.pathname, search: location.search, hash: item ? '#checklist/' + encodeURIComponent(item.codigo) : '#checklist' }, { replace: true });
   };
   useLayoutEffect(() => {
+    if (flat) return;
     // Router navigation can commit after local accordion state. Do not consume
     // preservation in the first commit and then run a second hash auto-scroll.
     if (pendingScrollHash.current !== null && pendingScrollHash.current !== location.hash) return;
@@ -1104,7 +1160,10 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
   };
 
   return <section className="bg-white">
-    <div className="border-b border-neutral-300 pb-4">
+    {flat ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-300 pb-3">
+      <p className="text-sm font-semibold text-neutral-700">{completed} de {items.length} revisados{nonCompliant > 0 && <span className="ml-2 rounded-full bg-error-50 px-2.5 py-1 text-xs font-bold text-error-700">{nonCompliant} {nonCompliant === 1 ? 'no cumple' : 'no cumplen'}</span>}</p>
+      <ChecklistJumpIndex items={orderedItems} onSelect={openControl} />
+    </div> : <div className="border-b border-neutral-300 pb-4">
       <h2 className="flex items-center gap-2 text-base font-bold text-primary-900"><Eye size={20} aria-hidden="true" />Recorrido de campo</h2>
       <p className="mb-3 mt-1 text-sm text-neutral-700">Revisá el lugar y registrá lo que encontrás.</p>
       <div className="flex items-start justify-between gap-4">
@@ -1116,13 +1175,13 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
         <ChecklistJumpIndex items={orderedItems} activeId={activeItem} onSelect={openControl} />
         <Button className="max-lg:hidden" variant="outline" disabled={!nextPendingAfter(items.find((item) => item.id === activeItem))} onClick={() => openControl(nextPendingAfter(items.find((item) => item.id === activeItem)))}>{nextPendingAfter(items.find((item) => item.id === activeItem)) ? 'Ir al siguiente pendiente (' + remaining.length + ')' : remaining.length ? 'Último control pendiente' : 'Todos revisados'}</Button>
       </div>
-    </div>
+    </div>}
     {groups.map((group) => {
       const groupItems = items.filter((item) => item.categoria === group);
       const groupCompleted = groupItems.filter((item) => item.resultado !== 'PENDIENTE').length;
       const groupFails = groupItems.filter((item) => item.resultado === 'NO_CUMPLE').length;
       return <div key={group} className="mt-5">
-        <div style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-12 items-center justify-between gap-3 rounded-t-lg border border-neutral-300 bg-neutral-100 px-3 py-2 sm:px-5">
+        <div style={flat ? undefined : { top: 'var(--inspection-middle-top, 0px)' }} className={(flat ? '' : 'sticky z-10 ') + 'flex min-h-12 items-center justify-between gap-3 rounded-t-lg border border-neutral-300 bg-neutral-100 px-3 py-2 sm:px-5'}>
           <p className="font-bold text-[#10213A]">{group}</p>
           <div className="text-right text-xs font-semibold text-neutral-600"><span>{groupCompleted}/{groupItems.length} revisados</span>{groupCompleted < groupItems.length && <span className="text-warning-800"> · {groupItems.length - groupCompleted} pendientes</span>}{groupFails > 0 && <span className="text-error-800"> · {groupFails} {groupFails === 1 ? 'no cumple' : 'no cumplen'}</span>}</div>
         </div>
@@ -1133,14 +1192,19 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           const visibleItemEvidence = itemEvidenceExpanded ? itemEvidence : itemEvidence.slice(0, 4);
           const pendingItemEvidence = pendingEvidence.filter((evidence) => evidence.fields.itemId === item.id);
           // Observation and photos appear once a result is chosen: a pending card shows only the three answers.
-          const showObservation = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0 || (editable && item.resultado !== 'PENDIENTE');
-          const expanded = activeItem === item.id;
+          const hasContent = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0;
+          // Flat list: a card opens by its content or by an explicit tap, and never closes on its own.
+          const expanded = flat ? hasContent || manuallyOpened.has(item.id) : activeItem === item.id;
+          const showObservation = flat ? expanded : hasContent || (editable && item.resultado !== 'PENDIENTE');
           return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`mt-2 rounded-lg border border-l-4 px-3 py-1 sm:px-5 ${isFail ? 'border-error-300 border-l-error-600 bg-error-50/30' : expanded ? 'border-primary-300 border-l-primary-700 bg-primary-50/50' : 'border-neutral-300 border-l-neutral-300 bg-white'}`}>
-            <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item, false)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            {flat ? <div className="flex min-h-16 w-full items-start gap-3 py-3 text-left">
+              <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{orderedItems.indexOf(item) + 1}</span>}</div>
+              <div className="min-w-0 flex-1"><p className="text-base font-semibold leading-relaxed text-[#10213A]">{item.etiqueta}</p><div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"><span className="text-xs font-medium text-neutral-500">{item.codigo}</span><span data-testid={'inspection-item-status-' + item.id} className={'rounded-md px-2 py-1 text-xs font-semibold ' + (item.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-900' : isFail ? 'bg-error-50 text-error-800' : item.resultado === 'CUMPLE' ? 'bg-success-50 text-success-800' : 'bg-neutral-100 text-neutral-700')}>{itemStatus(item)}</span>{item.observacion && <span className="text-xs text-neutral-600">Observación</span>}{itemEvidence.length + pendingItemEvidence.length > 0 && <span className="text-xs text-neutral-600">{itemEvidence.length + pendingItemEvidence.length} adjuntos</span>}</div></div>
+            </div> : <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item, false)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{orderedItems.indexOf(item) + 1}</span>}</div>
               <div className="min-w-0 flex-1"><p className="text-base font-semibold leading-relaxed text-[#10213A]">{item.etiqueta}</p><div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"><span className="text-xs font-medium text-neutral-500">{item.codigo}</span><span data-testid={'inspection-item-status-' + item.id} className={'rounded-md px-2 py-1 text-xs font-semibold ' + (item.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-900' : isFail ? 'bg-error-50 text-error-800' : item.resultado === 'CUMPLE' ? 'bg-success-50 text-success-800' : 'bg-neutral-100 text-neutral-700')}>{itemStatus(item)}</span>{item.observacion && <span className="text-xs text-neutral-600">Observación</span>}{itemEvidence.length + pendingItemEvidence.length > 0 && <span className="text-xs text-neutral-600">{itemEvidence.length + pendingItemEvidence.length} adjuntos</span>}</div></div>
               {expanded ? <ChevronUp size={17} className="mt-1 shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="mt-1 shrink-0 text-neutral-500" />}
-            </button>
+            </button>}
             {/* The three answers stay at hand on every card; details open with a tap or once a result is chosen. */}
             {editable && <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2 pb-3 pl-0 sm:pl-10">
                 {RESULTS.map((option) => {
@@ -1148,8 +1212,9 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                   return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:flex-row sm:gap-1.5 sm:text-sm ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
                 })}
               </div>}
+            {flat && editable && !expanded && item.resultado !== 'PENDIENTE' && <button type="button" onClick={() => setManuallyOpened((current) => new Set(current).add(item.id))} className="mb-3 min-h-11 text-sm font-semibold text-primary-800 underline">Agregar observación o foto</button>}
             {/* A pending editable card has nothing to unfold yet: no empty details block with a lone «Siguiente pendiente». */}
-            {expanded && (showObservation || !editable) && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
+            {expanded && (flat || showObservation || !editable) && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
               {!editable && <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2">
                 {RESULTS.map((option) => {
                   const selected = item.resultado === option.value;
@@ -1158,7 +1223,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
               </div>}
               {showObservation && <div className={`mt-3 border-l-2 pl-3 ${isFail ? 'border-error-300' : 'border-neutral-300'}`}>
                 <label><span className={`mb-1 block text-sm font-bold ${isFail ? 'text-error-900' : 'text-neutral-900'}`}>{isFail ? 'Hallazgo: qué no cumple' : 'Observación de este control'}</span><textarea disabled={!editable} aria-label={`Observación: ${item.etiqueta}`} value={item.observacion || ''} onChange={(event) => updateItem(item.id, { observacion: event.target.value })} rows={2} placeholder={isFail ? 'Qué encontraste, dónde y qué evidencia lo respalda' : 'Qué observaste en este control'} className={`w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-base outline-none focus:ring-2 ${isFail ? 'border-error-300 focus:border-error-600 focus:ring-error-100' : 'border-neutral-400 focus:border-primary-700 focus:ring-primary-100'}`} /></label>
-                {editable && <div className="mt-2"><OfflineDictation buttonLabel="Dictar observación" active={expanded && location.hash.startsWith('#checklist')} onActiveChange={onDictationActiveChange} onText={(text) => onDictatedText(item.id, text)} /></div>}
+                {editable && <div className="mt-2"><OfflineDictation buttonLabel="Dictar observación" active={flat || (expanded && location.hash.startsWith('#checklist'))} onActiveChange={onDictationActiveChange} onText={(text) => onDictatedText(item.id, text)} /></div>}
                 {itemEvidence.length > 0 && <div className="mt-3"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{visibleItemEvidence.map((evidence) => <EvidenceTile key={evidence.id} inspectionId={inspectionId} evidence={evidence} editable={editable} onAnnul={onAnnul} />)}</div>{itemEvidence.length > 4 && <button type="button" onClick={() => setExpandedEvidence((ids) => itemEvidenceExpanded ? ids.filter((id) => id !== item.id) : [...ids, item.id])} className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{itemEvidenceExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}{itemEvidenceExpanded ? 'Mostrar menos' : `Ver las ${itemEvidence.length} evidencias`}</button>}</div>}
                 {pendingItemEvidence.length > 0 && <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{pendingItemEvidence.map((evidence) => <PendingEvidenceThumbnail key={evidence.id} evidence={evidence} />)}</div>}
                 {editable && <div className="mt-3 flex flex-wrap gap-2">
@@ -1174,7 +1239,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                   </label>
                 </div>}
               </div>}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><button type="button" disabled={!nextPendingAfter(item)} onClick={() => openControl(nextPendingAfter(item))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(item) ? 'Siguiente pendiente' : remaining.length ? 'Último control pendiente' : 'Checklist revisado'}</button></div>
+              {!flat && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><button type="button" disabled={!nextPendingAfter(item)} onClick={() => openControl(nextPendingAfter(item))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(item) ? 'Siguiente pendiente' : remaining.length ? 'Último control pendiente' : 'Checklist revisado'}</button></div>}
             </div>}
           </div>;
         })}

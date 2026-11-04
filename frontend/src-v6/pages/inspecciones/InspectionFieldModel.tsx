@@ -1,10 +1,10 @@
 import React, { lazy, Suspense } from 'react';
-import { MapPin, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import type { InspectionActData, InspectionMeasure } from '../../types/inspection';
 const LocationMap = lazy(() => import('./InspectionLocationMap'));
 const input = 'mt-1 min-h-11 w-full rounded-lg border border-neutral-300 bg-white p-3 text-base text-neutral-900 disabled:bg-neutral-50';
 
-export function InspectionFieldModel({ value, onChange, disabled, section }: { value: InspectionActData; onChange: (v: InspectionActData) => void; disabled: boolean; section: 'visita' | 'constatacion' | 'medidas' }) {
+export function InspectionFieldModel({ value, onChange, disabled, section }: { value: InspectionActData; onChange: (v: InspectionActData) => void; disabled: boolean; section: 'lugar' | 'visita' | 'constatacion' | 'medidas' }) {
   const update = <K extends keyof InspectionActData>(key: K, next: InspectionActData[K]) => onChange({ ...value, modeloCampo: 2, [key]: next });
   const area = (key: 'actividadObservada' | 'ampliacionDetalle' | 'entornoObservado' | 'restriccionReferencia', label: string) => <label className="block text-sm font-medium">{label}<textarea disabled={disabled} className={input} rows={3} value={value[key] || ''} onChange={e => update(key, e.target.value)} /></label>;
   if (section === 'visita') return <section aria-label="Datos de la visita" className="space-y-5">
@@ -12,8 +12,9 @@ export function InspectionFieldModel({ value, onChange, disabled, section }: { v
     <div className="grid gap-4 sm:grid-cols-2">{([['atendidoPor', 'Persona que atiende'], ['cargoAtendido', 'Carácter o cargo'], ['dniAtendido', 'Documento de identidad']] as const).map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={input} disabled={disabled} value={value[key] || ''} onChange={e => update(key, e.target.value)} /></label>)}</div>
     <label className="block text-sm font-medium">Correo declarado para recibir el acta<input type="email" autoComplete="email" className={input} disabled={disabled} value={value.contactoActa || ''} onChange={e => update('contactoActa', e.target.value || undefined)} /></label>
     <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" disabled={disabled} checked={Boolean(value.solicitaCopia)} onChange={e => update('solicitaCopia', e.target.checked)} />La persona solicita una copia del acta</label>
-    <div><h3 className="mb-3 flex items-center gap-2 font-semibold"><MapPin size={20} />Lugar de la inspección</h3><Suspense fallback={<p role="status">Cargando mapa…</p>}><LocationMap value={value.ubicacionCampo} disabled={disabled} onChange={v => update('ubicacionCampo', v)} /></Suspense></div>
   </section>;
+  // The map is its own section so the field sheet can put it first, before the people and the reason.
+  if (section === 'lugar') return <Suspense fallback={<p role="status">Cargando mapa…</p>}><LocationMap value={value.ubicacionCampo} disabled={disabled} onChange={v => update('ubicacionCampo', v)} /></Suspense>;
   if (section === 'constatacion') return <section aria-label="Actividad y entorno" className="space-y-5">
     {area('actividadObservada', 'Actividad observada')}
     <label className="block text-sm font-medium">Instalaciones y ampliaciones respecto de lo declarado<select className={input} disabled={disabled} value={value.ampliacionEstado || 'NO_VERIFICADO'} onChange={e => update('ampliacionEstado', e.target.value as InspectionActData['ampliacionEstado'])}><option value="NO_VERIFICADO">Sin verificar</option><option value="COINCIDE">Coincide</option><option value="DIFIERE">Hay diferencias o ampliaciones</option><option value="NO_APLICA">No aplica</option></select></label>
