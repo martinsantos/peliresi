@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Expand, Image as ImageIcon, X } from 'lucide-react';
+import { Expand, Image as ImageIcon } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
 import { inspeccionService } from '../../services/inspeccion.service';
 
 export function InspectionEvidenceImage({ inspectionId, evidenceId, alt, className = '', preview = false }: {
@@ -39,12 +39,6 @@ function EvidenceImageLoader({ inspectionId, evidenceId, alt, className, preview
   }, [inspectionId, evidenceId]);
 
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
-  }, [open]);
 
   const thumbnail = <span className={`relative block overflow-hidden bg-neutral-100 text-neutral-400 ${className}`}>
     {(!image.url || !image.loaded) && <span role="img" aria-label={image.failed ? `Miniatura no disponible: ${alt}` : `Cargando miniatura: ${alt}`} className="absolute inset-0 flex items-center justify-center bg-neutral-100"><ImageIcon size={24} /></span>}
@@ -61,16 +55,15 @@ function EvidenceImageLoader({ inspectionId, evidenceId, alt, className, preview
   </span>;
 
   return <>
-    {preview ? <button type="button" onClick={() => image.loaded && setOpen(true)} disabled={!image.loaded} aria-label={`Ampliar evidencia: ${alt}`} className="group relative block w-full cursor-zoom-in overflow-hidden text-left disabled:cursor-default">
+    {preview ? <button type="button" onClick={() => image.loaded && setOpen(true)} disabled={!image.loaded} aria-label={`Ampliar evidencia: ${alt}`} className="group relative block w-full cursor-zoom-in overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600 disabled:cursor-default">
       {thumbnail}
       {image.loaded && <span className="absolute right-2 top-2 rounded-md bg-[#10213A]/80 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"><Expand size={15} /></span>}
     </button> : thumbnail}
-    {preview && open && image.url && createPortal(<div role="dialog" aria-modal="true" aria-label={`Vista ampliada: ${alt}`} className="fixed inset-0 z-[10050] flex items-center justify-center bg-[#07111F]/90 p-3 sm:p-8" onClick={() => setOpen(false)}>
-      <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar vista ampliada" className="absolute right-4 top-4 rounded-full border border-white/30 bg-black/40 p-2 text-white hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={22} /></button>
-      <figure className="flex max-h-full max-w-6xl flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}>
-        <img src={image.url} alt={alt} className="max-h-[calc(100vh-7rem)] max-w-full rounded-lg object-contain shadow-2xl" />
-        <figcaption className="max-w-3xl text-center text-sm font-semibold text-white">{alt}</figcaption>
-      </figure>
-    </div>, document.body)}
+    <Modal isOpen={Boolean(preview && open && image.url)} onClose={() => setOpen(false)} title="Vista ampliada" size="xl">
+      {image.url && <figure className="flex min-w-0 flex-col items-center gap-3">
+        <img src={image.url} alt={alt} className="max-h-[65dvh] max-w-full rounded-lg object-contain" />
+        <figcaption className="max-w-full text-center text-sm font-semibold text-neutral-700 [overflow-wrap:anywhere]">{alt}</figcaption>
+      </figure>}
+    </Modal>
   </>;
 }

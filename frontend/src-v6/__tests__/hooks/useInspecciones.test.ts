@@ -8,6 +8,9 @@ const useQueryMock = vi.hoisted(() => vi.fn((options: unknown) => options));
 const getInspection = vi.hoisted(() => vi.fn());
 const getOfflineMock = vi.hoisted(() => vi.fn());
 const saveOfflineMock = vi.hoisted(() => vi.fn());
+const listMock = vi.hoisted(() => vi.fn());
+const getAllOfflineMock = vi.hoisted(() => vi.fn());
+const auth = vi.hoisted(() => ({ currentUser: { id: 'inspector-7', rol: 'ADMIN', actorId: 'actor-1', empresaContexto: undefined as any } }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
@@ -20,27 +23,30 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 });
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ currentUser: { id: 'inspector-7' } }),
+  useAuth: () => auth,
 }));
 
-vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: { get: getInspection } }));
-vi.mock('../../services/indexeddb', () => ({ getOffline: getOfflineMock, saveOffline: saveOfflineMock }));
+vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: { get: getInspection, list: listMock } }));
+vi.mock('../../services/indexeddb', () => ({ getOffline: getOfflineMock, getAllOffline: getAllOfflineMock, saveOffline: saveOfflineMock }));
 
-import { useInspection, useInspectionMutation } from '../../hooks/useInspecciones';
+import { useInspection, useInspections, useInspectionMutation } from '../../hooks/useInspecciones';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
 describe('useInspection connectivity fallback', () => {
   const cached = { id: 'inspection-9', numero: 'DEMO' };
   const query = () => renderHook(() => useInspection('inspection-9')).result.current as unknown as { queryFn: () => Promise<unknown> };
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.currentUser = { id: 'inspector-7', rol: 'ADMIN', actorId: 'actor-1', empresaContexto: undefined };
     saveOfflineMock.mockResolvedValue(undefined);
-    getOfflineMock.mockResolvedValue({ inspection: cached });
+    const owner = inspectionWorkspaceOwner(auth.currentUser);
+    getOfflineMock.mockResolvedValue({ id: inspectionContextKey('inspector-7', owner, 'inspection-9'), owner, inspection: cached });
   });
 
   it.each(['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'])('recovers only the current user snapshot for %s', async (code) => {
     getInspection.mockRejectedValue(new AxiosError('Offline', code));
     await expect(query().queryFn()).resolves.toEqual(cached);
-    expect(getOfflineMock).toHaveBeenCalledWith('inspection_cases', 'inspector-7:inspection-9');
+    expect(getOfflineMock).toHaveBeenCalledWith('inspection_cases', inspectionContextKey('inspector-7', inspectionWorkspaceOwner(auth.currentUser), 'inspection-9'));
   });
 
   it.each([401, 403, 404, 500, 503])('does not hide HTTP %s behind a cached case', async (status) => {
@@ -70,6 +76,32 @@ describe('useInspection connectivity fallback', () => {
     saveOfflineMock.mockRejectedValue(new Error('quota'));
     await expect(query().queryFn()).resolves.toEqual(cached);
     expect(getOfflineMock).not.toHaveBeenCalled();
+  });
+
+  it.each([{ rol: 'ADMIN_GENERADOR' }, { actorId: 'another-actor' }, { empresaContexto: { empresaId: 'company-2', autorizacionId: 'grant-2', revision: 3 } }])('isolates the same account after changing context %j', async change => {
+    const oldKey = (query() as any).queryKey;
+    auth.currentUser = { ...auth.currentUser, ...change };
+    const next = query();
+    expect((next as any).queryKey).not.toEqual(oldKey);
+    const error = new AxiosError('Offline', 'ERR_NETWORK');
+    getInspection.mockRejectedValue(error);
+    await expect(next.queryFn()).rejects.toBe(error);
+  });
+
+  it('rejects old unscoped offline copies and does not overwrite them', async () => {
+    getOfflineMock.mockResolvedValue({ id: 'inspector-7:inspection-9', inspection: cached });
+    const error = new AxiosError('Offline', 'ERR_NETWORK');
+    getInspection.mockRejectedValue(error);
+    await expect(query().queryFn()).rejects.toBe(error);
+    expect(saveOfflineMock).not.toHaveBeenCalled();
+  });
+
+  it('does not report an empty registry when the current activity has no offline copy', async () => {
+    const error = new AxiosError('Offline', 'ERR_NETWORK');
+    listMock.mockRejectedValue(error);
+    getAllOfflineMock.mockResolvedValue([{ id: 'inspector-7:inspection-9', inspection: cached }]);
+    const { result } = renderHook(() => useInspections());
+    await expect((result.current as any).queryFn()).rejects.toBe(error);
   });
 });
 

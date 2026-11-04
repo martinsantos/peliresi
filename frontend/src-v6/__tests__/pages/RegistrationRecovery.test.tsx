@@ -1,20 +1,21 @@
 import { act, fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 import { readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
 import { queryClient } from '../../lib/queryClient';
 
-const mock = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn(), requirements: vi.fn(), canWrite: vi.fn(), token: '' }));
+const mock = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn(), upload: vi.fn(), requirements: vi.fn(), canWrite: vi.fn(), token: '' }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get, put: mock.put, post: mock.post }, getAccessToken: () => mock.token, setTokensDurably: vi.fn() }));
-vi.mock('../../services/solicitud.service', () => ({ solicitudService: { getRequirements: mock.requirements } }));
+vi.mock('../../services/solicitud.service', () => ({ solicitudService: { getRequirements: mock.requirements, uploadDocumento: mock.upload } }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: mock.canWrite, retry: vi.fn() }) }));
 const revision = '2026-10-09T10:00:00.000Z';
 function session(owner: string) { return `qa.${btoa(JSON.stringify({ id: owner, restricted: true, registrationDraft: 'draft' }))}.qa`; }
 function request(owner = 'owner') { return { data: { data: { solicitud: { id: 'draft', usuarioId: owner, tipoActor: 'GENERADOR', estado: 'BORRADOR', datosActor: '{}', updatedAt: revision,
   usuario: { nombre: 'QA responsable', cuit: '30-70987654-3', email: 'qa@night-qa.invalid' }, documentos: [] } } } }; }
-async function open(type = 'generador') {
-  await act(async () => { render(<MemoryRouter initialEntries={[`/inscripcion/${type}`]}><Routes><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
+function ReturnReceipt() { const location = useLocation(); return <p>Solicitud recuperada {location.search}</p>; }
+async function open(type = 'generador', prefix = '', query = '') {
+  await act(async () => { render(<MemoryRouter initialEntries={[`${prefix}/inscripcion/${type}${query}`]}><Routes><Route path={`${prefix}/inscripcion/:tipo`} element={<InscripcionWizardPage />} /><Route path="/mi-solicitud" element={<ReturnReceipt />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); queryClient.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
@@ -24,9 +25,96 @@ beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
 });
-afterEach(() => { cleanup(); queryClient.clear(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); queryClient.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('a real registration UI protects the current step and account boundary', () => {
+  it.each(['generador', 'transportista', 'operador'].flatMap(type => ['', '/app'].map(prefix => [type, prefix])))('%s %s focuses the opened stage, keeps typing and manual saves in place, and returns predictably', async (type, prefix) => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA continuidad', domicilio: 'QA 123' });
+    mock.get.mockResolvedValue(response);
+    await open(type, prefix);
+    const next = screen.getByRole('button', { name: 'Siguiente', exact: true }); next.focus();
+    fireEvent.click(next);
+    const title = await screen.findByRole('heading', { level: 2, name: type === 'transportista' ? 'Habilitacion y Datos DPA' : 'Datos Regulatorios' });
+    await waitFor(() => expect(title).toHaveFocus());
+    expect(title).toHaveAttribute('tabindex', '-1');
+    const field = document.querySelector<HTMLInputElement>('input');
+    expect(field).not.toBeNull(); field!.focus(); fireEvent.change(field!, { target: { value: 'QA dato mantenido' } });
+    expect(field).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador', exact: true }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Borrador guardado en SITREP'));
+    expect(field).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Anterior', exact: true }));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: type === 'transportista' ? 'Datos del Transportista' : 'Datos del Establecimiento' })).toHaveFocus());
+    expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA continuidad');
+    expect(mock.post).not.toHaveBeenCalled();
+  });
+  it.each(['generador', 'transportista', 'operador'])('%s stage selector cannot bypass missing required data', async type => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: '', domicilio: '' });
+    mock.get.mockResolvedValue(response);
+    await open(type);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Etapa de la inscripción' }), { target: { value: '2' } });
+    await waitFor(() => expect(screen.getByLabelText('Razon Social *')).toHaveFocus());
+    expect(screen.getByRole('combobox', { name: 'Etapa de la inscripción' })).toHaveValue('1');
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+
+  it('does not move to another stage or refocus its heading after a rejected save', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA continuidad', domicilio: 'QA 123' }); mock.get.mockResolvedValue(response);
+    mock.put.mockRejectedValue(new Error('QA disconnected'));
+    await open();
+    const next = screen.getByRole('button', { name: 'Siguiente', exact: true }); next.focus(); fireEvent.click(next);
+    await screen.findByText(/No se confirmó el guardado en SITREP/);
+    expect(next).toHaveFocus(); expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA continuidad');
+    expect(screen.queryByRole('heading', { name: 'Datos Regulatorios' })).toBeNull();
+  });
+
+  it.each(['generador', 'transportista', 'operador'])('%s reopens a confirmed save without declaring or resending identical fields as pending', async type => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA alta', domicilio: 'QA 123' });
+    mock.get.mockImplementation(async () => response);
+    mock.put.mockImplementation(async (_path, body) => {
+      response.data.data.solicitud.datosActor = JSON.stringify(body.datosActor);
+      response.data.data.solicitud.updatedAt = '2026-10-09T10:01:00.000Z';
+      return response;
+    });
+    await open(type);
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA guardado' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Borrador guardado en SITREP'));
+    cleanup(); mock.put.mockClear();
+    // PostgreSQL JSON may return keys in a different order; identity fields
+    // are appended by persistDraft but absent from the device's original form.
+    const stored = JSON.parse(response.data.data.solicitud.datosActor);
+    response.data.data.solicitud.datosActor = JSON.stringify(Object.fromEntries(Object.entries(stored).reverse()));
+    await open(type);
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('QA guardado');
+    expect(screen.getByRole('status')).toHaveTextContent('Borrador guardado en SITREP');
+    expect(screen.queryByText(/pendientes de guardar en SITREP/)).toBeNull();
+    vi.useFakeTimers(); await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('automatically saves typing paused by an in-flight licence upload once the upload finishes', async () => {
+    const response = request(); response.data.data.solicitud.tipoActor = 'TRANSPORTISTA';
+    response.data.data.solicitud.datosActor = JSON.stringify({ _sitrepDraftStep: 3, razonSocial: 'QA transporte', domicilio: 'QA 123', choferesJson: [{ key: 'driver-qa', nombre: 'QA inicial', dni: '000001', vencimiento: '2027-12-31' }] });
+    mock.get.mockResolvedValue(response);
+    let finish!: (value: unknown) => void;
+    mock.upload.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await open('transportista');
+    fireEvent.change(screen.getByLabelText('Archivo de licencia del chofer 1'), { target: { files: [new File(['QA'], 'licencia.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(mock.upload).toHaveBeenCalledOnce());
+    mock.put.mockClear(); vi.useFakeTimers();
+    fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'QA escrito durante la lectura' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(mock.put).not.toHaveBeenCalled();
+    await act(async () => finish({ id: 'qa-file', tipo: 'LICENCIA_CHOFER_driver-qa', nombre: 'licencia.png', estado: 'PENDIENTE', analisis: { version: 1, lectura: 'LEIDO', campos: {}, texto: 'QA' } }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(mock.put).toHaveBeenCalledOnce();
+    expect(mock.put.mock.calls[0][1].datosActor).toMatchObject({ _sitrepDraftStep: 3 });
+    expect(JSON.parse(mock.put.mock.calls[0][1].datosActor.choferesJson)[0].nombre).toBe('QA escrito durante la lectura');
+    expect(screen.getByLabelText('Nombre *')).toHaveValue('QA escrito durante la lectura');
+  });
   it.each(['generador', 'operador', 'transportista'])('%s points to the missing field, not session recovery, and keeps typing in place', async type => {
     const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase(); mock.get.mockResolvedValue(response);
     await open(type);
@@ -210,4 +298,129 @@ describe('a real registration UI protects the current step and account boundary'
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' })); await waitFor(() => expect(mock.put).toHaveBeenCalledOnce());
     expect(mock.put.mock.calls[0][1].datosActor).toMatchObject({ tefInputs: { personal: 0, potenciaHP: 100 }, legacy: { version: 1 }, razonSocial: 'QA nueva declaración' });
   });
+});
+
+
+describe('returning from corrections never submits stale saved data', () => {
+  it.each(['generador', 'transportista', 'operador'].flatMap(type => ['', '/app'].map(prefix => [type,prefix])))('%s %s saves the current edit before returning to its exact request', async (type,prefix) => {
+    const response=request(); response.data.data.solicitud.tipoActor=type.toUpperCase(); response.data.data.solicitud.estado='OBSERVADA';
+    mock.get.mockResolvedValue(response); await open(type,prefix);
+    let finish!: (value: unknown) => void; mock.put.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+    fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'Corrección recién escrita'}});
+    fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(mock.put).toHaveBeenCalledOnce(); expect(screen.queryByText(/Solicitud recuperada/)).toBeNull();
+    expect(mock.put.mock.calls[0][1].datosActor.domicilio).toBe('Corrección recién escrita');
+    await act(async()=>finish({data:{data:{solicitud:{updatedAt:'2026-10-09T10:01:00.000Z'}}}}));
+    expect(await screen.findByText('Solicitud recuperada ?solicitud=draft')).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('stays with the correction when return cannot confirm its save',async()=>{
+    await open(); mock.put.mockRejectedValue(new Error('disconnected'));
+    fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'No perder'}});
+    fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(await screen.findByText(/No se confirmó el guardado en SITREP/)).toBeVisible(); expect(screen.getByLabelText('Domicilio')).toHaveValue('No perder'); expect(screen.queryByText(/Solicitud recuperada/)).toBeNull();
+  });
+  it('does not leave behind text typed while the return save is pending',async()=>{
+    await open(); let finish!:(value:unknown)=>void; mock.put.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+    fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'Primera corrección'}});fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(mock.put).toHaveBeenCalledOnce();fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'Cambio posterior'}});
+    await act(async()=>finish({data:{data:{solicitud:{updatedAt:'2026-10-09T10:01:00.000Z'}}}}));
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('Cambio posterior');expect(screen.queryByText(/Solicitud recuperada/)).toBeNull();
+  });
+  it('returns without a write when there are no local changes',async()=>{
+    await open();fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(await screen.findByText('Solicitud recuperada ?solicitud=draft')).toBeVisible();expect(mock.put).not.toHaveBeenCalled();expect(mock.post).not.toHaveBeenCalled();
+  });
+});
+
+
+it.each(['generador','transportista','operador'].flatMap(type=>['', '/app'].map(prefix=>[type,prefix])))('%s %s ignores a previous account local hint and recovers the authenticated application',async(type,prefix)=>{
+ mock.token=`qa.${btoa(JSON.stringify({id:'owner',restricted:true}))}.qa`;
+ localStorage.setItem('sitrep_pending_solicitud',JSON.stringify({id:'foreign',tipoActor:type.toUpperCase(),step:6}));
+ const response=request();response.data.data.solicitud.tipoActor=type.toUpperCase();response.data.data.solicitud.estado='OBSERVADA';response.data.data.solicitud.datosActor=JSON.stringify({razonSocial:'Mi alta exacta',domicilio:'Datos propios'});
+ mock.get.mockImplementation(async(path)=>path==='/solicitudes/mis-solicitudes'?{data:{data:{solicitudes:[response.data.data.solicitud]}}}:path==='/solicitudes/draft'?response:Promise.reject(new Error('Otra cuenta')));
+ await open(type,prefix);expect(screen.getByLabelText('Razon Social *')).toHaveValue('Mi alta exacta');expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/foreign');expect(mock.put).not.toHaveBeenCalled();expect(mock.post).not.toHaveBeenCalled();
+});
+
+it.each(['null','[]','true'])('ignores malformed local hint %s without breaking recovery',async value=>{
+ localStorage.setItem('sitrep_pending_solicitud',value);await open();expect(screen.getByLabelText('Razon Social *')).toBeVisible();expect(mock.put).not.toHaveBeenCalled();
+});
+
+
+describe('a failed replacement remains pending after closing the application', () => {
+  it.each(['generador', 'operador', 'transportista'].flatMap(type => ['', '/app'].map(prefix => [type, prefix])))('%s %s keeps a failed replacement marker even with a saved original', async (type, prefix) => {
+    const response = request();
+    response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA reemplazo', domicilio: 'QA 123', _sitrepDraftStep: type === 'generador' ? 6 : type === 'operador' ? 7 : 4 });
+    Object.assign(response.data.data.solicitud, { documentos: [{ id: 'original', tipo: 'COMPROBANTE_PAGO', nombre: 'original.pdf', size: 100, estado: 'APROBADO' }] });
+    mock.get.mockResolvedValue(response); mock.requirements.mockResolvedValue({ documentos: [{ tipo: 'COMPROBANTE_PAGO', nombre: 'Comprobante ATM', required: false }], maxBytes: 10485760 });
+    mock.upload.mockRejectedValue(new Error('QA upload interrupted'));
+    await open(type, prefix);
+    fireEvent.click(screen.getByRole('button', { name: 'Reemplazar Comprobante ATM' }));
+    fireEvent.change(screen.getByLabelText('Adjuntar Comprobante ATM'), { target: { files: [new File(['replacement'], 'nuevo.pdf', { type: 'application/pdf' })] } });
+    await screen.findByText('QA upload interrupted');
+    await waitFor(() => expect(readRegistrationDraft('owner', `public:${type.toUpperCase()}:draft`)?.data.files).toEqual(['COMPROBANTE_PAGO']));
+    cleanup(); await open(type, prefix);
+    expect(screen.getByText(/Hay archivos pendientes de recuperar/)).toBeVisible();
+    expect(screen.getByTestId('registration-document-COMPROBANTE_PAGO')).not.toHaveTextContent('Documento aprobado');
+    expect(screen.getByTestId('registration-document-COMPROBANTE_PAGO')).toHaveTextContent('Original guardado');
+    fireEvent.click(screen.getByRole('button', { name: 'Conservar original de Comprobante ATM' }));
+    await waitFor(() => expect(readRegistrationDraft('owner', `public:${type.toUpperCase()}:draft`)?.data.files).toEqual([]));
+    expect(screen.queryByText(/Hay archivos pendientes de recuperar/)).toBeNull();
+    expect(mock.post).not.toHaveBeenCalled();
+    expect(mock.upload).toHaveBeenCalledOnce();
+  });
+  it('prevents submitting an optional missing replacement even if the saved original meets requirements', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial:'QA', domicilio:'QA', coordenadas:'-32.9, -68.8', _sitrepDraftStep:7 });
+    Object.assign(response.data.data.solicitud,{ documentos:[{id:'original',tipo:'FACTURA_ELECTRICA',nombre:'original.pdf',size:100,estado:'APROBADO'}] });
+    mock.get.mockResolvedValue(response);
+    writeRegistrationDraft('owner','public:GENERADOR:draft',{form:{razonSocial:'QA',domicilio:'QA',coordenadas:'-32.9, -68.8'},serverRevision:revision,step:7,files:['FACTURA_ELECTRICA']});
+    await open(); fireEvent.click(screen.getByRole('button',{name:'Enviar solicitud',exact:true}));
+    await waitFor(()=>expect(screen.getByRole('heading',{name:'Documentos',exact:true})).toBeVisible());
+    expect(screen.getByText(/Hay archivos pendientes de recuperar/).closest('[role="alert"]')).toHaveFocus();
+    expect(mock.post).not.toHaveBeenCalled(); expect(mock.put).not.toHaveBeenCalled();
+    expect(readRegistrationDraft('owner','public:GENERADOR:draft')?.data.files).toEqual(['FACTURA_ELECTRICA']);
+    fireEvent.click(screen.getByRole('button',{name:'Conservar original de FACTURA ELECTRICA'}));
+    expect(screen.queryByText('Recuperá o descartá los archivos pendientes antes de enviar.')).toBeNull();
+    expect(screen.queryByText(/Hay archivos pendientes de recuperar/)).toBeNull();
+  });
+});
+
+
+describe('explicit application selection', () => {
+  it.each(['generador','transportista','operador'].flatMap(type => ['', '/app'].map(prefix => [type,prefix])))('%s %s opens the selected application instead of an old local receipt', async (type,prefix) => {
+    mock.token=`qa.${btoa(JSON.stringify({id:'owner',restricted:true}))}.qa`;
+    localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({id:'old',owner:'owner',tipoActor:type.toUpperCase(),step:1}));
+    const selected=request(); selected.data.data.solicitud.id='selected'; selected.data.data.solicitud.tipoActor=type.toUpperCase(); selected.data.data.solicitud.datosActor=JSON.stringify({razonSocial:'Solicitud elegida QA',domicilio:'QA 123'});
+    mock.get.mockImplementation(async path => {
+      if(path==='/solicitudes/selected')return selected;
+      const old=request(); old.data.data.solicitud.id='old';old.data.data.solicitud.tipoActor=type.toUpperCase(); old.data.data.solicitud.estado='RECHAZADA';return old;
+    });
+    await open(type,prefix,'?solicitud=selected');
+    expect(await screen.findByLabelText('Razon Social *')).toHaveValue('Solicitud elegida QA');
+    expect(mock.get).toHaveBeenCalledWith('/solicitudes/selected');
+    expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/old');
+    expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('does not let a query parameter widen a draft-only credential', async () => {
+    await open('generador','','?solicitud=other');
+    expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/other');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No se pudo recuperar/);
+    expect(screen.queryByLabelText('Razon Social *')).toBeNull();
+  });
+  it('does not replace an unavailable selected application with another draft', async () => {
+    mock.token=`qa.${btoa(JSON.stringify({id:'owner',restricted:true}))}.qa`;
+    mock.get.mockRejectedValue(new Error('not available'));
+    await open('generador','','?solicitud=missing');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No se pudo recuperar/);
+    expect(mock.get).toHaveBeenCalledWith('/solicitudes/missing');
+    expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/mis-solicitudes');
+  });
+});
+
+it('an explicit application link without a session offers recovery, not a duplicate account', async () => {
+  mock.token=''; await open('generador','','?solicitud=selected');
+  expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos abrir la solicitud elegida');
+  expect(screen.queryByRole('button',{name:'Crear cuenta'})).toBeNull();
+  expect(screen.getByRole('button',{name:'Iniciar sesión y recuperar'})).toBeEnabled();
+  expect(mock.post).not.toHaveBeenCalled();
 });

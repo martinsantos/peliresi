@@ -1,4 +1,5 @@
-import { Rol, TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import { Rol, TipoNotificacion, PrioridadNotificacion, type Notificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { enviarPushAlUsuario } from './push.service';
@@ -35,11 +36,17 @@ class NotificationService {
             }
         });
 
-        // Send via configured channels (fire-and-forget, never blocks)
+        this.programarCanalesDeNotificacion(notif);
+        return notif;
+    }
+
+    /** Only call after the inbox notice has committed. Email has its own
+     * durable relay; push and placeholder channels remain best effort. */
+    programarCanalesDeNotificacion(notif: Pick<Notificacion, 'id' | 'usuarioId' | 'tipo' | 'titulo' | 'mensaje' | 'manifiestoId' | 'prioridad'>): void {
         setImmediate(async () => {
             try {
                 const user = await prisma.usuario.findUnique({
-                    where: { id: data.usuarioId },
+                    where: { id: notif.usuarioId },
                     select: { email: true, nombre: true, notifEmail: true, notifWhatsapp: true, notifTelegram: true, whatsappPhone: true, telegramChatId: true },
                 });
                 if (!user) return;
@@ -50,30 +57,28 @@ class NotificationService {
 
                 // WhatsApp channel (placeholder — requires integration with WhatsApp Business API)
                 if (user.notifWhatsapp && user.whatsappPhone) {
-                    logger.info({ channel: 'WhatsApp', to: user.whatsappPhone }, `${data.titulo}: ${data.mensaje}`);
+                    logger.info({ channel: 'WhatsApp', to: user.whatsappPhone }, `${notif.titulo}: ${notif.mensaje}`);
                     // TODO: Integrate with WhatsApp Business API or Twilio
-                    // await whatsappService.send(user.whatsappPhone, `*${data.titulo}*\n${data.mensaje}`);
                 }
 
                 // Telegram channel (placeholder — requires Telegram Bot API)
                 if (user.notifTelegram && user.telegramChatId) {
-                    logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${data.titulo}: ${data.mensaje}`);
+                    logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${notif.titulo}: ${notif.mensaje}`);
                 }
 
                 // Push channel — enviar a todos los dispositivos suscritos del usuario
-                await enviarPushAlUsuario(data.usuarioId, {
-                    title:     data.titulo,
-                    body:      data.mensaje,
-                    url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
-                    tag:       data.manifiestoId ?? data.tipo,
-                    prioridad: (data.prioridad ?? 'NORMAL') as any,
+                await enviarPushAlUsuario(notif.usuarioId, {
+                    title:     notif.titulo,
+                    body:      notif.mensaje,
+                    url:       `/notificaciones/${notif.id}`,
+                    tag:       notif.manifiestoId ?? notif.tipo,
+                    prioridad: notif.prioridad as any,
                 }).catch(() => {});
             } catch (err) {
                 logger.error({ err }, 'Error sending notification via channels');
             }
         });
 
-        return notif;
     }
 
     // Notificar a usuarios por rol (DB + push a cada uno)
@@ -91,9 +96,11 @@ class NotificationService {
         });
 
         const prioridad = data.prioridad || 'NORMAL';
+        const recipients = usuarios.map(user => ({ ...user, noticeId: randomUUID() }));
 
         await prisma.notificacion.createMany({
-            data: usuarios.map(u => ({
+            data: recipients.map(u => ({
+                id: u.noticeId,
                 usuarioId:    u.id,
                 tipo:         data.tipo,
                 titulo:       data.titulo,
@@ -106,11 +113,11 @@ class NotificationService {
 
         // Push a cada usuario del rol (fire-and-forget)
         setImmediate(() => {
-            Promise.all(usuarios.map(u =>
+            Promise.all(recipients.map(u =>
                 enviarPushAlUsuario(u.id, {
                     title:     data.titulo,
                     body:      data.mensaje,
-                    url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    url:       `/notificaciones/${u.noticeId}`,
                     tag:       data.manifiestoId ?? data.tipo,
                     prioridad: prioridad as any,
                 }).catch(() => {})
@@ -149,17 +156,23 @@ class NotificationService {
             const promises: Promise<any>[] = [];
             const isInSitu = manifiesto.modalidad === 'IN_SITU';
 
-            // Transportista: full pickup details with map link (skip for IN_SITU — no transportista)
+            // In origin the carrier is an approver, not a scheduled pickup.
             if (trans && trans.usuario.id !== actorId) {
                 const retiroInfo = fechaRetiro ? ` Retiro: ${fechaRetiro}.` : '';
                 promises.push(this.crearNotificacion({
                     usuarioId: trans.usuario.id,
                     tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                    titulo: 'Nuevo retiro asignado',
-                    mensaje: `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
+                    titulo: isInSitu ? 'Tratamiento en origen aprobado' : 'Nuevo retiro asignado',
+                    mensaje: isInSitu
+                        ? `${num} se tratará en el domicilio de ${gen.razonSocial}. No hay retiro, traslado ni GPS. Revisá el manifiesto para conocer el próximo paso.`
+                        : `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
                     manifiestoId,
                     prioridad: 'ALTA' as PrioridadNotificacion,
-                    datos: {
+                    datos: isInSitu ? {
+                        tipo: 'tratamiento_insitu',
+                        generador: gen.razonSocial,
+                        operadorDestino: oper.razonSocial,
+                    } : {
                         tipo: 'retiro_asignado',
                         fechaRetiro: fechaRetiro || null,
                         direccion: gen.domicilio || null,
@@ -177,7 +190,7 @@ class NotificationService {
                     ? 'Tratamiento in situ requerido'
                     : 'Manifiesto firmado — recibiras residuos';
                 const mensaje = isInSitu
-                    ? `${num} de ${gen.razonSocial}. Debe proceder con tratamiento in situ en ${gen.domicilio || 'domicilio del generador'}.`
+                    ? `${num} de ${gen.razonSocial}. Revisá el manifiesto para coordinar la recepción en ${gen.domicilio || 'el domicilio del generador'}; no hay traslado.`
                     : `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`;
                 promises.push(this.crearNotificacion({
                     usuarioId: oper.usuario.id,
@@ -201,7 +214,9 @@ class NotificationService {
                     usuarioId: gen.usuario.id,
                     tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
                     titulo: 'Tu manifiesto fue firmado',
-                    mensaje: `${num} firmado y listo para retiro`,
+                    mensaje: isInSitu
+                        ? `${num} firmado para tratamiento en origen. Revisá el manifiesto para conocer el próximo paso.`
+                        : `${num} firmado y listo para retiro`,
                     manifiestoId,
                     prioridad: 'NORMAL' as PrioridadNotificacion,
                 }));
@@ -254,6 +269,7 @@ class NotificationService {
                 mensaje: `La carga del manifiesto ${num} ha sido rechazada`,
                 tipo: 'MANIFIESTO_RECHAZADO'
             },
+            'CANCELADO': { titulo: 'Manifiesto cancelado', mensaje: `El manifiesto ${num} fue cancelado. Consultá el motivo y el historial.`, tipo: 'INFO_GENERAL' },
             'EN_TRATAMIENTO': {
                 titulo: 'Tratamiento Iniciado',
                 mensaje: `El manifiesto ${num} ha iniciado el proceso de tratamiento`,
@@ -271,6 +287,7 @@ class NotificationService {
         await Promise.all(destinatarios.map(usuarioId =>
             this.crearNotificacion({
                 usuarioId, ...info, manifiestoId,
+                datos: { tipo: 'estado_manifiesto', version: 1, estado: nuevoEstado },
                 prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
             })
         ));

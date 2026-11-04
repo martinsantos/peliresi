@@ -1,66 +1,50 @@
-/**
- * SITREP v6 - Offline Sync Service
- * =================================
- * Downloads and caches data to IndexedDB for offline use.
- * Data is scoped per user (key: `user_{userId}`) for multi-user isolation.
- */
-
-import { saveOffline, getOffline, getAllOffline, removeOffline } from './indexeddb';
+/** Downloadable copies are isolated by the server-verified UI context. */
+import { updateOffline, getOffline, getAllOffline, removeOffline } from './indexeddb';
 import { manifiestoService } from './manifiesto.service';
+import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import type { Manifiesto } from '../types/models';
-import { getAccessToken } from './api';
-import { readActorActivity } from './actorActivity';
-import { readCompanyContext,companyCacheScope } from './companyContext';
 
-const accountCacheKey = (userId: string | number) => import.meta.env.VITE_ENTERPRISE_ENABLED==='true'
-  ? `user_${userId}:company:${companyCacheScope(readCompanyContext(getAccessToken()))}:activity:${readActorActivity(getAccessToken())||'base'}`
-  : import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'
-  ? `user_${userId}:activity:${readActorActivity(getAccessToken()) || 'base'}` : `user_${userId}`;
+const accountCacheKey = (userId: string | number, owner: string) =>
+  userId && owner ? 'context-v2:' + JSON.stringify([String(userId), owner]) : '';
 
 interface CachedManifiestos {
   id: string;
+  owner: string;
   items: Manifiesto[];
   syncedAt: number;
 }
 
-/**
- * Download manifiestos from API and cache in IndexedDB, scoped by userId.
- */
-export async function syncOfflineData(userId: string | number): Promise<void> {
-  const cacheKey = accountCacheKey(userId);
-  // Fetch manifiestos (the list endpoint already filters by role server-side)
+export async function syncOfflineData(userId: string | number, owner: string): Promise<void> {
+  const key = accountCacheKey(userId, owner);
+  const context = supportRequestContext();
+  const assertContext = () => {
+    if (!key || !context || !supportSessionMatches(String(userId)) || supportRequestContext() !== context) {
+      throw new Error('Cambió el contexto de la cuenta. Volvé a descargar los manifiestos.');
+    }
+  };
+  assertContext();
   const response = await manifiestoService.list({ limit: 200 });
-  const items = response?.items || [];
-
-  await saveOffline('manifiestos', {
-    id: cacheKey,
-    items: Array.isArray(items) ? items : [],
-    syncedAt: Date.now(),
-  } satisfies CachedManifiestos);
+  assertContext();
+  if (!Array.isArray(response?.items)) throw new Error('No se recibió una lista válida de manifiestos.');
+  await updateOffline<CachedManifiestos>('manifiestos', key, () => {
+    assertContext();
+    return { id: key, owner, items: response.items, syncedAt: Date.now() };
+  });
 }
 
-/**
- * Get cached manifiestos for a specific user.
- */
-export async function getCachedManifiestos(userId: string | number): Promise<Manifiesto[]> {
-  try {
-    const cached: CachedManifiestos | null = await getOffline('manifiestos', accountCacheKey(userId));
-    return cached?.items || [];
-  } catch {
-    return [];
-  }
+async function readCopy(userId: string | number, owner: string): Promise<CachedManifiestos | null> {
+  const key = accountCacheKey(userId, owner);
+  if (!key) return null;
+  const cached = await getOffline<CachedManifiestos>('manifiestos', key);
+  return cached?.owner === owner && Array.isArray(cached.items) ? cached : null;
 }
 
-/**
- * Get the timestamp of the last sync for a user.
- */
-export async function getLastSyncTime(userId: string | number): Promise<number | null> {
-  try {
-    const cached: CachedManifiestos | null = await getOffline('manifiestos', accountCacheKey(userId));
-    return cached?.syncedAt || null;
-  } catch {
-    return null;
-  }
+export async function getCachedManifiestos(userId: string | number, owner: string): Promise<Manifiesto[]> {
+  return (await readCopy(userId, owner))?.items || [];
+}
+
+export async function getLastSyncTime(userId: string | number, owner: string): Promise<number | null> {
+  return (await readCopy(userId, owner))?.syncedAt || null;
 }
 
 /**
@@ -69,12 +53,18 @@ export async function getLastSyncTime(userId: string | number): Promise<number |
  * silently deleting unpublished field work would be unsafe.
  */
 export async function clearUserOfflineData(userId: string | number): Promise<void> {
-  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true') {
-    const snapshots = await getAllOffline<{ id: string }>('manifiestos').catch(() => []);
-    for (const row of snapshots.filter(row => row.id.startsWith(`user_${userId}:activity:`)||row.id.startsWith(`user_${userId}:company:`))) await removeOffline('manifiestos', row.id).catch(() => {});
+  for (const store of ['manifiestos', 'catalogos'] as const) {
+    const snapshots = await getAllOffline<{ id: string; owner?: string }>(store).catch(() => []);
+    for (const row of snapshots) {
+      let belongs = row.id.startsWith('user_' + userId + ':');
+      try {
+        const identity = JSON.parse(row.owner || 'null');
+        belongs ||= row.id.startsWith('context-v2:') && Array.isArray(identity) && String(identity[0]) === String(userId);
+      } catch { /* Unknown copies are never adopted by another context. */ }
+      if (belongs) await removeOffline(store, row.id).catch(() => {});
+    }
+    await removeOffline(store, 'user_' + userId).catch(() => {});
   }
-  await removeOffline('manifiestos', `user_${userId}`).catch(() => {});
-  await removeOffline('catalogos', `user_${userId}`).catch(() => {});
   const prefix = `${userId}:`;
   const cases = await getAllOffline<{ id: string }>('inspection_cases').catch(() => []);
   await Promise.all(cases.filter((entry) => entry.id.startsWith(prefix)).map((entry) => removeOffline('inspection_cases', entry.id).catch(() => {})));

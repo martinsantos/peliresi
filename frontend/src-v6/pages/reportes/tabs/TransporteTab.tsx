@@ -1,19 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import {
-  Truck, Activity, TrendingUp, FileDown,
+  Truck, Activity, TrendingUp,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
-import { Button } from '../../../components/ui/ButtonV2';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { ChartLegendLabel } from '../../../components/charts/ChartLegendLabel';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
-export default function TransporteTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
+export default function TransporteTab({ data, periodo }: { data: any; periodo: string }) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const transportistas = data.transportistas || [];
@@ -131,11 +130,6 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
             className="flex-col sm:flex-row"
             title={`Detalle de Transportistas (${transportistas.length})`}
             subtitle="Estadísticas de cada transportista"
-            action={
-              <Button variant="outline" size="sm" leftIcon={<FileDown size={16} />} onClick={onExportPDF}>
-                Exportar PDF
-              </Button>
-            }
           />
           <CardContent className="p-0">
             <div className="overflow-x-auto max-h-[520px] overflow-y-auto">

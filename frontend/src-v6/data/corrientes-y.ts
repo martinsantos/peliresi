@@ -1,9 +1,14 @@
 /**
- * Corrientes Y — Convenio de Basilea
- * Códigos de corrientes de residuos peligrosos
+ * Etiquetas abreviadas de categorías sometidas a control, Ley 24.051, Anexo I.
+ * Fuente: https://www.argentina.gob.ar/normativa/nacional/ley-24051-450/actualizacion
+ * Y48: Resolución 897/2002, modificada por 830/2008 (Argentina).
+ * Son ayudas de lectura; no determinan la habilitación de ningún actor.
  */
 
 export const CORRIENTES_Y: Record<string, string> = {
+  Y1: 'Residuos de atención clínica humana o veterinaria',
+  Y2: 'Residuos de elaboración de fármacos',
+  Y3: 'Medicamentos y productos farmacéuticos descartados',
   Y4: 'Desechos de fabricación de biocidas y productos fitofarmacéuticos',
   Y5: 'Desechos de fabricación de productos químicos para preservación de madera',
   Y6: 'Desechos de producción/uso de disolventes orgánicos',
@@ -15,9 +20,11 @@ export const CORRIENTES_Y: Record<string, string> = {
   Y12: 'Desechos de tintas, colorantes, pigmentos, lacas, barnices',
   Y13: 'Desechos de resinas, látex, plastificantes, colas/adhesivos',
   Y14: 'Sustancias químicas de desecho no identificadas',
+  Y15: 'Residuos explosivos no regulados por otra legislación',
   Y16: 'Desechos de productos o sustancias fotográficas',
   Y17: 'Desechos de tratamiento superficial de metales y plásticos',
   Y18: 'Residuos de operaciones industriales de eliminación',
+  Y19: 'Carbonilos metálicos',
   Y20: 'Desechos que contengan berilio',
   Y21: 'Compuestos de cromo hexavalente',
   Y22: 'Compuestos de cobre',
@@ -26,6 +33,7 @@ export const CORRIENTES_Y: Record<string, string> = {
   Y25: 'Selenio y compuestos',
   Y26: 'Cadmio y compuestos',
   Y27: 'Antimonio y compuestos',
+  Y28: 'Telurio y sus compuestos',
   Y29: 'Mercurio y compuestos',
   Y30: 'Talio y compuestos',
   Y31: 'Plomo y compuestos',
@@ -40,7 +48,10 @@ export const CORRIENTES_Y: Record<string, string> = {
   Y40: 'Éteres',
   Y41: 'Solventes orgánicos halogenados',
   Y42: 'Solventes orgánicos (excepto halogenados)',
-  Y48: 'Residuos de operaciones de eliminación',
+  Y43: 'Dibenzofuranos policlorados',
+  Y44: 'Dibenzoparadioxinas policloradas',
+  Y45: 'Organohalogenados no incluidos en otras categorías del Anexo I',
+  Y48: 'Materiales contaminados con residuos peligrosos, o con características peligrosas, destinados a eliminación',
 };
 
 export const CORRIENTES_Y_CODES = Object.keys(CORRIENTES_Y);
@@ -54,9 +65,8 @@ export const CORRIENTES_Y_CODES = Object.keys(CORRIENTES_Y);
  */
 export function parseCorrientes(str: string | null | undefined): string[] {
   if (!str) return [];
-  return str
-    .split(',')
-    .flatMap(part => part.split('-'))
-    .map(s => s.trim())
-    .filter(Boolean);
+  return [...new Set(str
+    .split(/[,;/\s-]+/)
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean))];
 }

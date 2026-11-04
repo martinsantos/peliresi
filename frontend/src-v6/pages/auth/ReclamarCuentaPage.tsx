@@ -43,14 +43,14 @@ const ReclamarCuentaPage: React.FC = () => {
         <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={32} className="text-green-600" />
         </div>
-        <h2 className="text-2xl font-bold text-neutral-900 mb-3">Revisá el correo registrado</h2>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-3">Revisá el correo registrado</h1>
         <p className="text-neutral-700 mb-6">
           Si los datos coinciden, recibirás un enlace en el correo ya registrado en SITREP.
           Desde ese enlace podrás elegir una nueva contraseña. Tu correo y el estado de tu cuenta no cambian.
         </p>
         <p className="text-sm text-neutral-600 mb-6">Si no tenés acceso a ese correo, contactá al administrador.</p>
         <Link to="/login" className="inline-flex items-center gap-2 bg-[#1B5E3C] text-white hover:text-white focus:text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#164D32] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
-          Ir al login
+          Iniciar sesión
         </Link>
       </div>
     );
@@ -58,12 +58,12 @@ const ReclamarCuentaPage: React.FC = () => {
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-6">
-      <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 mb-6">
-        <ArrowLeft size={16} /> Volver al login
+      <Link to="/login" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 mb-6">
+        <ArrowLeft size={16} /> Volver a iniciar sesión
       </Link>
       <div className="text-center mb-6">
         <SitrepMark size={56} className="mx-auto mb-3" />
-        <h2 className="text-2xl font-bold text-neutral-900">Recuperar acceso a tu cuenta</h2>
+        <h1 className="text-2xl font-bold text-neutral-900">Recuperar acceso a tu cuenta</h1>
         <p className="text-sm text-neutral-700 mt-2">
           Identificá tu empresa. El enlace se enviará únicamente al correo ya registrado en SITREP.
         </p>

@@ -1,0 +1,104 @@
+{
+  "viewport": "344x760, app PWA, caso artificial GRP-2026-00001 en campo, scrollTop 0",
+  "metric": "firstFieldTop = borde superior del primer campo editable del paso; navBottom = fin de la cabecera (pestañas + título); barHeight = barra inferior de guardado; buttons = botones/summary/enlaces internos visibles del paso; textParas = párrafos visibles del paso",
+  "before": {
+    "commit": "b0eaa71b",
+    "resumen": {
+      "firstFieldTop": 536,
+      "navBottom": 401,
+      "barHeight": 132,
+      "stepHeight": 2972,
+      "buttons": 16,
+      "textParas": 11
+    },
+    "acta": {
+      "firstFieldTop": 576,
+      "navBottom": 401,
+      "barHeight": 132,
+      "stepHeight": 1191,
+      "buttons": 9,
+      "textParas": 2
+    },
+    "checklist": {
+      "firstFieldTop": 1054,
+      "navBottom": 401,
+      "barHeight": 132,
+      "stepHeight": 2767,
+      "buttons": 19,
+      "textParas": 19
+    },
+    "evidencias": {
+      "firstFieldTop": null,
+      "navBottom": 401,
+      "barHeight": 132,
+      "stepHeight": 216,
+      "buttons": 3,
+      "textParas": 1
+    },
+    "revision": {
+      "firstFieldTop": null,
+      "navBottom": 401,
+      "barHeight": 84,
+      "stepHeight": 637,
+      "buttons": 4,
+      "textParas": 84
+    }
+  },
+  "after": {
+    "commit": "102775f1",
+    "resumen": {
+      "firstFieldTop": 445,
+      "navBottom": 309,
+      "barHeight": 81,
+      "stepHeight": 2681,
+      "buttons": 14,
+      "textParas": 10
+    },
+    "acta": {
+      "firstFieldTop": 500,
+      "navBottom": 325,
+      "barHeight": 81,
+      "stepHeight": 1191,
+      "buttons": 9,
+      "textParas": 2
+    },
+    "checklist": {
+      "firstFieldTop": null,
+      "navBottom": 325,
+      "barHeight": 81,
+      "stepHeight": 2409,
+      "buttons": 18,
+      "textParas": 18,
+      "nota": "sin campo editable visible: un control pendiente muestra sólo sus tres respuestas"
+    },
+    "evidencias": {
+      "firstFieldTop": null,
+      "navBottom": 325,
+      "barHeight": 81,
+      "stepHeight": 216,
+      "buttons": 3,
+      "textParas": 1
+    },
+    "revision": {
+      "firstFieldTop": null,
+      "navBottom": 325,
+      "barHeight": 81,
+      "stepHeight": 566,
+      "buttons": 4,
+      "textParas": 83
+    }
+  },
+  "nota": "navBottom en Visita es menor porque su título cabe en una línea con «Paso 1 de 4». La barra pasó por 61 px con el estado al lado de los botones, pero el texto se partía; a 81 px el estado tiene su propia línea legible.",
+  "constatar_lista": {
+    "commit": "0e9f5c17",
+    "acordeones": "3 → 0",
+    "controles visibles al llegar (teléfono)": "1 → 11",
+    "toques hasta la primera respuesta de un control": "2 → 0",
+    "botones de navegación interna quitados": [
+      "Ver los 11 controles / Volver al control actual",
+      "Volver al índice de controles"
+    ],
+    "encabezado de Controles al abrir #checklist (344 px)": "81 px bajo la barra de la app",
+    "colapsar una tarjeta enlazada mueve la página": "no (344 px)"
+  }
+}

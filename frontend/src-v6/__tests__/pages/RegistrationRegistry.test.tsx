@@ -6,10 +6,10 @@ import SolicitarCambiosPage from '../../pages/perfil/SolicitarCambiosPage';
 import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
 const mock = vi.hoisted(() => ({ get: vi.fn(), token: '', role: 'GENERADOR', submit: vi.fn() }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get }, getAccessToken: () => mock.token }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', actorId: 'actor' }, isGenerador: mock.role === 'GENERADOR', isOperador: mock.role === 'OPERADOR' }) }));
-vi.mock('../../services/renovacion.service', () => ({ renovacionService: { create: mock.submit } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', actorId: 'actor', rol: mock.role }, isGenerador: mock.role === 'GENERADOR', isOperador: mock.role === 'OPERADOR' }) }));
+vi.mock('../../services/renovacion.service', () => ({ renovacionService: { create: mock.submit, getOwn: async () => null } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
-beforeEach(() => { vi.clearAllMocks(); mock.role = 'GENERADOR'; mock.token = `qa.${btoa(JSON.stringify({ id: 'owner' }))}.qa`; });
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); mock.role = 'GENERADOR'; mock.token = `qa.${btoa(JSON.stringify({ id: 'owner' }))}.qa`; });
 describe('existing registry is available only through the verified owner and actual API shape', () => {
   it('finds the exact imported CUIT without separators, without rewriting it or matching another actor', async () => {
     mock.get.mockResolvedValueOnce({ data: { data: { generadores: [] } } })
@@ -28,7 +28,7 @@ describe('existing registry is available only through the verified owner and act
   it.each(['GENERADOR', 'OPERADOR'] as const)('%s precarga uses the wrapped actor API and retains the current address', async role => {
     mock.role = role; mock.get.mockResolvedValue({ data: { data: { [role.toLowerCase()]: { id: 'actor', razonSocial: 'QA padrón', domicilio: 'QA domicilio anterior', telefono: '0261-QA' } } } });
     await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));
-    expect(screen.getByLabelText('Razon Social')).toHaveValue('QA padrón'); expect(screen.getByLabelText('Domicilio')).toHaveValue('QA domicilio anterior');
+    expect(screen.getByLabelText('Razón social')).toHaveValue('QA padrón'); expect(screen.getByLabelText('Domicilio')).toHaveValue('QA domicilio anterior');
     expect(mock.submit).not.toHaveBeenCalled();
   });
   it('never renders an editable empty registry after a failed preload', async () => {
@@ -58,7 +58,7 @@ describe('change requests explain a server rejection instead of inviting a point
     mock.submit.mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { message: 'Ya existe una renovacion para este actor en ese ano' } } });
     await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));
     fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA domicilio nuevo' } });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Enviar Solicitud/ })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Enviar solicitud/ })); });
     expect(mockedToast.error).toHaveBeenCalledWith('No se envió la solicitud', 'Ya existe una renovacion para este actor en ese ano');
     expect(screen.getByLabelText('Domicilio')).toHaveValue('QA domicilio nuevo');
   });

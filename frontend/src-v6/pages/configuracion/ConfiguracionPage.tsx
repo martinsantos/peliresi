@@ -21,8 +21,8 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
-import { resetOnboardingTour } from '../../components/OnboardingTour';
-import { resetDemoOnboarding } from '../../components/DemoAppOnboarding';
+import { LinkPreferenceSettings } from '../../components/LinkPreferenceSettings';
+import OnboardingWizard from '../../components/OnboardingWizard';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { InstallPWAButton } from '../../components/InstallPWAButton';
@@ -50,12 +50,33 @@ const BASE_SECTIONS = [
 ];
 
 const ConfiguracionPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const { currentUser, isAdmin, showOnboarding } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const validSections = [...BASE_SECTIONS, { id: 'notificaciones' }].map(s => s.id);
   const [activeSection, setActiveSection] = useState(
     tabParam && validSections.includes(tabParam) ? tabParam : 'perfil'
   );
+  const [welcome, setWelcome] = useState(searchParams.get('bienvenida') === '1');
+  useEffect(() => {
+    if (searchParams.get('bienvenida') !== '1') return;
+    // First login already presents this guide. Consume the link without
+    // opening a second dialog after the automatic introduction is closed.
+    setWelcome(!showOnboarding);
+    if (showOnboarding) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('bienvenida');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showOnboarding]);
+  const dismissWelcome = () => {
+    setWelcome(false);
+    if (searchParams.has('bienvenida')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('bienvenida');
+      setSearchParams(next, { replace: true });
+    }
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [notifNuevoRegistro, setNotifNuevoRegistro] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
@@ -64,7 +85,6 @@ const ConfiguracionPage: React.FC = () => {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [savingNotif, setSavingNotif] = useState(false);
-  const { currentUser, isAdmin } = useAuth();
 
   // Profile form state
   const [profile, setProfile] = useState({
@@ -232,6 +252,7 @@ const ConfiguracionPage: React.FC = () => {
       case 'apariencia':
         return (
           <div className="space-y-6 animate-fade-in">
+            <LinkPreferenceSettings />
             {/* Tour & Onboarding reset */}
             <div>
               <h4 className="font-medium text-neutral-900 mb-4">Ayuda y tour</h4>
@@ -241,9 +262,9 @@ const ConfiguracionPage: React.FC = () => {
                     <HelpCircle size={18} />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-neutral-900">Tour guiado</p>
+                    <p className="font-medium text-neutral-900">Bienvenida por rol</p>
                     <p className="text-sm text-neutral-500">
-                      Reinicia el tour de bienvenida y las pantallas de introduccion por rol para verlos nuevamente.
+                      Repasá el circuito de tu actividad actual sin salir de esta pantalla.
                     </p>
                   </div>
                 </div>
@@ -252,12 +273,10 @@ const ConfiguracionPage: React.FC = () => {
                   size="sm"
                   leftIcon={<RotateCcw size={16} />}
                   onClick={() => {
-                    resetOnboardingTour();
-                    resetDemoOnboarding();
-                    toast.success('Tour reiniciado', 'El tour se mostrara al recargar la pagina.');
+                    setWelcome(true);
                   }}
                 >
-                  Reiniciar tour
+                  Ver bienvenida de mi rol
                 </Button>
               </div>
             </div>
@@ -273,7 +292,7 @@ const ConfiguracionPage: React.FC = () => {
                   <div className="flex-1">
                     <p className="font-medium text-neutral-900">Instalar SITREP</p>
                     <p className="text-sm text-neutral-500">
-                      Instala la app en tu dispositivo para acceso rapido, funcionamiento offline y notificaciones.
+                      Instalá la app para abrirla más rápido. Las tareas sin conexión y los avisos dependen de los permisos y de las funciones habilitadas.
                     </p>
                   </div>
                 </div>
@@ -380,6 +399,7 @@ const ConfiguracionPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <h2 className="sr-only">Configuración</h2>
+      {welcome && !showOnboarding && currentUser && <OnboardingWizard key={currentUser.rol} rol={currentUser.rol} esInspector={currentUser.esInspector} userId={currentUser.id} onDismiss={dismissWelcome} />}
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}
@@ -415,11 +435,11 @@ const ConfiguracionPage: React.FC = () => {
             <CardContent>{renderSection()}</CardContent>
           </Card>
 
-          <div className="flex justify-end mt-6">
+          {activeSection === 'perfil' && <div className="flex justify-end mt-6">
             <Button onClick={handleSave} isLoading={isSaving} leftIcon={<Save size={18} />}>
               Guardar cambios
             </Button>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

@@ -52,6 +52,9 @@ for (const [category, role] of [['Transportistas', 'TRANSPORTISTA'], ['Generador
     const posted = page.waitForResponse(r => r.url().endsWith('/' + id + '/intercambios') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Presentar en expediente', exact: true }).click();
     expect((await posted).status()).toBe(201);
+    // Wait for the confirmed UI to close the composer and clear its durable draft.
+    // A network response alone can precede that completion on a constrained worker.
+    await expect(page.getByRole('textbox', { name: 'Contenido', exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.getByText('CAP respuesta del participante: control ficticio completado, sin actuación real.', { exact: true })).toBeVisible();
     await page.screenshot({ path: info.outputPath(`training-${role}-response.png`), fullPage: true });
@@ -163,7 +166,7 @@ test('school generator signs and hands the same manifest to transport and operat
   await enter(page, info, 'Operadores', index);
   await page.goto(prefix(info) + '/manifiestos/' + id);
   const received = page.waitForResponse(r => r.url().endsWith('/confirmar-recepcion') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Confirmar Recepcion', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar recepción', exact: true }).click();
   expect((await received).status()).toBe(200);
   await page.getByRole('button', { name: 'Registrar Tratamiento', exact: true }).click();
   const treatment = page.getByRole('dialog', { name: 'Registrar Tratamiento', exact: true });

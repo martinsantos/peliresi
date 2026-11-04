@@ -20,4 +20,16 @@ describe('TransportistaTripQueue', () => {
 
     expect(screen.getByText('Sin viajes asignados')).toBeInTheDocument();
   });
+
+  it('keeps concurrent trips and pending pickups separately selectable', () => {
+    const onOpenTrip = vi.fn();
+    render(<TransportistaTripQueue activeTrips={[activeTrip, { ...activeTrip, id: 'trip-second', numero: 'M-003' }]} pendingTrips={[pendingTrip]} onOpenTrip={onOpenTrip} activeTotal={2} pendingTotal={1} />);
+    expect(screen.getByRole('heading', { name: 'En tránsito: 2 manifiestos' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Por revisar: 1 manifiesto' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Ir al viaje M-003' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir viaje asignado M-002' }));
+    expect(onOpenTrip).toHaveBeenNthCalledWith(1, 'trip-second');
+    expect(onOpenTrip).toHaveBeenNthCalledWith(2, 'trip-pending');
+    expect(screen.getByText(/Cada móvil transmite GPS únicamente/)).toBeVisible();
+  });
 });

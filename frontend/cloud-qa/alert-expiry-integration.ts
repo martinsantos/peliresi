@@ -14,6 +14,7 @@ try {
   const vehicles = await db.vehiculo.findMany({ where: { id: { in: ['night-qa-vehicle-1', 'night-qa-vehicle-2'] } }, orderBy: { id: 'asc' } });
   assert.equal(vehicles.length, 2);
   const admin = await db.usuario.findUniqueOrThrow({ where: { email: 'admin@night-qa.invalid' } });
+  const recipientIds = (await db.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } })).map((user: { id: string }) => user.id).sort();
   const rule = await db.reglaAlerta.create({ data: {
     nombre: 'QA identidad vencimiento SQL', evento: 'VENCIMIENTO',
     condicion: JSON.stringify({ entidadId: { in: vehicles.map((v: { id: string }) => v.id) } }),
@@ -29,14 +30,15 @@ try {
   assert.equal(cases.length, 2);
   assert.deepEqual(cases.map((c: { datos: string }) => JSON.parse(c.datos).entidadId).sort(), vehicles.map((v: { id: string }) => v.id).sort());
   const notices = await db.notificacion.findMany({ where: { titulo: rule.nombre } });
-  assert.equal(notices.length, 2); assert.ok(notices.every((n: { usuarioId: string }) => n.usuarioId === admin.id));
+  assert.equal(notices.length, 2 * recipientIds.length);
+  for (const vehicle of vehicles) assert.deepEqual(notices.filter((n: { datos: string }) => JSON.parse(n.datos).entidadId === vehicle.id).map((n: { usuarioId: string }) => n.usuarioId).sort(), recipientIds);
   checks.push('two subjects with null manifest retain separate cases and configured admin notices');
   await alertaSubscriber(event(vehicles[0]));
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id } }), 2);
-  assert.equal(await db.notificacion.count({ where: { titulo: rule.nombre } }), 2);
+  assert.equal(await db.notificacion.count({ where: { titulo: rule.nombre } }), 2 * recipientIds.length);
   await alertaSubscriber(event(vehicles[0], new Date(deadline.getTime() + 86400000)));
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id } }), 3);
-  assert.equal(await db.notificacion.count({ where: { titulo: rule.nombre } }), 3);
+  assert.equal(await db.notificacion.count({ where: { titulo: rule.nombre } }), 3 * recipientIds.length);
   checks.push('same subject/date deduplicated; changed date retained by PostgreSQL string filters');
   await db.reglaAlerta.update({ where: { id: rule.id }, data: { activa: false } });
 } catch (error) {

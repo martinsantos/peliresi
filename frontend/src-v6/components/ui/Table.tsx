@@ -36,6 +36,7 @@ export interface TableProps<T> {
   onSelectionChange?: (keys: string[]) => void;
   sortable?: boolean;
   onSort?: (key: string, direction: 'asc' | 'desc') => void;
+  sort?: { key: string; direction: 'asc' | 'desc' } | null;
   loading?: boolean;
   emptyMessage?: string;
   striped?: boolean;
@@ -60,6 +61,7 @@ export function Table<T extends Record<string, any>>({
   onSelectionChange,
   sortable = false,
   onSort,
+  sort,
   loading = false,
   emptyMessage = 'No hay datos disponibles',
   striped = false,
@@ -71,7 +73,8 @@ export function Table<T extends Record<string, any>>({
   onRowClick,
   renderExpandedRow,
 }: TableProps<T>) {
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [internalSort, setInternalSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const sortConfig = sort === undefined ? internalSort : sort;
 
   const handleSort = (key: string) => {
     if (!sortable) return;
@@ -80,7 +83,7 @@ export function Table<T extends Record<string, any>>({
     if (sortConfig?.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    setSortConfig({ key, direction });
+    if (sort === undefined) setInternalSort({ key, direction });
     onSort?.(key, direction);
   };
 

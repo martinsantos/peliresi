@@ -1,13 +1,17 @@
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
+import { inspectionMeasureText } from '../domain/inspectionFieldModel';
+import { inspectionMapSummary, inspectionPointText } from '../domain/inspectionMapGeometry';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
 import {
   buildInspectionDocumentFingerprint,
   buildInspectionFieldActFingerprint,
 } from './inspectionDocumentIntegrity.service';
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
 import {
-  drawMendozaMark,
-  drawSitrepMark,
+  drawInstitutionalMasthead,
+  drawInstitutionalRule,
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
@@ -366,19 +370,17 @@ function institutionalHeader(
   branding: InspectionPdfBranding,
   subtitle?: string,
 ) {
-  drawMendozaMark(doc, branding, 34, 17, 152, 48);
-  drawSitrepMark(doc, 374, 21, { width: 187 });
-  doc.font('Helvetica-Bold').fontSize(6.3).fillColor(COLORS.green)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 34, 69, { width: 365, lineBreak: false });
-  doc.font('Helvetica').fontSize(6).fillColor(COLORS.muted)
-    .text('DOCUMENTO OFICIAL GENERADO POR SITREP', 385, 69, { width: 176, align: 'right', lineBreak: false });
-  doc.moveTo(34, 84).lineTo(doc.page.width - 34, 84).lineWidth(1.5).strokeColor(COLORS.green).stroke();
+  drawInstitutionalMasthead(doc, branding, 34, 16, doc.page.width - 68);
+  doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 34, 77, { width: doc.page.width - 68, lineBreak: false });
+  drawInstitutionalRule(doc, 34, 89, doc.page.width - 68);
 
   doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.ink)
     .text('ACTA DE INSPECCIÓN / CONSTATACIÓN', 34, 97, { width: 310 });
   doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.green)
     .text(`N.º ${actNumber}`, 337, 94, { width: 224, align: 'right' });
-  if (subtitle) doc.font('Helvetica').fontSize(6.8).fillColor(COLORS.muted)
+  doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted).text(syntheticPreviewEnabled() ? 'PRÁCTICA - SIN VALIDEZ OFICIAL' : 'DOCUMENTO GENERADO POR SITREP', 34, 115, { width: 295, lineBreak: false });
+  if (subtitle) doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
     .text(subtitle, 337, 115, { width: 224, align: 'right', height: 13, ellipsis: true });
   doc.moveTo(34, 133).lineTo(doc.page.width - 34, 133).lineWidth(0.6).strokeColor(COLORS.line).stroke();
   doc.y = 143;
@@ -404,23 +406,61 @@ function statusBanner(doc: PDFKit.PDFDocument, presentation: InspectionFieldActP
   doc.y = y + 48;
 }
 
-function row(doc: PDFKit.PDFDocument, cells: Array<{ label: string; value: string; weight?: number }>, minimumHeight = 30) {
+function row(
+  doc: PDFKit.PDFDocument,
+  cells: Array<{ label: string; value: string; weight?: number }>,
+  minimumHeight: number,
+  newPage: () => void,
+) {
   const totalWeight = cells.reduce((sum, cell) => sum + (cell.weight || 1), 0);
   const available = doc.page.width - 68;
   const widths = cells.map((cell) => available * (cell.weight || 1) / totalWeight);
-  doc.font('Helvetica').fontSize(7.5);
-  const heights = cells.map((cell, index) => doc.heightOfString(cell.value, { width: widths[index] - 12 }));
-  const height = Math.max(minimumHeight, Math.max(...heights) + 21);
-  const y = doc.y;
-  let x = 34;
-  cells.forEach((cell, index) => {
-    const width = widths[index];
-    doc.rect(x, y, width, height).fillAndStroke(COLORS.white, COLORS.line);
-    doc.font('Helvetica-Bold').fontSize(6.5).fillColor(COLORS.muted).text(cell.label.toUpperCase(), x + 6, y + 5, { width: width - 12 });
-    doc.font('Helvetica').fontSize(8.3).fillColor(COLORS.ink).text(cell.value, x + 6, y + 15, { width: width - 12, lineGap: 1 });
-    x += width;
-  });
-  doc.y = y + height;
+  // Measure using the exact font used to draw each line. PDFKit's automatic
+  // flow cannot paginate a table row: it leaves its border and other cells on
+  // the old page while moving text onto an unheaded page.
+  doc.font('Helvetica').fontSize(8.3);
+  const lines = cells.map((cell, index) => wrappedLines(doc, cell.value, widths[index] - 12));
+  const offsets = cells.map(() => 0);
+  const lineHeight = doc.currentLineHeight(true) + 1;
+  let continued = false;
+  while (lines.some((cell, index) => offsets[index] < cell.length)) {
+    const bottom = doc.page.height - 82;
+    const availableHeight = bottom - doc.y;
+    const capacity = Math.floor((availableHeight - 21) / lineHeight);
+    const remaining = Math.max(...lines.map((cell, index) => cell.length - offsets[index]));
+    if (availableHeight < minimumHeight || capacity < Math.min(2, remaining)) {
+      newPage();
+      continue;
+    }
+    const lineCount = Math.min(capacity, remaining);
+    const height = Math.max(minimumHeight, 21 + lineCount * lineHeight);
+    const y = doc.y;
+    let x = 34;
+    cells.forEach((cell, index) => {
+      const width = widths[index];
+      const fragment = lines[index].slice(offsets[index], offsets[index] + lineCount);
+      doc.rect(x, y, width, height).fillAndStroke(COLORS.white, COLORS.line);
+      doc.font('Helvetica-Bold').fontSize(6.5).fillColor(COLORS.muted)
+        .text(`${cell.label.toUpperCase()}${continued && fragment.length ? ' · CONT.' : ''}`, x + 6, y + 5,
+          { width: width - 12, lineBreak: false });
+      doc.font('Helvetica').fontSize(8.3).fillColor(COLORS.ink);
+      if (fragment.length) {
+        fragment.forEach((line, lineIndex) => {
+          if (line) doc.text(line, x + 6, y + 15 + lineIndex * lineHeight, { width: width - 12, lineBreak: false });
+        });
+        offsets[index] += fragment.length;
+      } else if (continued) {
+        doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted)
+          .text('Ver página anterior', x + 6, y + 15, { width: width - 12, lineBreak: false });
+      }
+      x += width;
+    });
+    doc.y = y + height;
+    if (lines.some((cell, index) => offsets[index] < cell.length)) {
+      newPage();
+      continued = true;
+    }
+  }
 }
 
 function splitToken(doc: PDFKit.PDFDocument, token: string, width: number): string[] {
@@ -511,25 +551,29 @@ function writeFormalityDetail(
   inspectionNumber: string,
   presentation: InspectionFieldActPresentation,
   branding: InspectionPdfBranding,
+  trailingSpace = 0,
 ) {
   doc.font('Helvetica-Bold').fontSize(6.4).fillColor(COLORS.muted);
   const detailLabel = formality.resolved ? 'CONSTANCIA REGISTRADA' : 'CONSTANCIA / PENDIENTE';
-  doc.text(detailLabel, 40, doc.y, { width: doc.page.width - 80, lineBreak: false });
-  doc.y += 11;
+  const labelY = doc.y;
+  doc.text(detailLabel, 40, labelY, { width: doc.page.width - 80, lineBreak: false });
+  doc.y = labelY + 11;
   doc.font('Helvetica').fontSize(8.2).fillColor(COLORS.ink);
   const detail = formality.unresolvedReason
     ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
     : formality.detail;
   const lines = wrappedLines(doc, detail, doc.page.width - 80);
-  for (const line of lines) {
-    if (doc.y + 12 > doc.page.height - 82) {
+  for (const [index, line] of lines.entries()) {
+    const reserve = index === lines.length - 1 ? trailingSpace : 0;
+    if (doc.y + 12 + reserve > doc.page.height - 82) {
       doc.addPage();
       article44PageHeader(doc, actNumber, inspectionNumber, presentation, branding, true);
       formalityHeading(doc, formality, true);
       doc.font('Helvetica').fontSize(8.2).fillColor(COLORS.ink);
     }
-    if (line) doc.text(line, 40, doc.y, { width: doc.page.width - 80, lineBreak: false });
-    doc.y += 11;
+    const lineY = doc.y;
+    if (line) doc.text(line, 40, lineY, { width: doc.page.width - 80, lineBreak: false });
+    doc.y = lineY + 11;
   }
   doc.y += 9;
 }
@@ -550,44 +594,49 @@ function article44Section(
     doc.y += 7;
   }
   const note = 'Esta sección reproduce únicamente datos consignados en el acta de campo. "No consignado" o "pendiente" no presume hechos, firmas, entrega de copias ni notificaciones. El control indicado es de completitud documental y no sustituye una valoración jurídica.';
+  doc.font('Helvetica').fontSize(7.2);
   const noteHeight = Math.max(37, doc.heightOfString(note, { width: doc.page.width - 100 }) + 17);
-  doc.roundedRect(40, doc.y, doc.page.width - 80, noteHeight, 4).fill(COLORS.soft);
+  const noteY = doc.y;
+  doc.roundedRect(40, noteY, doc.page.width - 80, noteHeight, 4).fill(COLORS.soft);
   doc.font('Helvetica').fontSize(7.2).fillColor(COLORS.ink)
-    .text(note, 50, doc.y + 8, { width: doc.page.width - 100, lineGap: 1 });
-  doc.y += noteHeight + 10;
+    .text(note, 50, noteY + 8, { width: doc.page.width - 100, lineGap: 1 });
+  doc.y = noteY + noteHeight + 10;
 
-  presentation.formalities.forEach((formality) => {
-    doc.font('Helvetica').fontSize(8.2);
-    const detail = formality.unresolvedReason
-      ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
-      : formality.detail;
-    const blockHeight = 43 + 11 + wrappedLines(doc, detail, doc.page.width - 80).length * 11 + 9;
-    // Keep a compact formality together. Longer statements still paginate,
-    // repeating their own heading on each continuation page.
-    if (doc.y + Math.min(blockHeight, doc.page.height - 82 - 216) > doc.page.height - 82) {
-      doc.addPage();
-      article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
-    }
-    formalityHeading(doc, formality);
-    writeFormalityDetail(doc, formality, actNumber, inspection.numero, presentation, branding);
-  });
-
-  if (doc.y + 52 > doc.page.height - 82) {
-    doc.addPage();
-    article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
-  }
   const summary = presentation.unresolved.length
     ? `Pendientes documentales: ${presentation.unresolved.map((entry) => entry.label).join('; ')}.`
     : presentation.hasAdverseOutcomes
       ? `Los seis controles tienen datos suficientes. Constancias adversas: ${presentation.adverse.map((entry) => entry.label).join('; ')}. Esto no implica cumplimiento de la formalidad material.`
       : 'No se detectaron pendientes en los seis controles estructurados incluidos en esta sección.';
+  doc.font('Helvetica-Bold').fontSize(7.2);
   const summaryHeight = Math.max(38, doc.heightOfString(summary, { width: doc.page.width - 100 }) + 20);
-  doc.roundedRect(40, doc.y, doc.page.width - 80, summaryHeight, 4)
+  presentation.formalities.forEach((formality, index) => {
+    doc.font('Helvetica').fontSize(8.2);
+    const detail = formality.unresolvedReason
+      ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
+      : formality.detail;
+    const blockHeight = 43 + 11 + wrappedLines(doc, detail, doc.page.width - 80).length * 11 + 9;
+    const reserve = index === presentation.formalities.length - 1 ? summaryHeight + 18 : 0;
+    // Keep a compact formality together. Longer statements still paginate,
+    // repeating their heading. Keep the final summary with the last formality.
+    if (doc.y + Math.min(blockHeight + reserve, doc.page.height - 82 - 216) > doc.page.height - 82) {
+      doc.addPage();
+      article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
+    }
+    formalityHeading(doc, formality);
+    writeFormalityDetail(doc, formality, actNumber, inspection.numero, presentation, branding, reserve);
+  });
+
+  if (doc.y + summaryHeight > doc.page.height - 82) {
+    doc.addPage();
+    article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
+  }
+  const summaryY = doc.y;
+  doc.roundedRect(40, summaryY, doc.page.width - 80, summaryHeight, 4)
     .fill(presentation.unresolved.length || presentation.hasAdverseOutcomes ? COLORS.warningSoft : COLORS.successSoft);
   doc.font('Helvetica-Bold').fontSize(7.2)
     .fillColor(presentation.unresolved.length || presentation.hasAdverseOutcomes ? COLORS.warning : COLORS.green)
-    .text(summary, 50, doc.y + 9, { width: doc.page.width - 100, lineGap: 1 });
-  doc.y += summaryHeight + 8;
+    .text(summary, 50, summaryY + 9, { width: doc.page.width - 100, lineGap: 1 });
+  doc.y = summaryY + summaryHeight + 8;
 }
 
 function signatureBlock(
@@ -609,23 +658,25 @@ function signatureBlock(
     // before the signature fields when the block must move to a new page.
     band(doc, 'Cierre documental y firmas');
     doc.y += 9;
-    doc.roundedRect(40, doc.y, doc.page.width - 80, 42, 4).fill(COLORS.soft);
+    const noteY = doc.y;
+    doc.roundedRect(40, noteY, doc.page.width - 80, 42, 4).fill(COLORS.soft);
     doc.font('Helvetica').fontSize(7.2).fillColor(COLORS.ink)
-      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Este PDF no incorpora una firma gráfica ni presume validación cuando el expediente la marca como pendiente.', 50, doc.y + 9, { width: doc.page.width - 100, lineGap: 1.2 });
-    doc.y += 51;
+      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Sólo las firmas identificadas como capturadas incluyen trazo manuscrito. No equivalen a conformidad con los hallazgos ni a firma digital certificada.', 50, noteY + 9, { width: doc.page.width - 100, lineGap: 1.2 });
+    doc.y = noteY + 51;
   }
   const actualY = doc.y + 18;
+  const captured: any[] = inspection.firmasCapturadas || [];
   const responsible = value(act.atendidoPor || act.titular || actor.representanteLegalNombre, 'Causante / responsable');
   const inspector = value(`${inspection.inspector?.nombre || ''} ${inspection.inspector?.apellido || ''}`);
   const blocks = [
     {
-      name: responsible,
+      name: captured.find(f => f.tipo === 'INSPECCIONADO')?.nombre || responsible,
       dni: act.dniAtendido || act.dniTitular || actor.representanteLegalDNI,
       role: 'CAUSANTE / RESPONSABLE',
       status: `ESTADO REGISTRADO: ${stateLabel(act.firmaIntervinienteEstado, SIGNATURE_STATES).toUpperCase()}`,
     },
     {
-      name: inspector,
+      name: captured.find(f => f.tipo === 'INSPECTOR')?.nombre || inspector,
       dni: '',
       role: 'INSPECTOR/A INTERVINIENTE',
       status: 'ESPACIO DE FIRMA - SIN FIRMA GRÁFICA INCORPORADA',
@@ -633,6 +684,11 @@ function signatureBlock(
   ];
   blocks.forEach(({ name, dni, role, status }, index) => {
     const x = 40 + index * (width + 12);
+    const signature = captured.find(f => f.tipo === (index === 0 ? 'INSPECCIONADO' : 'INSPECTOR'));
+    if (signature?.imagen?.startsWith('data:image/png;base64,')) {
+      doc.image(Buffer.from(signature.imagen.split(',')[1], 'base64'), x + 10, actualY - 2, { fit: [width - 20, 34], align: 'center' });
+      status = 'FIRMA MANUSCRITA EN PANTALLA · ' + new Date(signature.registradaAt).toLocaleDateString('es-AR');
+    }
     doc.moveTo(x, actualY + 34).lineTo(x + width, actualY + 34).lineWidth(0.7).strokeColor(COLORS.line).stroke();
     doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.ink).text(name, x, actualY + 40, { width, align: 'center' });
     if (dni) doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted).text(`DNI ${dni}`, x, actualY + 52, { width, align: 'center' });
@@ -679,8 +735,9 @@ function writePaginatedText(
         observationsHeader(doc, actNumber, branding, continuation);
         doc.font('Helvetica').fontSize(9).fillColor(COLORS.ink);
       }
-      doc.text(line, 40, doc.y, { width: maxWidth, lineBreak: false });
-      doc.y += lineHeight;
+      const lineY = doc.y;
+      doc.text(line, 40, lineY, { width: maxWidth, lineBreak: false });
+      doc.y = lineY + lineHeight;
       line = '';
     };
     words.forEach((word) => {
@@ -728,11 +785,10 @@ function photoAnnex(
     ];
     const captionHeight = measureInspectionPdfBlocks(doc, caption, doc.page.width - 76);
     const minimumCaption = Math.min(captionHeight, 90);
-    if (index === 0 || doc.y + 212 + Math.min(captionHeight, doc.page.height - 82 - 150 - 212) > doc.page.height - 82) newPhotoPage();
-    if (doc.y + 212 + minimumCaption > doc.page.height - 82) newPhotoPage();
+    newPhotoPage(); // One full, proportional photograph per page; caption stays attached.
     const y = doc.y;
     // Caption height, not a fixed photograph count, determines page breaks.
-    const imageHeight = 205;
+    const imageHeight = Math.max(205, doc.page.height - doc.y - 92 - Math.min(captionHeight, 160));
     doc.roundedRect(34, y, doc.page.width - 68, imageHeight, 4).fill(COLORS.soft);
     const prepared = preparedImages.get(photo.id);
     if (prepared?.buffer) doc.image(prepared.buffer, 38, y + 4, { fit: [doc.page.width - 76, imageHeight - 8], align: 'center', valign: 'center' });
@@ -759,16 +815,30 @@ export async function streamInspectionActPdf(
   inspection: any,
   resolveEvidence: (key: string) => string,
 ): Promise<void> {
+  if (inspection.datosActa?.modeloCampo === 2) return streamTypicalInspectionAct(res, inspection, resolveEvidence);
   const actor = actorOf(inspection);
-  const act = actDataOf(inspection);
+  const originalInspection = inspection;
+  const storedAct = actDataOf(inspection);
+  const extra = inspection.datosActa || {};
+  const act = { ...storedAct, requerimientos: [storedAct.requerimientos, extra.medidas?.length ? inspectionMeasureText(extra.medidas) : ''].filter(Boolean).join('\n\n') };
+  const additional = [
+    extra.actividadObservada && `Actividad observada: ${extra.actividadObservada}`,
+    extra.ampliacionEstado && `Instalaciones respecto de lo declarado: ${({ COINCIDE: 'Coincide', DIFIERE: 'Difiere', NO_VERIFICADO: 'No verificado / sin antecedente suficiente', NO_APLICA: 'No aplica' } as Record<string, string>)[extra.ampliacionEstado] || extra.ampliacionEstado}`,
+    extra.ampliacionDetalle && `Diferencias o ampliaciones: ${extra.ampliacionDetalle}`,
+    extra.entornoObservado && `Entorno: ${extra.entornoObservado}`,
+    extra.receptores?.length && `Receptores considerados: ${extra.receptores.join(', ')}`,
+    extra.restriccionReferencia && `Referencia de restricción o antecedente: ${extra.restriccionReferencia}`,
+    extra.ubicacionCampo && `Ubicación confirmada: ${inspectionPointText(extra.ubicacionCampo)}`,
+  ].filter(Boolean).join('\n');
+  inspection = { ...inspection, datosActa: act, observaciones: [inspection.observaciones, additional].filter(Boolean).join('\n\n') };
   const actNumber = value(inspection.numeroActa, inspection.numero);
   const started = dateParts(inspection.iniciadaAt || inspection.fechaProgramada || inspection.createdAt);
   const presentation = buildInspectionFieldActPresentation(inspection);
-  const fingerprint = buildInspectionFieldActFingerprint(inspection);
+  const fingerprint = buildInspectionFieldActFingerprint(originalInspection);
   // The public QR verifies the complete current dossier, while the field-act
   // footer intentionally preserves the frozen field-act fingerprint.
-  const traceFingerprint = buildInspectionDocumentFingerprint(inspection);
-  const traceQr = await buildInspectionPdfQr({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint: traceFingerprint });
+  const traceFingerprint = buildInspectionDocumentFingerprint(originalInspection);
+  const traceQr = inspection.firmasCapturadas?.length ? null : await buildInspectionPdfQr({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint: traceFingerprint });
   const branding = await loadInspectionPdfBranding();
   const fieldEvidence = (inspection.evidencias || []).filter((evidence: any) => !evidence.intercambioId);
   const preparedImages = await prepareInspectionPdfImages(fieldEvidence, resolveEvidence);
@@ -789,63 +859,78 @@ export async function streamInspectionActPdf(
 
   institutionalHeader(doc, actNumber, branding, `Expediente digital ${inspection.numero}`);
   statusBanner(doc, presentation);
-  doc.y = drawInspectionPdfQrCard(doc, traceQr, traceFingerprint, { y: doc.y, title: 'VERIFICAR TRAZABILIDAD DEL ACTA' }) + 8;
-  row(doc, [
+  if (traceQr) doc.y = drawInspectionPdfQrCard(doc, traceQr, traceFingerprint, { y: doc.y, title: 'VERIFICAR TRAZABILIDAD DEL ACTA' }) + 8;
+  const newCoverPage = () => {
+    doc.addPage();
+    institutionalHeader(doc, actNumber, branding, `CONTINUACIÓN · ${inspection.numero}`);
+    band(doc, 'Datos del acta · continuación');
+  };
+  const coverBand = (title: string) => {
+    if (doc.y + 18 + 44 > doc.page.height - 82) newCoverPage();
+    band(doc, title);
+  };
+  const coverRow = (cells: Array<{ label: string; value: string; weight?: number }>, minimumHeight = 30) =>
+    row(doc, cells, minimumHeight, newCoverPage);
+  coverRow([
     { label: 'Fecha', value: started.date },
     { label: 'Hora', value: started.time },
     { label: 'Código postal', value: value(act.codigoPostal) },
   ]);
-  band(doc, 'Domicilio inspeccionado');
-  row(doc, [
+  coverBand('Domicilio inspeccionado');
+  coverRow([
     { label: 'Departamento', value: value(act.departamento) },
     { label: 'Calle / domicilio', value: value(act.calle || inspection.ubicacion || actor.domicilio), weight: 2 },
     { label: 'N.º', value: value(act.numeroDomicilio) },
   ]);
-  band(doc, 'Empresa / entidad inspeccionada');
-  row(doc, [
+  coverBand('Empresa / entidad inspeccionada');
+  coverRow([
     { label: 'Razón social', value: value(actor.razonSocial), weight: 2 },
     { label: 'CUIT', value: value(actor.cuit) },
     { label: 'Teléfono', value: value(actor.telefono) },
   ]);
-  row(doc, [
+  coverRow([
     { label: 'Titular / propiedad de', value: value(act.titular || actor.representanteLegalNombre || actor.razonSocial), weight: 2 },
     { label: 'DNI', value: value(act.dniTitular || actor.representanteLegalDNI) },
     { label: 'Correo', value: value(actor.email) },
   ]);
-  row(doc, [
+  coverRow([
     { label: 'Atendido por', value: value(act.atendidoPor), weight: 2 },
     { label: 'DNI', value: value(act.dniAtendido) },
     { label: 'Cargo', value: value(act.cargoAtendido) },
   ]);
-  band(doc, 'Inspectores intervinientes');
-  row(doc, [
+  coverBand('Inspectores intervinientes');
+  coverRow([
     { label: 'Inspector/a asignado/a', value: value(`${inspection.inspector?.nombre || ''} ${inspection.inspector?.apellido || ''}`) },
     { label: 'Área', value: value(act.area) },
   ]);
-  band(doc, 'Alcance de la constatación');
-  row(doc, [
+  coverBand('Alcance de la constatación');
+  coverRow([
     { label: 'Lugar de afectación', value: value(act.lugarAfectacion), weight: 2 },
     { label: 'Motivo de inspección', value: value(act.motivoInspeccion), weight: 2 },
     { label: 'Infraestructura', value: act.infraestructura === 'SI' ? 'Sí' : act.infraestructura === 'NO' ? 'No' : 'No verificada' },
   ], 34);
-  row(doc, [
+  coverRow([
     { label: 'Detalle de infraestructura', value: value(act.detalleInfraestructura), weight: 2 },
     { label: 'Estado', value: value(act.estadoInfraestructura) },
   ], 35);
-  row(doc, [
+  coverRow([
     { label: 'Generación / corrientes observadas', value: value(act.generacion), weight: 2 },
     { label: 'Acta antecedente', value: value(act.actaAnterior) },
   ], 34);
   const failedItems = inspection.items.filter((item: any) => item.resultado === 'NO_CUMPLE');
   const requirementsFallback = failedItems.length ? `Ver observaciones. Controles no conformes registrados: ${failedItems.map((item: any) => item.codigo).join(', ')}.` : 'Sin requerimientos expresos consignados.';
-  row(doc, [{ label: 'Requerimientos consignados', value: value(act.requerimientos, requirementsFallback) }], 42);
+  coverRow([{ label: 'Requerimientos consignados', value: value(act.requerimientos, requirementsFallback) }], 42);
   const notice = typeof act.plazoDescargoDias === 'number'
     ? `En este acto se deja constancia del plazo de ${act.plazoDescargoDias} día${act.plazoDescargoDias === 1 ? '' : 's'} hábil${act.plazoDescargoDias === 1 ? '' : 'es'} registrado para formular descargo y ofrecer la prueba pertinente.`
     : 'Plazo de presentación o descargo no consignado en el expediente. Debe completarse antes de su notificación formal.';
+  doc.font('Helvetica-Bold').fontSize(7.4);
+  const noticeHeight = Math.max(37, doc.heightOfString(notice, { width: doc.page.width - 88 }) + 18);
+  // Keep the deadline context and the following signatures on one headed page.
+  if (doc.y + noticeHeight + 140 > doc.page.height - 82) newCoverPage();
   const noticeY = doc.y + 6;
-  doc.roundedRect(34, noticeY, doc.page.width - 68, 37, 4).fill(COLORS.soft);
+  doc.roundedRect(34, noticeY, doc.page.width - 68, noticeHeight, 4).fill(COLORS.soft);
   doc.font('Helvetica-Bold').fontSize(7.4).fillColor(COLORS.ink).text(notice, 44, noticeY + 9, { width: doc.page.width - 88, align: 'center' });
-  doc.y = noticeY + 42;
+  doc.y = noticeY + noticeHeight + 5;
   const signatureMovedToNewPage = signatureBlock(doc, inspection, act, branding, actNumber);
 
   // Keep the documentary section on the signature page when the cover page
@@ -876,6 +961,24 @@ export async function streamInspectionActPdf(
   doc.y += 55;
   signatureBlock(doc, inspection, act, branding, actNumber);
 
+  if (inspection.firmasCapturadas?.length) {
+    doc.addPage(); institutionalHeader(doc, actNumber, branding, 'CONSTANCIA DE FIRMA EN PANTALLA');
+    writePaginatedText(doc, inspection.firmasCapturadas.map((f: any) => `${f.nombre} · ${f.caracter} · Documento ${f.documento}\n${f.alcance}\nContenido revisado SHA-256: ${f.contenidoSha256}\nCaptura: ${new Date(f.registradaAt).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })}`).join('\n\n'), actNumber, branding);
+    signatureBlock(doc, inspection, act, branding, actNumber);
+  }
+  const locationMap = (originalInspection.datosActa as any)?.ubicacionCampo;
+  if (locationMap) {
+    doc.addPage(); institutionalHeader(doc, actNumber, branding, 'Lugar y entorno de la visita');
+    band(doc, 'Ubicación registrada');
+    doc.moveDown(); doc.font('Helvetica').fontSize(10).fillColor(COLORS.ink).text(`Coordenadas: ${inspectionPointText(locationMap)}`, 40, doc.y, { width: 510 });
+    doc.moveDown();
+    if (locationMap.mapaImagen) {
+      const y = doc.y; doc.image(Buffer.from(locationMap.mapaImagen.split(',')[1], 'base64'), 40, y, { fit: [515, 350], align: 'center' }); doc.y = y + 365;
+      doc.fontSize(8).text('© OpenStreetMap contributors · Referencia del entorno; no representa el límite del predio ni determina restricciones ambientales.', 40, doc.y, { width: 510 });
+    } else doc.text('Sin imagen de mapa guardada. Las coordenadas identifican el punto registrado.', 40, doc.y, { width: 510 });
+    // Numbering matches the saved image; distances are recomputed from stored coordinates.
+    doc.moveDown(); writePaginatedText(doc, [...inspectionMapSummary(locationMap), extra.entornoObservado, extra.restriccionReferencia ? 'Referencia verificada: ' + extra.restriccionReferencia : ''].filter(Boolean).join('\n'), actNumber, branding);
+  }
   photoAnnex(doc, inspection, preparedImages, actNumber, branding);
 
   const pages = doc.bufferedPageRange();
@@ -892,7 +995,56 @@ export async function streamInspectionActPdf(
     doc.fontSize(6.1)
       .text(`Gobierno de Mendoza · SITREP · ${inspection.numero} · ${presentation.statusLabel}`, 34, footerY + 9, { width: 410, lineBreak: false })
       .text(`Página ${index + 1} de ${pages.count}`, 466, footerY + 9, { width: 95, align: 'right', lineBreak: false });
+    drawSyntheticPreviewFooter(doc, footerY);
     doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();
+}
+
+/** Compact field model: only recorded observations, one location sheet and one page per photo. */
+async function streamTypicalInspectionAct(res: Response, inspection: any, resolveEvidence: (key: string) => string) {
+  const act = inspection.datosActa || {}, actor = actorOf(inspection), number = value(inspection.numeroActa, inspection.numero);
+  const branding = await loadInspectionPdfBranding(), images = await prepareInspectionPdfImages(inspection.evidencias || [], resolveEvidence);
+  const fingerprint = buildInspectionFieldActFingerprint(inspection);
+  const doc = new PDFDocument({size:'A4',margins:{top:145,bottom:82,left:40,right:40},bufferPages:true,info:{Title:`Acta de inspección ${number}`,Author:'SITREP Mendoza'}});
+  res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename=acta_${number.replace(/[^a-zA-Z0-9_-]+/g,'_')}.pdf`);doc.pipe(res);
+  const newPage = () => { doc.addPage(); institutionalHeader(doc,number,branding,inspection.numero); };
+  institutionalHeader(doc,number,branding,inspection.numero);
+  const write = (label: string, body: unknown) => {
+    if (!String(body ?? '').trim()) return;
+    drawInspectionPdfBlocks(doc,[{text:label,font:'Helvetica-Bold',size:10,color:COLORS.green,gap:4},{text:String(body),size:10,color:COLORS.ink,gap:12}],{x:40,width:515,bottom:doc.page.height-85,newPage,continuation:label+' - continuación'});
+  };
+  write(inspection.firmasCapturadas?.length ? 'Copia firmada de la versión revisada' : 'Acta en preparación', inspection.firmasCapturadas?.length ? 'La firma deja constancia de lectura y recepción. No implica conformidad con los hallazgos ni cierre del expediente.' : 'Sin firma capturada para esta copia. La descarga no cierra ni notifica el expediente.');
+  write('Visita', [dateParts(inspection.iniciadaAt || inspection.createdAt).date,inspection.ubicacion].filter(Boolean).join(' · '));
+  write('Establecimiento', [actor.razonSocial,actor.cuit].filter(Boolean).join(' · ') || 'Lugar sin actor registrado vinculado');
+  write('Inspector interviniente', [inspection.inspector?.nombre,inspection.inspector?.apellido].filter(Boolean).join(' '));
+  write('Persona que atiende', [act.atendidoPor,act.dniAtendido,act.cargoAtendido].filter(Boolean).join(' · '));
+  write('Motivo', [act.motivoTipo,act.motivoInspeccion].filter(Boolean).join(' · '));
+  write('Constatación', inspection.observaciones);
+  write('Actividad observada',act.actividadObservada);
+  write('Instalaciones y ampliaciones', [act.ampliacionEstado,act.ampliacionDetalle].filter(Boolean).join(' · '));
+  for(const r of inspection.items || []) if(r.resultado!=='PENDIENTE'||r.observacion)write(r.etiqueta,[r.resultado,r.observacion].filter(Boolean).join(' · '));
+  for(const r of inspection.comparaciones || []) write(r.etiqueta,`Declarado: ${r.valorDeclarado || 'Sin dato'}\nObservado: ${r.valorObservado || 'Sin dato'}\nResultado: ${r.resultado}${r.observacion?' · '+r.observacion:''}`);
+  write('Requerimientos y responsables',[act.requerimientos,inspectionMeasureText(act.medidas || [])].filter(Boolean).join('\n'));
+  write('Contacto declarado para copia',act.contactoActa);
+  const optional: Record<string,string> = {codigoPostal:'Código postal',departamento:'Departamento',calle:'Calle',numeroDomicilio:'Número de domicilio',titular:'Titular',dniTitular:'Documento del titular',area:'Área interviniente',lugarAfectacion:'Lugar de afectación',infraestructura:'Infraestructura',detalleInfraestructura:'Detalle de infraestructura',estadoInfraestructura:'Estado de infraestructura',generacion:'Generación observada',actaAnterior:'Acta anterior',plazoDescargoDias:'Días de descargo registrados',danosEstado:'Daños: estado',danosDetalle:'Daños: detalle',tercerosTestigosEstado:'Terceros y testigos',tercerosTestigosDetalle:'Detalle de terceros y testigos',libroOperacionesEstado:'Libro de operaciones',libroOperacionesDetalle:'Detalle del libro de operaciones',firmaIntervinienteEstado:'Firma: constancia',firmaIntervinienteDetalle:'Firma: detalle',copiaActaEstado:'Entrega de copia',copiaActaDetalle:'Entrega: detalle',domicilioLegal:'Domicilio legal',notificacionEstado:'Notificación',notificacionDetalle:'Notificación: detalle'};
+  for(const [key,label] of Object.entries(optional)) write(label,act[key]);
+  if(act.solicitaCopia===true) write('Copia solicitada','La persona solicitó una copia del acta.');
+  if(doc.y>doc.page.height-200)newPage();
+  signatureBlock(doc,inspection,act,branding,number);
+  for(const f of inspection.firmasCapturadas || []) write('Constancia de firma',`${f.nombre} · ${f.documento} · ${f.caracter}\n${f.alcance}\nVersión revisada: ${f.contenidoSha256}`);
+  const location = act.ubicacionCampo;
+  if(location || act.entornoObservado || act.restriccionReferencia){
+    newPage();write('Lugar y entorno',location ? inspectionPointText(location) : inspection.ubicacion);
+    if(location?.mapaImagen){const y=doc.y;doc.image(Buffer.from(location.mapaImagen.split(',')[1],'base64'),40,y,{fit:[515,300],align:'center'});doc.y=y+312;}
+    if(location)write('Sector y referencias del entorno',inspectionMapSummary(location).join('\n'));
+    write('Referencia cartográfica',location?.mapaImagen?'© OpenStreetMap contributors. La vista guardada no delimita el predio ni determina por sí sola restricciones ambientales.':'No se guardó una imagen de mapa. Las coordenadas identifican el punto registrado.');
+    write('Entorno observado',act.entornoObservado);write('Receptores considerados',(act.receptores || []).join(', '));write('Restricción o antecedente identificado',act.restriccionReferencia);
+  }
+  photoAnnex(doc,inspection,images,number,branding);
+  const pages=doc.bufferedPageRange();for(let index=pages.start;index<pages.start+pages.count;index++){
+    doc.switchToPage(index);const bottom=doc.page.margins.bottom;doc.page.margins.bottom=0;const y=doc.page.height-55;
+    doc.moveTo(34,y-5).lineTo(561,y-5).strokeColor(COLORS.line).stroke();
+    doc.font('Helvetica').fontSize(6).fillColor(COLORS.muted).text(`SITREP · ${inspection.numero} · Huella ${fingerprint.slice(0,20)}`,34,y,{width:420,lineBreak:false}).text(`${index+1} / ${pages.count}`,466,y,{width:95,align:'right',lineBreak:false});drawSyntheticPreviewFooter(doc,y);doc.page.margins.bottom=bottom;
+  }doc.end();
 }

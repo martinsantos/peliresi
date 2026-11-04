@@ -8,19 +8,17 @@
 
 import React from 'react';
 import {
-  Plus,
   Download,
   FileDown,
   Printer,
   Loader2,
 } from 'lucide-react';
-import { Card, CardContent } from '../ui/CardV2';
+import { Card } from '../ui/CardV2';
 import { CRUDSummary } from './CRUDSummary';
-import { Button } from '../ui/ButtonV2';
-import { SearchInput } from '../ui/SearchInput';
+import { RecordListToolbar } from './RecordListToolbar';
+import { RecordListFilters } from './RecordListFilters';
 import { Table, Pagination } from '../ui/Table';
 import { ConfirmModal } from '../ui/Modal';
-import { Select } from '../ui/Select';
 import { toast } from '../ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
@@ -33,9 +31,6 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
   const {
     // Page metadata
     title,
-    subtitle,
-    icon,
-    iconBg,
     // Data
     data,
     isLoading,
@@ -46,6 +41,7 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
     columns,
     tableClassName,
     getRowKey,
+    getRowLabel,
     onRowClick,
     emptyMessage = 'No se encontraron registros',
     // Search
@@ -65,7 +61,6 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
     // Actions
     onNew,
     newLabel = 'Nuevo',
-    mobileNewLabel,
     // Export
     csvExport,
     pdfExport,
@@ -131,59 +126,12 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
   // RENDER
   // ========================================
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* ── Header ── */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`p-2 sm:p-3 ${iconBg} rounded-xl`}>
-            {icon}
-          </div>
-          <div>
-            <h2 className="text-lg sm:text-2xl font-bold text-neutral-900">{title}</h2>
-            <p className="text-sm sm:text-base text-neutral-600">{subtitle}</p>
-          </div>
-        </div>
-        <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:flex-nowrap">
-          <button
-            onClick={() => window.print()}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors"
-            title="Imprimir"
-          >
-            <Printer size={14} />
-            Imprimir
-          </button>
-          {csvExport && (
-            <Button
-              variant="outline"
-              leftIcon={<Download size={18} />}
-              onClick={handleCsvExport}
-              isLoading={exporting === 'csv'}
-              size="sm"
-            >
-              CSV
-            </Button>
-          )}
-          {pdfExport && (
-            <Button
-              variant="outline"
-              leftIcon={<FileDown size={18} />}
-              onClick={handlePdfExport}
-              isLoading={exporting === 'pdf'}
-              size="sm"
-              className="text-error-700 border-error-200 hover:bg-error-50"
-            >
-              PDF
-            </Button>
-          )}
-          {onNew && (
-            <Button leftIcon={<Plus size={18} />} onClick={onNew} size="sm">
-              {mobileNewLabel ? (
-                <><span className="sm:hidden">{mobileNewLabel}</span><span className="hidden sm:inline">{newLabel}</span></>
-              ) : newLabel}
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="space-y-4 animate-fade-in">
+      <RecordListToolbar title={title} onNew={onNew} newLabel={newLabel} exports={[
+        ...(csvExport ? [{label: exporting === 'csv' ? 'Preparando CSV…' : 'Descargar CSV', icon: <Download size={16} />, onClick: handleCsvExport, disabled: isLoading || isError || exporting !== null || data.length === 0}] : []),
+        ...(pdfExport ? [{label: exporting === 'pdf' ? 'Preparando PDF…' : 'Descargar PDF', icon: <FileDown size={16} />, onClick: handlePdfExport, disabled: isLoading || isError || exporting !== null || data.length === 0}] : []),
+        {label: 'Imprimir', icon: <Printer size={16} />, onClick: () => window.print(), disabled: isLoading || isError},
+      ]} />
 
       {/* ── Stats ── */}
       {stats && stats.length > 0 && (
@@ -192,38 +140,8 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
 
       {renderAfterStats?.()}
 
-      {/* ── Filters ── */}
-      <Card padding="none">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-start gap-3">
-            <div className="min-w-0 flex-[1_1_18rem]">
-              <SearchInput
-                value={searchValue}
-                onChange={onSearchChange}
-                placeholder={searchPlaceholder}
-                debounce={searchDebounce}
-                size="md"
-              />
-            </div>
-            {filters && filters.length > 0 && (
-              <div className="flex min-w-0 flex-[2_1_32rem] flex-col sm:flex-row sm:flex-wrap gap-2">
-                {filters.map((filter) => (
-                  <div key={filter.key} className="w-full sm:w-auto sm:min-w-[160px]">
-                    <Select
-                      value={filter.value}
-                      onChange={filter.onChange}
-                      options={filter.options}
-                      placeholder={filter.placeholder || filter.options[0]?.label}
-                      size="sm"
-                      isFullWidth
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <RecordListFilters title={title} value={searchValue} onChange={onSearchChange}
+        placeholder={searchPlaceholder} debounce={searchDebounce} filters={filters} />
 
       {renderAfterFilters?.()}
 
@@ -246,19 +164,19 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
                 const key = getRowKey(item);
                 const selected = selection?.selectedKeys.includes(key) ?? false;
                 return <div key={key} className="relative">
-                  {selection && <label className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 bg-white shadow-sm" aria-label={`${selection.ariaLabel || 'Seleccionar registro'} ${key}`} onClick={(event) => event.stopPropagation()}>
+                  {selection && <label className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-lg border border-neutral-200 bg-white shadow-sm" aria-label={`${selection.ariaLabel || 'Seleccionar registro'} ${getRowLabel?.(item) || key}`} onClick={(event) => event.stopPropagation()}>
                     <input type="checkbox" checked={selected} onChange={() => selection.onSelectionChange(selected ? selection.selectedKeys.filter((id) => id !== key) : [...selection.selectedKeys, key])} className="h-4 w-4 rounded border-neutral-300 text-primary-500 focus:ring-primary-500" />
                   </label>}
-                  <div onClick={() => onRowClick?.(item)} className={onRowClick ? 'cursor-pointer' : ''}>
+                  {onRowClick ? <button type="button" aria-label={getRowLabel ? `Abrir ${getRowLabel(item)}` : undefined} onClick={() => onRowClick(item)} className="block w-full rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
                     {renderMobileCard(item)}
-                  </div>
+                  </button> : renderMobileCard(item)}
                 </div>
               })}
               <div className="flex items-center justify-between py-3 text-xs text-neutral-500">
                 <span>Pág. {pagination.currentPage}/{pagination.totalPages} — {pagination.totalItems} total</span>
                 <div className="flex gap-1">
-                  <button disabled={pagination.currentPage <= 1} onClick={() => pagination.onPageChange(pagination.currentPage - 1)} className="px-3 py-1.5 rounded-lg border border-neutral-200 disabled:opacity-30">Ant.</button>
-                  <button disabled={pagination.currentPage >= pagination.totalPages} onClick={() => pagination.onPageChange(pagination.currentPage + 1)} className="px-3 py-1.5 rounded-lg border border-neutral-200 disabled:opacity-30">Sig.</button>
+                  <button disabled={pagination.currentPage <= 1} onClick={() => pagination.onPageChange(pagination.currentPage - 1)} className="min-h-11 px-3 rounded-lg border border-neutral-200 disabled:opacity-50">Anterior</button>
+                  <button disabled={pagination.currentPage >= pagination.totalPages} onClick={() => pagination.onPageChange(pagination.currentPage + 1)} className="min-h-11 px-3 rounded-lg border border-neutral-200 disabled:opacity-50">Siguiente</button>
                 </div>
               </div>
             </>

@@ -1,11 +1,60 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { toast, ToastContainer } from '../../components/ui/Toast';
+import { toast, ToastContainer, holdNoticeLayout } from '../../components/ui/Toast';
+import { OfflineSyncNotice, offlineSyncNoticeMessage } from '../../components/OfflineSyncNotice';
 
 const ids: string[] = [];
 afterEach(() => { act(() => ids.forEach(id => toast.remove(id))); ids.length = 0; vi.useRealTimers(); });
 
 describe('system notices', () => {
+  it('clears all ephemeral notices and their expiry timers at a session boundary', () => {
+    vi.useFakeTimers(); render(<ToastContainer />);
+    act(() => {
+      ids.push(toast.success('Manifiesto firmado exitosamente'));
+      ids.push(toast.add({ type: 'warning', title: 'Aviso de la cuenta anterior', duration: 0 }));
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => toast.clear());
+    expect(screen.queryByRole('region', { name: 'Avisos del sistema' })).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.queryByText('Manifiesto firmado exitosamente')).toBeNull();
+  });
+  it('clears the visible snapshot immediately during a signature hold without reviving old notices', () => {
+    render(<ToastContainer />);
+    act(() => { ids.push(toast.success('Firma de la cuenta anterior')); });
+    const release = holdNoticeLayout();
+    act(() => { ids.push(toast.info('Otro aviso anterior')); toast.clear(); });
+    expect(screen.queryByText('Firma de la cuenta anterior')).toBeNull();
+    act(() => release());
+    expect(screen.queryByText('Otro aviso anterior')).toBeNull();
+    act(() => { ids.push(toast.success('Acción de la cuenta nueva')); });
+    expect(screen.getByText('Acción de la cuenta nueva')).toBeVisible();
+  });
+  it('keeps one actionable sync explanation and never revives a duplicate delivery notice', () => {
+    const message = 'El GPS sigue abierto en otra pestaña. Volvé allí y sincronizá.';
+    const status = { processed:0, pending:1, retryable:1, terminal:0, auth:0, skipped:0, syncing:false, lastError:message, retry:vi.fn(async () => {}) };
+    const view = render(<><OfflineSyncNotice status={status}/><ToastContainer syncNoticeMessage={offlineSyncNoticeMessage(status)}/></>);
+    act(() => {
+      ids.push(toast.info('Entrega pendiente', message));
+      ids.push(toast.info('Entrega pendiente', 'Una entrega anterior requiere revisión.'));
+    });
+    expect(screen.getAllByText(message)).toHaveLength(1);
+    expect(screen.getByRole('button', { name:'Reintentar', exact:true })).toBeVisible();
+    expect(screen.getByText('Una entrega anterior requiere revisión.')).toBeVisible();
+    view.rerender(<ToastContainer />);
+    expect(screen.queryByText(message)).toBeNull();
+    expect(screen.getByText('Una entrega anterior requiere revisión.')).toBeVisible();
+  });
+  it('keeps the detailed delivery notice if the sync banner shows a different explanation', () => {
+    const message = 'Un cambio anterior no identifica su empresa.';
+    const status = { processed:0,pending:2,retryable:2,terminal:0,auth:0,skipped:2,contextBlocked:1,legacyBlocked:1,
+      syncing:false,lastError:message,retry:vi.fn(async()=>{}) };
+    render(<><OfflineSyncNotice status={status}/><ToastContainer syncNoticeMessage={offlineSyncNoticeMessage(status)}/></>);
+    act(() => { ids.push(toast.info('Entrega pendiente', message)); });
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.getByText(/Los anteriores sin contexto se conservan/)).toBeVisible();
+  });
   it('offers the unread count itself as the compact action, preserving dismissal and full errors', () => {
     const open = vi.fn(); render(<ToastContainer />);
     act(() => { ids.push(toast.add({ type: 'info', title: '1 aviso sin leer', compact: true, duration: 0, actionLabel: 'Ver avisos', onAction: open })); });
@@ -22,6 +71,27 @@ describe('system notices', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir ticket' }));
     expect(open).toHaveBeenCalledOnce();
     expect(screen.queryByText('Nuevo ticket')).toBeNull();
+  });
+  it('keeps each live notice and its full accessible context in one linked control', () => {
+    const first=vi.fn(),second=vi.fn();render(<ToastContainer />);
+    const message='2026-000300. Generador: QA Generador 1. Transporte: QA Transporte 1.';
+    act(()=>{
+      ids.push(toast.add({type:'warning',title:'Tres aprobaciones. Listos para iniciar',message,actionLabel:'Abrir manifiesto',messagePreview:true,onAction:first,duration:0}));
+      ids.push(toast.add({type:'info',title:'Generador aprobó',message:'2026-000300. Decisión registrada.',actionLabel:'Abrir manifiesto',messagePreview:true,onAction:second,duration:0}));
+    });
+    const firstAction=screen.getByRole('button',{name:'Tres aprobaciones. Listos para iniciar '+message+' Abrir manifiesto'});
+    expect(firstAction.closest('[data-linked-notice]')).toHaveAttribute('role','alert');
+    expect(screen.getByRole('button',{name:'Generador aprobó 2026-000300. Decisión registrada. Abrir manifiesto'})).toBeVisible();
+    fireEvent.click(firstAction);expect(first).toHaveBeenCalledOnce();expect(second).not.toHaveBeenCalled();
+    expect(screen.queryByText('Tres aprobaciones. Listos para iniciar')).toBeNull();
+    expect(screen.getByText('Generador aprobó')).toBeVisible();
+  });
+  it('never compresses an error explanation even if it has an action',()=>{
+    render(<ToastContainer />);const retry=vi.fn();
+    act(()=>{ids.push(toast.add({type:'error',title:'No se pudo guardar',message:'Mantené esta ventana abierta y reintentá.',messagePreview:true,onAction:retry,actionLabel:'Reintentar',duration:0}));});
+    expect(screen.getByRole('alert')).not.toHaveAttribute('data-linked-notice');
+    expect(screen.getByText('Mantené esta ventana abierta y reintentá.')).not.toHaveClass('line-clamp-2');
+    fireEvent.click(screen.getByRole('button',{name:'Reintentar'}));expect(retry).toHaveBeenCalledOnce();
   });
   it('replaces superseded transient successes instead of consuming the field workspace', () => {
     render(<ToastContainer />);

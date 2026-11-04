@@ -1,14 +1,24 @@
+import { withApplicationNoticeContext } from '../services/applicationNotice.service';
 import { Request, Response, NextFunction } from 'express';
-import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia, Prisma } from '@prisma/client';
+import { EventoAlerta, EstadoAlerta, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { domainEvents } from '../services/domainEvent.service';
+import { detectGpsReceptionObservations } from '../services/gpsReceptionObservations.service';
 import { AppError } from '../middlewares/errorHandler';
 import { normalizeAlertCondition } from '../services/alertRuleCondition.service';
 import { validateFollowupRule, alertResolution, FOLLOWUP_RULE_ID, followupDays } from '../services/alertFollowupPolicy.service';
 import { ejecutarSeguimientoCierre, simularSeguimientoCierre } from '../jobs/seguimientoCierre.job';
 import { catalogueCondition, validateCatalogueRule, CATALOGUE_MARKER } from '../services/alertCataloguePolicy.service';
 import { ejecutarCatalogo, simularCatalogo } from '../jobs/alertCatalogue.job';
+import { withCompanyNoticeContext } from '../services/companyNotice.service';
+import { maskFiscalCompanyNotice, withFiscalCompanyNoticeContext } from '../services/fiscalCompanyNotice.service';
+import { maskManifestRuleCompanyNotice, withManifestRuleCompanyNoticeContext } from '../services/manifestRuleCompanyNotice.service';
+import { assertCanAccessManifiesto } from '../utils/roleFilter';
+import { createHash } from 'node:crypto';
+import { transitRuleNeedsThreshold } from '../services/transitDurationPolicy.service';
+import { recordGpsAnomaly } from '../services/gpsAnomalyRecorder.service';
+import { notificationService } from '../services/notification-dispatcher.service';
 
 const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
 function normalizeAlertRecipients(raw: unknown): string {
@@ -30,6 +40,24 @@ function normalizeAlertRecipients(raw: unknown): string {
 export { notificationService } from '../services/notification-dispatcher.service';
 
 // ============ CONTROLADOR DE NOTIFICACIONES ============
+
+/** Historical own-account notices did not carry their activity. Enrich the read
+ * in one bounded query, without rewriting the original notification/audit row. */
+async function withInspectionActivity<T extends { datos: string | null }>(notices: T[]): Promise<T[]> {
+    const references = notices.map(notice => {
+        try {
+            const data = JSON.parse(notice.datos || 'null');
+            return data?.version === 1 && ['intercambio_inspeccion', 'agenda_inspeccion'].includes(data.tipo)
+                && data.destino === 'participacion' && !data.tipoActor && typeof data.inspeccionId === 'string' ? data : null;
+        } catch { return null; }
+    });
+    const ids = [...new Set(references.filter(Boolean).map(data => data.inspeccionId as string))];
+    if (!ids.length) return notices;
+    const cases = await prisma.inspeccion.findMany({ where: { id: { in: ids } }, select: { id: true, tipoActor: true } });
+    const roles = new Map(cases.map(item => [item.id, item.tipoActor]));
+    return notices.map((notice, index) => references[index] && roles.get(references[index].inspeccionId)
+        ? { ...notice, datos: JSON.stringify({ ...references[index], tipoActor: roles.get(references[index].inspeccionId) }) } : notice);
+}
 
 // Obtener notificaciones del usuario actual
 export const getNotificaciones = async (req: Request, res: Response, next: NextFunction) => {
@@ -75,10 +103,12 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
         const stateByCase = new Map(cases.map(item => [item.id, item.estado]));
         const caseByNotice = new Map(linked.map(item => [item.noticeId, item.id]));
 
+        const contextualNotices = await withManifestRuleCompanyNoticeContext(prisma, await withFiscalCompanyNoticeContext(prisma, await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity(notificaciones)))));
+        res.setHeader('Cache-Control', 'private, no-store');
         res.json({
             success: true,
             data: {
-                notificaciones: notificaciones.map(notice => ({ ...notice,
+                notificaciones: contextualNotices.map(notice => ({ ...notice,
                     seguimientoEstado: stateByCase.get(caseByNotice.get(notice.id) || '') ?? null })),
                 total,
                 noLeidas,
@@ -89,6 +119,18 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
     } catch (error) {
         next(error);
     }
+};
+
+// Stable, read-only permalink: even administrators may only read their own notice.
+export const getNotificacion = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = (req as AuthRequest).user!;
+        const notice = await prisma.notificacion.findFirst({ where: { id: req.params.id, usuarioId: user.id },
+            include: { manifiesto: { select: { numero: true, estado: true } } } });
+        if (!notice) throw new AppError('Aviso no disponible para esta cuenta', 404);
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json({ success: true, data: (await withManifestRuleCompanyNoticeContext(prisma, await withFiscalCompanyNoticeContext(prisma, await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity([notice]))))))[0] });
+    } catch (error) { next(error); }
 };
 
 // Marcar notificacion como leida
@@ -102,7 +144,7 @@ export const marcarLeida = async (req: Request, res: Response, next: NextFunctio
             data: { leida: true, fechaLeida: new Date() }
         });
 
-        res.json({ success: true, data: notificacion });
+        res.json({ success: true, data: maskManifestRuleCompanyNotice(maskFiscalCompanyNotice(notificacion)) });
     } catch (error) {
         next(error);
     }
@@ -153,7 +195,9 @@ export const getReglasAlerta = async (req: Request, res: Response, next: NextFun
             }
         });
 
-        res.json({ success: true, data: reglas });
+        res.json({ success: true, data: reglas.map(regla => ({
+            ...regla, requiereUmbralTransito: transitRuleNeedsThreshold(regla.evento, regla.condicion),
+        })) });
     } catch (error) {
         next(error);
     }
@@ -172,6 +216,7 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
         const destinatariosStr = normalizeAlertRecipients(destinatarios);
         validateFollowupRule(evento, condicionStr, destinatariosStr);
         validateCatalogueRule(evento, condicionStr, destinatariosStr);
+        if (activa && transitRuleNeedsThreshold(evento, condicionStr)) throw new AppError('Indicá un umbral mínimo de horas de tránsito para activar esta regla.', 400);
 
         const regla = await prisma.reglaAlerta.create({
             data: {
@@ -210,6 +255,9 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
         if (activa !== undefined && typeof activa !== 'boolean') throw new AppError('Estado de regla inválido', 400);
         validateFollowupRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
         validateCatalogueRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        if ((activa ?? current.activa) && transitRuleNeedsThreshold(evento ?? current.evento, condicionStr ?? current.condicion)) {
+            throw new AppError('Indicá un umbral mínimo de horas de tránsito para activar esta regla.', 400);
+        }
         if (catalogueCondition(current.condicion)?.tipo !== catalogueCondition(condicionStr ?? current.condicion)?.tipo &&
             await prisma.alertaGenerada.count({ where: { reglaId: id } })) throw new AppError('Una regla con casos históricos no puede cambiar de familia; desactívela y cree otra', 409);
         if (id === FOLLOWUP_RULE_ID && followupDays(condicionStr ?? current.condicion) === null) throw new AppError('La regla de seguimiento existente sólo puede configurarse o desactivarse', 400);
@@ -356,38 +404,17 @@ export const evaluarCatalogoAlerta = async (_req: Request, res: Response, next: 
 
 // ============ DETECCION DE ANOMALIAS GPS ============
 
-interface PuntoGPS {
-    latitud: number;
-    longitud: number;
-    timestamp: Date;
-    velocidad?: number;
-}
-
 class AnomaliaDetector {
-    // Calcular distancia entre dos puntos en km (Haversine)
-    private calcularDistancia(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371; // Radio de la Tierra en km
-        const dLat = this.toRad(lat2 - lat1);
-        const dLon = this.toRad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    private toRad(deg: number): number {
-        return deg * (Math.PI / 180);
-    }
-
     // Detectar anomalias en la ruta
-    async detectarAnomalias(manifiestoId: string, userId?: string): Promise<any[]> {
+    async detectarAnomalias(manifiestoId: string, userId?: string, options: { automatic?: boolean } = {}): Promise<any[]> {
         const anomaliasDetectadas: any[] = [];
 
         // Obtener tracking del manifiesto
         const tracking = await prisma.trackingGPS.findMany({
             where: { manifiestoId },
-            orderBy: { timestamp: 'asc' }
+            orderBy: [{ timestamp: 'asc' }, { id: 'asc' }],
+            select: { id: true, latitud: true, longitud: true, timestamp: true, tramoId: true, emisor: true,
+                tramo: { select: { orden: true } } }
         });
 
         if (tracking.length < 2) return anomaliasDetectadas;
@@ -403,124 +430,37 @@ class AnomaliaDetector {
 
         if (!manifiesto) return anomaliasDetectadas;
 
-        // Analizar puntos
-        for (let i = 1; i < tracking.length; i++) {
-            const puntoAnterior = tracking[i - 1];
-            const puntoActual = tracking[i];
-
-            // Calcular distancia y tiempo
-            const distancia = this.calcularDistancia(
-                puntoAnterior.latitud, puntoAnterior.longitud,
-                puntoActual.latitud, puntoActual.longitud
-            );
-            const tiempoHoras = (puntoActual.timestamp.getTime() - puntoAnterior.timestamp.getTime()) / (1000 * 60 * 60);
-            const velocidadCalculada = tiempoHoras > 0 ? distancia / tiempoHoras : 0;
-
-            // 1. Detectar velocidad anormal (> 120 km/h)
-            if (velocidadCalculada > 120) {
-                anomaliasDetectadas.push({
-                    tipo: 'VELOCIDAD_ANORMAL' as TipoAnomalia,
-                    descripcion: `Velocidad anormalmente alta detectada: ${velocidadCalculada.toFixed(1)} km/h`,
-                    latitud: puntoActual.latitud,
-                    longitud: puntoActual.longitud,
-                    valorDetectado: velocidadCalculada,
-                    valorEsperado: 100,
-                    severidad: 'ALTA' as SeveridadAnomalia
-                });
-            }
-
-            // 2. Detectar parada prolongada (> 2 horas sin movimiento significativo)
-            if (distancia < 0.1 && tiempoHoras > 2) {
-                anomaliasDetectadas.push({
-                    tipo: 'PARADA_PROLONGADA' as TipoAnomalia,
-                    descripcion: `Parada prolongada de ${(tiempoHoras * 60).toFixed(0)} minutos`,
-                    latitud: puntoActual.latitud,
-                    longitud: puntoActual.longitud,
-                    valorDetectado: tiempoHoras * 60,
-                    valorEsperado: 60,
-                    severidad: tiempoHoras > 4 ? 'ALTA' as SeveridadAnomalia : 'MEDIA' as SeveridadAnomalia
-                });
-            }
-
-            // 3. Detectar perdida de GPS (gap > 30 min sin datos)
-            if (tiempoHoras > 0.5 && distancia > 10) {
-                anomaliasDetectadas.push({
-                    tipo: 'GPS_PERDIDO' as TipoAnomalia,
-                    descripcion: `Perdida de senal GPS por ${(tiempoHoras * 60).toFixed(0)} minutos`,
-                    latitud: puntoActual.latitud,
-                    longitud: puntoActual.longitud,
-                    valorDetectado: tiempoHoras * 60,
-                    valorEsperado: 5,
-                    severidad: 'MEDIA' as SeveridadAnomalia
-                });
-            }
-        }
+        const observations = detectGpsReceptionObservations(tracking, { userId, automatic: options.automatic });
 
         // Guardar anomalias detectadas
-        for (const anomalia of anomaliasDetectadas) {
-            await prisma.anomaliaTransporte.create({
-                data: {
-                    manifiestoId,
-                    ...anomalia
-                }
-            });
-
-            // Emitir evento de dominio para que el alertaSubscriber maneje notificaciones y alertas
-            domainEvents.emit({
-                type: 'ANOMALIA_GPS',
+        for (const { anomaly: anomalia, previousId, currentId, authorId } of observations) {
+            anomaliasDetectadas.push(anomalia);
+            // Pair and anomaly type identify the same observation across
+            // repeated analyses and separate workers, without a schema change.
+            const id = 'gpsan1_' + createHash('sha256')
+                .update(JSON.stringify([manifiestoId, anomalia.tipo, previousId, currentId])).digest('hex');
+            const event = {
+                type: 'ANOMALIA_GPS' as const,
                 manifiestoId,
+                numero: manifiesto.numero,
                 tipoAnomalia: anomalia.tipo,
                 descripcion: anomalia.descripcion,
                 severidad: anomalia.severidad,
-                userId: userId ?? manifiestoId,
-            });
+                userId: authorId,
+                avisosConfirmados: true,
+            };
+            const recorded = await recordGpsAnomaly(prisma, { id, manifiestoId, isDemoData: manifiesto.isDemoData, ...anomalia }, event);
+            if (!recorded.created) continue;
+
+            // The inbox is committed first. Channels and configurable rules
+            // remain best-effort and must not run while locks are held.
+            for (const notice of recorded.notices) notificationService.programarCanalesDeNotificacion(notice);
+            domainEvents.emit(event);
         }
 
         return anomaliasDetectadas;
     }
 
-    // Verificar tiempo excesivo de transito
-    async verificarTiempoTransito(manifiestoId: string): Promise<boolean> {
-        const manifiesto = await prisma.manifiesto.findUnique({
-            where: { id: manifiestoId }
-        });
-
-        if (!manifiesto || !manifiesto.fechaRetiro || manifiesto.estado !== 'EN_TRANSITO') {
-            return false;
-        }
-
-        const horasTransito = (Date.now() - manifiesto.fechaRetiro.getTime()) / (1000 * 60 * 60);
-        const LIMITE_HORAS = 24; // Maximo 24 horas de transito
-
-        if (horasTransito > LIMITE_HORAS) {
-            // Crear anomalia
-            await prisma.anomaliaTransporte.create({
-                data: {
-                    manifiestoId,
-                    tipo: 'TIEMPO_EXCESIVO',
-                    descripcion: `Tiempo de transito excede ${LIMITE_HORAS} horas: ${horasTransito.toFixed(1)} horas`,
-                    latitud: 0,
-                    longitud: 0,
-                    valorDetectado: horasTransito,
-                    valorEsperado: LIMITE_HORAS,
-                    severidad: 'ALTA'
-                }
-            });
-
-            // Emitir evento de dominio
-            domainEvents.emit({
-                type: 'TIEMPO_EXCESIVO',
-                manifiestoId,
-                horasTransito,
-                numero: manifiesto.numero,
-                userId: manifiestoId, // userId no disponible en este contexto
-            });
-
-            return true;
-        }
-
-        return false;
-    }
 }
 
 export const anomaliaDetector = new AnomaliaDetector();
@@ -529,7 +469,7 @@ export const anomaliaDetector = new AnomaliaDetector();
 export const detectarAnomalias = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { manifiestoId } = req.params;
-        const anomalias = await anomaliaDetector.detectarAnomalias(manifiestoId);
+        const anomalias = await anomaliaDetector.detectarAnomalias(manifiestoId, (req as AuthRequest).user.id);
         res.json({ success: true, data: anomalias });
     } catch (error) {
         next(error);
@@ -541,6 +481,9 @@ export const getAnomalias = async (req: Request, res: Response, next: NextFuncti
     try {
         const { manifiestoId } = req.params;
         const { resuelta } = req.query;
+        const user = (req as AuthRequest).user;
+        if (!user) throw new AppError('No autorizado', 401);
+        await assertCanAccessManifiesto(prisma, user, manifiestoId);
 
         const where: any = { manifiestoId };
         if (resuelta !== undefined) where.resuelta = resuelta === 'true';

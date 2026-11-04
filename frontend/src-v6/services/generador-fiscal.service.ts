@@ -1,6 +1,18 @@
 import api from './api';
+import type { ConfirmPaymentInput } from '../types/documentAnalysis';
+
+export const documentoIdentityService = {
+  async confirmarPago(docId: string, input: ConfirmPaymentInput): Promise<Documento> {
+    const { data } = await api.post(`/actores/documentos/${encodeURIComponent(docId)}/identidad-pago`, input);
+    return data.data.documento;
+  },
+};
 
 export const transportistaDocumentoService = {
+  async getDocumentos(id: string): Promise<Documento[]> {
+    const { data } = await api.get(`/actores/transportistas/${encodeURIComponent(id)}/documentos`);
+    return data.data.documentos || [];
+  },
   async upload(id: string, file: File, tipo: string, anio?: number): Promise<Documento> {
     const form = new FormData();
     form.append('archivo', file); form.append('tipo', tipo);

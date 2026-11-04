@@ -1,3 +1,4 @@
+import type { MapPoint, MapReference } from '../utils/inspectionMapGeometry';
 export type InspectionActorType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
 export type InspectionType = InspectionActorType | 'PETROLEO' | 'AIRE' | 'ESPONTANEA';
 export const INSPECTION_TYPES: Record<InspectionType, { label: string; serie: string }> = {
@@ -41,7 +42,37 @@ export interface InspectionActor {
   activo?: boolean;
 }
 
+export interface InspectionMeasure {
+  id: string;
+  detalle: string;
+  responsable: string;
+  finalidad: 'DOCUMENTACION' | 'SUBSANACION' | 'DESCARGO';
+  dias?: number;
+  tipoDias?: 'HABILES' | 'CORRIDOS';
+  inicio?: string;
+  vencimiento?: string;
+}
+export interface InspectionFieldLocation {
+  latitud: number; longitud: number;
+  origen: 'GPS' | 'MAPA' | 'MANUAL'; precisionMetros?: number;
+  registradaAt: string; zoom?: number; mapaImagen?: string; mapaZoom?: number;
+  perimetro?: MapPoint[]; referencias?: MapReference[]; radioMetros?: number;
+}
 export interface InspectionActData {
+  modeloCampo?: 2;
+  motivoTipo?: 'OFICIO' | 'DENUNCIA' | 'SEGUIMIENTO' | 'INCIDENTE';
+  contactoActa?: string;
+  solicitaCopia?: boolean;
+  actividadObservada?: string;
+  ampliacionEstado?: 'COINCIDE' | 'DIFIERE' | 'NO_VERIFICADO' | 'NO_APLICA';
+  ampliacionDetalle?: string;
+  entornoObservado?: string;
+  restriccionReferencia?: string;
+  receptores?: Array<'POBLACION' | 'SUELO' | 'AGUA' | 'AIRE'>;
+  ubicacionCampo?: InspectionFieldLocation;
+  medidas?: InspectionMeasure[];
+  cointervinientes?: Array<{ nombre: string; cargo?: string }>;
+
   codigoPostal?: string;
   departamento?: string;
   calle?: string;
@@ -108,6 +139,7 @@ export interface InspectionItem {
 }
 
 export interface InspectionEvidence {
+  intercambioId?: string | null;
   id: string;
   clienteId?: string | null;
   tipo: InspectionEvidenceType;
@@ -216,6 +248,11 @@ export interface InspectionExchange {
   adjuntos: InspectionExchangeAttachment[];
 }
 
+export interface InspectionFollowUp {
+  paso: 'PUBLICAR' | 'RESPONDER' | 'REVISAR' | 'CERRADO';
+  pendientes: Array<{ id: string; secuencia: number; plazoRespuestaAt: string | null }>;
+}
+
 export interface InspectionExchangeTimeline {
   inspeccion: {
     id: string;
@@ -226,9 +263,11 @@ export interface InspectionExchangeTimeline {
     actor: InspectionActor | null;
     plazoRespuestaAt?: string | null;
     version: number;
+    seguimiento?: InspectionFollowUp;
   };
   parteActual: InspectionExchangeParty;
   intercambios: InspectionExchange[];
+  resultadoAdministrativo?: { id: string; detalle: string | null; createdAt: string } | null;
   comunicacionExterna: false;
 }
 
@@ -250,6 +289,7 @@ export interface Inspection {
   iniciadaAt?: string | null;
   cerradaCampoAt?: string | null;
   plazoRespuestaAt?: string | null;
+  seguimiento?: InspectionFollowUp;
   observaciones?: string | null;
   datosActa?: InspectionActData | null;
   informeTecnico?: InspectionTechnicalReport | null;

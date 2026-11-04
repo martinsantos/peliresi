@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { User, UserRole } from '../../contexts/AuthContext';
 import { canAccessMobilePath } from '../../utils/mobileAccess';
+import appManifest from '../../../public/manifest-app.json';
 
 function user(rol: UserRole, esInspector = false): User {
   return {
@@ -19,6 +20,25 @@ function user(rol: UserRole, esInspector = false): User {
 }
 
 describe('canAccessMobilePath', () => {
+  it.each(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'AUDITOR'] as const)(
+    'offers %s only installed-app shortcuts available to every active role', role => {
+      for (const shortcut of appManifest.shortcuts) {
+        const target = new URL(shortcut.url, 'https://sitrep.example.invalid');
+        expect(target.origin).toBe('https://sitrep.example.invalid');
+        expect(target.pathname).toMatch(/^\/app\//);
+        expect(canAccessMobilePath(user(role), target.pathname)).toBe(true);
+      }
+      expect(appManifest.shortcuts.map(shortcut => shortcut.name)).toEqual(['Inicio', 'Escanear QR', 'Avisos']);
+    },
+  );
+  it.each(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] as const)('%s can open the application list and review route already granted by web/backend', role => {
+    expect(canAccessMobilePath(user(role), '/admin/solicitudes')).toBe(true);
+    expect(canAccessMobilePath(user(role), '/admin/solicitudes/own-sector-case')).toBe(true);
+  });
+  it.each(['GENERADOR', 'OPERADOR', 'TRANSPORTISTA', 'AUDITOR'] as const)('%s still cannot open administrative applications', role => {
+    expect(canAccessMobilePath(user(role), '/admin/solicitudes')).toBe(false);
+    expect(canAccessMobilePath(user(role), '/admin/solicitudes/other-case')).toBe(false);
+  });
   it('keeps ordinary authenticated routes available', () => {
     expect(canAccessMobilePath(user('GENERADOR'), '/dashboard')).toBe(true);
     expect(canAccessMobilePath(user('TRANSPORTISTA'), '/manifiestos')).toBe(true);
@@ -31,9 +51,9 @@ describe('canAccessMobilePath', () => {
   });
 
   it('exposes the contradiction portal only to inspected actor roles', () => {
-    expect(canAccessMobilePath(user('GENERADOR'), '/mis-inspecciones')).toBe(true);
+    expect(canAccessMobilePath(user('GENERADOR'), '/mis-inspecciones')).toBe(false);
     expect(canAccessMobilePath(user('TRANSPORTISTA'), '/mis-inspecciones/case-1')).toBe(true);
-    expect(canAccessMobilePath(user('OPERADOR'), '/mis-inspecciones')).toBe(true);
+    expect(canAccessMobilePath(user('OPERADOR'), '/mis-inspecciones')).toBe(false);
     expect(canAccessMobilePath(user('ADMIN'), '/mis-inspecciones')).toBe(false);
     expect(canAccessMobilePath(user('ADMIN_GENERADOR'), '/mis-inspecciones')).toBe(false);
   });

@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ========================================
@@ -79,11 +80,16 @@ vi.mock('../../components/OnboardingWizard', () => ({
 }));
 
 // Import AFTER mocks are declared
+import { toast } from '../../components/ui/Toast';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
+import LoginPage from '../../pages/auth/LoginPage';
+import ProtectedRoute from '../../components/ProtectedRoute';
+import { AuthGate } from '../../AppMobile';
 import { authService } from '../../services/auth.service';
 import { api, clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
 import { clearSyncQueue } from '../../services/indexeddb';
 import { OFFLINE_SESSION_KEY, MAX_OFFLINE_SESSION_MS } from '../../services/offlineSession';
+import { gpsQueueKey, readPendingGpsQueue } from '../../services/gpsQueue';
 import type { Usuario } from '../../types/models';
 
 // ========================================
@@ -115,6 +121,7 @@ function AuthConsumer() {
       <span data-testid="restricted">{String(auth.isRestricted)}</span>
       <span data-testid="draft">{auth.solicitudId ?? 'none'}</span>
       <button data-testid="login-btn" onClick={() => auth.login('admin@test.com', 'pass123')}>Login</button>
+      <button data-testid="login-deferred-btn" onClick={() => auth.login('admin@test.com', 'pass123', { deferWelcome: true })}>Login to task</button>
       <button data-testid="logout-btn" onClick={() => auth.logout()}>Logout</button>
       <button data-testid="switch-btn" onClick={() => auth.switchUser(-1)}>Switch</button>
     </div>
@@ -133,11 +140,62 @@ function renderWithProviders() {
   );
 }
 
+function SessionRouteProbe() {
+  const location = useLocation(), navigate = useNavigate();
+  return <><output data-testid="session-location">{location.pathname + location.search + location.hash}</output>
+    <output data-testid="session-return">{(location.state as { from?: string } | null)?.from || ''}</output>
+    <button onClick={() => navigate('/manifiestos/new-target?origen=aviso#certificaciones')}>Abrir otro enlace recibido</button></>;
+}
+function SessionPrivatePage() {
+  const auth = useAuth();
+  return <><span data-testid="private-role">{auth.currentUser?.rol}</span>
+    <button onClick={() => { void auth.logout(); }}>Salir explícitamente</button>
+    <button onClick={() => { void auth.logout({ reason: 'expired' }); }}>Simular vencimiento</button></>;
+}
+
 // ========================================
 // Tests
 // ========================================
 
 describe('AuthContext', () => {
+  it.each(['web', 'app'].flatMap(surface => ['exit', 'expired', 'new-link-after-exit'].map(reason => ({ surface, reason }))))('routes the full session cycle: $surface / $reason', async ({ surface, reason }) => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    const prefix = surface === 'app' ? '/app' : '';
+    const requested = '/inspecciones/old-account?vista=plazos#intercambios';
+    const routes = <Routes><Route path="/login" element={<LoginPage />} />{surface === 'app'
+      ? <Route path="*" element={<SessionPrivatePage />} />
+      : <Route element={<ProtectedRoute />}><Route path="*" element={<SessionPrivatePage />} /></Route>}
+    </Routes>;
+    render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter basename={prefix || '/'} initialEntries={[prefix + requested]}><AuthProvider>
+      <SessionRouteProbe />{surface === 'app' ? <AuthGate>{routes}</AuthGate> : routes}
+    </AuthProvider></MemoryRouter></QueryClientProvider>);
+    await waitFor(() => expect(screen.getByTestId('private-role')).toHaveTextContent('AUDITOR'));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: reason === 'expired' ? 'Simular vencimiento' : 'Salir explícitamente' }));
+    await screen.findByLabelText('Correo electrónico o CUIT');
+    expect(screen.getByTestId('session-location')).toHaveTextContent('/login');
+    expect(screen.getByTestId('session-return').textContent).toBe(reason === 'expired' ? requested : '');
+    if (reason === 'new-link-after-exit') {
+      await user.click(screen.getByRole('button', { name: 'Abrir otro enlace recibido' }));
+      await waitFor(() => expect(screen.getByTestId('session-return')).toHaveTextContent('/manifiestos/new-target?origen=aviso#certificaciones'));
+    }
+    const nextUser = reason === 'expired' ? inspector : { ...inspector, id: 'generator-next', rol: 'GENERADOR', esInspector: false };
+    vi.mocked(authService.login).mockResolvedValueOnce({ user: nextUser as Usuario, accessToken: 'next-token', refreshToken: 'next-refresh' });
+    await user.type(screen.getByLabelText('Correo electrónico o CUIT'), 'next@qa.invalid');
+    await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'synthetic');
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    const expected = reason === 'expired' ? requested : reason === 'new-link-after-exit' ? '/manifiestos/new-target?origen=aviso#certificaciones' : '/dashboard';
+    await waitFor(() => expect(screen.getByTestId('session-location').textContent).toBe(expected));
+    expect(screen.getByTestId('private-role')).toHaveTextContent(nextUser.rol);
+    if (reason === 'exit') {
+      expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+      expect(localStorage.getItem(`sitrep_onboarding_${nextUser.id}`)).toBeNull();
+    }
+  });
+
   it('restores a draft-only registration via its protected draft, without asking for a forbidden full profile', async () => {
     const token = `header.${btoa(JSON.stringify({ id: 'candidate', restricted: true, registrationDraft: 'draft-only' }))}.signature`;
     vi.mocked(getAccessToken).mockReturnValue(token);
@@ -168,6 +226,7 @@ describe('AuthContext', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    toast.clear();
     vi.mocked(getAccessToken).mockImplementation(() => localStorage.getItem('sitrep_access_token'));
     vi.mocked(clearTokens).mockImplementation(() => {
       localStorage.removeItem('sitrep_access_token');
@@ -176,7 +235,97 @@ describe('AuthContext', () => {
     vi.mocked(authService.getMe).mockRejectedValue(new Error('No token'));
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { toast.clear(); vi.useRealTimers(); });
+
+  it.each(['login-btn', 'logout-btn', 'switch-btn'])('clears prior-account notices synchronously on %s', async button => {
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    let visible: { title: string }[] = [];
+    const unsubscribe = toast.subscribe(rows => { visible = rows; });
+    try {
+      act(() => { toast.success('Manifiesto firmado exitosamente'); });
+      expect(visible).toHaveLength(1);
+      await userEvent.setup().click(screen.getByTestId(button));
+      expect(visible).toHaveLength(0);
+    } finally { unsubscribe(); }
+  });
+
+  it('preserves notices across same-account token refresh but clears a confirmed role change', async () => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValue(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    let visible: { title: string }[] = [];
+    const unsubscribe = toast.subscribe(rows => { visible = rows; });
+    try {
+      act(() => { toast.success('Acción actual de la misma cuenta'); });
+      const oldToken = getAccessToken();
+      const rotated = tokenFor(inspector.id, Date.now() + 48 * 60 * 60 * 1000);
+      localStorage.setItem('sitrep_access_token', rotated);
+      await act(async () => window.dispatchEvent(new StorageEvent('storage', { key: 'sitrep_access_token', oldValue: oldToken, newValue: rotated })));
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+      expect(visible.map(row => row.title)).toEqual(['Acción actual de la misma cuenta']);
+      vi.mocked(authService.getMe).mockResolvedValue({ ...inspector, rol: 'ADMIN' } as Usuario);
+      await act(async () => window.dispatchEvent(new Event('focus')));
+      await waitFor(() => expect(screen.getByTestId('rol')).toHaveTextContent('ADMIN'));
+      expect(visible).toHaveLength(0);
+    } finally { unsubscribe(); }
+  });
+
+  it('clears ephemeral notices on cross-tab logout', async () => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValue(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    let visible: { title: string }[] = [];
+    const unsubscribe = toast.subscribe(rows => { visible = rows; });
+    try {
+      act(() => { toast.info('Acción de la cuenta anterior'); });
+      const oldValue = getAccessToken(); localStorage.removeItem('sitrep_access_token');
+      act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'sitrep_access_token', oldValue, newValue: null })));
+      expect(visible).toHaveLength(0);
+    } finally { unsubscribe(); }
+  });
+
+  it.each([
+    [401, 'Credenciales inválidas'],
+    [429, 'Demasiados intentos de autenticación para esta cuenta, intente de nuevo en un minuto'],
+  ])('keeps the %s login failure visible after the loading gate remounts the form', async (status, message) => {
+    let rejectLogin!: (error: unknown) => void;
+    vi.mocked(authService.login).mockImplementationOnce(() => new Promise((_, reject) => { rejectLogin = reject; }));
+    function LoginGate() {
+      const auth = useAuth();
+      return auth.isLoading ? <div role="status">Cargando SITREP</div> : <LoginPage />;
+    }
+    render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter><AuthProvider><LoginGate /></AuthProvider></MemoryRouter></QueryClientProvider>);
+    const identifier = await screen.findByLabelText('Correo electrónico o CUIT');
+    const user = userEvent.setup();
+    await user.type(identifier, 'generador@capacitacion.invalid');
+    await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'synthetic');
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando SITREP');
+    expect(screen.queryByRole('button', { name: 'Ingresar', exact: true })).not.toBeInTheDocument();
+    await act(async () => rejectLogin({ response: { status, data: { message } } }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByRole('button', { name: 'Ingresar', exact: true })).toBeEnabled();
+    expect(clearTokens).toHaveBeenCalled();
+  });
+
+  it('shows the latest rejection when a second login attempt has a different error', async () => {
+    vi.mocked(authService.login)
+      .mockRejectedValueOnce({ response: { status: 401, data: { message: 'Credenciales inválidas' } } })
+      .mockRejectedValueOnce({ response: { status: 429, data: { message: 'Demasiados intentos: esperá un minuto' } } });
+    render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter><AuthProvider><LoginPage /></AuthProvider></MemoryRouter></QueryClientProvider>);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Correo electrónico o CUIT'), 'generador@qa.invalid');
+    await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'synthetic');
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Credenciales inválidas'));
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Demasiados intentos: esperá un minuto'));
+    expect(screen.getByLabelText('Correo electrónico o CUIT')).toHaveValue('generador@qa.invalid');
+    expect(authService.login).toHaveBeenCalledTimes(2);
+  });
 
   it('restores the restricted UI after server validation and clears it after a full session', async () => {
     localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);
@@ -271,6 +420,20 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument();
   });
 
+  it('preserves the welcome for a later ordinary login after opening a task', async () => {
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('login-deferred-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Admin User'));
+    expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+    expect(localStorage.getItem('sitrep_onboarding_42')).toBeNull();
+    await user.click(screen.getByTestId('logout-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    await user.click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument());
+  });
+
   it.each([false, true])('does not introduce pending applicants as approved actors (post-reset: %s)', async (postReset) => {
     if (postReset) localStorage.setItem('sitrep_post_reset', '1');
     vi.mocked(authService.login).mockResolvedValueOnce({
@@ -311,6 +474,24 @@ describe('AuthContext', () => {
     expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
   });
 
+  it('preserves GPS pending for its owner and does not assign it to the next account on logout', async () => {
+    const user = userEvent.setup();
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    await user.click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Admin User'));
+    const points = [{ lat:-33, lng:-69, speed:null, heading:null }];
+    const ownKey = gpsQueueKey('42', 'trip-a');
+    localStorage.setItem(ownKey, JSON.stringify(points));
+    localStorage.setItem('gps_pending_legacy-trip', JSON.stringify(points));
+    await user.click(screen.getByTestId('logout-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    expect(localStorage.getItem(ownKey)).toBe(JSON.stringify(points));
+    expect(localStorage.getItem('gps_pending_legacy-trip')).toBe(JSON.stringify(points));
+    expect(readPendingGpsQueue('next-account', 'trip-a')).toEqual({ ok:true, durable:true, points:[] });
+    expect(readPendingGpsQueue('42', 'trip-a')).toEqual({ ok:true, durable:true, points });
+  });
+
   it('useAuth throws when used outside AuthProvider', () => {
     function BareConsumer() {
       useAuth();
@@ -342,6 +523,89 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('null');
     expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
     expect(getAccessToken()).toBeNull();
+  });
+
+  it.each([429, 503])('keeps a validated session and its open role after HTTP %s on focus, then recovers', async status => {
+    const token = tokenFor();
+    localStorage.setItem('sitrep_access_token', token);
+    localStorage.setItem('sitrep_refresh_token', 'unchanged-refresh');
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    const snapshot = localStorage.getItem(OFFLINE_SESSION_KEY);
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('authError')).not.toHaveTextContent('none'));
+    expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno');
+    expect(screen.getByTestId('rol')).toHaveTextContent('AUDITOR');
+    expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
+    expect(clearTokens).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe(token);
+    expect(localStorage.getItem('sitrep_refresh_token')).toBe('unchanged-refresh');
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBe(snapshot);
+    vi.mocked(authService.getMe).mockResolvedValueOnce({ ...inspector, esInspector: false });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('inspector')).toHaveTextContent('false'));
+    expect(screen.getByTestId('authError')).toHaveTextContent('none');
+    expect(authService.getMe).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([429, 503])('keeps credentials for retry but grants no initial profile after HTTP %s', async status => {
+    // Even a previously cached profile is not authorization after an HTTP error.
+    await cacheVerifiedSession();
+    const token = getAccessToken();
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('isAnyAdmin')).toHaveTextContent('false');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('false');
+    expect(getAccessToken()).toBe(token);
+    expect(clearTokens).not.toHaveBeenCalled();
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+  });
+
+  it.each([429, 503])('does not carry a previous profile to a different token after HTTP %s', async status => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    const nextToken = tokenFor('another-person');
+    localStorage.setItem('sitrep_access_token', nextToken);
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    expect(getAccessToken()).toBe(nextToken);
+    expect(clearTokens).not.toHaveBeenCalled();
+    expect(screen.getByTestId('rol')).toHaveTextContent('none');
+  });
+
+  it.each([401, 403])('invalidates an open validated session on HTTP %s from profile', async status => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    expect(clearTokens).toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+  });
+
+  it('does not grant restricted draft access from a token when admission is temporarily unavailable', async () => {
+    const token = `header.${btoa(JSON.stringify({ id: 'candidate', restricted: true, registrationDraft: 'draft-only' }))}.signature`;
+    localStorage.setItem('sitrep_access_token', token);
+    vi.mocked(api.get).mockRejectedValueOnce({ response: { status: 503 } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('false');
+    expect(screen.getByTestId('draft')).toHaveTextContent('none');
+    expect(getAccessToken()).toBe(token);
+    expect(clearTokens).not.toHaveBeenCalled();
   });
 
   it('does not authenticate offline without a previously verified profile', async () => {
@@ -444,10 +708,14 @@ describe('AuthContext', () => {
     vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
     renderWithProviders();
     await waitFor(()=>expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    const draftKey = 'sitrep:manifest-form:v1:' + JSON.stringify([inspector.id, 'AUDITOR', '', false, '', '', '']);
+    const savedDraft = JSON.stringify({ version: 1, savedAt: Date.now(), draft: { step: 2, form: { observaciones: 'Trabajo pendiente de la cuenta anterior' } } });
+    localStorage.setItem(draftKey, savedDraft);
     try {
       await userEvent.setup().click(screen.getByTestId('logout-btn'));
       expect(screen.getByTestId('user')).toHaveTextContent('null');
       expect(getAccessToken()).toBeNull();
+      expect(localStorage.getItem(draftKey)).toBe(savedDraft);
     } finally { await act(async()=>finish()); }
   });
 

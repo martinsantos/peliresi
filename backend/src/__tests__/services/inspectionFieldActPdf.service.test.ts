@@ -166,7 +166,7 @@ describe('inspection field act PDF', () => {
       expect(extracted.stdout).toContain('Firma e intervinientes');
       expect(extracted.stdout).toContain('Entrega de copia del acta');
       expect(extracted.stdout).toContain('Notificación y domicilio legal');
-      expect(extracted.stdout).toContain('DOCUMENTO OFICIAL GENERADO POR SITREP');
+      expect(extracted.stdout).toContain('DOCUMENTO GENERADO POR SITREP');
       expect(extracted.stdout).toContain('Gobierno de Mendoza');
       expect(extracted.stdout).toContain('VERIFICAR TRAZABILIDAD DEL ACTA');
       expect(extracted.stdout).toContain('HUELLA SHA-256 DEL EXPEDIENTE');
@@ -175,6 +175,26 @@ describe('inspection field act PDF', () => {
       expect(extracted.stdout.replace(/\s/g, '')).toContain(buildInspectionFieldActFingerprint(inspection));
     } else {
       expect((extracted.error as NodeJS.ErrnoException).code).toBe('ENOENT');
+    }
+    const compactStream = new PassThrough() as typeof stream;
+    compactStream.setHeader = () => undefined;
+    const compactChunks: Buffer[] = [];
+    compactStream.on('data', chunk => compactChunks.push(Buffer.from(chunk)));
+    const compactDone = new Promise<void>((resolve,reject) => { compactStream.on('finish', resolve); compactStream.on('error', reject); });
+    await streamInspectionActPdf(compactStream as any, {...inspection, datosActa: {modeloCampo:2, actividadObservada:'Actividad de prueba', danosDetalle:'Detalle adicional conservado', ubicacionCampo:{latitud:-32.89,longitud:-68.84,origen:'MANUAL',perimetro:[{latitud:-32.89,longitud:-68.84},{latitud:-32.8891,longitud:-68.84},{latitud:-32.8891,longitud:-68.8389}],referencias:[{id:'r1',tipo:'VIVIENDA',etiqueta:'Casa lindera de práctica',latitud:-32.8895,longitud:-68.84}]}}}, () => imagePath);
+    await compactDone;
+    const compactPdf=Buffer.concat(compactChunks);expect(compactPdf.subarray(0,4).toString()).toBe('%PDF');
+    fs.writeFileSync(path.join(tempDir,'compact.pdf'),compactPdf);
+    const compactText=spawnSync('pdftotext',[path.join(tempDir,'compact.pdf'),'-'],{encoding:'utf8'});
+    if(!compactText.error){
+      expect(compactText.status).toBe(0);
+      expect(compactText.stdout).toContain('Actividad de prueba');
+      expect(compactText.stdout).toContain('Detalle adicional conservado');
+      expect(compactText.stdout).toContain('Vista general del control observado.');
+      expect(compactText.stdout).toContain('-32.890000, -68.840000 · coordenadas ingresadas');
+      expect(compactText.stdout).toContain('Sector observado, trazado aproximado');
+      expect(compactText.stdout).toContain('1. Vivienda — Casa lindera de práctica');
+      expect(compactText.stdout).not.toContain('FORMALIDADES DOCUMENTALES DEL ART. 44');
     }
     if (process.env.SITREP_ACTA_PDF_QA_OUTPUT) {
       fs.mkdirSync(path.dirname(process.env.SITREP_ACTA_PDF_QA_OUTPUT), { recursive: true });

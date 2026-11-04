@@ -1,3 +1,5 @@
+import { directoryActorIdScope } from '../utils/roleFilter';
+import { actorRegistrationIdentity, linkApprovedRegistration, notifyCompanyActorChange } from '../services/companyRegistration.service';
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcryptjs';
@@ -7,7 +9,9 @@ import { auditarActor } from '../utils/auditoria';
 import { approvedOperatorModeChange, operatorModalitiesForType } from '../domain/operatorModalities';
 import { actorCoordinates, actorNumber } from '../domain/actorNumbers';
 import { parsePagination } from '../utils/pagination';
+import { directoryText, operatorDirectoryQuery } from '../services/actorDirectoryFilters';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
+import { fiscalCompanyRecipients } from '../services/fiscalCompanyNotice.service';
 import {
     buildFiscalWhere,
     combineWhere,
@@ -16,7 +20,6 @@ import {
     parseFiscalYear,
 } from '../utils/generadorFiscal';
 
-type DirectoryActorType = 'generador' | 'transportista' | 'operador';
 
 function validateVehicleCapacity(capacidad: unknown): asserts capacidad is number {
     if (typeof capacidad !== 'number' || !Number.isFinite(capacidad) || capacidad <= 0) {
@@ -31,12 +34,6 @@ function validateInitialPassword(password: unknown, cuit: string): asserts passw
     if (password.replace(/\D/g, '') === String(cuit).replace(/\D/g, '') && /^[\d\s-]+$/.test(password)) {
         throw new AppError('La contraseña inicial no puede ser el CUIT', 400);
     }
-}
-
-function directoryActorIdScope(req: AuthRequest, type: DirectoryActorType) {
-    if (['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user?.rol) || req.user?.esInspector) return undefined;
-    const ownId = req.user?.rol === type.toUpperCase() ? req.user[type]?.id : undefined;
-    return ownId || { in: [] as string[] };
 }
 
 // ============== GENERADORES (CU-A06) ==============
@@ -92,7 +89,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
         }
 
         const where: any = combineWhere(baseWhere, buildFiscalWhere(fiscalStatus, fiscalYear));
-        const directoryId = directoryActorIdScope(req, 'generador');
+        const directoryId = directoryActorIdScope(req.user, 'generador');
         if (directoryId !== undefined) where.id = directoryId;
         const include = {
             usuario: { select: { email: true, nombre: true, apellido: true } },
@@ -219,36 +216,37 @@ export const crearRecordatoriosGeneradores = async (req: AuthRequest, res: Respo
             throw new AppError('El motivo debe tener entre 10 y 500 caracteres', 400);
         }
 
-        const recipients = await prisma.generador.findMany({
-            where: { id: { in: ids }, usuario: { activo: true } },
-            select: { id: true, usuarioId: true },
+        const generators = await prisma.generador.findMany({
+            where: { id: { in: ids } }, select: { id: true, usuarioId: true, usuario: { select: { activo: true } } },
         });
+        const representatives = await fiscalCompanyRecipients(prisma, generators.map(g => g.id));
         const campaignId = `${Date.now()}-${req.user!.id}`;
-        if (recipients.length > 0) {
-            await prisma.notificacion.createMany({
-                data: recipients.map((recipient) => ({
-                    usuarioId: recipient.usuarioId,
-                    tipo: 'INFO_GENERAL',
-                    titulo: `Recordatorio fiscal ${fiscalYear}`,
-                    mensaje: motivo,
-                    prioridad: 'ALTA',
-                    datos: JSON.stringify({
-                        tipo: 'recordatorio_fiscal',
-                        fiscalYear,
-                        generadorId: recipient.id,
-                        campaignId,
-                        url: '/perfil',
-                    }),
-                })),
-            });
+        const notices = new Map<string, { generadorId: string; usuarioId: string; tipo: 'INFO_GENERAL'; titulo: string; mensaje: string; prioridad: 'ALTA'; datos: string }>();
+        for (const generator of generators) {
+            if (!generator.usuario.activo) continue;
+            notices.set(`${generator.id}:${generator.usuarioId}`, { generadorId: generator.id, usuarioId: generator.usuarioId,
+                tipo: 'INFO_GENERAL', titulo: `Recordatorio fiscal ${fiscalYear}`, mensaje: motivo, prioridad: 'ALTA',
+                datos: JSON.stringify({ tipo: 'recordatorio_fiscal', fiscalYear, generadorId: generator.id, campaignId, url: '/perfil' }) });
         }
+        for (const recipient of representatives) {
+            const key = `${recipient.generadorId}:${recipient.usuarioId}`;
+            if (notices.has(key)) continue;
+            // The stored copy is generic; the message and company are projected only while access remains valid.
+            notices.set(key, { generadorId: recipient.generadorId, usuarioId: recipient.usuarioId,
+                tipo: 'INFO_GENERAL', titulo: 'Aviso para tu empresa', mensaje: 'Abrí el aviso para consultar la información de la actividad.', prioridad: 'ALTA',
+                datos: JSON.stringify({ tipo: 'recordatorio_fiscal', version: 1, destino: 'representante', generadorId: recipient.generadorId,
+                    fiscalYear, empresaId: recipient.acceso.empresaId, actividadId: recipient.acceso.actividadId, motivo, campaignId }) });
+        }
+        const rows = [...notices.values()];
+        if (rows.length) await prisma.notificacion.createMany({ data: rows.map(({ generadorId: _actorId, ...row }) => row) });
+        const reached = new Set(rows.map(row => row.generadorId));
 
         res.status(201).json({
             success: true,
             data: {
                 requested: ids.length,
-                delivered: recipients.length,
-                skipped: ids.length - recipients.length,
+                delivered: rows.length,
+                skipped: ids.length - reached.size,
                 campaignId,
             },
         });
@@ -289,12 +287,13 @@ export const getGeneradorById = async (req: AuthRequest, res: Response, next: Ne
 export const createGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            razonSocial, cuit, domicilio, telefono, email, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
+            razonSocial, cuit: declaredCuit, domicilio, telefono, email: declaredEmail, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
             expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
             domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
             certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
             latitud, longitud, tefInputs,
         } = req.body;
+        const { cuit, email } = actorRegistrationIdentity(declaredCuit, declaredEmail) as { cuit: string; email: string };
         const coordinates = actorCoordinates(latitud, longitud);
         const numericFactor = actorNumber(factorR, 'Factor R'), numericAmount = actorNumber(montoMxR, 'Monto M×R');
 
@@ -311,9 +310,15 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
         // Verificar email único en usuarios
         const existeEmail = await prisma.usuario.findUnique({ where: { email } });
         if (existeEmail) {
-            throw new AppError('Ya existe un usuario con ese email', 400);
+            throw new AppError(process.env.ACTOR_MULTIROLE_ENABLED === 'true' ? 'Ya existe un usuario con ese email. Para otro rol usá Mi perfil → Mis actividades; no crees otra cuenta.' : 'Ya existe un usuario con ese email', 400);
         }
 
+        if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
+            const digits = String(cuit).replace(/\D/g, '');
+            const formatted = digits.slice(0,2)+'-'+digits.slice(2,10)+'-'+digits.slice(10);
+            const account = await prisma.usuario.findFirst({ where: { OR: [{ email: { equals: String(email).trim(), mode: 'insensitive' } }, { cuit: { in: [digits, formatted] } }] } });
+            if (account) throw new AppError('La cuenta o el CUIT ya están registrados. Para sumar un rol, la persona debe usar Mi perfil → Mis actividades y presentar la actividad adicional. Conserva su cuenta y contraseña.', 409);
+        }
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
 
@@ -332,7 +337,7 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
             });
 
             // Crear generador
-            return tx.generador.create({
+            const approvedActor = await tx.generador.create({
                 data: {
                     usuarioId: usuario.id,
                     razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
@@ -350,6 +355,8 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
                     usuario: { select: { email: true, nombre: true } }
                 }
             });
+            await linkApprovedRegistration(tx, { id: 'alta-administrativa:' + approvedActor.id, usuarioId: usuario.id, tipoActor: 'GENERADOR' }, approvedActor.id, req.user!);
+            return approvedActor;
         });
 
         await auditarActor({ accion: 'CREATE', modulo: 'GENERADOR', datosDespues: generador, usuarioId: req.user!.id, generadorId: generador.id, ip: req.ip, userAgent: req.headers['user-agent'] });
@@ -397,6 +404,7 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             }
         });
 
+        await notifyCompanyActorChange(transaction, 'GENERADOR', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'GENERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
         });
@@ -455,7 +463,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
         const orderBy = TRANS_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
-        const directoryId = directoryActorIdScope(req, 'transportista');
+        const directoryId = directoryActorIdScope(req.user, 'transportista');
         if (directoryId !== undefined) where.id = directoryId;
         if (search) {
             where.OR = [
@@ -467,7 +475,12 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             where.activo = activo === 'true';
         }
 
-        const [transportistas, total] = await Promise.all([
+        // Facets come from the complete authorized directory, never just this page.
+        const facetWhere = { ...where };
+        const localidad = directoryText(req.query.localidad, 'localidad');
+        if (localidad) where.localidad = { equals: localidad, mode: 'insensitive' };
+
+        const [transportistas, total, localidades] = await Promise.all([
             prisma.transportista.findMany({
                 where,
                 skip,
@@ -481,7 +494,8 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
                 },
                 orderBy
             }),
-            prisma.transportista.count({ where })
+            prisma.transportista.count({ where }),
+            prisma.transportista.findMany({ where: facetWhere, distinct: ['localidad'], select: { localidad: true }, orderBy: { localidad: 'asc' } })
         ]);
 
         // Map ultimaActividad from most recent manifiesto
@@ -503,6 +517,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             success: true,
             data: {
                 transportistas: mappedT,
+                localidades: localidades.map(item => item.localidad).filter((value): value is string => Boolean(value?.trim())),
                 pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
@@ -537,12 +552,13 @@ export const getTransportistaById = async (req: AuthRequest, res: Response, next
 export const createTransportista = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            razonSocial, cuit, domicilio, numeroHabilitacion, telefono, email, password, vehiculos, choferes,
+            razonSocial, cuit: declaredCuit, domicilio, numeroHabilitacion, telefono, email: declaredEmail, password, vehiculos, choferes,
             // Campos regulatorios DPA
             localidad, vencimientoHabilitacion, corrientesAutorizadas,
             expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
             latitud, longitud,
         } = req.body;
+        const { cuit, email } = actorRegistrationIdentity(declaredCuit, declaredEmail) as { cuit: string; email: string };
         const coordinates = actorCoordinates(latitud, longitud);
 
         if (!razonSocial || !cuit || !email) {
@@ -579,6 +595,12 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             throw new AppError('Ya existe un transportista con ese CUIT', 400);
         }
 
+        if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
+            const digits = String(cuit).replace(/\D/g, '');
+            const formatted = digits.slice(0,2)+'-'+digits.slice(2,10)+'-'+digits.slice(10);
+            const account = await prisma.usuario.findFirst({ where: { OR: [{ email: { equals: String(email).trim(), mode: 'insensitive' } }, { cuit: { in: [digits, formatted] } }] } });
+            if (account) throw new AppError('La cuenta o el CUIT ya están registrados. Para sumar un rol, la persona debe usar Mi perfil → Mis actividades y presentar la actividad adicional. Conserva su cuenta y contraseña.', 409);
+        }
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
         const transportista = await prisma.$transaction(async tx => {
@@ -595,7 +617,7 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                 }
             });
 
-            return tx.transportista.create({
+            const approvedActor = await tx.transportista.create({
                 data: {
                     usuarioId: usuario.id,
                     razonSocial,
@@ -637,6 +659,8 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                 },
                 include: { vehiculos: true, choferes: true }
             });
+            await linkApprovedRegistration(tx, { id: 'alta-administrativa:' + approvedActor.id, usuarioId: usuario.id, tipoActor: 'TRANSPORTISTA' }, approvedActor.id, req.user!);
+            return approvedActor;
         });
 
         await auditarActor({ accion: 'CREATE', modulo: 'TRANSPORTISTA', datosDespues: transportista, usuarioId: req.user!.id, transportistaId: transportista.id, ip: req.ip, userAgent: req.headers['user-agent'] });
@@ -685,6 +709,7 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
             }
         });
 
+        await notifyCompanyActorChange(transaction, 'TRANSPORTISTA', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'TRANSPORTISTA', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
         });
@@ -916,7 +941,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
         const orderBy = OPER_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
-        const directoryId = directoryActorIdScope(req, 'operador');
+        const directoryId = directoryActorIdScope(req.user, 'operador');
         if (directoryId !== undefined) where.id = directoryId;
         if (search) {
             where.OR = [
@@ -926,6 +951,13 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
         }
         if (activo !== undefined) {
             where.activo = activo === 'true';
+        }
+
+        const directoryQuery = operatorDirectoryQuery(req.query);
+        if (directoryQuery) {
+            const matches = await prisma.$queryRaw<Array<{ id: string }>>(directoryQuery);
+            // Keep role/actor scope in conjunction with advanced filters.
+            where.AND = [{ id: { in: matches.map(item => item.id) } }];
         }
 
         const [operadores, total] = await Promise.all([
@@ -1090,7 +1122,7 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
 export const createOperador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, password, nombre, categoria, tipoOperador, tecnologia, corrientesY,
+            razonSocial, cuit: declaredCuit, numeroHabilitacion, domicilio, telefono, email: declaredEmail, password, nombre, categoria, tipoOperador, tecnologia, corrientesY,
             expedienteInscripcion, certificadoNumero,
             domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
             domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
@@ -1098,6 +1130,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
             representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
             vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
         } = req.body;
+        const { cuit, email } = actorRegistrationIdentity(declaredCuit, declaredEmail) as { cuit: string; email: string };
         const coordinates = actorCoordinates(latitud, longitud);
 
         if (!razonSocial || !cuit || !email) {
@@ -1111,9 +1144,15 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
 
         const existeEmail = await prisma.usuario.findUnique({ where: { email } });
         if (existeEmail) {
-            throw new AppError('Ya existe un usuario con ese email', 400);
+            throw new AppError(process.env.ACTOR_MULTIROLE_ENABLED === 'true' ? 'Ya existe un usuario con ese email. Para otro rol usá Mi perfil → Mis actividades; no crees otra cuenta.' : 'Ya existe un usuario con ese email', 400);
         }
 
+        if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
+            const digits = String(cuit).replace(/\D/g, '');
+            const formatted = digits.slice(0,2)+'-'+digits.slice(2,10)+'-'+digits.slice(10);
+            const account = await prisma.usuario.findFirst({ where: { OR: [{ email: { equals: String(email).trim(), mode: 'insensitive' } }, { cuit: { in: [digits, formatted] } }] } });
+            if (account) throw new AppError('La cuenta o el CUIT ya están registrados. Para sumar un rol, la persona debe usar Mi perfil → Mis actividades y presentar la actividad adicional. Conserva su cuenta y contraseña.', 409);
+        }
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
         const modalidades = ['ADMIN', 'ADMIN_OPERADOR'].includes(req.user!.rol) ? operatorModalitiesForType(tipoOperador) : undefined;
@@ -1130,7 +1169,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                 }
             });
 
-            return tx.operador.create({
+            const approvedActor = await tx.operador.create({
                 data: {
                     usuarioId: usuario.id,
                     razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria, tipoOperador, tecnologia, corrientesY,
@@ -1147,6 +1186,8 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                 },
                 include: { usuario: { select: { email: true, nombre: true } } }
             });
+            await linkApprovedRegistration(tx, { id: 'alta-administrativa:' + approvedActor.id, usuarioId: usuario.id, tipoActor: 'OPERADOR' }, approvedActor.id, req.user!);
+            return approvedActor;
         });
 
         await auditarActor({ accion: 'CREATE', modulo: 'OPERADOR', datosDespues: operador, usuarioId: req.user!.id, operadorId: operador.id, ip: req.ip, userAgent: req.headers['user-agent'] });
@@ -1197,6 +1238,7 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
             }
         });
 
+        await notifyCompanyActorChange(transaction, 'OPERADOR', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'OPERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
         });

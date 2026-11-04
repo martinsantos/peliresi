@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ messages: [] as unknown[], status: 'OBSERVADA', sentAt: null as string | null, loading: false, error: false, hasData: true, refetch: vi.fn() }));
+const state = vi.hoisted(() => ({ messages: [] as unknown[], status: 'OBSERVADA', sentAt: null as string | null, loading: false, error: false, hasData: true, refetch: vi.fn(), messageError:false, messageLoading:false, retryMessages:vi.fn() }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: true, logout: vi.fn() }) }));
 vi.mock('../../hooks/useSolicitudes', () => ({
   useMisSolicitudes: () => ({ data: state.hasData ? [{ id: 'own', estado: state.status, fechaEnvio: state.sentAt, tipoActor: 'GENERADOR', observaciones: 'Completar domicilio' }] : undefined, isLoading: state.loading, isError: state.error, refetch: state.refetch }),
-  useMensajesSolicitud: () => ({ data: state.messages }),
+  useMensajesSolicitud: () => ({ data: state.messageLoading ? undefined : state.messages, isError:state.messageError, isLoading:state.messageLoading, refetch:state.retryMessages }),
   useEnviarMensaje: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useEnviarSolicitud: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
@@ -12,7 +13,7 @@ import MiSolicitudPage from '../../pages/solicitud/MiSolicitudPage';
 const originalScroll = HTMLElement.prototype.scrollIntoView;
 const documentScroll = vi.fn();
 describe('applicant conversation scroll', () => {
-  beforeEach(() => { state.messages = []; state.status = 'OBSERVADA'; state.sentAt = null; state.loading = false; state.error = false; state.hasData = true; state.refetch.mockClear(); documentScroll.mockClear(); HTMLElement.prototype.scrollIntoView = documentScroll; });
+  beforeEach(() => { localStorage.clear(); state.messages = []; state.status = 'OBSERVADA'; state.sentAt = null; state.loading = false; state.error = false; state.hasData = true; state.refetch.mockClear();state.messageError=false;state.messageLoading=false;state.retryMessages.mockClear(); documentScroll.mockClear(); HTMLElement.prototype.scrollIntoView = documentScroll; });
   afterEach(() => { HTMLElement.prototype.scrollIntoView = originalScroll; });
   it('replaces initial skeletons with the received application', () => {
     state.loading = true; state.hasData = false;
@@ -21,13 +22,13 @@ describe('applicant conversation scroll', () => {
     state.loading = false; state.hasData = true;
     view.rerender(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
     expect(view.container.querySelector('[data-form-skeleton]')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Mi Solicitud de Inscripcion' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Inscripción de Generador' })).toBeVisible();
   });
   it('offers retry on a failed fetch instead of an empty state or endless loading', () => {
     state.hasData = false; state.error = true;
     render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar tu solicitud');
-    expect(screen.queryByText('No tienes solicitudes de inscripcion')).toBeNull();
+    expect(screen.queryByText('Todavía no tenés solicitudes')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(state.refetch).toHaveBeenCalledOnce();
   });
@@ -39,11 +40,11 @@ describe('applicant conversation scroll', () => {
     view.rerender(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
     expect(input).toHaveValue('Mi respuesta todavía sin enviar');
     expect(view.container.querySelector('[data-form-skeleton]')).toBeNull();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos actualizar el estado');
   });
   it('does not pull the document away from its heading on initial load', () => {
     render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
-    expect(screen.getByRole('heading', { name: 'Mi Solicitud de Inscripcion' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Inscripción de Generador' })).toBeInTheDocument();
     expect(documentScroll).not.toHaveBeenCalled();
   });
   it('shows the latest message by scrolling only the conversation container', () => {
@@ -59,12 +60,32 @@ describe('applicant conversation scroll', () => {
   it.each([['RECHAZADA', null], ['BORRADOR', null], ['RECHAZADA', 'invalid']])('does not invent a pending submission for %s with date %s', (status, sentAt) => {
     state.status = status!; state.sentAt = sentAt;
     render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
-    expect(screen.getByText(/^Tipo:/)).toHaveTextContent(/^Tipo: GENERADOR$/);
+    expect(screen.getByRole('heading',{name:'Inscripción de Generador'})).toBeVisible();
+    expect(screen.queryByText(/^Enviada /)).toBeNull();
     expect(screen.queryByText(/Enviada pendiente|Invalid Date/)).not.toBeInTheDocument();
   });
   it('shows a persisted submission date in Mendoza, independent of the runner timezone', () => {
     state.sentAt = '2026-10-12T01:00:00Z';
     render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
-    expect(screen.getByText(/^Tipo:/)).toHaveTextContent('Enviada 11/10/2026');
+    expect(screen.getByText('Enviada 11/10/2026')).toBeVisible();
   });
+});
+
+it('never represents a message loading/error as an empty conversation; retries preserve typed text',()=>{
+  state.messageLoading=true;
+  const view=render(<MemoryRouter><MiSolicitudPage/></MemoryRouter>);
+  expect(screen.getByText('Consultando mensajes…')).toHaveAttribute('role','status');
+  expect(screen.queryByText('Todavía no hay mensajes')).toBeNull();
+  const field=screen.getByRole('textbox',{name:'Mensaje a administración'});
+  fireEvent.change(field,{target:{value:'Consulta sin enviar'}});
+  state.messageLoading=false;state.messageError=true;view.rerender(<MemoryRouter><MiSolicitudPage/></MemoryRouter>);
+  expect(screen.getByRole('alert')).toHaveTextContent('No pudimos consultar los mensajes');
+  expect(field).toHaveValue('Consulta sin enviar');
+  fireEvent.click(screen.getByRole('button',{name:'Reintentar mensajes'}));expect(state.retryMessages).toHaveBeenCalledOnce();
+  expect(screen.queryByText('Todavía no hay mensajes')).toBeNull();
+});
+it.each(['ENVIADA','EN_REVISION'])('%s explains who acts without offering a duplicate submission',estado=>{
+  state.status=estado;render(<MemoryRouter><MiSolicitudPage/></MemoryRouter>);
+  expect(screen.getByText('Administración revisa tu solicitud')).toBeVisible();
+  expect(screen.queryByRole('button',{name:/Continuar borrador|Responder y Re-enviar/})).toBeNull();
 });

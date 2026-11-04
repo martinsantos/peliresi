@@ -28,7 +28,7 @@ interface OnboardingTourProps {
 // ========================================
 const TOUR_STEPS: TourStep[] = [
   {
-    title: 'Dashboard',
+    title: 'Inicio',
     description:
       'Tu panel principal con indicadores clave: manifiestos activos, alertas pendientes y estadísticas en tiempo real del sistema de trazabilidad.',
     targetSelector: 'a[href="/dashboard"]',

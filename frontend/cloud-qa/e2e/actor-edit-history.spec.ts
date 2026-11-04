@@ -1,3 +1,4 @@
+import { syntheticCuit } from '../synthetic-cuit';
 import { randomUUID, randomInt } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import { login, prefix } from './helpers';
@@ -18,7 +19,7 @@ for (const actor of [
   const oldAddress = 'QA Calle anterior 100';
   const newAddress = 'QA Calle corregida 200';
   const created = await page.request.post(`/api/actores/${actor.path}`, { headers: { Authorization: authorization }, data: {
-    razonSocial: `QA Dirección ${unique}`, cuit: `30-${randomInt(10000000, 99999999)}-1`, email: `${unique}@night-qa.invalid`,
+    razonSocial: `QA Dirección ${unique}`, cuit: syntheticCuit(randomInt(10000000, 99999999)), email: `${unique}@night-qa.invalid`,
     password: 'OnlyLocal-NightQA-2026!', nombre: 'QA padrón', domicilio: oldAddress, telefono: '000', categoria: 'FIJO',
     numeroInscripcion: 'QA-G', numeroHabilitacion: 'QA-H', domicilioLegalCalle: oldAddress, domicilioLegalLocalidad: 'Capital', domicilioLegalDepto: 'Capital',
   } });

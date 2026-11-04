@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import path from 'node:path';
+import {assertCloudDatabase,backendRequire} from './safety.ts';
+
+await assertCloudDatabase();
+assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'),'proposal_operations_20261021');
+assert.equal(process.env.TRAINING_DATABASE_URL,'');assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL,'2000-01-01T00:00:00Z');
+assert.equal(process.env.DISABLE_EMAILS,'true');assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED,'false');
+const directory=process.env.QA_ARTIFACTS!,fixture=JSON.parse(readFileSync(path.join(directory,'fleet-durable-private.json'),'utf8'));
+const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient(),results=[];
+try{
+  for(const surface of ['web','app']){
+    const {a,b,stale}=fixture.cases[surface];
+    const records=await Promise.all([a,b,stale].map((item:{id:string})=>db.manifiesto.findUniqueOrThrow({where:{id:item.id},select:{numero:true,isDemoData:true,estado:true}})));
+    for(const record of records)assert.equal(record.isDemoData,true);
+    assert.deepEqual(records.map((record:{estado:string})=>record.estado),['ENTREGADO','EN_TRANSITO','EN_TRANSITO']);
+    const points=await Promise.all([a,b,stale].map((item:{id:string})=>db.trackingGPS.count({where:{manifiestoId:item.id}})));
+    assert.deepEqual(points,[1,1,1]);
+    assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:a.id,tipo:'ENTREGA'}}),1);
+    assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:stale.id,tipo:'ENTREGA'}}),0);
+    results.push({surface,own:points[0],other:points[1],reconciledOld:points[2],deliveries:1});
+  }
+  assert.equal(await db.emailQueue.count({where:{intentos:{gt:0}}}),0);
+  assert.equal(await db.emailQueue.count({where:{sentAt:{not:null}}}),0);
+  const result={synthetic:true,production:false,emails:false,push:false,results};
+  writeFileSync(path.join(directory,'fleet-durable-audit.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+}finally{await db.$disconnect();}

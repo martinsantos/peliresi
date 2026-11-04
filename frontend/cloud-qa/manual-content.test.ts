@@ -6,10 +6,343 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const root = new URL('../../docs/manual/', import.meta.url);
+
+test('travel-duration monitoring documents explicit thresholds, periodic checks and their limits', () => {
+  const manual = readFileSync(new URL('help-data.js', root), 'utf8');
+  assert.match(manual, /Un viaje no tiene un plazo fijo automático/);
+  assert.match(manual, /regla de Duración del viaje con un umbral explícito en horas/);
+  assert.match(manual, /cada cinco minutos mientras el servicio funciona, incluso si no llegan puntos/);
+  assert.match(manual, /transporte vinculado recibe el aviso si fue seleccionado, incluso si su dispositivo envió la ubicación/);
+  assert.match(manual, /puede generar otro aviso después de 30 minutos/);
+  assert.match(manual, /sus representantes autorizados reciben un aviso por persona/);
+  assert.match(manual, /si se revoca o ya no incluye esa sede, oculta el contenido/);
+  assert.match(manual, /no reconstruye avisos anteriores/);
+  assert.match(manual, /seguimiento GPS actual no activa las reglas históricas de Desvío de ruta/i);
+  assert.match(manual, /no con una ruta vial autorizada/i);
+  assert.match(manual, /se desconoce cuándo las captó el teléfono y pueden ser anteriores/i);
+  assert.match(manual, /observación de corredor compara tres posiciones recibidas del transporte original o de un mismo tramo de relevo/i);
+  assert.match(manual, /Pueden haber sido captadas antes de su recepción/i);
+  assert.match(manual, /La ausencia de aviso no garantiza que el trayecto sea correcto/i);
+});
 const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('practice guidance distinguishes the isolated environment and preserved signed documents', () => {
+  const guide = guides.find((item: any) => item.id === 'entorno-practica-aislado');
+  const text = JSON.stringify(guide);
+  for (const phrase of ['Datos ficticios', 'PRUEBA', 'no envía correos ni push', 'en cada página', 'certificado firmado previamente']) assert.ok(text.includes(phrase), phrase);
+  for (const role of ['generador', 'transportista', 'operador', 'administrador', 'inspector']) assert.ok(guide.audiences.includes(role), role);
+});
+test('updating guidance explains work in other tabs and storage limits', () => {
+  const guide = guides.find((item: any) => item.id === 'actualizar-sin-perder-contexto');
+  const text = JSON.stringify(guide);
+  assert.match(text, /cambios de cada pestaña antes de actualizar/);
+  assert.match(text, /La contraseña no se guarda como borrador/);
+  assert.match(text, /navegador, que puede eliminar copias/);
+  assert.match(text, /Una pantalla nunca cargada puede necesitar conexión/);
+  assert.doesNotMatch(text, /Web y app reutilizan los archivos versionados de pantallas que ya guardaron/);
+});
+test('the actor overview explains global filtering, recovery and page-only exports', () => {
+  const guide=guides.find((g:any)=>g.id==='padrones-administrativos');
+  const step=guide.steps.find((s:any)=>s.title==='Consultar Actores en conjunto');
+  const text=JSON.stringify(step);
+  for(const phrase of ['todos los registros autorizados antes de paginar','Reintentar consulta','formulario completo','de la página actual']) assert.ok(text.includes(phrase),phrase);
+});
+test('the actor overview capture is unedited evidence from synthetic preview', () => {
+  const proof=JSON.parse(read('actor-overview-provenance.json'));
+  assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);
+  assert.ok(read('help-data.js').includes(proof.file.replace('screenshots/','')));
+  assert.equal(createHash('sha256').update(readFileSync(new URL(proof.file,root))).digest('hex'),proof.sha256);
+});
+test('directory accordions use native buttons with an accessible initial state', () => {
+  const directory = read('directorio.html');
+  const controls = directory.match(/<button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible\(this\)">/g) || [];
+  assert.equal(controls.length, 98);
+  assert.doesNotMatch(directory, /<div class="collapsible-header"/);
+  assert.match(read('directorio.js'), /setAttribute\('aria-expanded', String\(open\)\)/);
+  assert.match(read('directorio.css'), /\.collapsible-header:focus-visible/);
+  assert.match(read('directorio.css'), /@media\(max-width:900px\)\{\.back-to-top\.visible\{display:none;\}\}/);
+  assert.match(directory, /href="#mainContent" class="nav-link">Volver al inicio del directorio/);
+});
+test('directory index groups identify their panels and offer a search empty state', () => {
+  const directory = read('directorio.html');
+  const groups = [...directory.matchAll(/<button type="button" class="nav-section-title(?: active-parent)?" aria-expanded="true" aria-controls="([^"]+)" onclick="toggleNavGroup\(this\)">[^<]+<\/button>\s*<div class="nav-group-items" id="\1">/g)];
+  assert.equal(groups.length, 18);
+  assert.equal(new Set(groups.map(group => group[1])).size, 18);
+  assert.doesNotMatch(directory, /<div class="nav-section-title/);
+  assert.match(directory, /id="sidebarSearchEmpty" role="status" hidden/);
+});
+test('directory introduction distinguishes three approvals, GPS receipt and certificate publication', () => {
+  const directory = read('directorio.html');
+  const introduction = directory.split('<h4>Procesos Cubiertos</h4>')[1].split('</table>')[0];
+  const generator = directory.split('<section id="guia-generador"')[1].split('</section>')[0];
+  assert.match(introduction, /Las tres partes vinculadas deben aprobarla/);
+  assert.match(introduction, /Cerrar el manifiesto no emite el documento por sí solo/);
+  assert.match(introduction, /última ubicación recibida/);
+  assert.match(generator, /Generador, transporte y operador deben aprobar explícitamente/);
+  assert.match(generator, /lectura no reemplaza una aprobación/i);
+  assert.match(generator, /el cierre por sí solo no la emite/i);
+  assert.doesNotMatch(generator, /Una vez firmado, el manifiesto pasa a APROBADO/i);
+  const cases = directory.split('<section id="cu-generador"')[1].split('</section>')[0];
+  assert.match(cases, /Crearla no equivale a aprobar por ninguna de las partes/);
+  assert.match(cases, /Una sola firma no habilita la coordinación/);
+  assert.doesNotMatch(cases, /Firma electronica del manifiesto en estado BORRADOR para pasarlo a APROBADO/i);
+  const flow = directory.split('<h4 id="fg-6">')[1].split('</div>')[0];
+  assert.match(flow, /Sólo con las tres decisiones se habilita iniciar la coordinación/);
+  assert.doesNotMatch(flow, /Al firmar, el estado cambia a APROBADO/i);
+});
+test('certificate recovery explains the receipt when the document list is available or unavailable', () => {
+  const guide = guides.find((g: any) => g.id === 'certificados-operador-partes');
+  const step = guide.steps.find((s: any) => s.title === 'Recuperar una emisión al cerrar web o app');
+  const text = JSON.stringify(step);
+  for (const phrase of ['Comprobar resultado', 'se muestran allí una sola vez', 'el recibo conserva esos datos', 'Continuar con certificados', 'retira la copia local']) assert.ok(text.includes(phrase), phrase);
+});
+test('certificate guide distinguishes issued documents from types without a document', () => {
+  const guide = guides.find((g: any) => g.id === 'certificados-operador-partes');
+  const step = guide.steps.find((s: any) => s.title === 'Operador: abrir el mismo manifiesto');
+  const text = JSON.stringify(step);
+  for (const phrase of ['Cada documento emitido aparece una sola vez', 'Los tipos que todavía no tienen documento muestran su estado', 'el parcial figura como no emitido']) assert.ok(text.includes(phrase), phrase);
+});
+test('certificate layout captures are unedited evidence from the artificial preview', () => {
+  const provenance = JSON.parse(read('certificate-layout-provenance.json'));
+  assert.equal(provenance.synthetic,true);assert.equal(provenance.productionCapture,false);assert.equal(provenance.edited,false);
+  const active = read('help-data.js') + read('directorio.html');
+  for (const file of provenance.files) {
+    assert.ok(active.includes(file.file.replace('screenshots/','')) || active.includes(file.file));
+    assert.equal(createHash('sha256').update(readFileSync(new URL(file.file,root))).digest('hex'),file.sha256);
+  }
+});
+test('fleet GPS explains a stale capture and does not promise a server capture time', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'transporte-cargas-simultaneas'));
+  assert.match(text, /SITREP confirmó una ubicación anterior/);
+  assert.match(text, /no se envía en ese intento/);
+  assert.match(text, /servidor aún registra la hora de recepción, no la de captura/);
+});
+test('addenda distinguish local drafts from an uncertain or confirmed submission', () => {
+  const guide = guides.find((g: any) => g.id === 'adendas-hallazgos-partes');
+  const step = guide.steps.find((s: any) => s.title === 'Guardar y recuperar la adenda');
+  const text = JSON.stringify(step);
+  assert.match(text, /Comprobar envío/);
+  assert.match(text, /misma referencia y el contenido original/);
+  assert.match(text, /no despacha una solicitud nueva/);
+  assert.match(text, /sólo una pestaña con esta versión puede editar/);
+  assert.match(text, /no se sincroniza entre dispositivos/);
+  assert.doesNotMatch(text, /Dura siete días/);
+});
+test('eventual records without a site require full company authorization', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'eventuales-aprobaciones-avisos'));
+  assert.match(text, /eventuales no identifican una sede/);
+  assert.match(text, /autorización limitada a una sede no alcanza/);
+  assert.match(text, /actividades propias aprobadas y representaciones con acceso a todos los establecimientos/);
+  assert.match(text, /Si una autorización se revoca, el aviso deja de mostrar el registro/);
+  assert.match(text, /avisos anteriores pueden no incluir representaciones/i);
+  assert.match(text, /borrador se guarda en este dispositivo para la cuenta, actividad y contexto actuales/);
+  assert.match(text, /sólo una pestaña con esta versión puede editar este borrador/);
+  assert.match(text, /Si hay un envío sin confirmar, no lo repitas en otro navegador/);
+  assert.match(text, /cerrá la primera y elegí Volver a comprobar antes de editar o comprobar una acción/);
+  assert.match(text, /Comprobar envío: se reutilizan la referencia y los datos originales/);
+  assert.match(text, /nota y la diferencia que estás preparando se guardan en este navegador/);
+  assert.match(text, /Comprobar acción con la misma referencia/);
+  assert.match(text, /borrar los datos del navegador o de la app también elimina esa copia local/);
+  assert.match(text, /sólo ves los eventuales en los que participa esa actividad/);
+  assert.match(text, /un reintento usa la actividad original/);
+});
+test('an authenticated link opens the requested task without covering it with the welcome', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'bienvenida-preferencia-ayuda'));
+  assert.match(text, /primero se abre la tarea sin cubrirla con la bienvenida/);
+  assert.match(text, /repasar la introducción desde Ayuda/);
+});
+test('repeated receipt guidance distinguishes the specific application from an actor profile', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'correos-decisiones-documentos'));
+  assert.match(text, /se abre esa solicitud y se señala el documento indicado, incluso si tu cuenta tiene varias actividades/);
+  assert.match(text, /El archivo no se descarga automáticamente/);
+  assert.match(text, /avisos anteriores sin referencia al documento abren la solicitud/i);
+  assert.match(text, /el aviso identifica la actividad; si usás otra, confirmá el cambio de actividad/);
+  assert.match(text, /un aviso antiguo sin datos suficientes conserva el mensaje/i);
+});
+test('inspection guidance distinguishes the saved act and its continued fields', () => {
+  const text = JSON.stringify(guides);
+  assert.match(text, /Otras descargas elegí Acta de inspección/i);
+  assert.match(text, /versión guardada en el servidor/i);
+  assert.match(text, /Los campos extensos continúan en páginas identificadas/i);
+});
+test('inspection guidance explains how to enlarge and close an evidence photograph', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'psip-flujo-inspecciones'));
+  assert.match(text, /En Evidencias, elegí una miniatura para ampliar la fotografía/);
+  assert.match(text, /Cerrala con Cerrar o Escape: volvés a la miniatura sin salir del expediente/);
+  assert.match(text, /deslizá la barra inferior para ver más opciones/);
+});
+test('operational notices identify the target and recheck the representative activity and site', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-avisos'));
+  assert.match(text, /incidente en tránsito avisa a la cuenta del operador/i);
+  assert.match(text, /diferencia de pesaje mayor al 5 % avisa a la cuenta del generador/i);
+  assert.match(text, /vuelve a comprobar la actividad y la sede autorizadas/i);
+  assert.match(text, /no reemplaza el informe de hallazgo ni la adenda/i);
+});
+test('delivery guidance distinguishes the saved inbox from external channels and explains representative access', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
+  assert.match(text, /entrega confirmada deja avisos internos/);
+  assert.match(text, /confirmación queda deshabilitada.*Reintentar guardado en el mismo diálogo/i);
+  assert.match(text, /Reintentar la misma entrega no duplica esos avisos/);
+  assert.match(text, /empresa, actividad y sede autorizadas/);
+  assert.match(text, /aviso interno no confirma que se haya enviado correo o push/i);
+});
+test('current manual explains three in-situ approvals and complete treatment before a final certificate', () => {
+  const proposals = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-tres-partes'));
+  const certificates = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
+  const notices = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-avisos'));
+  const directory = read('directorio.html');
+  assert.match(proposals, /transporte aprobador/);
+  assert.match(proposals, /3 de 3 aprobaciones/);
+  assert.doesNotMatch(proposals, /en origen sin transporte, 2 de 2/);
+  assert.match(certificates, /la certificación final queda bloqueada hasta completar su tratamiento/);
+  assert.match(notices, /En tratamiento en origen, el transporte también aprueba, pero no hay retiro, viaje ni GPS/);
+  assert.match(directory, /En modalidad IN SITU también se elige un transporte aprobador/);
+  assert.doesNotMatch(directory, /Si se elige modalidad IN SITU, el transportista no es requerido/);
+  assert.match(directory, /el cierre del tratamiento no las emite automáticamente/i);
+});
+test('GPS guidance distinguishes device signal from server receipt and scopes the retry action', () => {
+  const start = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-retiro'));
+  const recovery = JSON.stringify(guides.find((g: any) => g.id === 'resolver-gps'));
+  assert.match(start, /la señal del dispositivo por sí sola no confirma/i);
+  assert.match(start, /si la ubicación quedó sin actualizar o su hora no puede verificarse, usá Reintentar GPS/i);
+  assert.match(start, /Última confirmación con la hora de este dispositivo/i);
+  const delivery = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
+  assert.match(delivery, /sólo se adjunta al incidente o la entrega si la lectura del dispositivo sigue siendo reciente al confirmar/i);
+  assert.match(delivery, /podés continuar sin adjuntarla/i);
+  assert.match(delivery, /si no llega la confirmación de un incidente, pausa o reanudación, usá Comprobar envío/i);
+  assert.match(delivery, /la copia no se transfiere a otros dispositivos ni versiones anteriores/i);
+  assert.match(start, /no se garantiza el seguimiento al cerrar la app/i);
+  assert.match(recovery, /En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece/);
+  assert.match(recovery, /desplegá «Cómo habilitar la ubicación»/);
+  assert.match(recovery, /Administración puede consultar la hora de recepción registrada por SITREP en Monitor/);
+  assert.match(recovery, /el punto puede ser anterior si no había conexión/i);
+  assert.match(recovery, /Reintentar envío GPS/);
+  assert.match(recovery, /la ubicación puede haber llegado aunque se haya perdido la respuesta/i);
+  assert.match(recovery, /el sensor sigue funcionando/i);
+  assert.match(recovery, /una entrega puede quedar guardada para enviarse al reconectar con la misma cuenta/i);
+  assert.match(recovery, /no pudo comprobar si existe un relevo, reconectate/i);
+  assert.match(recovery, /ubicaciones anteriores sin titular identificado se conservan para revisión/i);
+  assert.match(recovery, /ubicaciones pendientes de otra cuenta o actividad en este navegador o app/i);
+  assert.match(recovery, /versión anterior sin actividad identificada se conservan para revisión/i);
+  assert.match(recovery, /otra pestaña mantiene abierto el seguimiento individual/i);
+  assert.match(recovery, /copia del último viaje se guarda para la cuenta, actividad y empresa o establecimiento/i);
+  assert.match(recovery, /si SITREP deniega el acceso, no se muestra la copia guardada/i);
+  assert.match(recovery, /conserva el envío en este dispositivo hasta recibir una confirmación verificable/i);
+  assert.match(recovery, /al reabrir, usá la misma cuenta y actividad/i);
+  assert.match(recovery, /no confirmes una segunda entrega desde otro dispositivo/i);
+  assert.match(recovery, /se intenta guardar la última lectura no enviada/i);
+  assert.match(recovery, /falla la escritura y queda una ubicación sólo en memoria/i);
+  assert.match(recovery, /volvé al mismo viaje, resolvé el almacenamiento y usá Reintentar guardado/i);
+  assert.match(recovery, /un cierre forzado o ignorar el aviso puede perder esa ubicación/i);
+  assert.match(recovery, /no comprueba otros dispositivos ni perfiles de navegador/i);
+  assert.match(recovery, /otra ventana está sincronizando esa misma cuenta/i);
+  assert.match(recovery, /si la espera supera diez segundos/i);
+  assert.match(recovery, /misma cuenta, actividad y establecimiento/i);
+  assert.match(recovery, /volvé al contexto en que la guardaste/i);
+  assert.match(recovery, /entrega anterior de Transporte ya registró un error de autorización/i);
+  assert.match(recovery, /cambios anteriores que no identifiquen su empresa/i);
+  assert.match(recovery, /no se puede leer la copia local, aparece un error/i);
+  assert.match(recovery, /no puede comprobar desde aquí lo que siga pendiente en otro dispositivo o perfil de navegador/i);
+  assert.match(recovery, /no se puede verificar el viaje o el servidor/i);
+  assert.match(recovery, /no se garantiza conservar todas las lecturas durante la desconexión/i);
+  assert.match(recovery, /una ubicación antigua sin confirmar no se reenvía como actual/i);
+  assert.match(recovery, /el primer envío sin confirmar por carga/i);
+  assert.doesNotMatch(recovery, /los puntos pendientes se sincronizan al volver la conexión/i);
+  const directory = read('directorio.html');
+  assert.match(directory, /la capacidad del entorno de destino todavía no está verificada/i);
+  assert.match(directory, /la certificación del circuito nuevo requiere emisión expresa del operador/i);
+  assert.match(directory, /una ubicación anterior no puede confirmarse, conservá el dispositivo y consultá a soporte/i);
+  assert.doesNotMatch(directory, /hasta 5 puntos|máximo 5 puntos|maximo 5 puntos|gps_pending_\{|50\+ transportistas/i);
+  assert.doesNotMatch(directory, /Generacion automatica del Certificado|Genera Certificado de Disposicion/i);
+  const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));
+  assert.match(monitor, /Monitor y Centro de Control/);
+  assert.match(monitor, /hora de captura no está disponible/i);
+  assert.match(monitor, /retiro no se cuenta como ubicación GPS/i);
+  assert.match(monitor, /datos actuales del generador, que pueden haber cambiado/i);
+  assert.match(monitor, /horas del historial usan la zona de Mendoza/i);
+  assert.match(monitor, /líneas entre puntos no demuestran el trayecto/i);
+  assert.match(monitor, /detalle de viaje es una instantánea del momento en que lo abriste/i);
+  assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
+  assert.match(monitor, /primer intento se guarda en este dispositivo con su referencia, sin guardar el enlace de acceso/i);
+  assert.match(monitor, /se conserva sólo el primer intento pendiente por carga/i);
+  assert.match(monitor, /si se renovó la autorización, abrí el enlace vigente/i);
+  assert.match(monitor, /si no llegó y aún es reciente/i);
+  assert.match(monitor, /el enlace revocado no funciona/i);
+  assert.match(monitor, /otro dispositivo o perfil no comparte esta copia/i);
+  assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
+  assert.match(monitor, /mensajes anteriores conservan su texto y muestran una aclaración/i);
+  const alerts = JSON.stringify(guides.find((g: any) => g.id === 'administrador-alertas-proactivas'));
+  assert.match(alerts, /cuentas ADMIN activas reciben un aviso en la campana/i);
+  assert.match(alerts, /no se repite el aviso de la misma clase y manifiesto/i);
+  assert.match(alerts, /avisos anteriores faltantes no se reconstruyen automáticamente/i);
+});
+function jpegDimensions(bytes: Buffer): { width: number; height: number } {
+  assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');
+  let index = 2;
+  while (index + 8 < bytes.length) {
+    assert.equal(bytes[index++], 0xff, 'JPEG marker');
+    while (bytes[index] === 0xff) index++;
+    const marker = bytes[index++];
+    if (marker === 0xda || marker === 0xd9) break;
+    if (marker === 0x01 || marker >= 0xd0 && marker <= 0xd7) continue;
+    const size = bytes.readUInt16BE(index);
+    assert.ok(size >= 2 && index + size <= bytes.length, 'JPEG segment');
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      return { height: bytes.readUInt16BE(index + 3), width: bytes.readUInt16BE(index + 5) };
+    }
+    index += size;
+  }
+  throw new Error('JPEG dimensions not found');
+}
+test('PSIP explains the existing follow-up loop for both parties without promising external delivery', () => {
+  const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
+  assert.ok(guide); assert.ok(guide.steps.length >= 7);
+  assert.deepEqual(Array.from(guide.audiences), ['administrador', 'inspector', 'generador', 'transportista', 'operador', 'auditor']);
+  const content = JSON.stringify(guide);
+  for (const text of ['Notificada', 'En descargo', 'Requiere subsanación', 'Cerrada conforme', 'los correos se simulan', 'push sigue apagado', 'fuera de plazo', 'responsable', 'CAP sigue cerrado']) assert.ok(content.includes(text), text);
+  assert.match(content, /genera un aviso en la campana/);
+  assert.match(content, /Leer el aviso no responde ni aprueba/);
+  assert.ok(guide.steps.filter((step: any) => step.image).length >= 3);
+});
+test('PSIP explains inspection-opening recovery and its local scope', () => {
+  const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
+  const step = guide.steps.find((item: any) => item.title === 'Administración: organizar la agenda');
+  const content = JSON.stringify(step);
+  for (const text of ['Continuar apertura', 'Comprobar envío', 'referencia originales', 'no se envía automáticamente', 'Borrar los datos del navegador', 'otra pestaña', 'consulta falla']) assert.ok(content.includes(text), text);
+});
+test('PSIP screenshots are original synthetic preview captures from successful browser tests', () => {
+  const proof = JSON.parse(read('psip-capture-provenance.json'));
+  assert.equal(proof.synthetic, true); assert.equal(proof.productionCapture, false); assert.equal(proof.edited, false);
+  assert.equal(proof.files.length, 3); assert.equal(proof.browserTestsPassed, 18);
+  const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
+  for (const item of proof.files) {
+    const bytes = readFileSync(new URL('screenshots/' + item.file, root));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), item.sha256);
+    assert.equal(bytes.readUInt32BE(16), item.width); assert.equal(bytes.readUInt32BE(20), item.height);
+    const step = guide.steps.find((value: any) => value.image === 'screenshots/' + item.file);
+    assert.ok(step); assert.match(step.caption, /Datos sintéticos/);
+  }
+});
+test('simultaneous loads and device notices have unedited synthetic captures and distinct delivery semantics',()=>{
+  const proof=JSON.parse(read('fleet-gps-capture-provenance.json'));
+  assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.browserTestsPassed,2);
+  const loads=guides.find((g:any)=>g.id==='transporte-cargas-simultaneas'),notices=guides.find((g:any)=>g.id==='manifiestos-avisos');
+  assert.equal(loads.steps.filter((s:any)=>s.image).length,2);
+  assert.ok(notices.steps.some((s:any)=>s.image==='screenshots/mobile/device-notifications-20261019.png'));
+  assert.match(JSON.stringify(loads),/las cargas ya elegidas/);assert.match(JSON.stringify(loads),/otras cargas siguen viajando/);
+  assert.match(JSON.stringify(notices),/un aviso guardado no acredita una entrega externa/);
+  for(const item of proof.files){const bytes=readFileSync(new URL('screenshots/'+item.file,root));assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);assert.equal(bytes.readUInt32BE(16),item.width);assert.equal(bytes.readUInt32BE(20),item.height);}
+});
+test('handoff guide uses original synthetic captures and distinguishes delegated GPS from user access',()=>{
+  const proof=JSON.parse(read('transport-handoff-capture-provenance.json'));
+  assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.gpsEmulated,true);
+  const guide=guides.find((g:any)=>g.id==='transporte-relevo');assert.ok(guide);
+  assert.equal(guide.steps.filter((s:any)=>s.image).length,3);
+  assert.match(JSON.stringify(guide),/transportista del manifiesto original/);assert.match(JSON.stringify(guide),/No necesita una cuenta/);
+  for(const item of proof.files){const bytes=readFileSync(new URL('screenshots/'+item.file,root));assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);assert.equal(bytes.readUInt32BE(16),item.width);assert.equal(bytes.readUInt32BE(20),item.height);}
+});
 
 test('new operational guides include relevant reusable captures, not text-only walkthroughs', () => {
   const minimums: Record<string, number> = {
@@ -22,6 +355,8 @@ test('new operational guides include relevant reusable captures, not text-only w
     assert.ok(guide.steps.filter((s: any) => s.image && s.alt).length >= minimum, id);
   }
   const provenance = JSON.parse(read('training-capture-provenance.json'));
+  const replacement = JSON.parse(read('actor-onboarding-capture-provenance.json'));
+  const requirementReplacement = JSON.parse(read('psip-actor-capture-provenance.json'));
   assert.equal(provenance.synthetic, true);
   assert.equal(provenance.productionCapture, false);
   assert.equal(provenance.edited, false);
@@ -32,7 +367,13 @@ test('new operational guides include relevant reusable captures, not text-only w
     assert.equal(bytes.readUInt32BE(16), item.width);
     assert.equal(bytes.readUInt32BE(20), item.height);
     const steps = guides.flatMap((g: any) => g.steps).filter((s: any) => s.image === 'screenshots/' + item.file);
-    assert.ok(steps.length, item.file + ' must be used');
+    const owner = replacement.supersedes.some((entry: any) => entry.file === item.file) ? replacement : requirementReplacement;
+    const superseded = owner.supersedes.find((entry: any) => entry.file === item.file);
+    if (superseded) {
+      assert.equal(steps.length, 0, 'A superseded capture stays archived, without illustrating the current flow');
+      assert.ok(owner.files.some((entry: any) => entry.file === superseded.replacement));
+      assert.ok(guides.find((g: any) => g.id === superseded.guide).steps.some((s: any) => s.image === 'screenshots/' + superseded.replacement));
+    } else assert.ok(steps.length, item.file + ' must be used');
     for (const step of steps) assert.match(step.caption, /Datos sintéticos/);
   }
 });
@@ -42,7 +383,64 @@ test('actor inspection guide does not grant access to general inspections or aut
   assert.deepEqual(Array.from(guide.audiences), ['generador', 'transportista', 'operador']);
   assert.match(JSON.stringify(guide), /No ve los borradores/);
   assert.match(JSON.stringify(guide), /no aprueba ni cierra/);
+  assert.match(JSON.stringify(guide), /autorización vigente para toda la actividad/);
+  assert.match(JSON.stringify(guide), /Una autorización limitada a una sede no habilita este acceso/);
+  assert.match(JSON.stringify(guide), /Si se revoca la autorización, el contenido deja de estar disponible/);
+  assert.match(JSON.stringify(guide), /la autoridad habilitó una regla de requerimientos vencidos/);
+  assert.match(JSON.stringify(guide), /ese aviso de representación indica que debe consultarse el estado actual/);
+  assert.match(JSON.stringify(guide), /el titular y la autoridad autorizada ven el expediente y si ya se registró una respuesta/);
   assert.match(JSON.stringify(guide), /no habilita nuevas respuestas/);
+  assert.match(JSON.stringify(guide), /no al módulo general de Inspecciones/);
+  const proof = JSON.parse(read('psip-actor-capture-provenance.json'));
+  assert.equal(proof.synthetic, true); assert.equal(proof.productionCapture, false);
+  assert.equal(proof.edited, false); assert.equal(proof.physicalAndroid, false);
+  assert.equal(proof.files.length, 3);
+  for (const [index, file] of proof.files.entries()) {
+    const bytes = readFileSync(new URL('screenshots/' + file.file, root));
+    assert.equal(file.mime, 'image/jpeg'); assert.match(file.file, /\.jpg$/);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
+    assert.deepEqual(jpegDimensions(bytes), { width: file.width, height: file.height });
+    assert.equal(guide.steps[index].image, 'screenshots/' + file.file);
+    assert.match(guide.steps[index].caption, /artificial/);
+    assert.match(guide.steps[index].caption, /Android físico pendiente/);
+  }
+});
+
+test('audit guidance separates certificate configuration from issuance and preserves the recorded wording', () => {
+  const guide = guides.find((g: any) => g.id === 'auditor-consultar-actividad');
+  const text = JSON.stringify(guide);
+  for (const phrase of ['Gestión de certificados configurada', 'no que se emitió un documento',
+    'Texto original registrado', 'columna Aclaración', 'búsqueda de texto se limita a la página visible',
+    'CSV descarga sólo los registros visibles de la página actual']) assert.ok(text.includes(phrase), phrase);
+});
+
+test('certificate and addendum guides explain the approved rectification without erasing the observation', () => {
+  const cert = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
+  const adenda = JSON.stringify(guides.find((g: any) => g.id === 'adendas-hallazgos-partes'));
+  assert.ok(cert.includes('Una rectificación aprobada resuelve la observación'));
+  assert.ok(cert.includes('Otras adendas pendientes o rechazadas siguen requiriendo resolución'));
+  assert.ok(adenda.includes('la observación anterior deja de bloquear la certificación final'));
+  assert.ok(adenda.includes('queda como antecedente observado'));
+});
+test('certificate guide distinguishes an approved finding from an explicitly treated quantity', () => {
+  const cert = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
+  assert.ok(cert.includes('sólo si efectivamente la trataste'));
+  assert.ok(cert.includes('completá el tratamiento e indicá el total efectivamente tratado'));
+  assert.ok(cert.includes('la certificación final queda bloqueada hasta completar su tratamiento'));
+  assert.ok(cert.includes('Revisar corrientes halladas junto al botón de publicación'));
+  assert.ok(cert.includes('Si una cantidad hallada no es válida'));
+  assert.ok(cert.includes('La firma registra tu decisión'));
+});
+test('alert directory describes configured thresholds without inventing fixed deadlines or route tracking', () => {
+  const directory = read('directorio.html');
+  const section = directory.match(/<h3 id="proc-alertas">[\s\S]*?<\/section>/)?.[0];
+  assert.ok(section);
+  assert.match(section, /umbral operativo decidido por Ambiente/);
+  assert.match(section, /No hay un plazo fijo obligatorio/);
+  assert.match(section, /Simular sin enviar/);
+  assert.match(section, /no compara actualmente una ruta autorizada/);
+  assert.doesNotMatch(section, /Tiempo transcurrido mayor a 8 horas|estado por mas de 48 horas|GPS update|Temporizador semanal/);
+  assert.doesNotMatch(directory, /viajes que excedan el tiempo estimado, y manifiestos estancados/);
 });
 
 test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {
@@ -67,10 +465,20 @@ test('OCR evidence is an unedited real trial with synthetic data, not approval o
   const bytes = readFileSync(new URL('screenshots/' + p.file, root));
   assert.equal(createHash('sha256').update(bytes).digest('hex'), p.sha256);
   assert.equal(bytes.readUInt32BE(16), p.width); assert.equal(bytes.readUInt32BE(20), p.height);
-  const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps[1];
-  assert.equal(step.image, 'screenshots/' + p.file);
-  assert.match(step.caption, /Datos sintéticos/); assert.match(step.caption, /no aprueba/);
-  assert.match(step.alt, /seleccionables/);
+  // The 2026-10-12 licence image is retained as historical evidence; the
+  // current guide illustrates the separately verified synthetic bill instead.
+  const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps.find((s: any) => s.title === 'Cargar documentos y revisar OCR');
+  assert.ok(step);
+  assert.match(step.caption, /Factura artificial/);
+  assert.match(step.alt, /Factura eléctrica/);
+  const current = JSON.parse(read('electricity-capture-provenance.json'));
+  assert.equal(current.synthetic, true); assert.equal(current.productionCapture, false);
+  assert.equal(current.edited, false); assert.equal(current.physicalAndroid, false);
+  const currentBytes = readFileSync(new URL('screenshots/' + current.file, root));
+  assert.equal(current.mime, 'image/jpeg'); assert.match(current.file, /\.jpg$/);
+  assert.equal(createHash('sha256').update(currentBytes).digest('hex'), current.sha256);
+  assert.deepEqual(jpegDimensions(currentBytes), { width: current.width, height: current.height });
+  assert.equal(step.image, 'screenshots/' + current.file);
 });
 
 test('guides have unique identities, useful steps and existing evidence', () => {
@@ -78,11 +486,45 @@ test('guides have unique identities, useful steps and existing evidence', () => 
   for (const guide of guides) {
     assert.ok(profiles.some((p: any) => p.id === guide.profile));
     for (const audience of guide.audiences || []) assert.ok(profiles.some((p: any) => p.id === audience));
-    assert.ok(guide.steps.length >= 3, guide.id);
+    if (guide.id === 'documentos-identidad-integridad') assert.ok(guide.steps.length >= 2, guide.id);
+    else assert.ok(guide.steps.length >= 3, guide.id);
     for (const step of guide.steps) {
       assert.ok(step.title && step.expected && step.body.length, guide.id);
       if (step.image) assert.ok(existsSync(fileURLToPath(new URL(step.image, root))), step.image);
     }
+  }
+});
+
+test('images displayed in the manual use an extension matching their file contents', () => {
+  const sources = new Set<string>();
+  for (const guide of guides) for (const step of guide.steps) if (step.image) sources.add(step.image);
+  for (const match of read('directorio.html').matchAll(/<img\s+src="(screenshots\/[^"]+)"/g)) sources.add(match[1]);
+  for (const source of sources) {
+    const bytes = readFileSync(new URL(source, root));
+    if (bytes.readUInt16BE(0) === 0xffd8) assert.match(source, /\.jpe?g$/i, source + ' contains JPEG');
+    else if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) assert.match(source, /\.png$/i, source + ' contains PNG');
+    else if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') assert.match(source, /\.webp$/i, source + ' contains WebP');
+    else assert.fail(source + ' is not a recognized manual image');
+  }
+});
+
+test('MIME aliases preserve the original evidence bytes and replace active references', () => {
+  const aliases = JSON.parse(read('image-mime-aliases-20261027.json'));
+  assert.equal(aliases.syntheticCapturesUnchanged, true);
+  assert.ok(aliases.files.length > 0);
+  assert.equal(new Set(aliases.files.map((file: any) => file.previous)).size, aliases.files.length);
+  const active = read('help-data.js') + read('directorio.html');
+  // Keep historical bytes verified even when a newer product capture replaces one.
+  const superseded = new Set(['screenshots/mobile/certificate-recovery-20261026.jpg']);
+  for (const file of aliases.files) {
+    const old = readFileSync(new URL(file.previous, root));
+    const current = readFileSync(new URL(file.current, root));
+    assert.match(file.previous, /\.png$/); assert.match(file.current, /\.jpg$/);
+    assert.equal(current.readUInt16BE(0), 0xffd8);
+    assert.ok(old.equals(current), file.previous);
+    assert.equal(createHash('sha256').update(current).digest('hex'), file.sha256);
+    assert.ok(active.includes(file.current.replace(/^screenshots\//, '')) || superseded.has(file.current), file.current);
+    assert.ok(!active.includes(file.previous.replace(/^screenshots\//, '')), file.previous);
   }
 });
 
@@ -125,35 +567,26 @@ test('training does not present another server dataset or destructive resets as 
   assert.doesNotMatch(html, /<td>Texto libre<\/td>/);
 });
 
-test('classroom records keep five teams and distinct actor/authority views', () => {
+test('training requires an isolated environment and three independent approvals', () => {
   const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
   assert.equal(workshop.steps.length, 6);
-  assert.match(workshop.steps[0].body.join(' '), /enlaces no inician sesión ni cambian el rol/);
-  assert.match(workshop.steps[0].body.join(' '), /Equipo 5: reserva/);
-  assert.match(workshop.steps[2].body.join(' '), /número conserva/);
-  for (const index of [2, 3, 4]) {
-    assert.equal(workshop.steps[index].teams.length, 5);
-    for (const [i, team] of workshop.steps[index].teams.entries()) {
-      const n = i + 1;
-      assert.equal(team.label, 'Equipo ' + n);
-      for (const r of team.records) assert.match(r.path, new RegExp('cap-20261012-(?:manifiesto-' + n + '-|inspeccion-' + n + '-|participacion-' + n + '-|ticket-(?:generador|transportista|operador)-' + n + '$)'));
-      if (index === 2) assert.deepEqual(Array.from(team.records, (r: any) => r.path), ['BORRADOR', 'APROBADO', 'TRATADO'].map(s => '/manifiestos/cap-20261012-manifiesto-' + n + '-' + s));
-      if (index === 3) {
-        assert.equal(team.records[0].path, '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR');
-        for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
-          const id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
-          assert.ok(team.records.some((r: any) => r.path === '/mis-inspecciones/' + id));
-          assert.ok(team.records.some((r: any) => r.path === '/inspecciones/' + id));
-        }
-      }
-    }
-  }
+  assert.match(workshop.safety, /CAP puede estar cerrado/);
+  assert.match(workshop.steps[0].body.join(' '), /entorno aislado/);
+  assert.match(workshop.steps[0].body.join(' '), /no es por sí solo un enlace para otros dispositivos/);
+  const flow = workshop.steps[2].body.join(' ');
+  assert.match(flow, /Crear o firmar no aprueba por las demás partes/);
+  assert.match(flow, /Comprobá las tres decisiones.*antes de iniciar la coordinación/);
+  assert.match(flow, /En origen también se elige un transportista aprobador/);
+  assert.doesNotMatch(flow, /firmá\. Verificá APROBADO|CAP-N-BORRADOR/);
+  assert.ok(workshop.steps.every((step: any) => !step.teams?.length));
+  assert.doesNotMatch(JSON.stringify(workshop), /cap-20261012-(?:manifiesto|participacion|ticket)-/);
 });
 
 test('all classroom links remain on the current/future domain; trial stays trial', () => {
   const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
   const resources = workshop.steps.flatMap((s: any) => [...(s.resources || []), ...(s.teams || []).flatMap((t: any) => t.records)]);
-  assert.equal(resources.length, 73);
+  assert.ok(resources.length > 0);
+  assert.equal(resources.filter((r: any) => r.href === '/manual/tutorial.html?guide=capacitacion-cuatro-telefonos').length, 1);
   for (const r of resources) {
     const href = r.path || r.href;
     assert.match(href, /^\/(?!\/)[a-zA-Z0-9/?=&._-]+$/);
@@ -166,4 +599,164 @@ test('all classroom links remain on the current/future domain; trial stays trial
   const fixture = resources.find((r: any) => r.download);
   assert.equal(fixture.href, '/manual/fixtures/licencia-capacitacion.png');
   assert.ok(existsSync(fileURLToPath(new URL('fixtures/licencia-capacitacion.png', root))));
+});
+
+
+test('classroom new features explain incomplete identities, registered fleet and preserved declarations', () => {
+  const guide = guides.find((g: any) => g.id === 'capacitacion-novedades');
+  assert.equal(guide.steps.length, 4);
+  assert.match(guide.safety, /CAP puede estar cerrado/);
+  assert.match(guide.safety, /no supongas.*otro entorno/);
+  assert.match(JSON.stringify(guide), /no inventes datos/i);
+  assert.match(JSON.stringify(guide), /otra.*conserva el antecedente/);
+  assert.match(JSON.stringify(guide), /no se aprueba a sí mismo/);
+  assert.match(JSON.stringify(guide), /no se reemplazan|elegilas otra vez/);
+  assert.equal(guide.steps[0].resources.length, 0);
+  assert.match(read('index.html'), /guide=capacitacion-novedades/);
+});
+
+
+test('four phones retain their roles and follow one new case through GPS and closure', () => {
+  const guide = guides.find((g: any) => g.id === 'capacitacion-cuatro-telefonos');
+  assert.equal(guide.steps.length, 7);
+  assert.match(guide.safety, /CAP puede estar cerrado/);
+  assert.match(guide.safety, /No se necesita la cuenta administradora personal/);
+  assert.match(guide.steps[0].body.join(' '), /perfiles de navegador independientes/);
+  assert.match(guide.steps[0].body.join(' '), /no certifica GPS físico/);
+  assert.match(guide.steps[2].body.join(' '), /Última confirmación/);
+  assert.match(guide.steps[2].body.join(' '), /reloj del teléfono/);
+  assert.match(guide.steps[3].body.join(' '), /Hoy → Viajes Activos/);
+  assert.match(guide.steps[5].body.join(' '), /luego cierra el manifiesto\. Recién después comprueben el estado Tratado/);
+  assert.doesNotMatch(guide.steps[0].body.join(' '), /admin@capacitacion\.invalid/);
+  assert.match(read('index.html'), /guide=capacitacion-cuatro-telefonos/);
+});
+
+
+test('classroom new proposals separate authorship, three decisions, agenda and signed releases', () => {
+  const guide=guides.find((g:any)=>g.id==='capacitacion-cuatro-telefonos');
+  const text=JSON.stringify(guide);
+  assert.match(text,/Puede iniciar Generador, Transporte u Operador/);
+  assert.match(text,/Sólo con las tres aprobaciones/);
+  assert.match(text,/Manifiestos pendientes/);
+  assert.match(text,/Por aprobar, En espera o En curso/);
+  assert.match(text,/Iniciar coordinación/);
+  assert.match(text,/correo y push apagados/);
+  assert.match(text,/Tratado no libera automáticamente/);
+  assert.match(text,/las adendas resueltas/);
+  assert.match(text,/no tienen validez oficial/);
+});
+
+test('signature reminders explain authorized representatives and the two phases', () => {
+  const guide = guides.find((g: any) => g.id === 'avisos-enlaces-plazos');
+  const step = guide.steps.find((s: any) => s.title === 'Leer los plazos y el seguimiento');
+  const text = step.body.join(' ');
+  assert.match(text, /23 días/); assert.match(text, /30/); assert.match(text, /representantes autorizados/);
+  assert.match(text, /cuando la representación de empresas esté habilitada/);
+  assert.match(text, /empresa, actividad y sede/); assert.match(text, /una sola vez por persona/);
+  assert.match(text, /no una declaración automática de infracción/);
+});
+
+test('operation reminders distinguish the planned date from pickup and origin treatment', () => {
+  const guide = guides.find((g: any) => g.id === 'avisos-enlaces-plazos');
+  const step = guide.steps.find((s: any) => s.title === 'Leer los plazos y el seguimiento');
+  const text = step.body.join(' ');
+  assert.match(text, /fecha próxima/); assert.match(text, /no hay retiro, traslado ni GPS/);
+  assert.match(text, /no aprueba la propuesta ni inicia el viaje/);
+  assert.match(text, /recordatorios anteriores conservan su texto original/);
+});
+
+test('notice links explain verified personal activities and preserve historical addendum targets', () => {
+  const guide = guides.find((g: any) => g.id === 'avisos-enlaces-plazos');
+  const text = guide.steps.find((s: any) => s.title === 'Elegir app o web').body.join(' ');
+  assert.match(text, /varias actividades/);
+  assert.match(text, /comprueba los permisos antes de cambiar/);
+  assert.match(text, /enlace anterior/);
+  assert.match(text, /sin perder la adenda solicitada/);
+});
+
+test('an individual approval notice is an event and the current state is in the manifest', () => {
+  const guide = guides.find((g: any) => g.id === 'manifiestos-tres-partes');
+  const text = guide.steps.find((s: any) => s.title === 'Revisar y decidir desde cada rol').body.join(' ');
+  assert.match(text, /El aviso registra una decisión/);
+  assert.match(text, /abrí el manifiesto para consultar las aprobaciones y el próximo paso actuales/);
+  assert.match(text, /Actualizar aprobaciones y revisá el estado antes de intentar nuevamente/);
+  assert.match(text, /fechas se muestran en hora de Mendoza/);
+  assert.match(text, /acciones simultáneas pueden aparecer fuera de orden/);
+});
+
+test('manual entry points load the current help-data version', () => {
+  const expected = createHash('sha256').update(readFileSync(new URL('help-data.js', root))).digest('hex').slice(0, 12);
+  for (const file of ['index.html', 'search.html', 'tutorial.html']) {
+    assert.ok(read(file).includes(`help-data.js?v=${expected}`), `${file} has a stale help-data version`);
+  }
+});
+
+test('weighing guide explains recovery when waste details cannot be verified', () => {
+  const guide = guides.find((g: any) => g.id === 'operador-recibir-pesar');
+  const text = guide.steps.find((s: any) => s.title === 'Registrar el pesaje').body.join(' ');
+  assert.match(text, /Pesaje por comprobar/);
+  assert.match(text, /actualizá el manifiesto/);
+  assert.match(text, /pesaje, tratamiento y cierre quedan deshabilitados/);
+  assert.match(text, /consultá a Ambiente/);
+});
+
+test('directory describes mail suppression and scheduled operation reminders without promising delivery', () => {
+  const section = read('directorio.html').split('<section id="mod-emails"')[1].split('</section>')[0];
+  assert.match(section, /Los correos suprimidos no se reactivan automáticamente/);
+  assert.match(section, /fecha de activación explícita/);
+  assert.match(section, /aceptación por SMTP, no entrega ni lectura/);
+  assert.match(section, /tres partes activas y representantes autorizados/);
+  assert.match(section, /sin retiro, traslado ni GPS/);
+  assert.doesNotMatch(section, /garantiza que ningun email se pierda|los emails pendientes se procesan en el proximo ciclo/);
+});
+
+test('directory distinguishes a non-persistent liveness probe from database health checks', () => {
+  const directory = read('directorio.html');
+  assert.match(directory, /La sonda de vida no comprueba la base de datos/);
+  assert.match(directory, /no escribe analítica ni contadores persistentes/);
+  assert.match(directory, /health\/ready[^<]*<\/td><td>[^<]*contador persistente/);
+});
+
+test('directory describes shared installed-app shortcuts without risking local drafts', () => {
+  const section = read('directorio.html').split('<section id="pwa-instalacion"')[1].split('</section>')[0];
+  assert.match(section, /Inicio, Escanear QR y Avisos/);
+  assert.match(section, /dependen del dispositivo y del navegador/);
+  assert.match(section, /no borres datos ni desinstales para forzar el cambio/i);
+  assert.match(section, /borradores locales/);
+});
+
+test('directory distinguishes the inbox from optional device notifications', () => {
+  const section = read('directorio.html').split('CU-S09: Enviar Notificaciones Push')[1].split('CU-S10:')[0];
+  assert.match(section, /campana y la bandeja de Avisos/);
+  assert.match(section, /dependen de la habilitación del sistema y del permiso del dispositivo/);
+  assert.match(section, /preview están apagadas/);
+  assert.match(section, /si no se abre o falta conexión/i);
+  assert.doesNotMatch(section, /Web Push API esta planificada para la proxima version|alertas criticas en tiempo real/);
+});
+
+test('directory describes party and representative notices without a stale single-recipient table', () => {
+  const section = read('directorio.html').split('CU-S02: Enviar Notificaciones Automaticas')[1].split('CU-S03:')[0];
+  assert.match(section, /partes vinculadas y sus representantes autorizados/);
+  assert.match(section, /una lectura no reemplaza la aprobación/);
+  assert.match(section, /otras partes y representantes autorizados/);
+  assert.match(section, /consultá el estado actual/);
+  assert.doesNotMatch(section, /<td>Aprobacion<\/td><td>Transportista asignado<\/td>/);
+});
+
+test('manual distinguishes newly labelled artificial documents from signed historical certificates', () => {
+  for (const file of ['directorio.html', 'help-data.js']) {
+    const content = read(file);
+    assert.match(content, /DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL/);
+    assert.match(content, /cada página/);
+    assert.match(content, /Una banda visual por sí sola no convierte un registro real en una práctica/);
+    assert.match(content, /certifica(?:ciones|dos) guardad(?:as|os) anteriormente|certificaciones guardadas antes de este cambio/i);
+  }
+});
+
+test('explains that a prior approval can be rejected only while the proposal remains pending', () => {
+  const guide = guides.find((item: any) => item.id === 'manifiestos-tres-partes');
+  const text = JSON.stringify(guide);
+  assert.match(text, /Aunque ya hayas aprobado, podés rechazar mientras la propuesta siga pendiente/);
+  assert.match(text, /ambas decisiones quedan en el historial/);
+  assert.match(read('directorio.html'), /Mientras la propuesta siga pendiente, una parte que ya aprobó puede rechazar con motivo/);
 });

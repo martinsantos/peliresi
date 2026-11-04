@@ -30,8 +30,16 @@ export interface ActionButtonsProps {
   isAdmin: boolean;
   userRol: string;
   isActionPending: boolean;
+  deliveryUnavailable?: boolean;
+  incidentUnavailable?: boolean;
   isInSitu?: boolean;
   training?: boolean;
+  operatorCertificates?: boolean;
+  immutableProposal?: boolean;
+  pickupBlocked?: boolean;
+  legacyDraftBlocked?: boolean;
+  pesajePendiente?: boolean;
+  pesajeUnavailable?: boolean;
   isCancelling: boolean;
   mutations: {
     firmar: MutationState;
@@ -63,8 +71,16 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   isAdmin,
   userRol,
   isActionPending,
+  deliveryUnavailable,
+  incidentUnavailable,
   isInSitu,
   training,
+  operatorCertificates,
+  immutableProposal,
+  pickupBlocked,
+  legacyDraftBlocked,
+  pesajePendiente = true,
+  pesajeUnavailable = false,
   isCancelling,
   mutations,
   onOpenFirmaModal,
@@ -85,7 +101,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {/* State-based action buttons with role guards */}
-      {estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
+      {estado === EstadoManifiesto.BORRADOR && !legacyDraftBlocked && (isAdmin || userRol === 'GENERADOR') && (
         <Button
           fullWidth
           leftIcon={mutations.firmar.isPending ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
@@ -102,22 +118,22 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           fullWidth
           leftIcon={mutations.confirmarRetiro.isPending ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
           onClick={onConfirmarRetiro}
-          disabled={isActionPending}
+          disabled={isActionPending || pickupBlocked}
         >
           Confirmar Retiro
         </Button>
       )}
 
-      {/* Confirmar Recepcion In Situ — APROBADO + no transportista */}
+      {/* Confirmar recepción en origen, sin viaje físico. */}
       {isInSitu && estado === EstadoManifiesto.APROBADO && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
           leftIcon={mutations.confirmarRecepcionInSitu.isPending ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
           onClick={onConfirmarRecepcionInSitu}
-          disabled={isActionPending}
-          className="!bg-emerald-600 hover:!bg-emerald-700"
+          disabled={isActionPending || pickupBlocked}
+          className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900"
         >
-          Confirmar Recepcion In Situ
+          Confirmar recepción en origen
         </Button>
       )}
 
@@ -127,7 +143,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           fullWidth
           leftIcon={mutations.confirmarEntrega.isPending ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
           onClick={onConfirmarEntrega}
-          disabled={isActionPending}
+          disabled={isActionPending || deliveryUnavailable}
         >
           Confirmar Entrega
         </Button>
@@ -140,7 +156,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           variant="outline"
           leftIcon={mutations.registrarIncidente.isPending ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} />}
           onClick={onOpenIncidenteModal}
-          disabled={isActionPending}
+          disabled={isActionPending || incidentUnavailable}
         >
           Registrar Incidente
         </Button>
@@ -153,7 +169,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           onClick={onConfirmarRecepcion}
           disabled={isActionPending}
         >
-          Confirmar Recepcion
+          Confirmar recepción
         </Button>
       )}
 
@@ -173,9 +189,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {estado === EstadoManifiesto.RECIBIDO && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
+          variant={pesajePendiente ? 'primary' : 'outline'}
           leftIcon={<Scale size={16} />}
           onClick={onOpenPesajeModal}
-          disabled={isActionPending}
+          disabled={isActionPending || pesajeUnavailable}
         >
           Registrar Pesaje
         </Button>
@@ -184,9 +201,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {estado === EstadoManifiesto.RECIBIDO && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
+          variant={pesajePendiente ? 'outline' : 'primary'}
           leftIcon={<Beaker size={16} />}
           onClick={onOpenTratamientoModal}
-          disabled={isActionPending}
+          disabled={isActionPending || pesajeUnavailable}
         >
           Registrar Tratamiento
         </Button>
@@ -195,26 +213,26 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {(estado === EstadoManifiesto.EN_TRATAMIENTO || estado === EstadoManifiesto.RECIBIDO) && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
+          variant={estado === EstadoManifiesto.EN_TRATAMIENTO ? 'primary' : 'outline'}
           leftIcon={mutations.cerrar.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
           onClick={onCerrar}
-          disabled={isActionPending}
-          className="!bg-success-600 hover:!bg-success-700"
+          disabled={isActionPending || pesajeUnavailable}
         >
           Cerrar Manifiesto
         </Button>
       )}
 
-      <Button variant="outline" fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Download size={16} />} onClick={onDescargarPDF}>
+      {!training && <Button variant="outline" fullWidth leftIcon={<Download size={16} />} onClick={onDescargarPDF}>
         Descargar PDF
-      </Button>
+      </Button>}
 
-      {estado === EstadoManifiesto.TRATADO && (
-        <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="!bg-success-600 hover:!bg-success-700">
+      {!training && !operatorCertificates && estado === EstadoManifiesto.TRATADO && (
+        <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900">
           Descargar Certificado
         </Button>
       )}
 
-      {training && <p id="training-document-limit" className="col-span-full text-sm text-neutral-600">Capacitación: no se emiten documentos oficiales.</p>}
+      {training && <p id="training-document-limit" className="col-span-full text-sm text-neutral-600">Las certificaciones se emiten y descargan más abajo, en Certificaciones.</p>}
 
       {estado !== EstadoManifiesto.CANCELADO && estado !== EstadoManifiesto.TRATADO && (isAdmin || userRol === 'GENERADOR') && (
         <Button variant="outline" fullWidth leftIcon={<XCircle size={16} />} onClick={onOpenCancelModal} disabled={isActionPending || isCancelling} className="!text-error-800 !border-error-300 hover:!bg-error-50">
@@ -222,7 +240,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Button>
       )}
 
-      {isAdmin && estado !== EstadoManifiesto.BORRADOR && (
+      {isAdmin && !immutableProposal && estado !== EstadoManifiesto.BORRADOR && (
         <Button
           variant="outline"
           fullWidth

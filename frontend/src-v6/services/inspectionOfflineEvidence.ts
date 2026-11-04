@@ -15,6 +15,7 @@ export interface PendingInspectionEvidence {
   id: string;
   inspectionId: string;
   userId: string;
+  owner?: string; // Legacy copies stay preserved, outside automatic recovery.
   file: Blob;
   fileName: string;
   mimeType: string;
@@ -28,6 +29,7 @@ export interface PendingInspectionEvidence {
   failureKind?: 'retryable' | 'terminal';
   nextRetryAt?: string;
   uploaded?: boolean;
+  recoveredManually?: boolean;
 }
 
 const STORE = 'inspection_evidence_queue' as const;
@@ -95,16 +97,18 @@ async function sha256(file: Blob): Promise<string> {
 async function buildPendingInspectionEvidence(
   inspectionId: string,
   userId: string,
+  owner: string,
   file: File,
   fields: PendingInspectionEvidenceFields = {},
 ): Promise<PendingInspectionEvidence> {
-  if (!inspectionId || !userId) throw new Error('La captura requiere una inspección y una sesión identificadas.');
+  if (!inspectionId || !userId || !owner) throw new Error('La captura requiere una inspección y una sesión identificadas.');
   const mimeType = await validateInspectionEvidence(file, fields);
   const capturedAt = new Date(file.lastModified || Date.now()).toISOString();
   const pending: PendingInspectionEvidence = {
     id: randomId(),
     inspectionId,
     userId,
+    owner,
     file,
     fileName: file.name,
     mimeType,
@@ -118,17 +122,18 @@ async function buildPendingInspectionEvidence(
   return pending;
 }
 
-export async function queueInspectionEvidence(inspectionId: string, userId: string, file: File, fields: PendingInspectionEvidenceFields = {}): Promise<PendingInspectionEvidence> {
-  const pending = await buildPendingInspectionEvidence(inspectionId, userId, file, fields);
+export async function queueInspectionEvidence(inspectionId: string, userId: string, owner: string, file: File, fields: PendingInspectionEvidenceFields = {}): Promise<PendingInspectionEvidence> {
+  const pending = await buildPendingInspectionEvidence(inspectionId, userId, owner, file, fields);
   try { await saveOffline(STORE, pending); }
   catch { throw new InspectionEvidenceStorageError(); }
   return pending;
 }
 
-export async function listPendingInspectionEvidence(inspectionId: string, userId: string): Promise<PendingInspectionEvidence[]> {
+export async function listPendingInspectionEvidence(inspectionId: string, userId: string, owner: string): Promise<PendingInspectionEvidence[]> {
+  if (!owner) return [];
   const entries = await getAllOffline<PendingInspectionEvidence>(STORE);
   return entries
-    .filter((entry) => entry.inspectionId === inspectionId && entry.userId === userId)
+    .filter((entry) => entry.inspectionId === inspectionId && entry.userId === userId && entry.owner === owner)
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
@@ -153,6 +158,7 @@ export interface InspectionEvidenceSyncResult {
 interface SyncOptions {
   inspectionId: string;
   userId: string;
+  owner: string;
   upload: (entry: PendingInspectionEvidence) => Promise<unknown>;
   manual?: boolean;
   onlyId?: string;
@@ -161,23 +167,25 @@ interface SyncOptions {
 
 /** One bounded pass: failures remain visible while independent captures continue. */
 export function syncPendingInspectionEvidence(options: SyncOptions): Promise<InspectionEvidenceSyncResult> {
-  const key = JSON.stringify([options.userId, options.inspectionId]);
+  const key = JSON.stringify([options.userId, options.owner, options.inspectionId]);
   const running = runningSyncs.get(key);
   if (running) {
     if (!options.onlyId) return running;
     // A capture added after the running pass read its snapshot still needs its own turn.
     return running.then(async (result) => {
-      const stillPending = (await listPendingInspectionEvidence(options.inspectionId, options.userId)).some((entry) => entry.id === options.onlyId);
+      const stillPending = (await listPendingInspectionEvidence(options.inspectionId, options.userId, options.owner)).some((entry) => entry.id === options.onlyId);
       return stillPending ? syncPendingInspectionEvidence(options) : result;
     });
   }
   const changing = pendingChanges.get(key);
   const run = async (): Promise<InspectionEvidenceSyncResult> => {
     const result = { synchronized: 0, failed: 0, skipped: 0 };
-    const entries = await listPendingInspectionEvidence(options.inspectionId, options.userId);
+    const entries = await listPendingInspectionEvidence(options.inspectionId, options.userId, options.owner);
     for (const entry of entries) {
       if (options.isActive?.() === false || !navigator.onLine) break;
       if (options.onlyId && entry.id !== options.onlyId) continue;
+      // Recovery is a local review, not consent to upload or erase a receipt.
+      if (entry.recoveredManually && !options.manual) { result.skipped += 1; continue; }
       if (!entry.uploaded && !options.manual && (entry.failureKind === 'terminal' || entry.attempts >= MAX_AUTO_ATTEMPTS || (entry.nextRetryAt && Date.parse(entry.nextRetryAt) > Date.now()))) {
         result.skipped += 1;
         continue;
@@ -220,21 +228,21 @@ export function syncPendingInspectionEvidence(options: SyncOptions): Promise<Ins
 }
 
 /** Removes only this user's local pending copy; published evidence is never touched. */
-export async function discardPendingInspectionEvidence(inspectionId: string, userId: string, evidenceId: string): Promise<void> {
-  await changePendingEvidence(inspectionId, userId, async () => {
-    const entry = await ownedUnpublishedEvidence(inspectionId, userId, evidenceId);
+export async function discardPendingInspectionEvidence(inspectionId: string, userId: string, owner: string, evidenceId: string): Promise<void> {
+  await changePendingEvidence(inspectionId, userId, owner, async () => {
+    const entry = await ownedUnpublishedEvidence(inspectionId, userId, owner, evidenceId);
     await removePendingInspectionEvidence(entry.id);
   });
 }
 
-async function ownedUnpublishedEvidence(inspectionId: string, userId: string, evidenceId: string): Promise<PendingInspectionEvidence> {
-  const entry = (await listPendingInspectionEvidence(inspectionId, userId)).find((candidate) => candidate.id === evidenceId);
+async function ownedUnpublishedEvidence(inspectionId: string, userId: string, owner: string, evidenceId: string): Promise<PendingInspectionEvidence> {
+  const entry = (await listPendingInspectionEvidence(inspectionId, userId, owner)).find((candidate) => candidate.id === evidenceId);
   if (!entry || entry.uploaded) throw new Error('Esta captura ya cambió. Actualizá la lista antes de continuar.');
   return entry;
 }
 
-function changePendingEvidence<T>(inspectionId: string, userId: string, change: () => Promise<T>): Promise<T> {
-  const key = JSON.stringify([userId, inspectionId]);
+function changePendingEvidence<T>(inspectionId: string, userId: string, owner: string, change: () => Promise<T>): Promise<T> {
+  const key = JSON.stringify([userId, owner, inspectionId]);
   const previous = [runningSyncs.get(key), pendingChanges.get(key)];
   const promise = Promise.all(previous).then(async () => navigator.locks ? await navigator.locks.request(`sitrep-evidence-${key}`, change) : await change()).finally(() => {
     if (pendingChanges.get(key) === promise) pendingChanges.delete(key);
@@ -244,12 +252,12 @@ function changePendingEvidence<T>(inspectionId: string, userId: string, change: 
 }
 
 /** Caller must confirm loss of the original local copy before replacement. */
-export async function replacePendingInspectionEvidence(inspectionId: string, userId: string, evidenceId: string, file: File): Promise<PendingInspectionEvidence> {
-  return changePendingEvidence(inspectionId, userId, async () => {
-    const entry = await ownedUnpublishedEvidence(inspectionId, userId, evidenceId);
+export async function replacePendingInspectionEvidence(inspectionId: string, userId: string, owner: string, evidenceId: string, file: File): Promise<PendingInspectionEvidence> {
+  return changePendingEvidence(inspectionId, userId, owner, async () => {
+    const entry = await ownedUnpublishedEvidence(inspectionId, userId, owner, evidenceId);
     if (entry.failureKind !== 'terminal') throw new Error('Reintentá primero la captura para comprobar si el servidor ya la recibió.');
     // New bytes require a new idempotency key; both local changes commit together.
-    const replacement = await buildPendingInspectionEvidence(inspectionId, userId, file, entry.fields);
+    const replacement = await buildPendingInspectionEvidence(inspectionId, userId, owner, file, entry.fields);
     try { await replaceOffline(STORE, entry.id, replacement); }
     catch { throw new InspectionEvidenceStorageError(); }
     return replacement;

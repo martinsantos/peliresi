@@ -1,3 +1,4 @@
+import { manifestPartyEligibility } from '../domain/manifestPartyEligibility';
 import { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import prisma from '../lib/prisma';
@@ -70,6 +71,7 @@ export const getGeneradores = async (req: Request, res: Response, next: NextFunc
                 usuario: {
                     select: {
                         email: true,
+                        activo: true,
                         nombre: true,
                         apellido: true
                     }
@@ -79,7 +81,7 @@ export const getGeneradores = async (req: Request, res: Response, next: NextFunc
 
         res.json({
             success: true,
-            data: { generadores }
+            data: { generadores: generadores.map(actor => ({ ...actor, aprobacionManifiesto: manifestPartyEligibility(actor, 'generador') })) }
         });
     } catch (error) {
         next(error);
@@ -101,6 +103,7 @@ export const getTransportistas = async (req: Request, res: Response, next: NextF
                 usuario: {
                     select: {
                         email: true,
+                        activo: true,
                         nombre: true,
                         apellido: true
                     }
@@ -112,7 +115,7 @@ export const getTransportistas = async (req: Request, res: Response, next: NextF
 
         res.json({
             success: true,
-            data: { transportistas }
+            data: { transportistas: transportistas.map(actor => ({ ...actor, aprobacionManifiesto: manifestPartyEligibility(actor, 'transportista') })) }
         });
     } catch (error) {
         next(error);
@@ -146,6 +149,7 @@ export const getOperadores = async (req: Request, res: Response, next: NextFunct
                 usuario: {
                     select: {
                         email: true,
+                        activo: true,
                         nombre: true,
                         apellido: true
                     }
@@ -160,7 +164,7 @@ export const getOperadores = async (req: Request, res: Response, next: NextFunct
 
         res.json({
             success: true,
-            data: { operadores }
+            data: { operadores: operadores.map(actor => ({ ...actor, aprobacionManifiesto: manifestPartyEligibility(actor, 'operador') })) }
         });
     } catch (error) {
         next(error);

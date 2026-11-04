@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import AdminOperadoresPage from '../../pages/admin/AdminOperadoresPage';
@@ -8,12 +8,13 @@ const records = [
   { id: 'qa-active', razonSocial: 'QA Activo', cuit: '99000000001', activo: true, vehiculos: [], choferes: [], tratamientos: [] },
   { id: 'qa-inactive', razonSocial: 'QA Inactivo', cuit: '99000000002', activo: false, vehiculos: [], choferes: [], tratamientos: [] },
 ];
+const queries = vi.hoisted(() => ({ operadores: vi.fn(), transportistas: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isAdmin: false }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonateUser: vi.fn() }) }));
 vi.mock('../../hooks/useEnrichment', () => ({ useOperadoresEnrichment: () => ({ data: { operadores: {} } }) }));
 vi.mock('../../hooks/useActores', () => ({
-  useOperadores: () => ({ data: { items: records, total: 52, totalPages: 3 }, isLoading: false, isError: false }),
-  useTransportistas: () => ({ data: { items: records, total: 52, totalPages: 3 }, isLoading: false, isError: false }),
+  useOperadores: (filters: unknown) => { queries.operadores(filters); return { data: { items: records, total: 52, totalPages: 3 }, isLoading: false, isError: false }; },
+  useTransportistas: (filters: unknown) => { queries.transportistas(filters); return { data: { items: records, total: 52, totalPages: 3, localidades: ['Tunuyán'] }, isLoading: false, isError: false }; },
   useDeleteOperador: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateTransportista: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateTransportista: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -21,6 +22,30 @@ vi.mock('../../hooks/useActores', () => ({
 }));
 
 describe('Actor summaries disclose the actual denominator', () => {
+  it.each([['Tipo','IN SITU',{tipoOperador:'IN SITU'}],['Corriente Y','Y8',{corriente:'Y8'}]] as const)('queries the full operator directory for %s', (label,option,expected) => {
+    render(<MemoryRouter><AdminOperadoresPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Filtros'}));
+    fireEvent.click(screen.getByRole('button',{name:label,exact:true}));
+    fireEvent.click(screen.getByRole('option',{name:option,exact:true}));
+    expect(queries.operadores).toHaveBeenLastCalledWith(expect.objectContaining({...expected,page:1}));
+  });
+  it('offers a locality returned by the server even when absent from the current page',()=>{
+    render(<MemoryRouter><TransportistasPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Filtros'}));
+    fireEvent.click(screen.getByRole('button',{name:'Localidad',exact:true}));
+    fireEvent.click(screen.getByRole('option',{name:'Tunuyán',exact:true}));
+    expect(queries.transportistas).toHaveBeenLastCalledWith(expect.objectContaining({localidad:'Tunuyán',page:1}));
+  });
+  it.each([
+    ['operadores', AdminOperadoresPage], ['transportistas', TransportistasPage],
+  ] as const)('%s filters active state on the server across all pages', (kind, Page) => {
+    render(<MemoryRouter><Page /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', {name:'Filtros'}));
+    fireEvent.click(screen.getByRole('button', {name:'Estado'}));
+    fireEvent.click(screen.getByRole('option', {name:'Inactivo',exact:true}));
+    expect(queries[kind]).toHaveBeenLastCalledWith(expect.objectContaining({activo:false,page:1}));
+    expect(screen.getByRole('button',{name:'Abrir QA Inactivo'})).toBeInTheDocument();
+  });
   it.each([
     ['operadores', AdminOperadoresPage, 'Total Operadores'],
     ['transportistas', TransportistasPage, 'Total Transportistas'],

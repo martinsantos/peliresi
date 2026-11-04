@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "name": "backend-types",
+      "code": 0
+    },
+    {
+      "name": "frontend-types",
+      "code": 0
+    },
+    {
+      "name": "backend-tests",
+      "code": 0
+    },
+    {
+      "name": "frontend-tests",
+      "code": 0
+    }
+  ],
+  "stop": "",
+  "peak": 877469696,
+  "peakStat": {
+    "anon": 830238720,
+    "active_file": 0,
+    "shmem": 16171008
+  },
+  "production": false,
+  "emails": false,
+  "push": false
+}

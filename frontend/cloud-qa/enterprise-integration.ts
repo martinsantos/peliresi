@@ -22,26 +22,26 @@ try {
  const legacy=await db.manifiesto.findMany({orderBy:{id:'asc'},include:manifestInclude});
  const beforeUsers=await db.usuario.findMany({orderBy:{id:'asc'}});
  const beforeActors=await db.generador.findMany({orderBy:{id:'asc'}});
- const admin=await login('admin');
+ const admin=await login('admin'),existingCompanies=await db.empresa.count({where:{activa:true}});
  for(const [i,surface] of ['http','web-desktop','web-responsive','app','apk'].entries()) {
   const prefix='empresa-'+surface;
-  const user=async(suffix:string,extra:any={})=>db.usuario.create({data:{email:prefix+'-'+suffix+'@night-qa.invalid',nombre:'QA '+surface+' '+suffix,password:original.password,rol:'GENERADOR',activo:true,emailVerified:true,notifEmail:false,notifWhatsapp:false,notifTelegram:false,notifNuevoRegistro:false,...extra}});
-  const owner=await user('owner'),member=await user('member'),other=await user('other'),actorUser=await user('actor');
+  const user=async(suffix:string,extra:any={})=>(await db.usuario.findUnique({where:{email:prefix+'-'+suffix+'@night-qa.invalid'}}))||db.usuario.create({data:{email:prefix+'-'+suffix+'@night-qa.invalid',nombre:'QA '+surface+' '+suffix,password:original.password,rol:'GENERADOR',activo:true,emailVerified:true,notifEmail:false,notifWhatsapp:false,notifTelegram:false,notifNuevoRegistro:false,...extra}});
+  const owner=await user('owner'),member=await user('member'),other=await user('other'),actorUser=owner;
   const tax=cuit(90001000+i);
-  const actor=await db.generador.create({data:{...template,id:randomUUID(),usuarioId:actorUser.id,razonSocial:'QA Empresa '+surface,cuit:tax,numeroInscripcion:'QA-EMP-'+i}});
-  const company=(await req(admin,'/empresas',201,{cuit:tax,razonSocial:actor.razonSocial,domicilioLegal:{calle:'Legal QA 100',localidad:'Mendoza',departamento:'Capital'}})).empresa;
+  const actor=(await db.generador.findUnique({where:{usuarioId:actorUser.id}}))||await db.generador.create({data:{...template,id:randomUUID(),usuarioId:actorUser.id,razonSocial:'QA Empresa '+surface,cuit:tax,numeroInscripcion:'QA-EMP-'+i}});
+  const company=(await db.empresa.findUnique({where:{cuit:tax}}))||(await req(admin,'/empresas',201,{cuit:tax,razonSocial:actor.razonSocial,domicilioLegal:{calle:'Legal QA 100',localidad:'Mendoza',departamento:'Capital'}})).empresa;
   const route='/empresas/'+company.id;
-  const activity=(await req(admin,route+'/actividades',201,{rol:'GENERADOR',actorId:actor.id})).actividad;
-  await req(admin,route+'/responsables',200,{email:owner.email,motivo:'Responsable sintético validado por DGFA'});
+  const activity=(await db.empresaActividad.findUnique({where:{empresaId_rol:{empresaId:company.id,rol:'GENERADOR'}}}))||(await req(admin,route+'/actividades',201,{rol:'GENERADOR',actorId:actor.id})).actividad;
+  if(!await db.responsableEmpresa.findUnique({where:{empresaId_usuarioId:{empresaId:company.id,usuarioId:owner.id}}}))await req(admin,route+'/responsables',200,{email:owner.email,motivo:'Responsable sintético validado por DGFA'});
   const token=await login(prefix+'-owner');
   const sites=[];
-  for(const [code,name,address]of [['NORTE','Planta Norte','Productiva QA 200'],['SUR','Planta Sur','Productiva QA 300']])sites.push((await req(token,route+'/establecimientos',201,{codigo:code,nombre:name,domicilio:address,localidad:'Mendoza',departamento:'Capital',certificados:['QA-'+surface+'-'+code]})).establecimiento);
+  for(const [code,name,address]of [['NORTE','Planta Norte','Productiva QA 200'],['SUR','Planta Sur','Productiva QA 300']])sites.push((await db.establecimientoEmpresa.findFirst({where:{empresaId:company.id,codigo:code}}))||(await req(token,route+'/establecimientos',201,{codigo:code,nombre:name,domicilio:address,localidad:'Mendoza',departamento:'Capital',certificados:['QA-'+surface+'-'+code]})).establecimiento);
   const scope={actividadId:activity.id,todosEstablecimientos:true,establecimientoIds:[]};
-  await req(token,route+'/personas',201,{...scope,email:owner.email});
-  const grant=(await req(token,route+'/personas',201,{...scope,email:member.email,todosEstablecimientos:false,establecimientoIds:[sites[0].id]})).autorizacion;
-  const old=await db.manifiesto.create({data:{id:randomUUID(),numero:'QA-EMP-OLD-'+i,estado:'BORRADOR',generadorId:actor.id,transportistaId:fixture.actors.transportista,operadorId:fixture.actors.operador,creadoPorId:actorUser.id,isDemoData:true}});
+  if(!await db.autorizacionEmpresa.findUnique({where:{actividadId_usuarioId:{actividadId:activity.id,usuarioId:owner.id}}}))await req(token,route+'/personas',201,{...scope,email:owner.email});
+  const grant=(await db.autorizacionEmpresa.findUnique({where:{actividadId_usuarioId:{actividadId:activity.id,usuarioId:member.id}}}))||(await req(token,route+'/personas',201,{...scope,email:member.email,todosEstablecimientos:false,establecimientoIds:[sites[0].id]})).autorizacion;
+  const old=(await db.manifiesto.findUnique({where:{numero:'QA-EMP-OLD-'+i}}))||await db.manifiesto.create({data:{id:randomUUID(),numero:'QA-EMP-OLD-'+i,estado:'BORRADOR',generadorId:actor.id,transportistaId:fixture.actors.transportista,operadorId:fixture.actors.operador,creadoPorId:actorUser.id,isDemoData:true}});
   const headers=(site:any)=>({'X-SITREP-Empresa':company.id,'X-SITREP-Empresa-Actividad':activity.id,'X-SITREP-Establecimiento':site.id});
-  const body={transportistaId:fixture.actors.transportista,operadorId:fixture.actors.operador,modalidad:'FIJO',residuos:[{tipoResiduoId:fixture.wastes[0],cantidad:5,unidad:'kg'}]};
+  const body={fechaEstimadaRetiro:new Date().toISOString().slice(0,10),transportistaId:fixture.actors.transportista,operadorId:fixture.actors.operador,modalidad:'FIJO',residuos:[{tipoResiduoId:fixture.wastes[0],cantidad:5,unidad:'kg'}]};
   const north=(await req(token,'/manifiestos',201,body,'POST',headers(sites[0]))).manifiesto;
   const south=(await req(token,'/manifiestos',201,body,'POST',headers(sites[1]))).manifiesto;
   assert.equal(north.creadoPorId,owner.id);assert.equal(north.generadorId,actor.id);
@@ -65,9 +65,9 @@ try {
  const last=paginationCompanies.at(-1)!,lastActivity=activities.at(-1)!;
  await db.autorizacionEmpresa.createMany({data:browserOwners.map(usuarioId=>({empresaId:last.id,actividadId:lastActivity.id,usuarioId,todosEstablecimientos:true,establecimientoIds:[],otorgadaPor:fixture.users.admin}))});
  const adminAll=await req(admin,'/empresas?limit=100'),allIds:string[]=[];
- assert.equal(adminAll.pagination.total,215);assert.equal(adminAll.empresas.length,100);
+ assert.equal(adminAll.pagination.total,existingCompanies+215);assert.equal(adminAll.empresas.length,100);
  for(let page=1;page<=adminAll.pagination.totalPages;page++)allIds.push(...(await req(admin,'/empresas?limit=100&page='+page)).empresas.map((e:any)=>e.id));
- assert.equal(new Set(allIds).size,215);assert.equal(allIds.length,215);
+ assert.equal(new Set(allIds).size,existingCompanies+215);assert.equal(allIds.length,existingCompanies+215);
  assert.deepEqual((await req(admin,'/empresas?limit=100&page=2')).empresas.map((e:any)=>e.id),allIds.slice(100,200),'stable ordering');
  const owned=await req(owner,'/empresas?limit=100&page=3');assert.equal(owned.pagination.total,211);assert.equal(owned.empresas.length,11);
  assert.ok(owned.empresas.some((p:any)=>p.id===last.id));
@@ -82,7 +82,7 @@ try {
  assert.ok(after200.user.contextosEmpresa.some((x:any)=>x.empresaId===last.id),'grant after 200 remains discoverable');
  assert.deepEqual((await req(owner,'/empresas/'+last.id)).contextos.map((x:any)=>x.actividadId),[lastActivity.id]);
  await req(owner,route+'/actividades',403,{rol:'OPERADOR',actorId:fixture.actors.operador});
- await req(owner,route+'/responsables',403,{email:c.other.email,motivo:'No autoridad'});
+ await req(owner,route+'/responsables',400,{email:c.other.email,motivo:'No tiene autorización previa'});
  await req(member,route+'/personas',403,{email:c.other.email,actividadId:c.activity.id,todosEstablecimientos:true,establecimientoIds:[]});
  await req(outsider,route,404);
  assert.deepEqual((await req(member,route)).establecimientos.map((s:any)=>s.id),[c.sites[0].id]);
@@ -122,14 +122,24 @@ try {
  await req(member,'/manifiestos/'+c.old.id,200,undefined,'GET',h);
  // Existing verified and new personal invitees, invalid/used/unverified/suspended denied.
  const invite=async(email:string)=>req(owner,route+'/invitaciones',201,{email,actividadId:c.activity.id,todosEstablecimientos:true,establecimientoIds:[]});
+ // A third person cannot enter through a direct grant, invitation or authority path.
+ await req(owner,route+'/personas',409,{email:c.other.email,actividadId:c.activity.id,todosEstablecimientos:true,establecimientoIds:[]});
+ await req(owner,route+'/invitaciones',409,{email:c.other.email,actividadId:c.activity.id,todosEstablecimientos:true,establecimientoIds:[]});
+ await req(admin,route+'/responsables',409,{email:c.other.email,motivo:'QA tercer representante'});
+ assert.equal((await req(owner,route)).cupoPersonas.ocupados,2);
+ await req(owner,route+'/personas/'+c.grant.id+'/revocar',200,{revision:2,motivo:'Reemplazo explícito del segundo representante'});
  const invited=await invite(c.other.email),inviteRoute=invited.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/');
  assert.equal(invited.enviada,false);await req(null,inviteRoute);
  await req(null,inviteRoute+'/aceptar',403,{email:c.other.email,password:'wrong'});
  await req(null,inviteRoute+'/aceptar',200,{email:c.other.email,password});
  await req(null,inviteRoute+'/aceptar',404,{email:c.other.email,password});
- const brute=await invite(c.other.email),bruteRoute=brute.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/')+'/aceptar';
+ const extraRole=await db.empresaActividad.findUniqueOrThrow({where:{empresaId_rol:{empresaId:c.company.id,rol:'OPERADOR'}}});
+ const brute=await req(owner,route+'/invitaciones',201,{email:c.other.email,actividadId:extraRole.id,todosEstablecimientos:true,establecimientoIds:[]}),bruteRoute=brute.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/')+'/aceptar';
  for(let i=0;i<5;i++)await req(null,bruteRoute,403,{email:c.other.email,password:'wrong'});
  await req(null,bruteRoute,429,{email:c.other.email,password:'wrong'});
+ await req(owner,route+'/invitaciones/'+brute.invitacion.id+'/revocar',200,{});
+ const otherGrant=await db.autorizacionEmpresa.findUniqueOrThrow({where:{actividadId_usuarioId:{actividadId:c.activity.id,usuarioId:c.other.id}}});
+ await req(owner,route+'/personas/'+otherGrant.id+'/revocar',200,{revision:otherGrant.revision,motivo:'Fin de representación QA'});
  const newEmail='empresa-new-personal@night-qa.invalid';
  await req(null,'/auth/register',201,{email:newEmail,password,nombre:'QA Persona invitada',rol:'GENERADOR'});
  const pending=await db.usuario.findUniqueOrThrow({where:{email:newEmail}});
@@ -140,6 +150,8 @@ try {
  await db.usuario.update({where:{id:pending.id},data:{emailVerificationToken:createHash('sha256').update(verifyToken).digest('hex')}});
  await req(null,'/auth/verify-email?token='+verifyToken);
  await req(null,newRoute+'/aceptar',200,{email:newEmail,password});
+ const personalGrant=await db.autorizacionEmpresa.findUniqueOrThrow({where:{actividadId_usuarioId:{actividadId:c.activity.id,usuarioId:pending.id}}});
+ await req(owner,route+'/personas/'+personalGrant.id+'/revocar',200,{revision:personalGrant.revision,motivo:'Fin de representación QA'});
  const suspended=await db.usuario.create({data:{nombre:'QA Suspendida',email:'empresa-suspended@night-qa.invalid',password:original.password,rol:'GENERADOR',activo:false,emailVerified:true,motivoInactividad:'SUSPENDIDA'}});
  const si=await invite(suspended.email),sr=si.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/');
  await req(null,sr+'/aceptar',403,{email:suspended.email,password});
@@ -153,7 +165,7 @@ try {
  await writeFile(path.join(process.env.QA_ARTIFACTS!,'enterprise-fixture.json'),JSON.stringify(Object.fromEntries(Object.entries(contexts).map(([k,v]:any)=>[k,{companyId:v.company.id,northId:v.north.id,southId:v.south.id,prefix:v.prefix}]))));
  await writeFile(path.join(process.env.QA_ARTIFACTS!,'enterprise-http.json'),JSON.stringify({passed:true,emailSent:0,groups:[
  '215 companies and 211 grants: complete pages, stable IDs/totals, name/CUIT search, scoped results and context after item 200',
- 'DGFA validates activities/responsibles; company owner alone delegates; outsiders and escalation rejected',
+ 'DGFA validates activities; responsible delegates existing authorized people; two people across roles, third denied through grant/invitation/authority paths',
  'separate legal and productive addresses, before/after audit and concurrent revision conflict',
  'site list/detail/edit/PDF isolation, no inference of legacy site, personal identity retained',
  'same JWT immediate revocation, personal recovery, deliberate regrant with current revision',

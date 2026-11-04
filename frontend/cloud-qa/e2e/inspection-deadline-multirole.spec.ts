@@ -1,0 +1,21 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { expect,test } from '@playwright/test';
+import { assertCloudDatabase } from '../safety';
+import { login,prefix } from './helpers';
+const fixture=JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!,'fixture-multirole.json'),'utf8'));
+test('a secondary personal activity can open its overdue requirement',async({page},info)=>{
+ await assertCloudDatabase();expect(fixture.email).toBe('draft-multirole-20261024@night-qa.invalid');
+ const item=fixture.cases[info.project.name],errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ await login(page,info,fixture.email.split('@')[0]);
+ await page.goto(prefix(info)+'/notificaciones/'+item.noticeId);
+ const notice=page.getByRole('region',{name:'Aviso recibido'});
+ await expect(notice.getByRole('button',{name:'Usar Operador y abrir requerimiento',exact:true})).toBeVisible();
+ await notice.getByRole('button',{name:'Usar Operador y abrir requerimiento',exact:true}).click();
+ await expect(page).toHaveURL(new RegExp('/requerimientos/'+item.inspectionId+'(?:[?#].*)?$'));
+ await expect(page.getByTestId('inspection-next-step')).toBeVisible();
+ await expect(page.getByRole('button',{name:/^Responder requerimiento #/})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Mis inspecciones',exact:true})).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+ expect(errors).toEqual([]);
+});

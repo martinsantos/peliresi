@@ -1,0 +1,45 @@
+import {act,cleanup,renderHook,render,screen,fireEvent,waitFor} from '@testing-library/react';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {beforeEach,afterEach,expect,it,vi} from 'vitest';
+import type {ReactNode} from 'react';
+const m=vi.hoisted(()=>({user:{id:'one',rol:'ADMIN'} as any,restricted:false,path:'/dashboard',search:vi.fn(),navigate:vi.fn(),close:vi.fn()}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:m.user,isRestricted:m.restricted})}));
+vi.mock('react-router-dom',()=>({useNavigate:()=>m.navigate,useLocation:()=>({pathname:m.path,search:'?page=2',hash:''})}));
+vi.mock('../../services/search.service',()=>({searchService:{search:m.search}}));
+import {inspectionWorkspaceOwner} from '../../utils/inspectionWorkspace';
+import {useGlobalSearch} from '../../hooks/useGlobalSearch';
+const data={manifiestos:[{id:'m1',numero:'QA-1',estado:'BORRADOR'}],generadores:[{id:'g1',razonSocial:'QA Generador',cuit:'QA'}],transportistas:[{id:'t1',razonSocial:'QA Transporte',cuit:'QA'}],operadores:[{id:'o1',razonSocial:'QA Operador',cuit:'QA'}],totalHits:4};
+let clients:QueryClient[]=[];
+beforeEach(()=>{localStorage.clear();m.user={id:'one',rol:'ADMIN'};m.restricted=false;m.path='/dashboard';m.search.mockReset().mockResolvedValue(data);m.navigate.mockReset();m.close.mockReset();});
+afterEach(()=>{cleanup();clients.forEach(c=>c.clear());clients=[];vi.restoreAllMocks();});
+function show(){const c=new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(c);return renderHook(()=>useGlobalSearch({onClose:m.close}),{wrapper:({children}:{children:ReactNode})=><QueryClientProvider client={c}>{children}</QueryClientProvider>});}
+async function query(h:ReturnType<typeof show>,q='QA'){act(()=>h.result.current.setQuery(q));await waitFor(()=>expect(h.result.current.flatResults.length).toBe(4));}
+it.each(['id','rol','actorId','training'])('immediately clears prior results and history after %s changes',async field=>{
+ const h=show();await query(h);act(()=>h.result.current.navigateTo(h.result.current.flatResults[0].href));expect(h.result.current.recentSearches).toContain('QA');
+ m.search.mockImplementation(()=>new Promise(()=>{}));m.user={...m.user,[field]:field==='training'?true:'other'};h.rerender();expect(h.result.current.flatResults).toEqual([]);expect(h.result.current.recentSearches).toEqual([]);expect(h.result.current.query).toBe('');
+});
+it.each(['empresaId','actividadId','establecimientoId','autorizacionId','revision'])('clears current search on company %s change',async field=>{
+ m.user.empresaContexto={empresaId:'a',actividadId:'b',establecimientoId:'c',autorizacionId:'d',revision:1,todasSedes:true};const h=show();await query(h);m.search.mockImplementation(()=>new Promise(()=>{}));m.user={...m.user,empresaContexto:{...m.user.empresaContexto,[field]:'other'}};h.rerender();expect(h.result.current.flatResults).toEqual([]);
+});
+it('does not search for restricted users',async()=>{m.restricted=true;const h=show();act(()=>h.result.current.setQuery('QA'));await act(async()=>{await new Promise(r=>setTimeout(r,350));});expect(m.search).not.toHaveBeenCalled();});
+it('does not show old hits or false empty while a new term is debouncing',async()=>{const h=show();await query(h);act(()=>h.result.current.setQuery('OTHER'));expect(h.result.current.flatResults).toEqual([]);expect(h.result.current.isLoading).toBe(true);});
+it('opens the selected generator ficha with the origin',async()=>{const h=show();await query(h);const hit=h.result.current.flatResults.find(v=>v.type==='generador')!;expect(hit.href).toBe('/admin/actores/generadores/g1');act(()=>h.result.current.navigateTo(hit.href));expect(m.navigate).toHaveBeenCalledWith(hit.href,{state:{actorReturn:'/dashboard?page=2'}});});
+it('preserves embedded mobile surface on all result links',async()=>{m.path='/mobile/dashboard';const h=show();await query(h);expect(h.result.current.flatResults.every(v=>v.href.startsWith('/mobile/'))).toBe(true);});
+it('preserves standalone app basename without doubling /app',async()=>{const h=show();await query(h);expect(h.result.current.flatResults.every(v=>!v.href.startsWith('/app/'))).toBe(true);});
+it('rejects corrupt recent history without crashing and ignores old global history',()=>{localStorage.setItem('sitrep_recent_searches','["private previous account"]');const h=show();expect(h.result.current.recentSearches).toEqual([]);});
+it('storage quota cannot block opening a result',async()=>{const h=show();await query(h);vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('quota');});expect(()=>act(()=>h.result.current.navigateTo(h.result.current.flatResults[0].href))).not.toThrow();expect(m.navigate).toHaveBeenCalled();});
+it('a stale keyboard index cannot crash when results shrink',async()=>{const h=show();await query(h);act(()=>h.result.current.setFocusedIndex(99));expect(()=>act(()=>h.result.current.onQueryKeyDown({key:'Enter',preventDefault:vi.fn()} as any))).not.toThrow();expect(m.navigate).not.toHaveBeenCalled();});
+it('HTTP failure is distinct from no results',async()=>{m.search.mockRejectedValue(new Error('down'));const h=show();act(()=>h.result.current.setQuery('QA'));await waitFor(()=>expect(h.result.current.isError).toBe(true));expect(h.result.current.flatResults).toEqual([]);});
+
+it('arrow selection followed by Enter opens exactly one result',async()=>{const h=show();await query(h);act(()=>h.result.current.onQueryKeyDown({key:'ArrowDown',preventDefault:vi.fn()} as any));expect(h.result.current.focusedIndex).toBe(0);act(()=>h.result.current.onQueryKeyDown({key:'Enter',preventDefault:vi.fn()} as any));expect(m.navigate).toHaveBeenCalledTimes(1);expect(m.navigate.mock.calls[0][0]).toBe('/manifiestos/m1');});
+it('recent history survives reopening in the same context only',async()=>{const h=show();await query(h);act(()=>h.result.current.navigateTo(h.result.current.flatResults[0].href));h.unmount();const same=show();expect(same.result.current.recentSearches).toEqual(['QA']);same.unmount();m.user={...m.user,id:'other'};expect(show().result.current.recentSearches).toEqual([]);});
+it('malformed scoped history is ignored',()=>{const h=show();h.unmount();const key='sitrep_recent_searches:v2:'+inspectionWorkspaceOwner(m.user);localStorage.setItem(key,'{"private":"text"}');expect(show().result.current.recentSearches).toEqual([]);});
+
+import {GlobalSearchPanel} from '../../components/GlobalSearchPanel';
+function panel(){const client=new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(client);return render(<QueryClientProvider client={client}><GlobalSearchPanel onClose={m.close}/></QueryClientProvider>);}
+it('offers named controls and all business states in the shared dialog',()=>{panel();expect(screen.getByRole('dialog',{name:'Buscar en SITREP'})).toBeInTheDocument();expect(screen.getByRole('combobox',{name:'Número, razón social o CUIT'})).toHaveFocus();expect(screen.getByRole('combobox',{name:'Número, razón social o CUIT'})).toHaveAttribute('type','text');expect(screen.getByRole('combobox',{name:'Estado del manifiesto'})).toBeInTheDocument();expect(screen.getByRole('option',{name:/Pendiente.*probación/i})).toBeInTheDocument();});
+it('debounce announces loading without flashing no-results',async()=>{panel();fireEvent.change(screen.getByRole('combobox',{name:'Número, razón social o CUIT'}),{target:{value:'QA'}});expect(screen.getByRole('status')).toHaveTextContent('Buscando');expect(screen.queryByText(/Sin coincidencias/)).not.toBeInTheDocument();await screen.findByRole('option',{name:/QA Generador/});});
+it('failed lookup presents retry and never an empty or stale result',async()=>{m.search.mockRejectedValueOnce(new Error('down'));panel();fireEvent.change(screen.getByRole('combobox',{name:'Número, razón social o CUIT'}),{target:{value:'QA'}});const retry=await screen.findByRole('button',{name:'Reintentar búsqueda'});expect(screen.queryByText(/Sin coincidencias/)).not.toBeInTheDocument();fireEvent.click(retry);await screen.findByRole('option',{name:/QA Generador/});expect(screen.queryByRole('alert')).not.toBeInTheDocument();});
+it('Escape closes and keyboard Enter opens the selected concrete ficha',async()=>{panel();const input=screen.getByRole('combobox',{name:'Número, razón social o CUIT'});fireEvent.change(input,{target:{value:'QA'}});await screen.findByRole('option',{name:/QA Generador/});fireEvent.keyDown(input,{key:'ArrowDown'});fireEvent.keyDown(input,{key:'ArrowDown'});fireEvent.keyDown(input,{key:'Enter'});expect(m.navigate).toHaveBeenCalledTimes(1);expect(m.navigate.mock.calls[0][0]).toBe('/admin/actores/generadores/g1');fireEvent.keyDown(input,{key:'Escape'});expect(m.close).toHaveBeenCalledTimes(2);});
+
+it('identifies role, company and site within the search dialog',()=>{m.user={...m.user,rol:'OPERADOR',empresaContexto:{empresaId:'company',razonSocial:'QA Empresa',establecimiento:{nombre:'QA Norte'}}};panel();expect(screen.getByRole('dialog',{name:'Buscar en SITREP'})).toHaveAccessibleDescription('Operador · QA Empresa · QA Norte');});

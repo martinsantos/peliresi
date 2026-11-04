@@ -1,12 +1,13 @@
 /**
  * CentroControl — Leaflet Map with all layers, markers, polylines
  */
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { Minus, Plus, RefreshCw } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './control-map.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { MapLayerToggle } from '../../../components/ui/MapLayerToggle';
@@ -17,6 +18,7 @@ import type { LayerState } from './ControlFilters';
 
 import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
 import { hasInspectionCoordinates, type InspectionOperation } from '../../../services/inspectionOperations.service';
+import { MonitorPosition } from '../../monitor/components/MonitorPosition';
 
 // ── Cluster helper ──
 function clusterMarkers<T extends { latitud: number; longitud: number }>(
@@ -55,6 +57,60 @@ function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
     map.on('zoomend', handler);
     return () => { map.off('zoomend', handler); };
   }, [map, onZoom]);
+  return null;
+}
+
+/** A marker can be visible near the edge of the scrolling workspace while its
+ * popup is hidden behind the app header or bottom navigation. Reveal the open
+ * popup only when it is actually clipped; do not move an already readable map. */
+function RevealOpenPopup() {
+  const map = useMap();
+  useEffect(() => {
+    let active: L.Popup | null = null;
+    let frame = 0;
+    const originalWidths = new WeakMap<L.Popup, number>();
+    const constrainWidth = () => {
+      if (!active) return;
+      if (!originalWidths.has(active)) originalWidths.set(active, active.options.maxWidth ?? 300);
+      // Leaflet's maxWidth applies to the inner content; reserve space for
+      // its margins, popup chrome and map padding as well.
+      const width = Math.max(80, Math.min(originalWidths.get(active)!, map.getSize().x - 64));
+      if (active.options.maxWidth !== width || active.options.minWidth !== 0) {
+        active.options.maxWidth = width;
+        active.options.minWidth = 0;
+        active.update();
+      }
+    };
+    const reveal = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const popup = active?.getElement();
+        const main = popup?.closest('main');
+        if (!active?.isOpen() || !popup || !main) return;
+        const content = popup.getBoundingClientRect(), workspace = main.getBoundingClientRect();
+        const nav = document.querySelector<HTMLElement>('nav[aria-label="Navegación principal"]');
+        const fixedNavTop = nav && getComputedStyle(nav).position === 'fixed' ? nav.getBoundingClientRect().top : innerHeight;
+        const top = Math.max(workspace.top, 0) + 8;
+        const bottom = Math.min(workspace.bottom, fixedNavTop, innerHeight) - 8;
+        const delta = content.top < top ? content.top - top : content.bottom > bottom ? content.bottom - bottom : 0;
+        if (delta) main.scrollBy({ top: delta, behavior: 'auto' });
+      });
+    };
+    const opened = (event: L.PopupEvent) => { active = event.popup; constrainWidth(); reveal(); };
+    const closed = () => { active = null; cancelAnimationFrame(frame); };
+    const resized = () => { constrainWidth(); reveal(); };
+    map.on('popupopen', opened);
+    map.on('popupclose', closed);
+    map.on('moveend', reveal);
+    map.on('resize', resized);
+    return () => {
+      cancelAnimationFrame(frame);
+      map.off('popupopen', opened);
+      map.off('popupclose', closed);
+      map.off('moveend', reveal);
+      map.off('resize', resized);
+    };
+  }, [map]);
   return null;
 }
 
@@ -126,6 +182,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
   onSelectInspection,
 }) => {
   const navigate = useNavigate();
+  const mapRef = useRef<L.Map | null>(null);
   const carrierLocations = useMemo(() => (cc?.transportistas || []).map(actor => ({
     actor, location: resolveActorLocation(actor),
   })), [cc?.transportistas]);
@@ -151,6 +208,11 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               {enTransitoForMap.length} en tránsito
             </Badge>
           </div>
+          <div role="group" aria-label="Zoom del mapa" className="flex gap-1">
+            <button type="button" aria-label="Acercar mapa" onClick={() => mapRef.current?.zoomIn()} className="grid h-11 w-11 place-items-center rounded-lg border border-neutral-300 bg-white text-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><Plus size={18} aria-hidden="true" /></button>
+            <button type="button" aria-label="Alejar mapa" onClick={() => mapRef.current?.zoomOut()} className="grid h-11 w-11 place-items-center rounded-lg border border-neutral-300 bg-white text-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><Minus size={18} aria-hidden="true" /></button>
+            <span className="sr-only" aria-live="polite">Nivel de zoom {mapZoom}</span>
+          </div>
         <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2 sm:flex sm:flex-wrap">
             <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} onToggle={() => onToggleLayer('generadores')} />
             <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} onToggle={() => onToggleLayer('transportistas')} />
@@ -164,6 +226,8 @@ export const ControlMap: React.FC<ControlMapProps> = ({
           {layers.transportistas && unlocatedCarriers > 0 && <p className="mb-3 text-sm text-neutral-700">{unlocatedCarriers} {unlocatedCarriers === 1 ? 'transportista sin ubicación verificada' : 'transportistas sin ubicación verificada'}</p>}
           <div className="h-[20rem] sm:h-[28rem] lg:h-[32rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
             <MapContainer
+              ref={mapRef}
+              zoomControl={false}
               fadeAnimation={false}
               center={[-32.9287, -68.8535]}
               zoom={10}
@@ -171,6 +235,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               className="z-0"
             >
               <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <RevealOpenPopup />
               {layers.inspecciones && <InspectionMapLayer items={inspections} onSelect={onSelectInspection} />}
               {inspectionFlyPoints.length > 0 && <FitBounds points={inspectionFlyPoints} animate={false} />}
               <ZoomTracker onZoom={onZoomChange} />
@@ -245,26 +310,26 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                     <Marker
                       position={[m.ultimaPosicion.latitud, m.ultimaPosicion.longitud]}
                       icon={m.manifiestoId === selectedTripId ? ACTOR_ICONS.enTransitoSelected : ACTOR_ICONS.enTransito}
+                      title={`Viaje en tránsito: ${m.numero}`}
+                      alt={`Viaje en tránsito: ${m.numero}`}
                       eventHandlers={{ click: () => onSelectTrip(m.manifiestoId) }}
                     >
-                      <Popup>
+                      <Popup className="control-trip-popup" minWidth={0} maxWidth={280}>
                         <div className="text-sm">
-                          <strong className="text-red-700">{m.numero}</strong>
-                          {m.ultimaPosicion.velocidad != null && (
-                            <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>{Math.round(m.ultimaPosicion.velocidad)} km/h</span>
-                          )}
+                          <strong className="block break-words pr-8 text-red-700">{m.numero}</strong>
                           <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#15803d' }}>ORIGEN:</strong> {m.origen}</span>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#b45309' }}>TRANSPORTE:</strong> {m.transportista}</span>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#1d4ed8' }}>OPERADOR:</strong> {m.destino}</span>
                           </div>
+                          <div className="mt-2"><MonitorPosition position={m.ultimaPosicion} /></div>
                           {m.canViewDetail === true ? <a
                             href="#"
                             onClick={(e) => {
                               e.preventDefault();
                               navigate(`/manifiestos/${m.manifiestoId}`);
                             }}
-                            style={{ color: '#0D8A4F', fontWeight: 600, fontSize: '12px', display: 'block', marginTop: '6px' }}
+                            className="control-trip-detail mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                           >
                             Ver detalle
                           </a> : <p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p>}

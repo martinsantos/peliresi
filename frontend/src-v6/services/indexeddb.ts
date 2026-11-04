@@ -8,10 +8,16 @@
 import {
   isSupportedSyncMethod,
   isSyncActionOwnedBy,
+  isTransportQueueAction,
   queuedDeliveryManifestId,
   type SyncMethod,
 } from './syncQueuePolicy';
 import api from './api';
+import { GpsPendingError, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
+import { matchesGpsReceipt } from './gpsReceipts';
+import { withGpsTransitionLock } from './gpsCoordination';
+import { clearTripSnapshot } from './tripSnapshot';
+import { notifyDeliveryConfirmed, notifyOfflineQueueChanged } from './offlineSyncEvents';
 
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 5;
@@ -26,9 +32,11 @@ export interface SyncAction {
   data: unknown;
   createdAt: string;
   userId: string | number;
+  contextOwner?: string;
   attempts?: number;
   lastError?: string;
   failureKind?: 'retryable' | 'terminal' | 'auth';
+  lastFailureUncertain?: boolean;
   nextRetryAt?: string;
 }
 
@@ -40,7 +48,12 @@ export interface SyncQueueResult {
   auth: number;
   skipped: number;
   lastError?: string;
+  contextBlocked?: number;
+  legacyBlocked?: number;
+  cleanupError?: boolean;
 }
+
+export interface SyncExecutionContext { owner: string; role: string; companyScoped: boolean; gpsOwner?: string }
 
 export function classifySyncFailure(error: unknown): { failureKind: NonNullable<SyncAction['failureKind']>; lastError: string } {
   const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
@@ -191,6 +204,29 @@ export async function replaceOffline(store: StoreName, previousKey: string, repl
   });
 }
 
+/** Read/modify/write in one transaction, including across browser tabs.
+ * The updater is synchronous so the transaction cannot become inactive.
+ */
+export async function updateOffline<T>(store: StoreName, key: string, update: (current: T | null) => T | null): Promise<T | null> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const records = tx.objectStore(store);
+    let result: T | null = null;
+    let failure: unknown;
+    const request = records.get(key);
+    request.onsuccess = () => {
+      try {
+        result = update(request.result ?? null);
+        if (result === null) records.delete(key); else records.put(result);
+      } catch (error) { failure = error; tx.abort(); }
+    };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(failure || tx.error || new Error('No se confirmó la copia del envío.'));
+    tx.onabort = () => reject(failure || tx.error || new Error('No se confirmó la copia del envío.'));
+  });
+}
+
 // ========================================
 // SYNC QUEUE
 // ========================================
@@ -223,6 +259,50 @@ export async function addToSyncQueue(action: Omit<SyncAction, 'id' | 'createdAt'
   });
 }
 
+/** Serialize lookup and insertion in one IndexedDB transaction across tabs.
+ * A previous delivery is never replaced with a new reference or other data. */
+export async function enqueueDeliveryOnce(action: Omit<SyncAction, 'id' | 'createdAt'>): Promise<{ action: SyncAction; legacy: boolean; reused: boolean }> {
+  const manifestId = queuedDeliveryManifestId(action.endpoint);
+  const reference = (action.data as { referencia?: unknown } | null)?.referencia;
+  if (action.type !== 'POST' || !manifestId || !action.endpoint.endsWith('/confirmar-entrega-idempotente')
+    || action.userId == null || !action.contextOwner || typeof reference !== 'string') {
+    throw new Error('No se pudo identificar la entrega y su actividad.');
+  }
+  const db = await getDB();
+  const result = await new Promise<{ action: SyncAction; legacy: boolean; reused: boolean }>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite'), records = tx.objectStore('sync_queue');
+    let value: { action: SyncAction; legacy: boolean; reused: boolean } | undefined, failure: Error | undefined;
+    const all = records.getAll();
+    all.onsuccess = () => {
+      const entries = all.result as SyncAction[];
+      const existing = entries.find(item => item.type === 'POST' && queuedDeliveryManifestId(item.endpoint) === manifestId);
+      if (existing) {
+        if (!isSyncActionOwnedBy(existing.userId, action.userId) || (existing.contextOwner && existing.contextOwner !== action.contextOwner) || existing.id == null) {
+          failure = new Error('Este dispositivo conserva una entrega pendiente de otra cuenta o actividad. Volvé a ese contexto para revisarla.');
+          tx.abort(); return;
+        }
+        value = { action: existing, legacy: !existing.contextOwner || !existing.endpoint.endsWith('/confirmar-entrega-idempotente'), reused: true };
+        return;
+      }
+      if (entries.length >= MAX_SYNC_QUEUE_SIZE) {
+        failure = new Error('La cola local está llena. Los cambios pendientes se conservaron; sincronizá antes de agregar otro.');
+        tx.abort(); return;
+      }
+      const created: SyncAction = { ...action, createdAt: new Date().toISOString(), attempts: 0 };
+      const write = records.add(created);
+      write.onsuccess = () => {
+        if (typeof write.result !== 'number') { failure = new Error('No se pudo identificar el envío guardado.'); tx.abort(); return; }
+        value = { action: { ...created, id: write.result }, legacy: false, reused: false };
+      };
+    };
+    tx.oncomplete = () => value ? resolve(value) : reject(new Error('No se confirmó el guardado local.'));
+    tx.onerror = () => reject(failure || tx.error || new Error('No se confirmó el guardado local.'));
+    tx.onabort = () => reject(failure || tx.error || new Error('No se confirmó el guardado local.'));
+  });
+  notifyOfflineQueueChanged();
+  return result;
+}
+
 /**
  * Retorna todas las acciones pendientes en la cola.
  */
@@ -252,16 +332,80 @@ export async function clearSyncQueue(): Promise<void> {
  * If currentUserId is provided, skips actions from other users.
  * Retorna la cantidad de acciones procesadas con éxito.
  */
-export async function processSyncQueue(currentUserId: string | number, manual = false): Promise<SyncQueueResult> {
+class SyncContextChangedError extends Error {}
+
+export async function processSyncQueue(currentUserId: string | number, context: SyncExecutionContext, manual = false, isCurrent: () => boolean = () => true, onlyId?: number): Promise<SyncQueueResult> {
+  const empty = (): SyncQueueResult => ({ processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0 });
+  const cannotSync = async (message: string): Promise<SyncQueueResult> => {
+    if (!isCurrent()) return empty();
+    const owned = (await getSyncQueue()).filter(action => isSyncActionOwnedBy(action.userId, currentUserId) && (onlyId === undefined || action.id === onlyId));
+    if (!isCurrent()) return empty();
+    const terminal = owned.filter(action => action.failureKind === 'terminal').length;
+    const auth = owned.filter(action => action.failureKind === 'auth').length;
+    return { ...empty(), pending: owned.length, retryable: owned.length - terminal - auth, terminal, auth, skipped: owned.length,
+      ...(owned.length ? { lastError: message } : {}) };
+  };
+  const unavailable = () => cannotSync('Este navegador no puede coordinar la sincronización entre ventanas. Actualizalo o usá un navegador compatible.');
+  const busy = () => cannotSync('Otra ventana está sincronizando esta cuenta. Esperá a que termine y reintentá.');
+  if (!context?.owner || !context.role) return cannotSync('No se pudo identificar la actividad. Volvé a ingresar antes de sincronizar.');
+  if (typeof navigator === 'undefined' || typeof navigator.locks?.request !== 'function') return unavailable();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  let entered = false;
+  try {
+    // Acquire before reading the queue and retain the lock through each
+    // acknowledged deletion or failure update. A waiting page reads fresh
+    // actions instead of replaying another page's stale snapshot.
+    return await navigator.locks.request<Promise<SyncQueueResult>>(`sitrep:offline-sync:${encodeURIComponent(String(currentUserId))}`,
+      { mode: 'exclusive', signal: controller.signal }, async lock => {
+        entered = true;
+        clearTimeout(timer);
+        if (!lock) return unavailable();
+        if (!isCurrent()) return empty();
+        return processSyncQueueLocked(currentUserId, context, manual, isCurrent, onlyId);
+      });
+  } catch (error) {
+    if (entered) throw error;
+    return controller.signal.aborted ? busy() : unavailable();
+  } finally { clearTimeout(timer); }
+}
+
+async function processSyncQueueLocked(currentUserId: string | number, context: SyncExecutionContext, manual: boolean, isCurrent: () => boolean, onlyId?: number): Promise<SyncQueueResult> {
   const queue = await getSyncQueue();
-  const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId));
+  const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId) && (onlyId === undefined || action.id === onlyId));
   const result: SyncQueueResult = { processed: 0, pending: owned.length, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
   if (owned.length === 0) return result;
 
   for (const action of owned) {
+    if (!isCurrent()) break;
     // Skip actions from other users (prevents cross-user data leakage)
     if (!isSyncActionOwnedBy(action.userId, currentUserId)) {
       continue;
+    }
+
+    if (action.contextOwner && action.contextOwner !== context.owner) {
+      result.retryable += 1; result.skipped += 1;
+      result.contextBlocked = (result.contextBlocked || 0) + 1;
+      result.lastError = isTransportQueueAction(action)
+        ? 'Volvé a Transporte y, si corresponde, a la empresa o establecimiento donde guardaste los cambios.'
+        : 'Hay cambios guardados en otra actividad o establecimiento. Volvé a ese contexto para sincronizarlos.';
+      continue;
+    }
+    if (!action.contextOwner) {
+      if (isTransportQueueAction(action) && !context.companyScoped && ['TRANSPORTISTA', 'ADMIN'].includes(context.role)) {
+        // Legacy personal transport actions have no stored context. The server
+        // still validates the actor and manifest before applying them.
+      } else {
+        result.retryable += 1; result.skipped += 1;
+        if (isTransportQueueAction(action) && !context.companyScoped) {
+          result.contextBlocked = (result.contextBlocked || 0) + 1;
+          result.lastError = 'Hay cambios anteriores de Transporte. Volvé a Transporte para sincronizarlos.';
+        } else {
+          result.legacyBlocked = (result.legacyBlocked || 0) + 1;
+          result.lastError = 'Un cambio anterior no identifica su actividad o empresa. Se conservó: consultá a soporte antes de sincronizarlo.';
+        }
+        continue;
+      }
     }
 
     if (!isSupportedSyncMethod(action.type)) {
@@ -278,9 +422,12 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
       continue;
     }
     if (!manual && action.failureKind === 'auth') {
-      result.auth += 1;
+      const legacyTransport = !action.contextOwner && isTransportQueueAction(action);
+      if (legacyTransport) result.retryable += 1; else result.auth += 1;
       result.skipped += 1;
-      result.lastError = action.lastError || result.lastError;
+      result.lastError = legacyTransport
+        ? 'El intento anterior no se pudo autorizar. Revisá tu sesión y usá Reintentar.'
+        : action.lastError || result.lastError;
       continue;
     }
     if (!manual && action.nextRetryAt && Date.parse(action.nextRetryAt) > Date.now()) {
@@ -290,19 +437,50 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
       continue;
     }
 
+    let deliveryAttempted = false, checkingGps = false;
     try {
       switch (action.type) {
         case 'POST':
-          await flushGpsBeforeQueuedDelivery(api, action.endpoint);
-          await api.post(action.endpoint, action.data);
+          {
+            const deliveryId = queuedDeliveryManifestId(action.endpoint);
+            if (deliveryId) {
+              await runExclusiveGpsTask(deliveryId, () => withGpsTransitionLock(deliveryId, async () => {
+                if (!isCurrent()) throw new SyncContextChangedError();
+                checkingGps = true;
+                await flushGpsBeforeQueuedDelivery(api, action.endpoint, currentUserId, context.gpsOwner || context.owner, isCurrent);
+                checkingGps = false;
+                if (!isCurrent()) throw new SyncContextChangedError();
+                deliveryAttempted = true;
+                const response = await api.post(action.endpoint, action.data);
+                if (action.endpoint.endsWith('/confirmar-entrega-idempotente')) {
+                  const answer = response?.data?.data;
+                  const reference = (action.data as { referencia?: unknown } | null)?.referencia;
+                  if (response?.data?.success !== true || typeof reference !== 'string' || answer?.idempotencia?.version !== 1
+                    || String(answer.idempotencia.referencia).toLowerCase() !== reference.toLowerCase()
+                    || typeof answer.idempotencia.repetido !== 'boolean' || answer?.manifiesto?.id !== deliveryId
+                    || !['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'RECHAZADO', 'CANCELADO'].includes(answer?.manifiesto?.estado)
+                    || !answer.manifiesto.fechaEntrega) {
+                    throw new Error('No se recibió una confirmación verificable de la entrega. La copia se conservó.');
+                  }
+                }
+                notifyDeliveryConfirmed(deliveryId, String(currentUserId));
+              }));
+            } else {
+              if (!isCurrent()) throw new SyncContextChangedError();
+              await api.post(action.endpoint, action.data);
+            }
+          }
           break;
         case 'PUT':
+          if (!isCurrent()) throw new SyncContextChangedError();
           await api.put(action.endpoint, action.data);
           break;
         case 'PATCH':
+          if (!isCurrent()) throw new SyncContextChangedError();
           await api.patch(action.endpoint, action.data);
           break;
         case 'DELETE':
+          if (!isCurrent()) throw new SyncContextChangedError();
           await api.delete(action.endpoint);
           break;
         default: {
@@ -316,12 +494,26 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
       if (action.id != null) {
         await removeOffline('sync_queue', action.id);
       }
-      cleanupAfterSuccessfulSync(action.endpoint);
+      notifyOfflineQueueChanged();
+      try { cleanupAfterSuccessfulSync(action.endpoint, context.owner); }
+      catch {
+        // The server already confirmed this action and it was removed from the
+        // queue. A cache failure must never put it back and replay the delivery.
+        result.cleanupError = true;
+        result.lastError = 'La entrega se confirmó, pero no se pudo actualizar la copia local. Consultá el manifiesto al reconectar.';
+      }
       result.processed += 1;
       result.pending -= 1;
     } catch (error) {
+      if (error instanceof SyncContextChangedError) break;
       const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
-      const { failureKind, lastError } = classifySyncFailure(error);
+      const classified = classifySyncFailure(error);
+      const uncertain = deliveryAttempted && !response
+        && (error as { isAxiosError?: boolean } | null)?.isAxiosError === true;
+      const failureKind = classified.failureKind;
+      const lastError = uncertain ? 'No recibimos confirmación de la entrega. Se conservó para comprobarla al reintentar.'
+        : checkingGps && failureKind === 'retryable' && !(error instanceof GpsPendingError)
+          ? 'Hay ubicaciones pendientes. Revisá la conexión y volvé a sincronizarlas antes de entregar.' : classified.lastError;
       const attempts = (action.attempts || 0) + 1;
       if (action.id != null) {
         await saveOffline('sync_queue', {
@@ -329,8 +521,10 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
           attempts,
           failureKind,
           lastError,
+          lastFailureUncertain: uncertain,
           nextRetryAt: failureKind === 'retryable' ? new Date(Date.now() + 30_000 * 2 ** Math.min(attempts, 6)).toISOString() : undefined,
         });
+        notifyOfflineQueueChanged();
       }
       result[failureKind] += 1;
       result.lastError = lastError;
@@ -344,47 +538,25 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
   return result;
 }
 
-type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };
+type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown>; get: (endpoint: string) => Promise<unknown> };
 
-async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string): Promise<void> {
+async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, owner: string | number, contextOwner: string, isCurrent: () => boolean): Promise<void> {
   const manifiestoId = queuedDeliveryManifestId(endpoint);
   if (!manifiestoId || typeof localStorage === 'undefined') return;
-
-  const key = `gps_pending_${manifiestoId}`;
-  const stored = localStorage.getItem(key);
-  if (!stored) return;
-
-  let points: Array<{ lat: number; lng: number; speed?: number; heading?: number }>;
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    points = Array.isArray(parsed)
-      ? parsed.filter((point): point is { lat: number; lng: number; speed?: number; heading?: number } => {
-          if (!point || typeof point !== 'object') return false;
-          const candidate = point as { lat?: unknown; lng?: unknown };
-          return Number.isFinite(candidate.lat) && Number.isFinite(candidate.lng);
-        })
-      : [];
-  } catch {
-    points = [];
-  }
-  for (const point of points) {
-    await api.post(`/manifiestos/${manifiestoId}/ubicacion`, {
-      latitud: point.lat,
-      longitud: point.lng,
-      velocidad: point.speed,
-      direccion: point.heading,
-    });
-  }
-  localStorage.removeItem(key);
+  await flushStoredGpsQueue(owner, manifiestoId, async point => {
+    if (!isCurrent()) throw new SyncContextChangedError();
+    await sendIdempotentGps(api, manifiestoId, point);
+    if (!isCurrent()) throw new SyncContextChangedError();
+  }, contextOwner, async point => {
+    if (!isCurrent()) throw new SyncContextChangedError();
+    const receipt = await api.get(`/manifiestos/${encodeURIComponent(manifiestoId)}/ubicaciones/${encodeURIComponent(point.puntoId!)}/confirmacion`);
+    if (!isCurrent()) throw new SyncContextChangedError();
+    return matchesGpsReceipt(receipt, point);
+  });
 }
 
-function cleanupAfterSuccessfulSync(endpoint: string): void {
+function cleanupAfterSuccessfulSync(endpoint: string, owner: string): void {
   const manifiestoId = queuedDeliveryManifestId(endpoint);
   if (!manifiestoId || typeof localStorage === 'undefined') return;
-  localStorage.removeItem(`viaje_snapshot_${manifiestoId}`);
-  localStorage.removeItem(`viaje_status_${manifiestoId}`);
-  localStorage.removeItem(`gps_pending_${manifiestoId}`);
-  if (localStorage.getItem('sitrep_active_trip_id') === manifiestoId) {
-    localStorage.removeItem('sitrep_active_trip_id');
-  }
+  clearTripSnapshot(owner, manifiestoId);
 }

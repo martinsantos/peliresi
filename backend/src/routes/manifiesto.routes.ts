@@ -1,3 +1,11 @@
+import { listManifestCertificates, releaseManifestCertificate, downloadManifestCertificate, recoverManifestCertificate } from '../controllers/manifest-certificate.controller';
+import { confirmarEntregaIdempotente } from '../controllers/manifiesto-delivery.controller';
+import { registrarIncidenteIdempotente } from '../controllers/manifiesto-incident-command.controller';
+import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
+import { canCreateManifestProposal } from '../domain/manifestProposal';
+import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
+import { multiGpsEnabled, transportGpsTargets } from '../controllers/transport-gps-session.controller';
+import { getManifestProposal, approveManifestParty, getProposalAgenda, startManifestCoordination, getTrainingTasks } from '../controllers/manifest-proposal.controller';
 import { Router } from 'express';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
@@ -11,6 +19,8 @@ import {
     firmarManifiesto,
     confirmarRetiro,
     actualizarUbicacion,
+    actualizarUbicacionIdempotente,
+    consultarConfirmacionUbicacion,
     confirmarEntrega,
     confirmarRecepcion,
     confirmarRecepcionInSitu,
@@ -70,6 +80,9 @@ router.get('/verificar/:numero', verificarManifiesto);
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+router.get('/cargas-en-curso',multiGpsEnabled,hasRole('TRANSPORTISTA'),transportGpsTargets);
+router.get('/relevos-asignados',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportHandoffs);
+router.post('/relevos-asignados/:tramoId/acceso',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportAccess);
 
 router.get('/baja-intensidad', exceptionalEnabled, listExceptional);
 router.get('/baja-intensidad/participantes', exceptionalEnabled, exceptionalParticipants);
@@ -244,6 +257,8 @@ router.get('/', getManifiestos);
  *       404:
  *         description: Manifiesto no encontrado
  */
+router.get('/agenda-partes', getProposalAgenda);
+router.get('/tareas-partes', getTrainingTasks);
 router.get('/:id', getManifiestoById);
 
 /**
@@ -280,7 +295,21 @@ router.get('/:id', getManifiestoById);
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/', hasRole('GENERADOR', 'ADMIN'), createManifiesto);
+router.post('/', (req: any, res, next) => canCreateManifestProposal(req.user) ? next() : hasRole('GENERADOR', 'ADMIN')(req, res, next), createManifiesto);
+router.get('/:id/certificados', listManifestCertificates);
+router.post('/:id/certificados', releaseManifestCertificate);
+router.post('/:id/certificados/:commandId/recuperar', recoverManifestCertificate);
+router.get('/:id/certificados/:documentId/archivo', downloadManifestCertificate);
+
+router.get('/:id/documentos-cap', listTrainingCertificates);
+router.post('/:id/documentos-cap', releaseTrainingCertificate);
+router.get('/:id/documentos-cap/:documentId/archivo', downloadTrainingCertificate);
+router.get('/:id/aprobaciones', getManifestProposal);
+router.get('/:id/tramos', handoffEnabled, listTransportLegs);
+router.post('/:id/tramos', handoffEnabled, hasRole('TRANSPORTISTA'), createTransportHandoff);
+router.post('/:id/tramos/:tramoId/acceso', handoffEnabled, hasRole('TRANSPORTISTA'), rotateTransportAccess);
+router.post('/:id/aprobar-parte', approveManifestParty);
+router.post('/:id/iniciar-coordinacion', startManifestCoordination);
 
 /**
  * @openapi
@@ -454,6 +483,11 @@ router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA', 'ADMIN'), confirma
  */
 router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacion);
 
+// A distinct endpoint makes old backends fail closed rather than silently
+// ignoring a retry key during a rolling deployment or rollback.
+router.post('/:id/ubicacion-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacionIdempotente);
+router.get('/:id/ubicaciones/:puntoId/confirmacion', hasRole('TRANSPORTISTA', 'ADMIN'), consultarConfirmacionUbicacion);
+
 /**
  * @openapi
  * /manifiestos/{id}/confirmar-entrega:
@@ -475,6 +509,8 @@ router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbica
  *         description: Rol no autorizado
  */
 router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarEntrega);
+// Separate contract: a client must not silently fall back to an older server.
+router.post('/:id/confirmar-entrega-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarEntregaIdempotente);
 
 /**
  * @openapi
@@ -509,6 +545,7 @@ router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), confirm
  *         description: Rol no autorizado
  */
 router.post('/:id/incidente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncidente);
+router.post('/:id/incidente-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncidenteIdempotente);
 
 /**
  * @openapi

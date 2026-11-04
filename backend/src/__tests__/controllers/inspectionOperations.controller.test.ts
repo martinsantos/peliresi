@@ -4,7 +4,7 @@ const db = vi.hoisted(() => ({
   inspeccion: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn(), create: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
   usuario: { findUnique: vi.fn(), findMany: vi.fn() },
   secuenciaInspeccion: { findUnique: vi.fn(), upsert: vi.fn() },
-  eventoInspeccion: { create: vi.fn() }, notificacion: { create: vi.fn() },
+  eventoInspeccion: { create: vi.fn() }, notificacion: { createMany: vi.fn() },
   generador: { findMany: vi.fn() }, transportista: { findMany: vi.fn() }, operador: { findMany: vi.fn() }, sedeOperador: { findMany: vi.fn() },
   $transaction: vi.fn(), $queryRaw: vi.fn(),
 }));
@@ -29,6 +29,8 @@ beforeEach(() => {
   db.inspeccion.count.mockResolvedValue(1);
   db.inspeccion.groupBy.mockResolvedValue([{ estado: 'EN_CAMPO', _count: { _all: 1 } }]);
   db.usuario.findUnique.mockResolvedValue(user);
+  db.usuario.findMany.mockResolvedValue([{ id: 'admin-peer' }]);
+  db.eventoInspeccion.create.mockImplementation(async ({ data }) => ({ id: 'event-1', ...data }));
   db.secuenciaInspeccion.findUnique.mockResolvedValue(null);
   db.secuenciaInspeccion.upsert.mockResolvedValue({ ultimo: 1 });
   snapshot.mockResolvedValue({ fields: [], actorId: 'g1' });
@@ -77,15 +79,16 @@ describe('creation independent of registered actors', () => {
     expect(next.mock.calls[0][0].statusCode).toBe(403);
   });
   it('notifies a scheduled assignment exactly once across an idempotent retry', async () => {
+    db.usuario.findMany.mockResolvedValue([{ id: user.id }]);
     const input = { clienteId: 'agenda-001', fechaProgramada: '2026-09-25T12:00:00Z' };
     const next = vi.fn();
     await crearInspeccion({ user, body: input } as any, response() as any, next);
     expect(next).not.toHaveBeenCalled();
-    expect(db.notificacion.create.mock.calls[0][0].data).toMatchObject({ usuarioId: user.id, tipo: 'INFO_GENERAL' });
+    expect(db.notificacion.createMany.mock.calls[0][0]).toMatchObject({ skipDuplicates: true, data: [{ usuarioId: user.id, tipo: 'INFO_GENERAL' }] });
     const createdData = db.inspeccion.create.mock.calls[0][0].data;
     db.inspeccion.findUnique.mockResolvedValue({ ...caseRow, ...createdData });
     await crearInspeccion({ user, body: input } as any, response() as any, next);
-    expect(db.notificacion.create).toHaveBeenCalledTimes(1);
+    expect(db.notificacion.createMany).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -131,7 +134,7 @@ describe('shared operational scope and organization', () => {
     db.inspeccion.findUnique.mockResolvedValue(caseRow); db.inspeccion.updateMany.mockResolvedValue({ count: 0 });
     const next = vi.fn();
     await organizarInspeccion({ user, params: { id: 'i1' }, body: { version: 1, fechaProgramada: null, motivo: 'Reprogramar visita' } } as any, response() as any, next);
-    expect(next.mock.calls[0][0].statusCode).toBe(409); expect(db.inspeccion.update).not.toHaveBeenCalled(); expect(db.notificacion.create).not.toHaveBeenCalled();
+    expect(next.mock.calls[0][0].statusCode).toBe(409); expect(db.inspeccion.update).not.toHaveBeenCalled(); expect(db.notificacion.createMany).not.toHaveBeenCalled();
   });
   it.each(['PRP', 'ARP'])('links a responsible actor without replacing the %s form or legajo', async (serie) => {
     db.inspeccion.findUnique.mockResolvedValue({ ...caseRow, numero: `${serie}-2026-00001` });
@@ -154,7 +157,7 @@ describe('shared operational scope and organization', () => {
     const next = vi.fn();
     await organizarInspeccion({ user, params: { id: 'i1' }, body: { version: 1, fechaProgramada: '2026-10-01T12:00:00Z', motivo: 'Programación de visita' } } as any, response() as any, next);
     expect(next).not.toHaveBeenCalled(); expect(db.inspeccion.update.mock.calls[0][0].data.estado).toBe('PLANIFICADA');
-    expect(db.notificacion.create.mock.calls[0][0].data.datos).toContain('i1');
+    expect(JSON.parse(db.notificacion.createMany.mock.calls[0][0].data[0].datos)).toMatchObject({ inspeccionId: 'i1', evento: 'PROGRAMADA', eventoId: 'event-1' });
   });
   it('searches the registry without a recent-manifest restriction and never links automatically', async () => {
     db.inspeccion.findUnique.mockResolvedValue(caseRow);

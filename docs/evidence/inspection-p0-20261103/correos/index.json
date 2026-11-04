@@ -1,0 +1,74 @@
+[
+  {
+    "archivo": "presentacion-inspector.html",
+    "audiencia": "INSPECTOR",
+    "evento": "presentacion",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Descargo recibido · inspección QA-CAMPO-0001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "presentacion-jefatura.html",
+    "audiencia": "JEFATURA",
+    "evento": "presentacion",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Seguimiento · descargo recibido en QA-CAMPO-0001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "presentacion-inspeccionado.html",
+    "audiencia": "INSPECCIONADO",
+    "evento": "presentacion",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Recibimos tu descargo sobre el acta QA-001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "respuesta-inspector-jefatura.html",
+    "audiencia": "JEFATURA",
+    "evento": "respuesta-inspector",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Seguimiento · respuesta publicada en QA-CAMPO-0001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "respuesta-inspector-inspeccionado.html",
+    "audiencia": "INSPECCIONADO",
+    "evento": "respuesta-inspector",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Respuesta del equipo de inspección · acta QA-001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "respuesta-jefatura-inspector.html",
+    "audiencia": "INSPECTOR",
+    "evento": "respuesta-jefatura",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Respuesta publicada · inspección QA-CAMPO-0001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "respuesta-jefatura-inspeccionado.html",
+    "audiencia": "INSPECCIONADO",
+    "evento": "respuesta-jefatura",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Respuesta del equipo de inspección · acta QA-001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  },
+  {
+    "archivo": "respuesta-tras-revocacion-jefatura.html",
+    "audiencia": "JEFATURA",
+    "evento": "respuesta-tras-revocacion",
+    "destinatario": "***@practica.sitrep.test",
+    "asunto": "[SITREP] Seguimiento · respuesta publicada en QA-CAMPO-0001",
+    "estado": "SUPRIMIDO",
+    "motivo": "EMAIL_DISABLED"
+  }
+]

@@ -5,11 +5,13 @@
  */
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
   Users,
+  Settings,
+  LogOut,
   Shield,
   Factory,
   Truck,
@@ -87,7 +89,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
   className,
   onSwitch,
 }) => {
-  const { currentUser, users, switchUser, getUsersByRole } = useAuth();
+  const { currentUser, users, switchUser, getUsersByRole, logout } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [isSwitching, setIsSwitching] = useState(false);
@@ -147,8 +150,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
           )}>
             {currentUser.avatar}
           </div>
-          <div className="hidden md:block text-left">
-            <p className={cn('text-sm font-semibold', currentConfig.color)}>
+          <div className="hidden min-w-0 max-w-[10rem] text-left xl:block">
+            <p title={currentUser.nombre} className={cn('overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold', currentConfig.color)}>
               {currentUser.nombre}
             </p>
             <p className="text-xs text-neutral-700">
@@ -174,8 +177,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                   <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center font-bold text-lg">
                     {currentUser.avatar}
                   </div>
-                  <div>
-                    <p className="font-semibold text-neutral-900">{currentUser.nombre}</p>
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-neutral-900">{currentUser.nombre}</p>
                     <div className="flex items-center gap-1">
                       <CurrentIcon size={12} className={currentConfig.color} />
                       <span className={cn('text-xs', currentConfig.color)}>
@@ -189,9 +192,15 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
               {/* Outside demo mode there are no switchable accounts: offer the profile, not an empty switcher. */}
               {users.length === 0 ? (
                 <div className="p-3">
-                  <Link to="/mi-perfil" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
-                    Mi perfil
+                  <Link to="/mi-perfil" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                    <User size={16} aria-hidden="true" />Mi perfil
                   </Link>
+                  <Link to="/configuracion" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50">
+                    <Settings size={16} aria-hidden="true" />Configuración
+                  </Link>
+                  <button type="button" onClick={() => { setIsOpen(false); void logout(); navigate('/login', { replace: true, state: null }); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-error-700 hover:bg-error-50">
+                    <LogOut size={16} aria-hidden="true" />Cerrar sesión
+                  </button>
                 </div>
               ) : <>
               {/* Filtros por rol */}

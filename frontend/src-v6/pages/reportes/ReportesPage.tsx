@@ -4,9 +4,12 @@
  * Shell: filter bar, tab switcher, lazy-loaded tab content
  */
 
+import { useScopedSearchParams } from '../../hooks/useScopedSearchParams';
+import { inspectionWorkspaceOwner, inspectionDateFilter, inspectionPage } from '../../utils/inspectionWorkspace';
+import { LoadingIndicator } from '../../components/ui/LoadingState';
 import { useAuth } from '../../contexts/AuthContext';
 import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
-import React, { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
 import {
   FileText,
   Truck,
@@ -30,6 +33,8 @@ import { useCentroControl } from '../../hooks/useCentroControl';
 import type { ActorGenerador, ActorTransportista, ActorOperador } from '../../hooks/useCentroControl';
 import { exportReportePDF } from '../../utils/exportPdf';
 import { formatReportQuantities } from '../../utils/report-quantities';
+import { formatEstado } from '../../utils/formatters';
+import type { EstadoManifiesto } from '../../types/models';
 import { DATE_PRESETS, computeDateRange } from '../../utils/date-presets';
 import { agruparPorDepartamento } from '../../utils/mendoza-departamentos';
 import type { ReporteFilters } from '../../types/api';
@@ -64,32 +69,62 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'mapa', label: 'Mapa de Actores', icon: MapIcon },
 ];
 
-function TabSpinner() {
-  return (
-    <div className="flex flex-col items-center justify-center py-24">
-      <div className="relative">
-        <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
-        <BarChart3 size={24} className="absolute inset-0 m-auto text-primary-500" />
-      </div>
-      <p className="mt-4 text-neutral-600 font-medium">Cargando módulo...</p>
-    </div>
-  );
-}
+const REPORT_FILTER_KEYS = ['tipo', 'desde', 'hasta', 'pagina', 'periodo', 'todos'] as const;
+function TabSpinner() { return <div className="flex justify-center py-12"><LoadingIndicator label="Cargando reporte…" size={32}/></div>; }
 
 const ReportesPage: React.FC = () => {
   const { currentUser } = useAuth();
-  // ── Period filter state (default: Ver Todos = days 0) ──
-  const [datePreset, setDatePreset] = useState(0);
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('manifiestos');
-  const [reportPage, setReportPage] = useState(1);
-  const [incluirTodos, setIncluirTodos] = useState(true);
+  return <ReportWorkspace key={inspectionWorkspaceOwner(currentUser)}/>;
+};
+function ReportWorkspace() {
+  const { currentUser } = useAuth();
+  const [params, setParams] = useScopedSearchParams('reportes', REPORT_FILTER_KEYS, inspectionWorkspaceOwner(currentUser));
+  const fechaDesde = inspectionDateFilter(params.get('desde'));
+  const fechaHasta = inspectionDateFilter(params.get('hasta'));
+  const validTab = tabs.find(tab => tab.id === params.get('tipo') && (tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)));
+  const activeTab: TabType = validTab?.id || 'manifiestos';
+  const reportNav = useRef<HTMLElement>(null);
+  const selectedReport = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const nav = reportNav.current;
+    const selected = selectedReport.current;
+    if (!nav || !selected) return;
+    const revealSelection = () => {
+      if (!nav.clientWidth || nav.scrollWidth <= nav.clientWidth) return;
+      const container = nav.getBoundingClientRect();
+      const item = selected.getBoundingClientRect();
+      // Scroll only the report choices, never the page or its focused field.
+      nav.scrollLeft += item.left - container.left - Math.max(0, (nav.clientWidth - item.width) / 2);
+    };
+    revealSelection();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealSelection);
+    observer?.observe(nav);
+    return () => observer?.disconnect();
+  }, [activeTab]);
+  const reportPage = inspectionPage(params.get('pagina'));
+  const datePreset = params.has('periodo') ? Number(params.get('periodo')) : (fechaDesde || fechaHasta ? -1 : 0);
+  const incluirTodos = params.has('todos') ? params.get('todos') === 'true' : !fechaDesde && !fechaHasta;
+  const invalidDates = !!fechaDesde && !!fechaHasta && fechaDesde > fechaHasta;
+  function updateFilters(values: Record<string, string | number | undefined>) {
+    setParams(next => {
+      for (const [key, value] of Object.entries(values)) {
+        if (value === undefined || value === '') next.delete(key);
+        else next.set(key, String(value));
+      }
+      return next;
+    });
+  }
+  const setReportPage = (page:number) => updateFilters({pagina:page>1?page:undefined});
+  const setIncluirTodos = (value:boolean) => updateFilters({todos:String(value)});
 
   // ── Department detail modal ──
   const [selectedDep, setSelectedDep] = useState<string | null>(null);
 
   const exportarReporte = useExportarReporte();
+  const [pdfPending,setPdfPending]=useState(false);
+  const [pdfError,setPdfError]=useState(false);
+  const pdfFlight=useRef(false), mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
 
   // ── Filters computed reactively ──
   const appliedFilters: ReporteFilters | undefined = useMemo(() => {
@@ -101,20 +136,16 @@ const ReportesPage: React.FC = () => {
   }, [fechaDesde, fechaHasta]);
 
   // ── Date preset handler ──
-  const handleDatePreset = useCallback((days: number) => {
-    setReportPage(1);
-    setDatePreset(days);
-    const range = computeDateRange(days);
-    setFechaDesde(range.desde);
-    setFechaHasta(range.hasta);
-    setIncluirTodos(days === 0);
-  }, []);
+  const handleDatePreset = (days:number) => {
+    const range=computeDateRange(days);
+    updateFilters({periodo:days,desde:range.desde,hasta:range.hasta,pagina:undefined,todos:undefined});
+  };
 
   // ── Queries — reports (only fetch if filters exist, i.e. dates are set) ──
   const reportFilters = useMemo(() => ({ ...appliedFilters, page: reportPage }), [appliedFilters, reportPage]);
-  const manifiestos = useReporteManifiestos(activeTab === 'manifiestos' ? reportFilters : undefined);
-  const tratados = useReporteTratados(activeTab === 'tratados' ? reportFilters : undefined);
-  const transporte = useReporteTransporte(activeTab === 'transporte' ? reportFilters : undefined);
+  const manifiestos = useReporteManifiestos(!invalidDates && activeTab === 'manifiestos' ? reportFilters : undefined);
+  const tratados = useReporteTratados(!invalidDates && activeTab === 'tratados' ? reportFilters : undefined);
+  const transporte = useReporteTransporte(!invalidDates && activeTab === 'transporte' ? reportFilters : undefined);
 
   // ── Centro Control data (for Departamentos + Mapa tabs) ──
   const ccParams = useMemo(() => ({
@@ -125,7 +156,7 @@ const ReportesPage: React.FC = () => {
   }), [fechaDesde, fechaHasta, incluirTodos]);
 
   const needsCentroControl = ['departamentos', 'mapa', 'generadores', 'operadores'].includes(activeTab);
-  const activityQuery = useCentroControl(ccParams, false, needsCentroControl);
+  const activityQuery = useCentroControl(ccParams, false, needsCentroControl && !invalidDates);
   const ccData = activityQuery.data;
 
   const activeQuery = activeTab === 'manifiestos' ? manifiestos
@@ -137,11 +168,13 @@ const ReportesPage: React.FC = () => {
     if (pagination && reportPage > Math.max(1, pagination.pages)) setReportPage(1);
   }, [pagination, reportPage]);
 
-  const periodoLabel = fechaDesde && fechaHasta
-    ? `${fechaDesde} — ${fechaHasta}`
-    : 'Todos los períodos';
+  const displayDate=(value:string)=>value.split('-').reverse().join('/');
+  const periodoLabel = fechaDesde && fechaHasta ? `${displayDate(fechaDesde)} — ${displayDate(fechaHasta)}`
+    : fechaDesde ? `Desde ${displayDate(fechaDesde)}` : fechaHasta ? `Hasta ${displayDate(fechaHasta)}` : 'Todos los períodos';
+  const canExport = !pdfPending && !invalidDates && !!activeQuery?.data && !activeQuery.isError && !activeQuery.isLoading && !activeQuery.isFetching && activeQuery.fetchStatus !== 'paused';
 
   const handleExportCSV = () => {
+    if (!canExport) return;
     const tipoMap: Record<string, string> = { manifiestos: 'manifiestos', tratados: 'tratados', transporte: 'transporte' };
     const tipo = tipoMap[activeTab];
     if (tipo) {
@@ -149,9 +182,11 @@ const ReportesPage: React.FC = () => {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const data = activeQuery?.data;
-    if (!data) return;
+    if (!data || !canExport || pdfFlight.current) return;
+    pdfFlight.current=true;setPdfPending(true);setPdfError(false);
+    try {
 
     const tabLabels: Record<string, string> = {
       manifiestos: 'Reporte de Manifiestos',
@@ -177,7 +212,7 @@ const ReportesPage: React.FC = () => {
       headers = ['Número', 'Estado', 'Generador', 'Transportista', 'Operador', 'Fecha'];
       rows = list.map((m) => [
         (m.numero as string) || '',
-        (m.estado as string) || '',
+        m.estado ? formatEstado(m.estado as EstadoManifiesto) : 'Sin estado',
         (m.generador as string) || '',
         (m.transportista as string) || '',
         (m.operador as string) || '',
@@ -216,13 +251,16 @@ const ReportesPage: React.FC = () => {
       ]);
     }
 
-    exportReportePDF({
+    await exportReportePDF({
+      canDownload: () => mounted.current,
       titulo: tabLabels[activeTab] || 'Reporte',
       subtitulo: `${tabs.find(t => t.id === activeTab)?.label} - Sistema SITREP${pagination ? ` · Página ${pagination.page} de ${Math.max(1, pagination.pages)} (${rows.length} registros de ${pagination.total})` : ''}`,
       periodo: periodoLabel,
       kpis,
       tabla: { headers, rows },
     });
+    } catch { if(mounted.current)setPdfError(true); }
+    finally { pdfFlight.current=false;if(mounted.current)setPdfPending(false); }
   };
 
   // ── Department detail modal data ──
@@ -277,7 +315,7 @@ const ReportesPage: React.FC = () => {
               <input
                 type="date"
                 value={fechaDesde}
-                onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); setIncluirTodos(false); setReportPage(1); }}
+                onChange={e => updateFilters({desde:e.target.value,periodo:-1,todos:undefined,pagina:undefined})}
                 className="min-h-11 min-w-0 w-full px-2 py-2 rounded border border-neutral-300 text-neutral-900 bg-white text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
               />
               </label>
@@ -285,7 +323,9 @@ const ReportesPage: React.FC = () => {
               <input
                 type="date"
                 value={fechaHasta}
-                onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); setIncluirTodos(false); setReportPage(1); }}
+                onChange={e => updateFilters({hasta:e.target.value,periodo:-1,todos:undefined,pagina:undefined})}
+                aria-invalid={invalidDates || undefined}
+                aria-describedby={invalidDates ? 'report-period-error' : undefined}
                 className="min-h-11 min-w-0 w-full px-2 py-2 rounded border border-neutral-300 text-neutral-900 bg-white text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
               />
               </label>
@@ -302,30 +342,38 @@ const ReportesPage: React.FC = () => {
             </span>
             {isReportTab && (
               <>
-                <Button variant="ghost" onClick={() => window.print()} className="hidden sm:flex min-w-11 px-3" aria-label="Imprimir reporte" title="Imprimir"><Printer size={18} /></Button>
-                <Button variant="outline" onClick={handleExportCSV} isLoading={exportarReporte.isPending} className="min-w-11 px-3" aria-label="Exportar CSV" title="Exportar CSV"><Download size={18} /><span>CSV</span></Button>
-                <Button onClick={handleExportPDF} disabled={!activeQuery?.data} className="min-w-11 px-3" aria-label="Exportar PDF" title="Exportar PDF"><FileDown size={18} /><span>PDF</span></Button>
+                <Button variant="ghost" disabled={!canExport} onClick={() => { if(canExport)window.print(); }} className="hidden sm:flex min-w-11 px-3" aria-label="Imprimir reporte" title="Imprimir"><Printer size={18} /></Button>
+                <Button variant="outline" onClick={handleExportCSV} disabled={!canExport} isLoading={exportarReporte.isPending} className="min-w-11 px-3" aria-label="Exportar CSV" title="Exportar CSV"><Download size={18} /><span>CSV</span></Button>
+                <Button onClick={() => void handleExportPDF()} disabled={!canExport} isLoading={pdfPending} className="min-w-11 px-3" aria-label="Exportar PDF" title="Exportar PDF"><FileDown size={18} /><span>PDF</span></Button>
               </>
             )}
           </div>
         </div>
 
-        {/* Row 2: Tabs — horizontally scrollable with gradient fade indicators */}
+        {/* One visible report chooser per viewport, using the same options and state. */}
         <div className="relative bg-white rounded-b-xl border-x border-b border-neutral-100">
+          <label className="block px-3 pb-3 text-sm font-medium text-neutral-700 sm:hidden">
+            Tipo de reporte
+            <select value={activeTab} onChange={event => updateFilters({tipo:event.target.value,pagina:undefined})}
+              className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+              {tabs.filter(tab => tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)).map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
+            </select>
+          </label>
           {/* Left gradient fade */}
-          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
+          <div className="hidden sm:block pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
           {/* Right gradient fade */}
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
-          <nav aria-label="Tipos de reporte" className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
+          <div className="hidden sm:block pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
+          <nav ref={reportNav} aria-label="Tipos de reporte" className="hidden sm:flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
             {tabs.filter(tab => tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)).map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  ref={isActive ? selectedReport : undefined}
                   type="button"
                   aria-pressed={isActive}
-                  onClick={() => { setActiveTab(tab.id); setReportPage(1); }}
+                  onClick={() => updateFilters({tipo:tab.id,pagina:undefined})}
                   className={`min-h-11 flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-700 ${
                     isActive
                       ? 'border-primary-700 text-primary-800'
@@ -343,42 +391,37 @@ const ReportesPage: React.FC = () => {
 
       {/* ── Tab Content ── */}
       <div className="mt-4 isolate">
+      {pdfError && <p role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudo preparar el PDF. Tus filtros se conservan; podés reintentar la descarga.</p>}
       {exportarReporte.isError && <p role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudo exportar el CSV. {exportarReporte.error instanceof Error ? exportarReporte.error.message : 'Tus filtros se conservan; podés reintentar la exportación.'}</p>}
-      <Suspense fallback={<TabSpinner />}>
-      {isReportTab ? (
+      <Suspense key={activeTab} fallback={<TabSpinner />}>
+      {invalidDates ? <p role="alert" id="report-period-error" className="rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-800">La fecha Hasta debe ser igual o posterior a Desde. Corregí el período para consultar o exportar.</p> : isReportTab ? (
         activeQuery?.fetchStatus === 'paused' ? (
           <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">Sin conexión. Tus filtros se conservan; el reporte se actualizará al reconectar.</p>
         ) : activeQuery?.isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
-              <BarChart3 size={24} className="absolute inset-0 m-auto text-primary-500" />
-            </div>
-            <p className="mt-4 text-neutral-600 font-medium">Generando reporte...</p>
-            <p className="text-sm text-neutral-400 mt-1">Consultando datos del sistema</p>
-          </div>
+          <TabSpinner/>
         ) : activeQuery?.isError ? (
           <Card className="border-0 shadow-sm">
             <div className="flex flex-col items-center justify-center py-16">
               <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
                 <FileText className="text-red-400" size={24} />
               </div>
-              <p className="text-error-600 font-medium">Error al generar el reporte</p>
+              <p role="alert" className="text-error-600 font-medium">Error al generar el reporte</p>
               <p className="text-sm text-neutral-700 mt-1">No se pudieron cargar los datos. Tus filtros se conservan.</p>
               <Button variant="outline" className="mt-4" onClick={() => void activeQuery.refetch()}>Reintentar reporte</Button>
             </div>
           </Card>
         ) : activeQuery?.data ? (
           <>
-            {activeTab === 'manifiestos' && <ManifiestosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
-            {activeTab === 'tratados' && <TratadosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
-            {activeTab === 'transporte' && <TransporteTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
+            {activeQuery.isFetching && <div className="mb-4"><LoadingIndicator label="Actualizando reporte; la exportación estará disponible al terminar…"/></div>}
+            {activeTab === 'manifiestos' && <ManifiestosTab data={activeQuery.data} periodo={periodoLabel} />}
+            {activeTab === 'tratados' && <TratadosTab data={activeQuery.data} periodo={periodoLabel} />}
+            {activeTab === 'transporte' && <TransporteTab data={activeQuery.data} periodo={periodoLabel} />}
             {pagination && (
               <nav aria-label="Páginas del reporte" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
                 <p role="status" className="text-sm text-neutral-700">Página {pagination.page} de {Math.max(1, pagination.pages)} · {pagination.total} registros</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" disabled={reportPage <= 1 || activeQuery.isFetching} onClick={() => setReportPage(value => value - 1)}>Página anterior</Button>
-                  <Button variant="outline" disabled={reportPage >= pagination.pages || activeQuery.isFetching} onClick={() => setReportPage(value => value + 1)}>Página siguiente</Button>
+                  <Button variant="outline" disabled={reportPage <= 1 || activeQuery.isFetching} onClick={() => setReportPage(reportPage - 1)}>Página anterior</Button>
+                  <Button variant="outline" disabled={reportPage >= pagination.pages || activeQuery.isFetching} onClick={() => setReportPage(reportPage + 1)}>Página siguiente</Button>
                 </div>
               </nav>
             )}

@@ -11,6 +11,7 @@ function uiProof(page:Page,info:TestInfo) {
   const title=await page.title(),text=await page.locator('#root').innerText();
   await info.attach('ui-console-proof',{body:Buffer.from(JSON.stringify({url:page.url(),title,meaningfulContent:text.trim().length,console:messages},null,2)),contentType:'application/json'});
   expect(title).toMatch(/SITREP/i);expect(text.trim().length).toBeGreaterThan(20);
+  expect(messages, 'No rejected background requests or console errors in the authorized journey').toEqual([]);
   await expect(page.locator('vite-error-overlay,nextjs-portal')).toHaveCount(0);
  };
 }

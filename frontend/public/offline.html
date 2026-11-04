@@ -1,130 +1,17 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sin Conexión - Trazabilidad RRPP</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        }
-        
-        .container {
-            text-align: center;
-            padding: 2rem;
-            max-width: 500px;
-        }
-        
-        .icon {
-            font-size: 80px;
-            margin-bottom: 1.5rem;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        h1 {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-        }
-        
-        p {
-            font-size: 1.1rem;
-            line-height: 1.6;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-        }
-        
-        .status {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 1rem;
-            border-radius: 12px;
-            margin-top: 2rem;
-            backdrop-filter: blur(10px);
-        }
-        
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ef4444;
-            margin-right: 8px;
-            animation: blink 1.5s infinite;
-        }
-        
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-        
-        button {
-            background: white;
-            color: #667eea;
-            border: none;
-            padding: 1rem 2rem;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        button:hover {
-            transform: scale(1.05);
-        }
-        
-        button:active {
-            transform: scale(0.95);
-        }
-    </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1B5E3C"><link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<title>SITREP · Sin conexión</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#f7f9fa;color:#172c24;font:16px/1.6 system-ui,-apple-system,sans-serif}main{width:100%;max-width:460px;padding:32px 24px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:36px;color:#1b5e3c;font-size:24px;font-weight:750}.brand img{width:40px;height:40px}h1{font-size:28px;line-height:1.2;letter-spacing:-.02em;margin:0 0 16px}p{color:#526359;margin:0 0 20px}button{width:100%;min-height:48px;padding:12px 20px;border:0;border-radius:8px;background:#1b5e3c;color:#fff;font:600 16px/1.5 system-ui;cursor:pointer}button:hover{background:#154a30}button:focus-visible{outline:3px solid #1b5e3c;outline-offset:4px}.note{margin-top:24px;padding-top:20px;border-top:1px solid #dce5df;font-size:14px}
+</style>
 </head>
-<body>
-    <div class="container">
-        <div class="icon">📡</div>
-        <h1>Sin Conexión a Internet</h1>
-        <p>
-            El sistema está funcionando en <strong>modo offline</strong>. 
-            Los datos se sincronizarán automáticamente cuando recuperes la conexión.
-        </p>
-        
-        <button onclick="window.location.reload()">
-            Reintentar Conexión
-        </button>
-        
-        <div class="status">
-            <span class="status-indicator"></span>
-            <span>Esperando conexión...</span>
-        </div>
-    </div>
-    
-    <script>
-        // Detectar cuando vuelve la conexión
-        window.addEventListener('online', () => {
-            window.location.reload();
-        });
-        
-        // Actualizar estado cada 5 segundos
-        setInterval(() => {
-            if (navigator.onLine) {
-                window.location.reload();
-            }
-        }, 5000);
-    </script>
-</body>
-</html>
+<body><main>
+<div class="brand"><img src="./favicon.svg" alt=""><span data-sitrep-wordmark>SITREP</span></div>
+<h1>No hay conexión</h1>
+<p>No pudimos abrir esta pantalla. Revisá tu conexión y volvé a intentar.</p>
+<button type="button" onclick="window.location.reload()">Reintentar conexión</button>
+<p class="note">Si tenías cambios pendientes, conservá este navegador y revisá su estado al volver. Un cambio está confirmado cuando SITREP indica que se guardó.</p>
+</main><script>window.addEventListener('online',()=>window.location.reload(),{once:true});</script></body></html>

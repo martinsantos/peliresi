@@ -1,3 +1,4 @@
+import { documentReadingOutcome } from '../../utils/documentReadingOutcome';
 /**
  * SITREP v6 - Inscripcion Wizard (Public)
  * ========================================
@@ -15,7 +16,7 @@ import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Check,
-  Factory, FlaskConical, AlertCircle, Loader2, Truck, Save,
+  AlertCircle, ChevronDown, Save,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { FormSkeleton } from '../../components/ui/LoadingState';
@@ -43,6 +44,7 @@ import {
 } from './inscripcion/shared';
 
 // Step components
+import { RegistrationFrame } from './inscripcion/RegistrationFrame';
 import { StepCuenta } from './inscripcion/steps/StepCuenta';
 import { StepEmpresa } from './inscripcion/steps/StepEmpresa';
 import { StepDocumentos } from './inscripcion/steps/StepDocumentos';
@@ -71,6 +73,14 @@ function receivedState(value: unknown): value is ReceivedState {
 
 const InscripcionWizardPage: React.FC = () => {
   const { tipo } = useParams<{ tipo: string }>();
+  const [params] = useSearchParams();
+  const labels: Record<string,string> = { generador: 'Generador', transportista: 'Transportista', operador: 'Operador' };
+  const label = labels[tipo || ''];
+  return <RegistrationFrame title={label ? `Inscripción como ${label}` : 'Inscripción'}><InscripcionWizardContent key={`${tipo}:${params.get('solicitud') || ''}:${params.get('modo') || ''}`} /></RegistrationFrame>;
+};
+
+const InscripcionWizardContent: React.FC = () => {
+  const { tipo } = useParams<{ tipo: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isGenerador = tipo === 'generador';
@@ -78,6 +88,8 @@ const InscripcionWizardPage: React.FC = () => {
   const isTransportista = tipo === 'transportista';
   const tipoActor: TipoActor = isGenerador ? 'GENERADOR' : isOperador ? 'OPERADOR' : 'TRANSPORTISTA';
   const isReviewMode = searchParams.get('modo') === 'revision';
+  const selectedApplication = searchParams.get('solicitud');
+  const recoveryDestination = `/inscripcion/${tipo}` + (selectedApplication ? '?solicitud=' + encodeURIComponent(selectedApplication) : '');
   const reviewFixture = isReviewMode ? getReviewFixture(tipoActor) : null;
   const steps = isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA;
   const totalSteps = steps.length;
@@ -98,7 +110,9 @@ const InscripcionWizardPage: React.FC = () => {
   const [step, setStep] = useState(isReviewMode ? Math.min(totalSteps, Math.max(1, Number(trialInitial?.data.step) || 1)) : 1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const validationRef = useRegistrationValidationFocus(attempted);
+  const focusStep = useRef<number | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [observations, setObservations] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>(() => trialInitial?.data.form && typeof trialInitial.data.form === 'object'
     ? Object.fromEntries(Object.entries(trialInitial.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : reviewFixture?.form || {});
   const [previewAnalyses, setPreviewAnalyses] = useState<Record<string, ReceiptAnalysis>>({});
@@ -107,6 +121,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
   const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'reading' | 'downloading' | 'error' | undefined>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
+  const [readingFeedback, setReadingFeedback] = useState<Record<string, string | undefined>>({});
   const uploadsInFlight = useRef(new Set<string>());
   const [requirements, setRequirements] = useState<DocDef[]>([]);
   const [requirementsStatus, setRequirementsStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -122,6 +137,7 @@ const InscripcionWizardPage: React.FC = () => {
   const serverRevisionRef = useRef<string | null>(null);
   const [localSaved, setLocalSaved] = useState(Boolean(trialInitial));
   const [localConflict, setLocalConflict] = useState<Record<string, string> | null>(null);
+  const pendingFilesNotice = useRef<HTMLDivElement>(null);
   const [missingLocalFiles, setMissingLocalFiles] = useState<string[]>(Array.isArray(trialInitial?.data.files) ? trialInitial.data.files.filter(item => typeof item === 'string') as string[] : []);
   const editRevision = useRef(0);
   const submitInFlight = useRef(false);
@@ -134,7 +150,6 @@ const InscripcionWizardPage: React.FC = () => {
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const receiptInFlight = useRef(false);
   const [regError, setRegError] = useState<string | null>(null);
-  const activeStepRef = useRef<HTMLButtonElement>(null);
   const draftScope = `public:${tipoActor}:${solicitudId || ''}`;
   const ownership = useInspectionDraftOwnership(`registration:${owner}:${draftScope}`, Boolean(owner && solicitudId && !isReviewMode && !submitSuccess));
   const vehicles = fleetRows(form.vehiculosJson, EMPTY_VEHICLE);
@@ -150,8 +165,8 @@ const InscripcionWizardPage: React.FC = () => {
       ? Object.fromEntries(Object.entries(local.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : reviewFixture?.form || {});
     setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step) || 1)));
     setMissingLocalFiles(Array.isArray(local?.data.files) ? local.data.files.filter(item => typeof item === 'string') as string[] : []);
-    setAdjuntos({}); setUploadedDocs({}); setPreviewAnalyses({}); setUploadStates({}); setUploadErrors({});
-    setOwner(null); setSolicitudId(null); setSubmitSuccess(false); setSaveError(null); setDirty(false);
+    setAdjuntos({}); setUploadedDocs({}); setPreviewAnalyses({}); setUploadStates({}); setUploadErrors({}); setReadingFeedback({});
+    setOwner(null); setSolicitudId(null); setSubmitSuccess(false); setSaveError(null); setDirty(false); setObservations(null);
     serverExtraFields.current = {}; setPhase(isReviewMode ? 2 : 1);
     setReg(reviewFixture?.reg || { nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
     setFormContext(context);
@@ -159,11 +174,18 @@ const InscripcionWizardPage: React.FC = () => {
 
   // A committed navigation starts at its heading, not at the previous page's
   // footer. Typing, validation errors and asynchronous requirements do not move
-  // the viewport. Keep the active step visible within its own horizontal rail.
+  // the viewport. Stage navigation stays within the available width.
   useLayoutEffect(() => {
-    activeStepRef.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' });
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [tipo, phase, step, submitSuccess]);
+
+  // Only a successful, explicit stage change moves keyboard focus. Refetches,
+  // draft recovery and autosaves must not interrupt the field being edited.
+  useEffect(() => {
+    if (focusStep.current !== step) return;
+    focusStep.current = null;
+    validationRef.current?.querySelector<HTMLElement>('h2[tabindex="-1"]')?.focus();
+  }, [step, validationRef]);
 
   const up = useCallback((field: string, value: string) => {
     setValidationError(null);
@@ -206,18 +228,27 @@ const InscripcionWizardPage: React.FC = () => {
 
   useEffect(() => {
     if (isReviewMode) return undefined;
-    let pending: { id?: string; tipoActor?: TipoActor; step?: number } = {};
-    try { pending = JSON.parse(localStorage.getItem('sitrep_pending_solicitud') || '{}'); } catch { /* use the server-owned draft */ }
+    let pending: { id?: string; tipoActor?: TipoActor; step?: number; owner?: string } = {};
+    try {
+      const stored = JSON.parse(localStorage.getItem('sitrep_pending_solicitud') || '{}');
+      if (stored && typeof stored === 'object' && !Array.isArray(stored)) pending = stored;
+    } catch { /* use the server-owned draft */ }
     const token = getAccessToken();
     const hint = token ? registrationDraftHint(token) : null;
+    // Legacy/global hints may belong to another signed-out account. Only an
+    // account-bound hint can select a draft; otherwise discover it on the server.
+    if (!hint && pending.owner !== registrationSessionOwner(token)) pending = {};
     if (hint) pending = { id: hint, tipoActor, step: pending.id === hint ? pending.step : 1 };
     if (pending.tipoActor !== tipoActor) pending = {};
-    if (!pending.id && !token) return undefined;
+    if (selectedApplication && token) pending = { id: selectedApplication, tipoActor, step: pending.id === selectedApplication ? pending.step : 1 };
+    if (!token) { if (selectedApplication) setResumeStatus('error'); return undefined; }
 
     let cancelled = false;
     setResumeStatus('loading');
     const accountAtStart = registrationSessionOwner(getAccessToken());
     const load = async () => {
+      // A URL selects a record, never grants access beyond a draft-only credential.
+      if (selectedApplication && (!/^[a-zA-Z0-9_-]{1,100}$/.test(selectedApplication) || (hint && hint !== selectedApplication))) throw new Error('Solicitud incompatible');
       if (!pending.id) {
         const response = await api.get('/solicitudes/mis-solicitudes');
         const candidates = response.data?.data?.solicitudes?.filter((item: { usuarioId: string; tipoActor: string }) => item.usuarioId === accountAtStart && item.tipoActor === tipoActor) || [];
@@ -235,6 +266,7 @@ const InscripcionWizardPage: React.FC = () => {
       if (!solicitud || solicitud.tipoActor !== tipoActor || solicitud.id !== pending.id) throw new Error('Solicitud incompatible');
       if (!accountAtStart || solicitud.usuarioId !== accountAtStart || registrationSessionOwner(getAccessToken()) !== accountAtStart) throw new Error('La sesión no pertenece a este borrador');
       if (receivedState(solicitud.estado)) {
+        setObservations(null);
         setOwner(accountAtStart); setSolicitudId(solicitud.id); setConfirmedState(solicitud.estado);
         setConfirmedReason(solicitud.estado === 'RECHAZADA' && typeof solicitud.motivoRechazo === 'string' ? solicitud.motivoRechazo : null);
         setReceiptError(null);
@@ -244,6 +276,7 @@ const InscripcionWizardPage: React.FC = () => {
         return;
       }
       if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) throw new Error('Estado de solicitud no reconocido');
+      setObservations(solicitud.estado === 'OBSERVADA' && typeof solicitud.observaciones === 'string' ? solicitud.observaciones : null);
       let persistedForm: Record<string, string> = {};
       try {
         const data = typeof solicitud.datosActor === 'string' ? JSON.parse(solicitud.datosActor || '{}') : solicitud.datosActor;
@@ -258,9 +291,14 @@ const InscripcionWizardPage: React.FC = () => {
       const local = readRegistrationDraft(accountAtStart, `public:${tipoActor}:${pending.id}`);
       const localForm = local?.data.form && typeof local.data.form === 'object' && !Array.isArray(local.data.form)
         ? Object.fromEntries(Object.entries(local.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : null;
-      const hasLocalChanges = localForm && JSON.stringify(localForm) !== JSON.stringify(persistedForm);
+      // Account identity is appended by the server/save contract, not edited
+      // in this form. JSON object order is also not an unsaved user change.
+      const accountFields = new Set(['nombre', 'cuit', 'email']);
+      const hasLocalChanges = localForm && [...new Set([...Object.keys(localForm), ...Object.keys(persistedForm)])]
+        .some(field => !accountFields.has(field) && localForm[field] !== persistedForm[field]);
       const serverChanged = hasLocalChanges && local?.data.serverRevision !== solicitud.updatedAt;
-      if (hasLocalChanges && !serverChanged) { persistedForm = localForm; setDirty(true); }
+      if (hasLocalChanges && !serverChanged) persistedForm = localForm;
+      setDirty(Boolean(hasLocalChanges && !serverChanged));
       setLocalConflict(serverChanged ? localForm : null);
       setMissingLocalFiles(Array.isArray(local?.data.files) ? local.data.files.filter(value => typeof value === 'string') as string[] : []);
       setOwner(accountAtStart);
@@ -272,14 +310,14 @@ const InscripcionWizardPage: React.FC = () => {
       ));
       setReg(previous => ({ ...previous, nombre: solicitud.usuario?.nombre || '', email: solicitud.usuario?.email || '', cuit: solicitud.usuario?.cuit || '' }));
       setSolicitudId(pending.id!);
-      setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step ?? pending.step) || 1)));
+      setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step ?? serverExtraFields.current._sitrepDraftStep ?? pending.step) || 1)));
       setPhase(2);
       setResumeStatus('loaded');
     }).catch(() => {
       if (!cancelled) setResumeStatus('error');
     });
     return () => { cancelled = true; };
-  }, [tipoActor, isReviewMode, resumeAttempt, totalSteps]);
+  }, [tipoActor, selectedApplication, isReviewMode, resumeAttempt, totalSteps]);
 
   // Persist the CURRENT step, not just a completed navigation. Only the account
   // validated by the server can read it back; passwords and file bytes never enter it.
@@ -287,16 +325,17 @@ const InscripcionWizardPage: React.FC = () => {
     if (isReviewMode || submitSuccess || !owner || !solicitudId || localConflict || !ownership.canWrite()) return;
     if (registrationSessionOwner(getAccessToken()) !== owner) return;
     setLocalSaved(writeRegistrationDraft(owner, draftScope, {
-      form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])].filter(type => !uploadedDocs[type]),
+      form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])],
     }));
   }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
 
   const clearVisibleAccount = useCallback(() => {
-      setForm({}); setAdjuntos({}); setUploadedDocs({}); setOwner(null);
+      setForm({}); setAdjuntos({}); setUploadedDocs({}); setReadingFeedback({}); setOwner(null);
       serverExtraFields.current = {};
       setLocalConflict(null); setMissingLocalFiles([]); setDirty(false); setLocalSaved(false);
       setReg({ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
       setConfirmedState(null); setConfirmedReason(null); setReceiptError(null); setSubmitSuccess(false); setSolicitudId(null);
+      setObservations(null);
       setResumeStatus('error'); setPhase(1);
   }, []);
   useEffect(() => {
@@ -322,6 +361,12 @@ const InscripcionWizardPage: React.FC = () => {
   // ========================================
 
   const docStepNumber = isGenerador ? 6 : isOperador ? 7 : 4;
+  useEffect(() => {
+    if (step === docStepNumber && attempted.has(step) && missingLocalFiles.length) {
+      pendingFilesNotice.current?.focus();
+      pendingFilesNotice.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
+  }, [attempted, step, docStepNumber]);
 
   const getStepErrors = (s: number): string[] => {
     if (isReviewMode) return [];
@@ -340,6 +385,7 @@ const InscripcionWizardPage: React.FC = () => {
     }
     if (isTransportista && s === 3) errs.push(...fleetErrors(vehicles, drivers));
     if (s === docStepNumber) {
+      if (missingLocalFiles.length) errs.push('Recuperá o descartá los archivos pendientes antes de enviar.');
       if (requirementsStatus !== 'loaded') {
         errs.push('No se pudieron verificar los requisitos documentales vigentes');
       } else {
@@ -365,13 +411,13 @@ const InscripcionWizardPage: React.FC = () => {
     try {
       assertDraftSession();
       const response = await api.put(`/solicitudes/${solicitudId}`, {
-        datosActor: { ...serverExtraFields.current, ...form, nombre: reg.nombre, cuit: reg.cuit, email: reg.email }, expectedUpdatedAt: serverRevisionRef.current,
+        datosActor: { ...serverExtraFields.current, ...form, _sitrepDraftStep: target, nombre: reg.nombre, cuit: reg.cuit, email: reg.email }, expectedUpdatedAt: serverRevisionRef.current,
       });
       assertDraftSession();
       const updated = response.data?.data?.solicitud?.updatedAt;
       if (typeof updated !== 'string') throw new Error('No se recibió confirmación del guardado. Conservamos los datos en pantalla.');
       serverRevisionRef.current = updated; setServerRevision(updated);
-      try { localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target })); } catch { /* owned draft also exists on server */ }
+      try { localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target, owner })); } catch { /* owned draft also exists on server */ }
       if (editRevision.current === revisionAtStart) setDirty(false);
       return true;
     } catch (error) {
@@ -379,6 +425,28 @@ const InscripcionWizardPage: React.FC = () => {
       return false;
     } finally { saveInFlight.current = false; setSaving(false); }
   };
+
+  const returnToRequest = async () => {
+    if (!owner || isReviewMode) { navigate(owner ? '/mi-solicitud' : '/login'); return; }
+    if (saveInFlight.current || submitInFlight.current) return;
+    if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la operación del archivo antes de volver a Mi solicitud.'); return; }
+    if (localConflict) { setSaveError('Elegí qué versión conservar antes de volver a Mi solicitud.'); return; }
+    const revisionAtStart = editRevision.current;
+    if (dirty && !(await persistDraft(step))) return;
+    // A person may continue typing while the save is pending. Keep that new
+    // edit visible instead of navigating to a resend of the older payload.
+    if (editRevision.current !== revisionAtStart) return;
+    navigate('/mi-solicitud' + (solicitudId ? '?solicitud=' + encodeURIComponent(solicitudId) : ''));
+  };
+
+  // An interrupted current step must be recoverable on another authenticated device.
+  // A rejected/conflicting save stops automatic retries and keeps the visible form.
+  const persistCurrent = useRef(persistDraft); persistCurrent.current = persistDraft;
+  useEffect(() => {
+    if (isReviewMode || submitSuccess || !solicitudId || !owner || !dirty || saving || submitting || localConflict || saveError || !ownership.canWrite()) return;
+    const timer = setTimeout(() => { if (!uploadsInFlight.current.size) void persistCurrent.current(step); }, 1000);
+    return () => clearTimeout(timer);
+  }, [isReviewMode, submitSuccess, solicitudId, owner, dirty, form, step, saving, submitting, localConflict, saveError, ownership.status, uploadStates]);
 
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;
@@ -391,14 +459,14 @@ const InscripcionWizardPage: React.FC = () => {
       return;
     }
     if (isReviewMode) {
-      if (persistTrial(target)) setStep(target);
+      if (persistTrial(target)) { focusStep.current = target; setStep(target); }
       return;
     }
     if (!solicitudId) {
       setSaveError('No hay una solicitud activa. Volvé al inicio del alta para crearla.');
       return;
     }
-    if (await persistDraft(target)) setStep(target);
+    if (await persistDraft(target)) { focusStep.current = target; setStep(target); }
   };
 
   const goNext = () => { if (step < totalSteps) void goStep(step + 1); };
@@ -407,17 +475,21 @@ const InscripcionWizardPage: React.FC = () => {
   // File handling
   const handleAddFile = useCallback(async (tipo: string, file: File) => {
     if (uploadsInFlight.current.has(tipo)) return;
+    setReadingFeedback(previous => ({ ...previous, [tipo]: undefined }));
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     if (file.size === 0 || file.size > requirementsMaxBytes || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: `Elegí un PDF, JPG o PNG con contenido de hasta ${(requirementsMaxBytes / 1024 / 1024).toFixed(0)} MB.` }));
       return;
     }
+    if (isReviewMode && adjuntos[tipo] !== file) {
+      setPreviewAnalyses(previous => Object.fromEntries(Object.entries(previous).filter(([key]) => key !== tipo)));
+    }
     setAdjuntos(previous => ({ ...previous, [tipo]: file }));
     setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
     if (isReviewMode) {
       uploadsInFlight.current.add(tipo); setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
-      try { const result = await previewDocument(file, 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); }
+      try { const result = await previewDocument(file, tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(result.analisis) })); }
       catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo leer el archivo de prueba. Los datos siguen en el navegador.') })); }
       finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
       return;
@@ -435,6 +507,7 @@ const InscripcionWizardPage: React.FC = () => {
       const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
       assertDraftSession();
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+      setReadingFeedback(previous => ({ ...previous, [tipo]: document.analisis ? documentReadingOutcome(document.analisis) : undefined }));
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
       return document;
@@ -442,7 +515,7 @@ const InscripcionWizardPage: React.FC = () => {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo guardar el archivo. Volve a seleccionarlo o reintenta al enviar.') }));
     } finally { uploadsInFlight.current.delete(tipo); }
-  }, [isReviewMode, requirementsMaxBytes, solicitudId, assertDraftSession]);
+  }, [isReviewMode, requirementsMaxBytes, solicitudId, assertDraftSession, adjuntos]);
 
   const handleLicense = async (key: string, file: File): Promise<LicensePreview> => {
     const type = licenseDocumentType(key);
@@ -462,9 +535,11 @@ const InscripcionWizardPage: React.FC = () => {
 
   const handleRemoveFile = useCallback(async (tipo: string) => {
     if (uploadsInFlight.current.has(tipo)) return;
+    setReadingFeedback(previous => ({ ...previous, [tipo]: undefined }));
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     const uploaded = uploadedDocs[tipo];
-    if (adjuntos[tipo] && uploaded) {
+    if ((adjuntos[tipo] || missingLocalFiles.includes(tipo)) && uploaded) {
+      setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
       return;
@@ -491,7 +566,7 @@ const InscripcionWizardPage: React.FC = () => {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo eliminar el archivo guardado.') }));
     } finally { uploadsInFlight.current.delete(tipo); }
-  }, [isReviewMode, solicitudId, uploadedDocs, adjuntos, assertDraftSession]);
+  }, [isReviewMode, solicitudId, uploadedDocs, adjuntos, missingLocalFiles, assertDraftSession]);
 
   // Submit
   const handleDownloadFile = async (tipo: string) => {
@@ -510,6 +585,7 @@ const InscripcionWizardPage: React.FC = () => {
     const uploaded = uploadedDocs[tipo];
     if (!solicitudId || !uploaded || uploadsInFlight.current.has(tipo) || isReviewMode) return;
     uploadsInFlight.current.add(tipo);
+    setReadingFeedback(previous => ({ ...previous, [tipo]: undefined }));
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
     try {
@@ -517,6 +593,7 @@ const InscripcionWizardPage: React.FC = () => {
       const document = await solicitudService.analizarDocumento(solicitudId, uploaded.id);
       assertDraftSession();
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+      setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(document.analisis) }));
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
     } catch (error) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
@@ -564,7 +641,7 @@ const InscripcionWizardPage: React.FC = () => {
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
         setValidationError(s !== 1 && s !== 3 ? errs.join('. ') : null);
-        setStep(s);
+        focusStep.current = s; setStep(s);
         return;
       }
     }
@@ -600,6 +677,7 @@ const InscripcionWizardPage: React.FC = () => {
       clearRegistrationDraft(owner!, draftScope);
       try { localStorage.removeItem('sitrep_pending_solicitud'); } catch { /* submission was already confirmed by SITREP */ }
       setConfirmedState('ENVIADA');
+      setObservations(null);
       setSubmitSuccess(true);
       void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
     } catch (err: unknown) {
@@ -631,12 +709,14 @@ const InscripcionWizardPage: React.FC = () => {
 
   const documentStep = <StepDocumentos
     reviewMode={isReviewMode}
+    missingFiles={missingLocalFiles}
     docs={[...requirements, ...licenseRequirements]}
     previewAnalyses={previewAnalyses}
     adjuntos={adjuntos}
     uploadedDocs={uploadedDocs}
     uploadStates={uploadStates}
     uploadErrors={uploadErrors}
+    readingFeedback={readingFeedback}
     requirementsStatus={requirementsStatus}
     maxBytes={requirementsMaxBytes}
     onRetryRequirements={() => setRequirementsAttempt(value => value + 1)}
@@ -658,19 +738,19 @@ const InscripcionWizardPage: React.FC = () => {
       if (step <= 4) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
       if (step === 5) return <StepActividad form={form} up={up} isOperador={false} />;
       if (step === 6) return documentStep;
-      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} missingFiles={missingLocalFiles} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isOperador) {
       if (step <= 5) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
       if (step === 6) return <StepActividad form={form} up={up} isOperador />;
       if (step === 7) return documentStep;
-      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} missingFiles={missingLocalFiles} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isTransportista) {
       if (step <= 3) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista}
         fleet={<><RegistrationFleetFields vehicles={vehicles} drivers={drivers} onVehicles={rows => up('vehiculosJson', JSON.stringify(rows))} onDrivers={rows => up('choferesJson', JSON.stringify(rows))} attempted={attempted.has(3)} onLicense={handleLicense}
           documents={Object.fromEntries(drivers.flatMap(driver => { const type = licenseDocumentType(driver.key), file = adjuntos[type], saved = uploadedDocs[type]; return file || saved ? [[driver.key, { name: file?.name || saved.nombre, status: saved ? 'Guardado en la solicitud' : isReviewMode ? 'Archivo de prueba · sólo en esta sesión' : 'Pendiente de guardar', error: uploadErrors[type] }]] : []; }))} />
         {(form.vehiculosDesc || form.choferesDesc) && <details className="mt-4"><summary className="min-h-11 cursor-pointer py-2 font-semibold text-neutral-800">Información previa en texto · conservada</summary><p className="whitespace-pre-wrap break-words text-sm text-neutral-700">{form.vehiculosDesc}\n{form.choferesDesc}</p></details>}</>} />;
       if (step === 4) return documentStep;
-      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} missingFiles={missingLocalFiles} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     }
     return null;
   };
@@ -681,7 +761,7 @@ const InscripcionWizardPage: React.FC = () => {
 
   if (!isGenerador && !isOperador && !isTransportista) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
+      <div className="flex items-start justify-center">
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-8 max-w-md text-center">
           <AlertCircle size={48} className="text-error-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-neutral-900 mb-2">Tipo invalido</h2>
@@ -700,7 +780,7 @@ const InscripcionWizardPage: React.FC = () => {
     const receipt = confirmedState ? RECEIVED_STATES[confirmedState] : RECEIVED_STATES.ENVIADA;
     const CompletionIcon = isReviewMode || confirmedState === 'APROBADA' ? Check : confirmedState === 'RECHAZADA' ? AlertCircle : Send;
     return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
+      <div className="flex items-start justify-center">
         <div className="min-w-0 w-full bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 sm:p-8 max-w-lg text-center">
           <div className="w-16 h-16 bg-[#0D8A4F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <CompletionIcon size={32} className={confirmedState === 'RECHAZADA' ? 'text-error-700' : 'text-[#0D8A4F]'} />
@@ -736,8 +816,8 @@ const InscripcionWizardPage: React.FC = () => {
       return <div className="flex min-h-[60vh] items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role="alert">
           <h2 className="text-lg font-bold">No se pudo recuperar tu solicitud</h2>
-          <p className="mt-2 text-sm text-neutral-600">No se perdió el borrador. Revisá la conexión o iniciá sesión con la cuenta creada.</p>
-          {resumeStatus === 'error' && <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button><Button onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Iniciar sesión y recuperar</Button></div>}
+          <p className="mt-2 text-sm text-neutral-600">No pudimos abrir la solicitud elegida. Revisá la conexión o ingresá con la cuenta correspondiente; no abriremos otro trámite en su lugar.</p>
+          {resumeStatus === 'error' && <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button><Button onClick={() => navigate('/login', { state: { from: recoveryDestination } })}>Iniciar sesión y recuperar</Button></div>}
         </div>
       </div>;
     }
@@ -761,74 +841,61 @@ const InscripcionWizardPage: React.FC = () => {
   const isLastStep = step === totalSteps;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 px-3 py-5 sm:px-4 sm:py-8">
-      <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6" data-testid="registration-wizard">
-        {/* Header */}
+    <div className="min-w-0">
+      <div className="w-full space-y-4 sm:space-y-6" data-testid="registration-wizard">
         <header className="space-y-3" data-testid="registration-identity">
-          <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">
-            Inscripción como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
-          </h2>
           <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <div aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
-              {isGenerador
-                ? <Factory size={18} className="text-purple-600" />
-                : isOperador ? <FlaskConical size={18} className="text-blue-600" />
-                : <Truck size={18} className="text-orange-600" />
-              }
-              </div>
-              <p className="text-sm leading-5 text-neutral-600">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
-            </div>
-            <button type="button" onClick={() => navigate(-1)} aria-label="Volver a la pantalla anterior" className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
-              <ArrowLeft size={16} aria-hidden="true" /> Volver
+            <label htmlFor="registration-stage" className="sr-only">Etapa de la inscripción</label>
+            <select id="registration-stage" value={step} onChange={event => void goStep(Number(event.target.value))} disabled={saving || submitting}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 text-base text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 lg:hidden">
+              {steps.map(item => <option key={item.id} value={item.id}>{item.id} de {totalSteps} · {item.label}{attempted.has(item.id) && stepHasErrors(item.id) ? ' — Revisar' : ''}</option>)}
+            </select>
+            <p className="hidden text-sm text-neutral-600 lg:block">Etapa {step} de {totalSteps}</p>
+            <button type="button" onClick={() => void returnToRequest()} disabled={saving || submitting} aria-label={owner ? "Volver a Mi solicitud" : "Volver al acceso"} title={owner ? "Volver a Mi solicitud" : "Volver al acceso"} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+              <ArrowLeft size={18} aria-hidden="true" /><span className="hidden sm:inline">{owner ? "Mi solicitud" : "Acceso"}</span>
             </button>
           </div>
-        </header>
-
-        {/* Stepper */}
-        <nav className="overflow-x-auto rounded-xl border border-neutral-200 bg-white p-3 [scrollbar-width:thin] sm:p-4" aria-label="Etapas de la inscripción" data-testid="registration-stepper">
-          <div className="flex min-w-max items-start justify-center">
-            {steps.map((s, i) => {
-              const isActive = step === s.id;
-              const isDone = step > s.id;
-              const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
-              return (
-                <React.Fragment key={s.id}>
-                  <button ref={isActive ? activeStepRef : undefined} type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className="group flex min-h-11 min-w-[112px] shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-2 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700">
-                    <div aria-hidden="true" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                      hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
-                      isActive ? 'bg-primary-700 text-white' :
-                      isDone ? 'bg-primary-50 text-primary-800' :
-                      'bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200'
-                    }`}>
-                      {hasErr ? <AlertCircle size={16} /> : s.id}
-                    </div>
-                    <span className={`block max-w-full text-center text-xs font-medium leading-tight ${
-                      hasErr ? 'text-error-700' : isActive ? 'text-primary-800' : isDone ? 'text-primary-700' : 'text-neutral-600'
-                    }`}>{s.label}</span>
-                  </button>
-                  {i < steps.length - 1 && (
-                    <div className={`mx-0.5 mt-[18px] h-0.5 w-3 shrink-0 rounded sm:mx-1 sm:w-4 lg:flex-1 ${step > s.id ? 'bg-[#0D8A4F]/40' : 'bg-neutral-200'}`} />
-                  )}
-                </React.Fragment>
-              );
+          <nav className="hidden gap-1 rounded-xl border border-neutral-200 bg-white p-2 lg:grid" style={{ gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))` }} aria-label="Etapas de la inscripción" data-testid="registration-stepper">
+            {steps.map(item => {
+              const active = step === item.id;
+              const invalid = attempted.has(item.id) && stepHasErrors(item.id);
+              return <button key={item.id} type="button" onClick={() => void goStep(item.id)} disabled={saving || submitting}
+                aria-current={active ? 'step' : undefined} aria-label={`Paso ${item.id} de ${totalSteps}: ${item.label}${invalid ? ' · Revisar' : ''}`}
+                className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 ${active ? 'bg-primary-50 text-primary-900' : invalid ? 'bg-error-50 text-error-800' : 'text-neutral-600 hover:bg-neutral-50'}`}>
+                <span aria-hidden="true" className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${active ? 'bg-primary-700 text-white' : invalid ? 'text-error-700' : 'bg-neutral-100 text-neutral-700'}`}>{invalid ? <AlertCircle size={16}/> : item.id}</span>
+                <span className="min-w-0 whitespace-nowrap leading-5">{item.label}</span>
+              </button>;
             })}
-          </div>
-        </nav>
+          </nav>
+        </header>
 
         {/* Step Content */}
         <div ref={validationRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
           {isReviewMode && <RegistrationTrialDraftBar saved={localSaved} onSave={() => { persistTrial(step); }} />}
-          {!isReviewMode && <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 pb-3">
-            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Cambios guardados en este dispositivo · pendientes de guardar en SITREP' : 'Cambios en pantalla · no se pudo guardar en este dispositivo') : 'Borrador guardado en SITREP · todavía no enviado'}</p>
-            <Button variant="outline" leftIcon={<Save size={16} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}>Guardar borrador</Button>
+          {!isReviewMode && <div className="mb-3 flex items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Guardado en este dispositivo · pendientes de guardar en SITREP' : 'No se pudo guardar en este dispositivo') : observations ? 'Guardado · pendiente de reenvío' : 'Borrador guardado en SITREP'}</p>
+            <Button aria-label="Guardar borrador" title="Guardar borrador" variant="ghost" className="shrink-0 !px-3" leftIcon={<Save size={18} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}><span className="hidden sm:inline">Guardar</span></Button>
           </div>}
           {!isReviewMode && ownership.status === 'blocked' && <div role="alert" className="mb-4 text-sm text-error-800">Este borrador está abierto en otra pestaña. No se sobrescribirá.<Button variant="outline" className="ml-2" onClick={ownership.retry}>Reintentar edición</Button></div>}
           {!isReviewMode && ownership.status === 'unavailable' && <p role="alert" className="mb-4 text-sm text-error-800">El navegador no pudo proteger el borrador frente a otra pestaña. Los datos siguen en pantalla; no se guardará una edición sin proteger.</p>}
           {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
-          {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : `Hay archivos que no llegaron a guardarse: ${missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.`}</p>}
-          {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
-          {validationError && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
+          {missingLocalFiles.length > 0 && <div ref={pendingFilesNotice} tabIndex={-1} role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p>{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : 'Hay archivos pendientes de recuperar. Volvé a seleccionarlos en Documentos o descartá esa selección antes de enviar.'}</p>
+            {!isReviewMode && <ul className="mt-2 space-y-2">{missingLocalFiles.map(type => {
+              const name = [...requirements, ...licenseRequirements].find(doc => doc.tipo === type)?.nombre || type.replace(/_/g, ' ');
+              return <li key={type} className="flex flex-wrap items-center justify-between gap-2"><span>{name}</span><Button variant="outline" size="sm" disabled={saving || submitting} aria-label={uploadedDocs[type] ? `Conservar original de ${name}` : `Descartar selección pendiente de ${name}`} onClick={() => setMissingLocalFiles(previous => previous.filter(item => item !== type))}>{uploadedDocs[type] ? 'Conservar original' : 'Descartar selección pendiente'}</Button></li>;
+            })}</ul>}
+          </div>}
+          {observations && <details className="group mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 [&::-webkit-details-marker]:hidden">
+              <AlertCircle size={18} aria-hidden="true" className="shrink-0"/>
+              <span className="min-w-0 flex-1"><strong className="block text-sm">Observaciones por corregir</strong><span aria-hidden="true" className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm group-open:hidden">{observations}</span></span>
+              <ChevronDown size={18} aria-hidden="true" className="shrink-0 transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"/>
+            </summary>
+            <div className="space-y-2 border-t border-amber-200 px-3 py-3 text-sm"><p className="whitespace-pre-wrap break-words">{observations}</p><p>Corregí lo solicitado y reenviá desde Resumen. Para agregar una respuesta, volvé a Mi solicitud.</p></div>
+          </details>}
+          {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: recoveryDestination } })}>Recuperar sesión</Button></div>}</div>}
+          {validationError && validationError !== 'Recuperá o descartá los archivos pendientes antes de enviar.' && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}
         </div>
 
@@ -844,11 +911,7 @@ const InscripcionWizardPage: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-2">
-            {saving && (
-              <span className="text-xs text-neutral-400 flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Guardando...
-              </span>
-            )}
+
 
             {isLastStep ? (
               <Button

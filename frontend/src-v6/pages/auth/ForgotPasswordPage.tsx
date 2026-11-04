@@ -31,7 +31,7 @@ const ForgotPasswordPage: React.FC = () => {
   return (
     <div className="w-full max-w-sm animate-fade-in">
       <Link to="/login" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-800 mb-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
-        <ArrowLeft size={16} /> Volver al login
+        <ArrowLeft size={16} /> Volver a iniciar sesión
       </Link>
 
       {done ? (
@@ -39,12 +39,12 @@ const ForgotPasswordPage: React.FC = () => {
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 size={32} className="text-green-600" />
           </div>
-          <h2 className="text-xl font-bold text-neutral-900 mb-2">Revisá tu email</h2>
+          <h1 className="text-xl font-bold text-neutral-900 mb-2">Revisá tu email</h1>
           <p className="text-neutral-600">Si el {mode === 'email' ? 'email' : 'CUIT'} existe en el sistema, recibirás un enlace para restablecer tu contraseña.</p>
         </div>
       ) : (
         <>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Recuperar contraseña</h2>
+          <h1 className="text-2xl font-bold text-neutral-900 mb-2">Recuperar contraseña</h1>
           <p className="text-sm text-neutral-500 mb-6">Ingresá tu email o CUIT y te enviaremos un enlace</p>
 
           {error && (

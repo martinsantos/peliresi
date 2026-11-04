@@ -1,81 +1,49 @@
-# Identidad SITREP — candidato vectorial
+# Identidad SITREP — contrato visual vigente
 
-## Actualización 12/10/2026: reciclaje / rotonda aprobado
+Actualizado el 23/10/2026. Esta revisión está en **preview**, pendiente de publicación. [Resultados y muestras](PRODUCTO-IDENTIDAD-AYUDA-20261023.md).
 
-El usuario autorizó extender al sistema y al manual la marca ya utilizada en los
-correos: tres segmentos iguales en giro, sin el monograma S. La fuente aprobada
-es `frontend/public/mail-sitrep-rotonda.svg`; `favicon.svg` conserva exactamente
-su geometría. `scripts/qa/brand-assets.ts` genera los íconos web/PWA y la copia
-portátil `docs/manual/sitrep-mark.svg`, y comprueba su igualdad con `--check`.
-Los isologos gubernamentales y los pictogramas de actores no cambian.
-Esta integración está pendiente de verificación y publicación; no actualiza
-por sí sola los íconos nativos de un APK instalado.
+## Marca
 
-El resto de este documento conserva la exploración anterior como antecedente;
-sus referencias a la S no describen la marca vigente del candidato.
+**SITREP y su flecha circular usan el mismo verde `#1B5E3C`.** Tres segmentos iguales, sin monograma S, hoja ni recuadro verde. La marca se presenta sobre blanco o un fondo claro que conserve el contraste. Los colores de estados y actores expresan su función; no cambian el color de la marca.
 
-Rediseño solicitado el 11/10/2026. No publicado ni aplicado a un APK distribuido.
+- Vector aprobado: `frontend/public/mail-sitrep-rotonda.svg`.
+- Isotipo sin fondo para interfaz: `frontend/public/sitrep-mark-green.svg`.
+- Componentes: `SitrepMark` y `SitrepWordmark`. El nombre no hereda el color del rol, de Mendoza ni de un tema de interfaz.
+- Favicon y copia portátil del manual: `favicon.svg` y `docs/manual/sitrep-mark.svg`. Usan la misma geometría verde sobre blanco.
+- Íconos de instalación: PNG 192 y 512. La variante **maskable** tiene margen propio para mantener la flecha dentro del círculo seguro; no se usa el PNG normal como adaptativo.
+- `scripts/qa/brand-assets.ts --check` comprueba derivados y zona segura. `mail-brand-assets.ts --check` comprueba el PNG del correo. La generación se hace en preview.
+- El arranque de la PWA usa fondo blanco y tema verde. No se cambian los IDs, alcances ni accesos directos de la aplicación.
 
-**Propuesta S RECHAZADA por el usuario.** Este documento conserva el diseño
-evaluado como antecedente, no autoriza su integración o publicación. Las nuevas
-exploraciones están fuera del producto, pendientes de elección estética.
+Los activos oficiales de Mendoza mantienen su dibujo y colores originales. El panel azul del acceso pertenece a la identidad gubernamental. El nombre SITREP se conserva verde también en ese acceso. El logo gubernamental secundario blanco se utiliza exclusivamente donde corresponde a un fondo oscuro.
 
-## Marca del sistema
+## Correo y PDF
 
-Monograma S como recorrido entre origen y destino, con extremos circulares.
-Elimina la hoja anterior. Es una marca de producto, no un pictograma reglamentario
-de peligrosidad, una habilitación ni una categoría de actor.
+La cabecera usa **dos mitades equilibradas** sobre blanco:
 
-- Fuente única: `frontend/public/favicon.svg`, retícula 24×24, 411 bytes.
-- Trazo blanco de 2,5 unidades, extremos y uniones redondos.
-- Base verde institucional `#1B5E3C`, radio 5 sobre 24.
-- Sin filtros, fuentes externas, imágenes embebidas ni scripts dentro del SVG.
-- `scripts/qa/brand-assets.ts` genera las variantes SVG y los PNG 192/512.
-  `--check` verifica que los derivados no se separen de la fuente vectorial.
-- Se conservan rutas, tamaños y contratos del componente `SitrepMark` y de los
-  manifiestos PWA. No se cambia la lógica de instalación, sesiones o borradores.
+| Mitad izquierda | Mitad derecha |
+|---|---|
+| Marca horizontal de Mendoza y Dirección General de Fiscalización Ambiental | Flecha, palabra SITREP y Sistema de Trazabilidad de Residuos Peligrosos |
 
-## Familia de categorías existente
+El nombre y el isotipo comparten color. No se traslada SITREP al extremo izquierdo ni se agranda una marca para llenar espacio. La separación respeta la proporción de cada activo. Una línea azul/verde cierra la cabecera; el título del documento aparece una sola vez debajo.
 
-| Identidad | Símbolo | Color | Contenedor |
-|---|---|---|---|
-| SITREP | S trazable | `#1B5E3C` | Cuadrado redondeado |
-| Generador | Factory | `#7c3aed` | Cuadrado redondeado |
-| Transporte | Truck | `#ea580c` | Rombo, símbolo sin girar |
-| Operador | FlaskConical | `#2563eb` | Cuadrado redondeado |
-| Inspección | ClipboardCheck | `#0f766e` | Cuadrado redondeado |
+En el correo, la composición toma una base de 600 px, márgenes internos de 12 px, marca Mendoza 100 × 32 px, flecha de 22 px y nombre de 20 px. Las referencias son de 12/15 px. En pantallas angostas se conservan ambas marcas y se retiran sólo las referencias secundarias. El nombre SITREP es texto real, incluso si se bloquean las imágenes.
 
-Los íconos de categorías mantienen sus formas y colores. La marca usa el mismo
-lenguaje de contorno Lucide, retícula y trazo; no copia su significado. No se
-debe sustituir Operador por un edificio ni girar el camión junto con su rombo.
-El control de inspección conserva el símbolo que usan los inspectores; no se
-introduce otra categoría ni permiso por una decisión gráfica.
+PDFKit y los reportes jsPDF conservan esas proporciones al ancho imprimible. Los documentos extensos repiten su cabecera y reservan cuerpo y pie. Las referencias del PDF conservan un orden de lectura semántico. Los títulos, datos, firmas, QR, estados y leyendas propios de cada documento no se sustituyen por elementos decorativos.
 
-Contraste calculado de los símbolos blancos contra sus fondos sólidos: SITREP
-7,74:1; generador 5,70:1; transporte 3,56:1; operador 5,17:1; inspección 5,47:1.
-Todos superan 3:1 para gráficos. El naranja no alcanza 4,5:1 para texto pequeño
-blanco: las etiquetas se mantienen oscuras fuera del símbolo, no dentro del rombo.
-Color, pictograma y etiqueta se complementan; no se depende sólo del color.
+**Los documentos firmados existentes mantienen sus bytes y hash originales.** La identidad nueva no reemite certificados ni reescribe antecedentes. CAP continúa cerrado; ningún cambio visual habilita sus cuentas o emisiones.
 
-## Encabezado de correos
+## Interfaz y manual
 
-Firma de Mendoza y DGFA en una fila blanca compacta; SITREP y su descripción
-forman un bloque verde propio, con la nueva marca. El inicio de la firma, la
-marca y el mensaje comparten el mismo eje de 24 px. El nombre SITREP es texto
-real para que siga identificándose el remitente si se bloquean imágenes.
-Tablas de presentación y estilos en línea; sin fuentes remotas, SVG en correo,
-gradientes, badges de estado inventados ni navegación decorativa.
+- Cabeceras blancas y marca verde en escritorio, app, menú, bienvenida, C3, inspecciones, acceso y recuperación.
+- Formularios, alertas, próximos pasos y permisos siguen dependiendo del contexto y del rol. Una decisión visual no altera reglas de negocio.
+- `LoadingIndicator` usa la flecha verde; en botones el indicador conserva el contraste de la acción. La animación respeta la preferencia de movimiento reducido.
+- El manual y su directorio usan la misma marca, favicon y cabecera clara; se mantienen los recorridos y el renderer.
+- La pantalla sin conexión ofrece reintento y explica cómo comprobar el guardado. No promete sincronización universal ni recarga indefinidamente.
 
-El logo del Gobierno de Mendoza no se modifica. Login azul y sistema verde
-se conservan. Los correos usan el PNG derivado, no otro dibujo de la marca.
+## Verificación y límites
 
-## Verificación
+La revisión usa capturas reales del preview, plantillas reales renderizadas sin envíos y PDF con datos artificiales. Incluye controles de color computado, texto completo, desbordes, imágenes cargadas, cabeceras, navegación y archivos de instalación. La cobertura y los fallos corregidos se detallan en el informe enlazado al inicio.
 
-La prueba `frontend/cloud-qa/mail-e2e/brand.spec.tsx` comprueba el logo en el
-login real y genera una lámina con los componentes reales de categoría, no
-copias de sus SVG. Evalúa tamaños 16/24/32/44 px y escritorio/móvil/app.
-Las 58 vistas de correo verifican imágenes cargadas, contraste declarado,
-alineación común, ausencia de desborde y tamaño de acciones.
+No equivale a certificar Android físico, un APK instalado, entrega externa en Gmail/Outlook ni comportamiento de todos los clientes de correo. Esos controles requieren sus entornos. No se habilitan correos, push ni CAP para verificar la identidad.
 
-La aceptación estética corresponde al usuario. QA de navegador no equivale
-a validar Gmail/Outlook, modo oscuro, imágenes bloqueadas ni un APK instalado.
+Las exploraciones anteriores (incluido el monograma S rechazado) permanecen en el historial Git; no son alternativas vigentes ni deben regenerarse.

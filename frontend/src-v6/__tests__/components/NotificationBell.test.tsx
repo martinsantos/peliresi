@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { NotificationBell } from '../../components/NotificationBell';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn(), restricted: false }));
@@ -16,7 +17,30 @@ function setup() {
   return client;
 }
 describe('assignment notification delivery', () => {
+  it('opens the inspected actor PSIP portal with the inspection icon', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-psip', destino: 'participacion' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    const title = await screen.findByText('PSIP · Nuevo requerimiento');
+    expect(title.closest('button')?.querySelector('svg.lucide-clipboard-check')).not.toBeNull();
+    fireEvent.click(title);
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/app/requerimientos/case-psip'));
+  });
   beforeEach(() => { service.restricted = false; service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
+  it('shows the reception-time warning in the bell for a historical GPS notice', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS',
+      mensaje: 'Parada prolongada de 120 minutos', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+    expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
+  });
+  it('keeps a new GPS observation and its capture-time warning readable in the bell', async () => {
+    const message = 'Tres posiciones recibidas están fuera del corredor geográfico. No se compara una ruta vial autorizada. Hora de captura no disponible. Verificá el caso con transporte.';
+    service.list.mockResolvedValue({ items: [{ ...notice, tipo: 'ALERTA_SISTEMA', titulo: 'QA corredor',
+      mensaje: message, datos: JSON.stringify({ evento: 'ANOMALIA_GPS', tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.getByText(message)).not.toHaveClass('line-clamp-2');
+  });
   it('does not mount an unusable inbox or query full-access notices for a restricted applicant', () => {
     service.restricted = true;
     setup();
@@ -33,7 +57,7 @@ describe('assignment notification delivery', () => {
 
   it('refreshes on opening so a newly assigned visit does not wait for the polling interval', async () => {
     const client = setup();
-    await waitFor(() => expect(client.getQueryState(['notificaciones', 'bell', 'inspector'])?.status).toBe('success'));
+    await waitFor(() => expect(client.getQueryState(['notificaciones', 'bell', 'inspector', inspectionWorkspaceOwner({ id: 'inspector' })])?.status).toBe('success'));
     service.list.mockResolvedValue({ items: [notice], noLeidas: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Notificaciones', exact: true }));
     expect(await screen.findByText(notice.titulo)).toBeVisible();
@@ -79,6 +103,22 @@ describe('assignment notification delivery', () => {
     service.list.mockResolvedValue({ items: [notice], noLeidas: 140 });
     setup();
     expect(await screen.findByRole('button', { name: 'Notificaciones (140 sin leer)', exact: true })).toBeVisible();
+  });
+  it('offers a separate, safe coordinate link without nesting it inside the notice button', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, titulo: 'Retiro previsto', manifiestoId: 'manifest',
+      datos: JSON.stringify({ mapsUrl: 'https://maps.google.com/?q=-33,-68' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    const link = await screen.findByRole('link', { name: 'Ver ubicación del generador' });
+    expect(link).toHaveAttribute('href', 'https://maps.google.com/?q=-33,-68');
+    expect(link.closest('button')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Retiro previsto/ }));
+    expect(screen.getByTestId('path')).toHaveTextContent('/app/manifiestos/manifest');
+  });
+  it('does not render an arbitrary URL from notice data as a map link', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, datos: JSON.stringify({ mapsUrl: 'https://elsewhere.invalid/?q=-33,-68' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    await screen.findByText(notice.titulo);
+    expect(screen.queryByRole('link', { name: 'Ver ubicación del generador' })).toBeNull();
   });
   it('uses the readable inverse error token for the small unread counter', async () => {
     service.list.mockResolvedValue({ items: [notice], noLeidas: 140 });

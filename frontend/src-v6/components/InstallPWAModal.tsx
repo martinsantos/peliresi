@@ -21,6 +21,11 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 const DISMISS_KEY = 'sitrep_pwa_dismiss';
 const DISMISS_DAYS = 7;
 const SHOW_DELAY_MS = 45_000; // 45 seconds of usage before showing
+const benefits = [
+  { icon: Zap, text: 'Accedé desde la pantalla de inicio' },
+  { icon: WifiOff, text: 'Consultá algunas pantallas guardadas sin conexión' },
+  { icon: BellRing, text: 'Revisá los avisos con la app abierta' },
+];
 
 function isDismissed(): boolean {
   try {
@@ -67,12 +72,6 @@ export const InstallPWAModal: React.FC = () => {
 
   if (!visible) return null;
 
-  const benefits = [
-    { icon: Zap, text: 'Acceso rapido desde tu pantalla de inicio' },
-    { icon: WifiOff, text: 'Funciona sin conexion a internet' },
-    { icon: BellRing, text: 'Recibe notificaciones en tiempo real' },
-  ];
-
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
@@ -86,8 +85,8 @@ export const InstallPWAModal: React.FC = () => {
         {/* Close */}
         <button
           onClick={handleDismiss}
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-neutral-100 transition-colors text-neutral-400 hover:text-neutral-600 z-10"
-          aria-label="Cerrar"
+          className="absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700 z-10"
+          aria-label="Cerrar invitación a instalar"
         >
           <X size={20} />
         </button>
@@ -98,10 +97,10 @@ export const InstallPWAModal: React.FC = () => {
             {isIOS ? <Smartphone size={28} className="text-primary-600" /> : <Download size={28} className="text-primary-600" />}
           </div>
           <h3 className="text-lg font-bold text-neutral-900">
-            {isIOS ? 'Agrega SITREP a tu pantalla' : 'Instala SITREP'}
+            {isIOS ? 'Agregá SITREP a tu pantalla' : 'Instalá SITREP'}
           </h3>
           <p className="text-sm text-neutral-500 mt-1">
-            Obtene la mejor experiencia instalando la app en tu dispositivo
+            Abrí SITREP directamente desde tu dispositivo.
           </p>
         </div>
 
@@ -115,14 +114,15 @@ export const InstallPWAModal: React.FC = () => {
               <p className="text-sm text-neutral-700">{text}</p>
             </div>
           ))}
+          <p className="text-sm text-neutral-600">Para enviar cambios y recibir avisos necesitás conexión.</p>
         </div>
 
         {/* iOS instructions */}
         {isIOS && (
           <div className="mx-6 mb-4 p-3 bg-blue-50 rounded-xl">
-            <p className="text-sm text-blue-800 font-medium mb-1">Como instalar:</p>
+            <p className="text-sm text-blue-800 font-medium mb-1">Cómo instalar:</p>
             <p className="text-sm text-blue-700">
-              Toca <Share2 size={13} className="inline mx-0.5" /> <strong>Compartir</strong> y luego{' '}
+              Tocá <Share2 size={13} className="inline mx-0.5" /> <strong>Compartir</strong> y luego{' '}
               <strong>"Agregar a pantalla de inicio"</strong>
             </p>
           </div>

@@ -1,3 +1,4 @@
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 /**
  * Tests for src-v6/hooks/useManifiestos.ts
  * Verify exported hooks exist and query key construction.
@@ -77,7 +78,7 @@ describe('useManifiestos module exports', () => {
     const otherOperatorQuery = mod.useManifiestos({ estado: 'ENTREGADO' as any, limit: 5 }) as any;
 
     expect(operatorQuery.queryKey).not.toEqual(otherOperatorQuery.queryKey);
-    expect(operatorQuery.queryKey).toContainEqual({ userId: 'operator-1', rol: 'OPERADOR', actorId: 'op-1' });
-    expect(otherOperatorQuery.queryKey).toContainEqual({ userId: 'operator-2', rol: 'OPERADOR', actorId: 'op-2' });
+    expect(operatorQuery.queryKey).toContainEqual(inspectionWorkspaceOwner({ id: 'operator-1', rol: 'OPERADOR', actorId: 'op-1' }));
+    expect(otherOperatorQuery.queryKey).toContainEqual(inspectionWorkspaceOwner({ id: 'operator-2', rol: 'OPERADOR', actorId: 'op-2' }));
   });
 });

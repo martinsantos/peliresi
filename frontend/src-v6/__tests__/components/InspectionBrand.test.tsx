@@ -5,7 +5,7 @@ import { InspectionInstitutionalMasthead } from '../../pages/inspecciones/Inspec
 
 it('inspection verification uses the shared SITREP mark without changing record identity or status', () => {
   const { container } = render(<InspectionInstitutionalMasthead inspectionNumber="I-QA-001" actNumber="QA-22" version={3} state="EN_CAMPO" />);
-  expect(container.querySelector('[data-sitrep-mark]')).toHaveAttribute('src', '/favicon.svg');
+  expect(container.querySelector('[data-sitrep-mark]')).toHaveAttribute('src', '/sitrep-mark-green.svg');
   expect(container.querySelector('[data-sitrep-mark]')).toHaveAttribute('width', '32');
   expect(container.querySelector('.lucide-leaf')).toBeNull();
   expect(screen.getByText('I-QA-001')).toBeVisible();

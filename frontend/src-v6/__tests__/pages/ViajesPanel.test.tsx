@@ -13,6 +13,18 @@ function Panel({ trips = [], initialFilter = '' }: { trips?: EnTransitoItem[]; i
 }
 
 describe('Centro de Control collapsible trip panels', () => {
+  it('shows the reception and unknown capture time for the selected trip, and distinguishes no GPS', () => {
+    const trip: EnTransitoItem = { manifiestoId: 'qa-trip', numero: 'QA Viaje', transportista: 'QA Transporte', origen: 'QA Origen', destino: 'QA Destino', origenLatLng: null, destinoLatLng: null, ultimaPosicion: { latitud: -32.85, longitud: -68.85, velocidad: null, direccion: null, timestamp: '2026-10-07T12:00:00Z' }, ruta: [] };
+    const missing: EnTransitoItem = { ...trip, manifiestoId: 'qa-no-gps', numero: 'QA sin GPS', ultimaPosicion: null };
+    render(<MemoryRouter><Panel trips={[trip, missing]} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar viaje QA Viaje' }));
+    const received = screen.getByLabelText('Última posición recibida');
+    expect(received).toHaveTextContent('Hora de captura no disponible');
+    expect(received.querySelector('time')).toHaveAttribute('datetime', '2026-10-07T12:00:00Z');
+    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar viaje QA sin GPS' }));
+    expect(screen.getByLabelText('Última posición recibida')).toHaveTextContent('Sin posición recibida');
+    expect(screen.queryByText(/Hora de captura no disponible/)).toBeNull();
+  });
   it.each([undefined, false, true])('only offers document navigation for an explicit server permission (%s)', (canViewDetail) => {
     const trip = { manifiestoId: 'qa-trip', numero: 'QA Viaje', transportista: 'QA Transporte', origen: 'QA Origen', destino: 'QA Destino', origenLatLng: null, destinoLatLng: null, ultimaPosicion: null, ruta: [], canViewDetail };
     render(<MemoryRouter><Panel trips={[trip]} /></MemoryRouter>);

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
-import { soporteAcceso, equipoSoporte, candidatosSoporte, configurarAgente, listarTickets, obtenerTicket, crearTicket, accionarTicket, descargarAdjuntoSoporte, comprobarEnvioTicket } from '../controllers/support.controller';
+import { soporteAcceso, equipoSoporte, candidatosSoporte, configurarAgente, listarTickets, obtenerTicket, crearTicket, accionarTicket, recuperarAccionTicket, descargarAdjuntoSoporte, comprobarEnvioTicket } from '../controllers/support.controller';
 import { SUPPORT_FILE_LIMIT } from '../services/supportFile.service';
 
 const router = Router();
@@ -22,5 +22,6 @@ router.get('/', listarTickets);
 router.post('/', writes, upload.array('files', 3), crearTicket);
 router.get('/:id', obtenerTicket);
 router.post('/:id/acciones', writes, upload.array('files', 3), accionarTicket);
+router.post('/:id/acciones/recuperar', writes, recuperarAccionTicket);
 router.get('/:id/adjuntos/:fileId', descargarAdjuntoSoporte);
 export default router;

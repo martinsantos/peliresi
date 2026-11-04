@@ -1,10 +1,10 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { login, prefix } from './helpers';
 
 test('live map details retain real actor identity, readable content and a reachable dismissal', async ({ page }, info) => {
-  test.setTimeout(90000);
+  test.setTimeout(240000);
   const fixture = JSON.parse(await readFile(path.join(process.env.QA_ARTIFACTS!, 'fixture.json'), 'utf8'));
   expect(fixture.database).toBe('sitrep_night_qa_20260926');
   expect(fixture.externalDelivery).toBe(false);
@@ -43,16 +43,16 @@ test('live map details retain real actor identity, readable content and a reacha
     await expect.poll(() => popup.evaluate(el => {
       const box = el.getBoundingClientRect(), map = el.closest('.leaflet-container')!.getBoundingClientRect();
       return box.left >= Math.max(0, map.left) - 1 && box.right <= Math.min(innerWidth, map.right) + 1;
-    })).toBe(true);
+    }), { timeout: 20000 }).toBe(true);
     // The older width-only contract missed clipped headings and data under
-    // the 240px mobile map's bottom controls. A passing popup must fit BOTH
+    // a short mobile map's bottom controls. A passing popup must fit BOTH
     // axes of the visible map, not merely exist in Leaflet's DOM.
     await expect.poll(() => popup.evaluate(el => {
       const box = el.getBoundingClientRect(), map = el.closest('.leaflet-container')!.getBoundingClientRect();
       const header = el.closest('.wr-layout')!.querySelector('.wr-layout-header')!.getBoundingClientRect();
       const visibleTop = Math.max(0, map.top, header.bottom);
       return box.top >= visibleTop - 1 && box.bottom <= Math.min(innerHeight, map.bottom) + 1;
-    }), { message: 'Complete popup frame inside the visible map, without hidden title or bottom data' }).toBe(true);
+    }), { message: 'Complete popup frame inside the visible map, without hidden title or bottom data', timeout: 20000 }).toBe(true);
     const close = popup.locator('.leaflet-popup-close-button');
     const geometry = await close.boundingBox();
     expect(geometry!.width).toBeGreaterThanOrEqual(44);
@@ -63,14 +63,38 @@ test('live map details retain real actor identity, readable content and a reacha
     }), 'Dismissal must not be covered by the sticky header or bottom controls').toBe(true);
     const content = popup.locator('.leaflet-popup-content');
     await expect(content).toHaveAttribute('tabindex', '0');
-    const before = await content.evaluate(el => ({ client: el.clientHeight, total: el.scrollHeight, start: el.scrollTop }));
+    const scrollState = () => content.evaluate(el => ({ client: el.clientHeight, total: el.scrollHeight, top: el.scrollTop,
+      overflow: getComputedStyle(el).overflowY, behavior: getComputedStyle(el).scrollBehavior, focused: document.activeElement === el }));
+    const before = await scrollState();
     if (before.total > before.client) {
-      await content.focus(); await content.press('End');
-      await expect.poll(() => content.evaluate(el => el.scrollTop + el.clientHeight >= el.scrollHeight - 1)).toBe(true);
+      await content.focus();
+      const focused = await scrollState();
+      await content.press('End');
+      const afterEnd = await scrollState();
+      await writeFile(info.outputPath(`monitor-scroll-${category}.json`), JSON.stringify({ before, focused, afterEnd }));
+      try {
+        await expect.poll(() => content.evaluate(el => el.scrollTop + el.clientHeight >= el.scrollHeight - 1), { timeout: 20000 }).toBe(true);
+      } catch (error) {
+        await writeFile(info.outputPath(`monitor-scroll-${category}-failure.json`), JSON.stringify(await scrollState()));
+        throw error;
+      }
       expect(await body.evaluate(el => {
         const tail = el.lastElementChild!.getBoundingClientRect(), frame = el.closest('.leaflet-popup-content')!.getBoundingClientRect();
         return tail.bottom <= frame.bottom + 1;
       }), 'Last data row remains reachable through normal keyboard scrolling').toBe(true);
+      if (category === 'transportista') {
+        // LIVE refreshes while the person is reading; do not silently return
+        // to the first row or drop keyboard focus after a real API response.
+        await page.waitForResponse(response => response.url().endsWith('/api/centro-control/monitor-live') && response.status() === 200,
+          { timeout: 40000 });
+        // The response event can precede React consuming it and Leaflet
+        // recalculating layout, especially under the constrained QA worker.
+        await page.waitForTimeout(1500);
+        const afterRefresh = await scrollState();
+        await writeFile(info.outputPath('monitor-scroll-transportista-refresh.json'), JSON.stringify(afterRefresh));
+        expect(afterRefresh.focused).toBe(true);
+        expect(afterRefresh.top + afterRefresh.client).toBeGreaterThanOrEqual(afterRefresh.total - 1);
+      }
       await page.screenshot({ path: info.outputPath(`monitor-popup-${category}-end.png`), animations: 'disabled', scale: 'css' });
       await content.press('Home');
       await expect.poll(() => content.evaluate(el => el.scrollTop)).toBe(0);

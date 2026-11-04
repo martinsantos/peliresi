@@ -1,0 +1,126 @@
+{
+  "source": "47ea8470f98faba50305643b0e4350b5a269ae85",
+  "deployedAt": "2026-10-21T11:31:08.597Z",
+  "timezone": "America/Argentina/Mendoza",
+  "deployedAtLocal": "21/10/2026 08:31:08",
+  "backend": "/var/www/sitrep-backend-releases/20261021-propuestas-47ea8470",
+  "frontend": "/var/www/sitrep-releases/20261021-propuestas-47ea8470",
+  "manualVersion": "2026.21.1",
+  "rootCache": "trazabilidad-rrpp-v142",
+  "appVersion": "20261021112835",
+  "exactSourceFiles": 2327,
+  "resources": {
+    "platform": "linux",
+    "docker": true,
+    "root": "/work/sitrep",
+    "cpu": "100000 100000\n",
+    "memory": "2147483648\n",
+    "swap": "0\n"
+  },
+  "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "buildFlags": {
+    "VITE_MANIFEST_PROPOSALS_ENABLED": "true",
+    "VITE_MANIFEST_PARTY_REVIEW_ENABLED": "false",
+    "VITE_API_URL": "https://sitrep.ultimamilla.com.ar/api",
+    "VITE_ENTERPRISE_ENABLED": "false",
+    "VITE_MANIFEST_EXCEPTIONAL_ENABLED": "false",
+    "VITE_MANIFEST_ADDENDA_ENABLED": "false",
+    "VITE_ACTOR_MULTIROLE_ENABLED": "false",
+    "VITE_DEMO_MODE": "false",
+    "VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED": "true",
+    "VITE_TRANSPORT_MULTI_GPS_ENABLED": "true"
+  },
+  "packageHashes": {
+    "backend": {
+      "file": "sitrep-backend.tar.gz",
+      "sha256": "3102db76402835b990e41307f57e64ec1d72478eae80aa380ed3466581f0cb88",
+      "bytes": 12840170,
+      "files": 388
+    },
+    "web": {
+      "file": "sitrep-web.tar.gz",
+      "sha256": "cb11db2bdb5f01435a9d1d424c537fc2b54e2d198586e75907132232de0b688a",
+      "bytes": 68010384,
+      "files": 513
+    },
+    "app": {
+      "file": "sitrep-app.tar.gz",
+      "sha256": "cc93c18390984395b3b8805268ed5c60c4fc2f132cdd14221860a010a4325732",
+      "bytes": 3632113,
+      "files": 200
+    },
+    "client": {
+      "file": "sitrep-client.tar.gz",
+      "sha256": "743d7ae14608573ab85aa25179adee45499715349097ace3bfc42e925ea370e4",
+      "bytes": 15303967,
+      "files": 14
+    }
+  },
+  "verifiedFiles": {
+    "backend": 388,
+    "web": 513,
+    "app": 200,
+    "client": 14
+  },
+  "configuration": {
+    "onlyChange": "MANIFEST_PROPOSALS_ENABLED=true",
+    "beforeSha256": "618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93",
+    "afterSha256": "97ef23d52f52f0f9b17ce26e467880670f264671c5a14acc8750feb94835d28f",
+    "capClosed": true,
+    "emailsOff": true,
+    "pushOff": true,
+    "otherFlagsUnchanged": true,
+    "uploadsUnchanged": true
+  },
+  "noMigration": true,
+  "nonMutatingSmoke": {
+    "server": 131,
+    "external": 9,
+    "pwa": 8,
+    "logins": 0,
+    "businessMutations": 0
+  },
+  "workers": [
+    {
+      "id": 1,
+      "pid": 614483,
+      "restarts": 33,
+      "status": "online",
+      "cwd": "/var/www/sitrep-backend-releases/20261021-propuestas-47ea8470"
+    },
+    {
+      "id": 2,
+      "pid": 614500,
+      "restarts": 33,
+      "status": "online",
+      "cwd": "/var/www/sitrep-backend-releases/20261021-propuestas-47ea8470"
+    }
+  ],
+  "stableAt": "2026-10-21T11:31:25.388Z",
+  "rollback": {
+    "backend": "/var/www/sitrep-backend-releases/20261021-propuestas-47ea8470",
+    "frontend": "/var/www/sitrep-releases/20261021-propuestas-47ea8470-rollback",
+    "scope": "previous interface/manual; backend with persisted proposal guards retained, new proposals disabled",
+    "backendDowngrade": false,
+    "rootCache": "trazabilidad-rrpp-v143",
+    "appVersion": "20261021113031",
+    "databaseRestore": false
+  },
+  "previewClosedAt": "2026-10-21T11:30:15.438083319Z",
+  "previewClosed": true,
+  "mainUnchanged": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "pushOrWorkflows": false,
+  "privateReports": {
+    "build.json": "c38354e93b3f56ba1cf9fcdf4e10d5e759e66f83eda92f910c71b3f50d2f4e7c",
+    "source-proof.json": "569639955ea749660031975b8940c1900f198834d162994fdb4bf9ece70ecacd",
+    "artifact-verification.json": "927b829b9cda51ce3cb8fa775a85ae8986399251ece9cd1699e03b7da4a71fd5",
+    "stage.json": "1de0896ac0ae697e763f138b87275d6f75693fb44d3946004411eacb0714880f",
+    "deployment.json": "cfad375053d93d71ff029b0409ae41257eb89287f9652030204beaa38337966d",
+    "smoke.json": "9541cc450d79b1e90800a0851a76c632ebd4c30367d48bfe44436299f8683953",
+    "external-smoke.json": "c6f9690bbb33e21dbb23ab65f472d466e867b05deae1c564e790ee602b696585",
+    "pwa-smoke.json": "0fdccfa83c7b4fb5e2db995a8ae6f5bc604aee448780beeddf402c681641bb6f",
+    "final-state.json": "f968cbd878011407b1a70f54ebed09976dc29b572acb784cad7bfa622d415588",
+    "closure-proof.json": "796a3dfb1c44c963a3af0ff57ce698470fb8cd21faa429f9fa512a0e64520f3c",
+    "publish-production.js": "947da494eee2e877310d42845d27fca9011b8ab6523e8dcd9931ebec7c41343f"
+  }
+}

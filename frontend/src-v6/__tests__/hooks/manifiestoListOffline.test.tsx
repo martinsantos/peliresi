@@ -1,3 +1,4 @@
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { act, renderHook, waitFor, cleanup } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
@@ -63,7 +64,7 @@ it('abre un detalle descargado por primera vez sin red ni una consulta pausada',
   const { result } = renderHook(() => useManifiesto('own-cached'), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data).toMatchObject({ id: 'own-cached', offline: true });
-  expect(mocks.cached).toHaveBeenCalledWith('offline-qa');
+  expect(mocks.cached).toHaveBeenCalledWith('offline-qa', inspectionWorkspaceOwner({id:'offline-qa',rol:'GENERADOR',actorId:'g-1'}));
   expect(mocks.detail).not.toHaveBeenCalled();
   client.clear();
 });
@@ -85,6 +86,19 @@ it('no disfraza un error online de detalle con datos de una copia anterior', asy
   expect(result.current.error?.message).toBe('Servidor QA no disponible');
   expect(mocks.cached).not.toHaveBeenCalled(); client.clear();
 });
+it.each([401, 403, 404])('no reintenta automáticamente una denegación de acceso %s', async status => {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  onlineManager.setOnline(true);
+  const denied = Object.assign(new Error('Acceso no disponible'), { response: { status } });
+  // A later success would mask the first denial if the query retried it.
+  mocks.detail.mockRejectedValueOnce(denied).mockResolvedValue({ id: 'online-id' });
+  const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+  const { result } = renderHook(() => useManifiesto('online-id'), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(result.current.error).toBe(denied);
+  expect(mocks.detail).toHaveBeenCalledTimes(1);
+  client.clear();
+});
 it('resuelve un filtro nuevo sin red con React Query real, sin esperar reconexión ni enviar peticiones', async () => {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
   onlineManager.setOnline(false);
@@ -98,7 +112,7 @@ it('resuelve un filtro nuevo sin red con React Query real, sin esperar reconexi�
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data?.items.map(m => m.id)).toEqual(['active']);
   expect(result.current.data).toHaveProperty('offline', true);
-  expect(mocks.cached).toHaveBeenCalledWith('offline-qa');
+  expect(mocks.cached).toHaveBeenCalledWith('offline-qa', inspectionWorkspaceOwner({id:'offline-qa',rol:'GENERADOR',actorId:'g-1'}));
   expect(mocks.list).not.toHaveBeenCalled();
   client.clear();
 });

@@ -90,6 +90,12 @@ async function action(page: Page, label: string, text: string) {
   await page.getByRole('region', { name: 'Atender ticket', exact: true }).getByRole('button', { name: direct[label as keyof typeof direct] || label, exact: true }).click();
   await page.getByRole('textbox', { name: /Mensaje o resolución|Nota interna \/ motivo/ }).fill(text);
 }
+async function continueAfterConfirmedAction(page: Page) {
+  const continueButton = page.getByRole('button', { name: 'Continuar', exact: true });
+  await expect(continueButton).toBeVisible({ timeout: 10000 });
+  await continueButton.click();
+  await expect(continueButton).toBeHidden();
+}
 test('native support: report, take, private note, handoff, reply, close and reopen with actual notices', async ({ page, browser }, info) => {
   test.setTimeout(180000);
   const contexts: BrowserContext[] = [];
@@ -138,30 +144,38 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(admin.getByRole('button', { name: 'Acción de soporte', exact: true })).toHaveCount(0);
     await screenshot(admin, info, 'visible-attention-controls');
     await admin.getByRole('button', { name: 'Asignarme', exact: true }).click();
-    await expect(admin.getByText('QA admin', { exact: true }).first()).toBeVisible();
+    await continueAfterConfirmedAction(admin);
+    await expect(admin.locator('dd').filter({ hasText: 'QA admin' })).toBeVisible();
     await action(admin, 'Nota interna de soporte', 'QA diagnóstico reservado: no mostrar al reportante.');
     await expect(admin.getByText('Sólo el equipo de soporte puede leer esta nota.', { exact: true })).toBeVisible();
     await admin.getByRole('button', { name: 'Guardar nota interna', exact: true }).click();
+    await continueAfterConfirmedAction(admin);
     await expect(admin.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toBeVisible();
     await action(admin, 'Derivar a otro responsable', 'QA motivo privado para el nuevo responsable.');
     await admin.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
     await admin.getByRole('option', { name: 'QA ' + technician + ' · ' + technician + '@night-qa.invalid', exact: true }).click();
     await admin.getByRole('button', { name: 'Confirmar derivación', exact: true }).click();
+    await continueAfterConfirmedAction(admin);
     await expect(admin.locator('dd').filter({ hasText: 'QA ' + technician })).toBeVisible();
     await screenshot(admin, info, 'desk-handoff'); await admin.close();
 
     const operator = await asUser(technician); await operator.goto(prefix(info) + '/notificaciones');
-    await operator.getByRole('button', { name: 'Abrir aviso: Ticket derivado a tu atención', exact: true }).first().click();
+    await operator.getByRole('button', { name: 'Abrir aviso: Ticket derivado a tu atención', exact: true }).filter({ hasText: ticket.referencia }).click();
     await expect(operator).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await action(operator, 'Solicitar respuesta al usuario', 'QA verificá si la pantalla ya muestra los datos.');
     await operator.getByRole('button', { name: 'Solicitar respuesta', exact: true }).click();
+    await continueAfterConfirmedAction(operator);
     await expect(operator.getByText('Esperando al usuario', { exact: true })).toBeVisible();
     await action(operator, 'Cerrar con una resolución', 'QA resolución sintética: se corrigió el acceso.');
     await operator.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
+    await continueAfterConfirmedAction(operator);
     await expect(operator.getByText('Cerrado', { exact: true }).first()).toBeVisible(); await operator.close();
 
     const reporter = await asUser('operador'); await reporter.goto(prefix(info) + '/notificaciones');
-    await reporter.getByRole('button', { name: 'Abrir aviso: Actualización de soporte', exact: true }).first().click();
+    const requested = reporter.getByRole('button', { name: 'Abrir aviso: Se solicitó una respuesta', exact: true }).filter({ hasText: ticket.referencia });
+    const closed = reporter.getByRole('button', { name: 'Abrir aviso: Ticket cerrado', exact: true }).filter({ hasText: ticket.referencia });
+    await expect(requested).toBeVisible(); await expect(closed).toBeVisible();
+    await closed.click();
     await expect(reporter).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await expect(reporter.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toHaveCount(0);
     await expect(reporter.getByText('QA motivo privado para el nuevo responsable.', { exact: true })).toHaveCount(0);
@@ -169,12 +183,17 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(reporter.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);
     await action(reporter, 'Responder y reabrir', 'QA el problema persiste, solicito otra revisión.');
     await reporter.getByRole('button', { name: 'Enviar respuesta', exact: true }).click();
+    await continueAfterConfirmedAction(reporter);
     await expect(reporter.getByText('Abierto', { exact: true }).first()).toBeVisible();
     await expect(reporter.getByText(ticket.referencia, { exact: true })).toBeVisible();
     await reporter.getByText('Historial del ticket', { exact: true }).click();
     await expect(reporter.getByText(/CERRAR · Cerrado/)).toBeVisible();
     await reporter.getByText('Historial del ticket', { exact: true }).click();
     await expect(reporter.getByText(/CERRAR · Cerrado/)).not.toBeVisible();
+    const attending = await asUser(technician); await attending.goto(prefix(info) + '/notificaciones');
+    await attending.getByRole('button', { name: 'Abrir aviso: Ticket reabierto', exact: true }).filter({ hasText: ticket.referencia }).click();
+    await expect(attending).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
+    await expect(attending.getByText('QA el problema persiste, solicito otra revisión.', { exact: true })).toBeVisible();
     await screenshot(reporter, info, 'reporter-reopened'); expect(errors).toEqual([]);
   } catch (error) {
     if (!activePage.isClosed()) { await nativeState(activePage, info).catch(() => {}); await screenshot(activePage, info, 'failed-step').catch(() => {}); }
@@ -210,11 +229,12 @@ test('support impersonation returns the report and the actual response to the re
   await expect(page).toHaveURL(/\/switch-user$/); await page.goto(path(info, '/' + ticket.id));
   await action(page, 'Responder', 'QA soporte respondió al usuario impersonado: el acceso fue revisado.');
   await page.getByRole('button', { name: 'Enviar respuesta', exact: true }).click();
+  await continueAfterConfirmedAction(page);
   await expect(page.getByText('QA soporte respondió al usuario impersonado: el acceso fue revisado.', { exact: true })).toBeVisible();
   const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
   try {
     const recipient = await context.newPage(); await login(recipient, info, who); await recipient.goto(prefix(info) + '/notificaciones');
-    await recipient.getByRole('button', { name: 'Abrir aviso: Actualización de soporte', exact: true }).first().click();
+    await recipient.getByRole('button', { name: 'Abrir aviso: Nueva respuesta en el ticket', exact: true }).filter({ hasText: ticket.referencia }).click();
     await expect(recipient).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await expect(recipient.getByText('QA soporte respondió al usuario impersonado: el acceso fue revisado.', { exact: true })).toBeVisible();
     await expect(recipient.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);
@@ -414,6 +434,7 @@ test('support list rows are keyboard navigable and a common actor cannot open an
   page.on('request', request => { if (request.url().endsWith('/api/soporte') && request.method() === 'POST') supportPosts++; });
   await screenshot(page, info, 'bubble-on-current-task');
   await bubble.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Reportar un problema', exact: true }).click();
   const reviewed = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
   const preview = reviewed.getByRole('img', { name: 'Captura de la pantalla que estabas usando', exact: true });
   await expect(preview).toBeVisible();
@@ -428,6 +449,7 @@ test('support list rows are keyboard navigable and a common actor cannot open an
   await reviewed.getByRole('button', { name: 'Continuar luego', exact: true }).click();
   await expect(page).toHaveURL(taskUrl); await expect(unsentReply).toHaveValue('QA comentario del trámite que aún no envié.');
   await bubble.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Reportar un problema', exact: true }).click();
   await expect(preview).toBeVisible();
   await reviewed.getByLabel('Asunto', { exact: true }).fill('QA burbuja contextual ' + info.project.name);
   await reviewed.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA envío desde la pantalla actual con captura revisada.');

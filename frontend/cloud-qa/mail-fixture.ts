@@ -1,11 +1,13 @@
 /** Persist only synthetic prerequisites; login and resource reads use the real API. */
 import path from 'node:path';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 import { loadSeed } from './load-seed.ts';
 import { createHash } from 'node:crypto';
 await assertCloudDatabase();
-const fixture = await loadSeed().seedNightDatabase();
+const fixture = process.env.QA_USE_EXISTING_FIXTURE === '1'
+  ? JSON.parse(await readFile(path.join(process.env.QA_ARTIFACTS!, 'fixture.json'), 'utf8'))
+  : await loadSeed().seedNightDatabase();
 const { PrismaClient } = backendRequire('@prisma/client');
 const { notificationMailContent } = backendRequire(path.join(root, 'backend/dist/services/notification-mail.service.js'));
 const { renderMail, renderDigest } = backendRequire(path.join(root, 'backend/dist/services/email-templates.js'));
@@ -33,7 +35,7 @@ try {
     datosActor: JSON.stringify({ razonSocial: 'QA solicitante correo', domicilio: 'QA sin domicilio real' }),
     observaciones: 'QA completar domicilio',
   } });
-  const cases: Array<{ id: string; user: string; tipo: string; datos: Record<string, string>; expected: string; visible: string }> = [
+  const cases: Array<{ id: string; user: string; tipo: string; datos: Record<string, unknown>; expected: string; visible: string }> = [
     { id: 'support-owner', user: 'generador', tipo: 'INFO_GENERAL', datos: { tipo: 'soporte', ticketId: ticket.id }, expected: '/soporte/' + ticket.id, visible: ticket.asunto },
     { id: 'support-staff', user: 'admin', tipo: 'INFO_GENERAL', datos: { tipo: 'soporte', ticketId: ticket.id }, expected: '/soporte/' + ticket.id, visible: ticket.asunto },
     { id: 'inspection-inspector', user: 'inspector', tipo: 'INFO_GENERAL', datos: { inspeccionId: inspection.id }, expected: '/inspecciones/' + inspection.id, visible: inspection.numero },
@@ -41,6 +43,12 @@ try {
     { id: 'application-staff', user: 'admin', tipo: 'SOLICITUD_OBSERVADA', datos: { solicitudId: application.id }, expected: '/admin/solicitudes/' + application.id, visible: 'QA sin-actor' },
     { id: 'application-owner', user: 'sin-actor', tipo: 'SOLICITUD_OBSERVADA', datos: { solicitudId: application.id }, expected: '/mi-solicitud', visible: 'QA completar domicilio' },
   ];
+  cases.push(
+    { id: 'psip-actor', user: 'generador', tipo: 'INFO_GENERAL', datos: { tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id, intercambioId: 'qa-render-only', secuencia: 1, evento: 'REQUERIMIENTO', parte: 'AUTORIDAD', destino: 'participacion' }, expected: '/mis-inspecciones/' + inspection.id, visible: inspection.numero },
+    { id: 'psip-staff', user: 'inspector', tipo: 'INFO_GENERAL', datos: { tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id, intercambioId: 'qa-render-only', secuencia: 2, evento: 'RESPUESTA', parte: 'INSPECCIONADO', destino: 'inspeccion' }, expected: '/inspecciones/' + inspection.id + '#intercambios', visible: inspection.numero },
+    { id: 'agenda-staff', user: 'admin', tipo: 'INFO_GENERAL', datos: { tipo: 'agenda_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id, eventoId: 'qa-render-only', evento: 'REPROGRAMADA', destino: 'inspeccion' }, expected: '/inspecciones/' + inspection.id, visible: inspection.numero },
+    { id: 'intake-staff', user: 'admin', tipo: 'INFO_GENERAL', datos: { tipo: 'antecedente_fiscalizacion', version: 1, correoVersion: 1, antecedenteId: 'qa-render-only' }, expected: '/inspecciones?vista=antecedentes', visible: 'Administración evalúa los antecedentes y decide si abre o vincula una inspección. No son infracciones comprobadas.' },
+  );
   const seedUser = await db.usuario.findUniqueOrThrow({ where: { id: fixture.users['sin-actor'] } });
   const pending = await db.usuario.create({ data: { email: 'pending-mail@night-qa.invalid', nombre: 'QA pending mail', password: seedUser.password,
     rol: 'GENERADOR', activo: false, motivoInactividad: 'PENDIENTE_APROBACION', emailVerified: true } });
@@ -59,8 +67,10 @@ try {
     datos: { tipo: 'certificado_ambiental', documentoId: 'qa-certificate', actorTipo: actor, actorId: fixture.actors[actor] },
     expected: '/mi-perfil', visible: 'Certificado ambiental anual',
   });
+  const eventual = await db.registroManifiestoExcepcional.findFirstOrThrow({ where: { creadoPorId: fixture.users.generador, operadorId: fixture.actors.operador }, orderBy: { createdAt: 'desc' } });
+  cases.push({ id: 'eventual-party', user: 'operador', tipo: 'INFO_GENERAL', datos: { tipo: 'manifiesto_eventual', version: 1, correoVersion: 1, registroId: eventual.id, eventoId: 'creacion', evento: 'CREADO' }, expected: '/manifiestos/baja-intensidad?registro=' + eventual.id, visible: 'BI-' + eventual.id });
   const mails = cases.map(item => ({ ...item, ...notificationMailContent({ ...item,
-    rol: item.user === 'admin' ? 'ADMIN' : 'GENERADOR', datos: JSON.stringify(item.datos),
+    rol: item.user === 'admin' ? 'ADMIN' : item.user === 'transportista' ? 'TRANSPORTISTA' : item.user === 'operador' ? 'OPERADOR' : 'GENERADOR', esInspector: item.user === 'inspector', datos: JSON.stringify(item.datos),
   }) }));
   const templates = ['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'].map(id => ({ id,
     ...renderMail(id, { name: 'Persona de capacitación',
@@ -73,7 +83,7 @@ try {
   templates.push(...mails.map(item => ({ id: 'notice-' + item.id, subject: item.subject, html: item.html })));
   // Preview every controlled event label, not just the role/destination samples.
   // Pure renderers only: these synthetic previews never enqueue or send mail.
-  const preview = (id: string, tipo: string, datos: Record<string, string>, manifiestoId?: string) => {
+  const preview = (id: string, tipo: string, datos: Record<string, unknown>, manifiestoId?: string) => {
     const content = notificationMailContent({ tipo, datos: JSON.stringify(datos), manifiestoId, rol: 'ADMIN' });
     if (!content) throw new Error('Missing synthetic preview: ' + id);
     templates.push({ id, subject: content.subject, html: content.html });
@@ -84,6 +94,13 @@ try {
   for (const event of ['INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA']) preview('alert-' + event.toLowerCase(), event, {});
   for (const event of ['CREADO', 'EN_NOMBRE', 'RESPONDER', 'DERIVAR', 'TOMAR', 'ESPERAR', 'CERRAR', 'REABRIR']) preview('support-' + event.toLowerCase(), 'INFO_GENERAL', { tipo: 'soporte', ticketId: ticket.id, evento: event });
   preview('inspection-assigned', 'INFO_GENERAL', { inspeccionId: inspection.id, evento: 'ASIGNADA' });
+  for (const evento of ['REQUERIMIENTO', 'RESPUESTA', 'DESCARGO', 'SUBSANACION', 'PRONUNCIAMIENTO', 'CIERRE_CONFORME', 'DERIVACION_LEGALES']) preview('psip-' + evento, 'INFO_GENERAL', { tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id, intercambioId: 'render-only', secuencia: 1, evento, parte: 'AUTORIDAD', destino: 'participacion' });
+  for (const evento of ['CREADA', 'PROGRAMADA', 'REPROGRAMADA', 'AGENDA_RETIRADA', 'REASIGNADA', 'SUJETO_VINCULADO', 'EN_CAMPO', 'EN_REVISION', 'NOTIFICADA', 'CANCELADA', 'EN_TRAMITE_LEGAL', 'FINALIZADA']) preview('agenda-' + evento, 'INFO_GENERAL', { tipo: 'agenda_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id, eventoId: 'render-only', evento, destino: 'inspeccion' });
+  for (const evento of ['CREADO','APROBACION','APROBADO','RECHAZADO','RETIRADO','RECIBIDO','TRATADO','DIFERENCIA','SOLICITAR_REVISION','APROBADA_POST_FACTO','OBSERVADA_POST_FACTO','RECHAZADA_POST_FACTO']) preview('eventual-' + evento, 'INFO_GENERAL', { tipo: 'manifiesto_eventual', version: 1, correoVersion: 1, registroId: eventual.id, eventoId: 'render-only', evento });
+  preview('intake-pending', 'INFO_GENERAL', { tipo: 'antecedente_fiscalizacion', version: 1, correoVersion: 1, antecedenteId: 'render-only' });
+  for (const fase of ['creada', 'aprobada', 'iniciada', 'rechazada', 'aprobacion-GENERADOR', 'aprobacion-TRANSPORTISTA', 'aprobacion-OPERADOR']) preview('proposal-' + fase, 'INFO_GENERAL', { tipo: 'propuesta_partes', fase }, 'render-only');
+  for (const evento of ['CREADA', 'APROBADA', 'OBSERVADA', 'RECHAZADA']) preview('addendum-' + evento, 'INFO_GENERAL', { tipo: 'adenda_manifiesto', evento }, 'render-only');
+  preview('transport-handoff', 'INFO_GENERAL', { tipo: 'relevo_transporte', tramoId: 'render-only' }, 'render-only');
   const alertSamples = [{ subject: 'Vencimiento próximo: revisar la habilitación', html: '<p>Ejemplo de capacitación.</p>' }, { subject: 'Manifiesto pendiente de cierre', html: '<p>Ejemplo de capacitación.</p>' }];
   for (const count of [1, 2]) templates.push({ id: 'digest-' + count, subject: '[SITREP] Resumen de alertas', html: digestTemplate(alertSamples.slice(0, count), '11/10/2026 10:00 (Mendoza)') });
   templates.push({ id: 'digest-helper', subject: '[SITREP] Resumen de alertas', html: renderDigest(alertSamples) });

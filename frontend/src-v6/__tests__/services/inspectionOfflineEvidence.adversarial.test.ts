@@ -29,6 +29,7 @@ function pending(overrides: Partial<PendingInspectionEvidence> = {}): PendingIns
     id: 'capture-1',
     inspectionId: 'inspection-1',
     userId: 'inspector-1',
+    owner: 'context-A',
     file: new Blob(['camera-bytes'], { type: 'image/jpeg' }),
     fileName: 'hallazgo-campo.jpg',
     mimeType: 'image/jpeg',
@@ -46,6 +47,14 @@ function pending(overrides: Partial<PendingInspectionEvidence> = {}): PendingIns
 }
 
 describe('inspection offline evidence queue adversarial invariants', () => {
+  it('never sends or removes an explicitly recovered legacy file on automatic sync', async () => {
+    indexedDbMocks.getAllOffline.mockResolvedValue([pending({ recoveredManually: true }), pending({ id: 'received', recoveredManually: true, uploaded: true })]);
+    const upload = vi.fn();
+    const result = await syncPendingInspectionEvidence({ inspectionId: 'inspection-1', userId: 'inspector-1', owner: 'context-A', upload });
+    expect(result).toEqual({ synchronized: 0, failed: 0, skipped: 2 });
+    expect(upload).not.toHaveBeenCalled();
+    expect(indexedDbMocks.removeOffline).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     indexedDbMocks.getAllOffline.mockResolvedValue([]);
@@ -65,7 +74,7 @@ describe('inspection offline evidence queue adversarial invariants', () => {
       lastModified: 1_725_000_000_000,
     });
 
-    const result = await queueInspectionEvidence('inspection-1', 'inspector-1', file, {
+    const result = await queueInspectionEvidence('inspection-1', 'inspector-1', 'context-A', file, {
       itemId: 'item-seg-1',
       descripcion: 'Matafuego sin constancia de mantenimiento.',
     });
@@ -94,10 +103,21 @@ describe('inspection offline evidence queue adversarial invariants', () => {
       pending({ id: 'earlier', createdAt: '2026-09-22T09:58:00.000Z' }),
     ]);
 
-    const entries = await listPendingInspectionEvidence('inspection-1', 'inspector-1');
+    const entries = await listPendingInspectionEvidence('inspection-1', 'inspector-1', 'context-A');
 
     expect(entries.map((entry) => entry.id)).toEqual(['earlier', 'later']);
     expect(indexedDbMocks.getAllOffline).toHaveBeenCalledWith('inspection_evidence_queue');
+  });
+
+  it('does not expose or synchronize a different authorization context or a legacy capture', async () => {
+    const entries = [pending({ id: 'current', owner: 'context-A' } as Partial<PendingInspectionEvidence>),
+      pending({ id: 'other-role', owner: 'context-B' } as Partial<PendingInspectionEvidence>), pending({ id: 'legacy', owner: undefined })];
+    indexedDbMocks.getAllOffline.mockResolvedValue(entries);
+    expect((await listPendingInspectionEvidence('inspection-1', 'inspector-1', 'context-A')).map(entry => entry.id)).toEqual(['current']);
+    const upload = vi.fn();
+    await syncPendingInspectionEvidence({ inspectionId: 'inspection-1', userId: 'inspector-1', owner: 'context-C', upload });
+    expect(upload).not.toHaveBeenCalled();
+    expect(indexedDbMocks.removeOffline).not.toHaveBeenCalled();
   });
 
   it('keeps a rejected or interrupted upload queued with an incremented attempt and diagnostic', async () => {
@@ -131,13 +151,13 @@ describe('inspection offline evidence queue adversarial invariants', () => {
     ['disfrazada.jpg', 'image/jpeg', new TextEncoder().encode('GIF89a'), 'Formato no permitido'],
     ['captura.heic', 'image/heic', new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99]), 'Conservá el archivo original'],
   ])('rejects unsupported content %s before persistence', async (name, type, bytes, message) => {
-    await expect(queueInspectionEvidence('inspection-1', 'inspector-1', new File([bytes], name, { type }))).rejects.toThrow(message);
+    await expect(queueInspectionEvidence('inspection-1', 'inspector-1', 'context-A', new File([bytes], name, { type }))).rejects.toThrow(message);
     expect(indexedDbMocks.saveOffline).not.toHaveBeenCalled();
   });
 
   it('does not claim durable capture when IndexedDB rejects for quota', async () => {
     indexedDbMocks.saveOffline.mockRejectedValue(new DOMException('quota', 'QuotaExceededError'));
-    await expect(queueInspectionEvidence('inspection-1', 'inspector-1', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }))).rejects.toThrow('No se pudo confirmar la copia');
+    await expect(queueInspectionEvidence('inspection-1', 'inspector-1', 'context-A', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }))).rejects.toThrow('No se pudo confirmar la copia');
   });
 
   function memoryQueue(entries: PendingInspectionEvidence[]) {
@@ -149,7 +169,7 @@ describe('inspection offline evidence queue adversarial invariants', () => {
     return store;
   }
   const valid = (id: string) => pending({ id, file: new Blob([jpeg], { type: 'image/jpeg' }) });
-  const scope = { inspectionId: 'inspection-1', userId: 'inspector-1' };
+  const scope = { inspectionId: 'inspection-1', userId: 'inspector-1', owner: 'context-A' };
 
   it('retains a 400 diagnostic while allowing the next valid capture to synchronize', async () => {
     const store = memoryQueue([valid('bad'), valid('good')]);
@@ -199,7 +219,7 @@ describe('inspection offline evidence queue adversarial invariants', () => {
 
   it('gives corrected bytes a new capture identity and preserves linkage', async () => {
     const store = memoryQueue([{ ...valid('old-capture'), failureKind: 'terminal' }]);
-    const replacement = await replacePendingInspectionEvidence(scope.inspectionId, scope.userId, 'old-capture', new File([jpeg], 'corrected.jpg', { type: 'image/jpeg' }));
+    const replacement = await replacePendingInspectionEvidence(scope.inspectionId, scope.userId, scope.owner, 'old-capture', new File([jpeg], 'corrected.jpg', { type: 'image/jpeg' }));
     expect(replacement.id).not.toBe('old-capture');
     expect(replacement.fields.itemId).toBe('item-seg-1');
     expect(store.has('old-capture')).toBe(false);
@@ -208,16 +228,25 @@ describe('inspection offline evidence queue adversarial invariants', () => {
 
   it('does not discard another user’s local capture or a confirmed upload', async () => {
     const store = memoryQueue([{ ...valid('foreign'), userId: 'inspector-2' }, { ...valid('published'), uploaded: true }]);
-    await expect(discardPendingInspectionEvidence(scope.inspectionId, scope.userId, 'foreign')).rejects.toThrow('Esta captura ya cambió');
-    await expect(discardPendingInspectionEvidence(scope.inspectionId, scope.userId, 'published')).rejects.toThrow('Esta captura ya cambió');
+    await expect(discardPendingInspectionEvidence(scope.inspectionId, scope.userId, scope.owner, 'foreign')).rejects.toThrow('Esta captura ya cambió');
+    await expect(discardPendingInspectionEvidence(scope.inspectionId, scope.userId, scope.owner, 'published')).rejects.toThrow('Esta captura ya cambió');
     expect(store.size).toBe(2);
+  });
+
+  it('refuses replacement or removal from another role of the same inspector', async () => {
+    const store = memoryQueue([{ ...valid('other-role'), owner: 'context-B' }]);
+    await expect(discardPendingInspectionEvidence(scope.inspectionId, scope.userId, scope.owner, 'other-role')).rejects.toThrow('Esta captura ya cambió');
+    await expect(replacePendingInspectionEvidence(scope.inspectionId, scope.userId, scope.owner, 'other-role', new File([jpeg], 'replacement.jpg'))).rejects.toThrow('Esta captura ya cambió');
+    expect(store.get('other-role')?.owner).toBe('context-B');
+    expect(indexedDbMocks.removeOffline).not.toHaveBeenCalled();
+    expect(indexedDbMocks.replaceOffline).not.toHaveBeenCalled();
   });
 
   it('preserves the original when a corrected capture cannot be saved', async () => {
     const original = { ...valid('old-capture'), failureKind: 'terminal' as const };
     const store = memoryQueue([original]);
     indexedDbMocks.replaceOffline.mockRejectedValue(new DOMException('quota', 'QuotaExceededError'));
-    await expect(replacePendingInspectionEvidence(scope.inspectionId, scope.userId, original.id, new File([jpeg], 'corrected.jpg'))).rejects.toThrow('No se pudo confirmar la copia');
+    await expect(replacePendingInspectionEvidence(scope.inspectionId, scope.userId, scope.owner, original.id, new File([jpeg], 'corrected.jpg'))).rejects.toThrow('No se pudo confirmar la copia');
     expect(store.get(original.id)).toBe(original);
     expect(indexedDbMocks.removeOffline).not.toHaveBeenCalled();
   });

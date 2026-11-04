@@ -41,13 +41,13 @@ describe('inspector actor consultation', () => {
   afterEach(() => vi.restoreAllMocks());
   it('does not grant administrative routes unless explicitly designated read-only', () => {
     open(false);
-    expect(screen.getByText('Acceso denegado')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Acceso no disponible' })).toBeInTheDocument();
   });
   it('can read the same ficha without payment, declaration, upload, review or delete controls', () => {
     open(true);
     expect(screen.getByRole('heading', { name: 'Planta de prueba' })).toBeInTheDocument();
     expect(screen.queryByText('Cargar certificado oficial')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Situacion Fiscal' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Situación fiscal' }));
     expect(screen.queryByRole('button', { name: 'Registrar Pago' })).not.toBeInTheDocument();
     expect(screen.queryByText('Acciones')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'DDJJ y Documentos' }));

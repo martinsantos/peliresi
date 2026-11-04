@@ -1,45 +1,49 @@
 /**
  * useActiveTripRecovery
  * =====================
- * After a TRANSPORTISTA logs in, checks API for any EN_TRANSITO manifiestos
- * and restores the active trip to localStorage.
- * This ensures trip persistence across app reinstalls and crashes.
+ * Restore the shortcut only when the carrier has exactly one active trip.
+ * With multiple trips, the driver chooses a manifest from the trip queue.
  */
 
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import { EstadoManifiesto } from '../types/models';
+import { useQueryOwner } from './useQueryOwner';
+import { readActiveTrip, readTripSnapshot, writeTripSnapshot } from '../services/tripSnapshot';
 
 export function useActiveTripRecovery() {
   const { currentUser, isTransportista, isRestricted } = useAuth();
+  const owner = useQueryOwner();
 
   useEffect(() => {
-    if (!isTransportista || !currentUser || isRestricted) return;
+    if (!isTransportista || !currentUser || isRestricted || !owner) return;
 
     // Only recover if there's no active trip in localStorage already
-    const existingTripId = localStorage.getItem('sitrep_active_trip_id');
+    const existingTripId = readActiveTrip(owner);
     if (existingTripId) return;
 
     let cancelled = false;
 
     const recover = async () => {
       try {
-        const res = await manifiestoService.list({ estado: EstadoManifiesto.EN_TRANSITO, limit: 1 });
+        const res = await manifiestoService.list({ estado: EstadoManifiesto.EN_TRANSITO, limit: 2 });
         if (cancelled) return;
 
         const manifiestos = res?.items || [];
-        if (manifiestos.length > 0) {
+        if (manifiestos.length === 1 && res.total === 1) {
           const trip = manifiestos[0];
           const tripId = String(trip.id);
-          localStorage.setItem('sitrep_active_trip_id', tripId);
-          localStorage.setItem(`viaje_snapshot_${tripId}`, JSON.stringify({
+          // The open trip page may have saved a more complete, verified copy
+          // while this background list request was in flight.
+          if (readActiveTrip(owner) || readTripSnapshot(owner, tripId)) return;
+          writeTripSnapshot(owner, tripId, {
             id: trip.id,
             numero: trip.numero,
             estado: trip.estado,
-            generador: trip.generador?.razonSocial,
-            operador: trip.operador?.razonSocial,
-          }));
+            generador: trip.generador ? { razonSocial: trip.generador.razonSocial } : undefined,
+            operador: trip.operador ? { razonSocial: trip.operador.razonSocial } : undefined,
+          });
         }
       } catch {
         // Silent fail — if API is offline, we can't recover
@@ -48,5 +52,5 @@ export function useActiveTripRecovery() {
 
     recover();
     return () => { cancelled = true; };
-  }, [isTransportista, currentUser?.id, isRestricted]);
+  }, [isTransportista, currentUser?.id, isRestricted, owner]);
 }

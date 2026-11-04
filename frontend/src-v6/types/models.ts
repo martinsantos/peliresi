@@ -93,9 +93,12 @@ export enum TipoDiferencia {
 // ========================================
 
 export interface Usuario {
+  preferenciaEnlaces?: import('../utils/linkPreference').LinkPreference;
+  motivoInactividad?: string | null;
   empresaContexto?:import('../services/companyContext').CompanyContext;
   contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
   empresaContextoError?:string;
+  actividadContextoError?:string;
   actividades?: Array<'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'>;
   training?: boolean;
   id: string;
@@ -108,6 +111,7 @@ export interface Usuario {
   telefono: string | null;
   activo: boolean;
   esInspector?: boolean;
+  esJefeInspecciones?: boolean;
   dosFaVerificado: boolean;
   createdAt: string;
   updatedAt: string;
@@ -273,6 +277,7 @@ export interface TipoResiduo {
 }
 
 export interface Manifiesto {
+  aprobacionOperacion?: 'SIN_PROPUESTA' | 'INCONSISTENTE' | 'SIN_TRANSPORTE' | 'RECHAZADA' | 'FALTAN_APROBACIONES' | 'FALTA_COORDINACION' | 'LISTA';
   contextoEmpresa?:import('../services/companyContext').CompanyContext|null;
   id: string;
   numero: string;
@@ -351,6 +356,8 @@ export interface TrackingGPS {
   velocidad: number | null;
   direccion: number | null;
   precision: number | null;
+  tramoId?:string|null;
+  emisor?:string|null;
   timestamp: string;
 }
 

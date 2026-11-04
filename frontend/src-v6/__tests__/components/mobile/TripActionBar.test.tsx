@@ -43,4 +43,26 @@ describe('TripActionBar', () => {
     expect(screen.getByRole('button', { name: /Confirmar entrega/i })).toBeInTheDocument();
     expect(screen.getByText('Sync pendiente')).toBeInTheDocument();
   });
+
+  it('allows only delivery when a verified saved trip has no connection', () => {
+    render(<TripActionBar estado={EstadoManifiesto.EN_TRANSITO} viajeStatus="ACTIVO" isPending={false} hasPendingSync={false}
+      connectionLimited onConfirmPickup={vi.fn()} onTogglePause={vi.fn()} onReportIncident={vi.fn()} onConfirmDelivery={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Pausar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Incidente/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Confirmar entrega/i })).toBeEnabled();
+  });
+
+  it('blocks delivery if the handoff status is not known', () => {
+    render(<TripActionBar estado={EstadoManifiesto.EN_TRANSITO} viajeStatus="ACTIVO" isPending={false} hasPendingSync={false}
+      disabled onConfirmPickup={vi.fn()} onTogglePause={vi.fn()} onReportIncident={vi.fn()} onConfirmDelivery={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Confirmar entrega/i })).toBeDisabled();
+  });
+
+  it('blocks another incident or pause while allowing a delivery to proceed', () => {
+    render(<TripActionBar estado={EstadoManifiesto.EN_TRANSITO} viajeStatus="ACTIVO" isPending={false} hasPendingSync={false}
+      incidentUnavailable onConfirmPickup={vi.fn()} onTogglePause={vi.fn()} onReportIncident={vi.fn()} onConfirmDelivery={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Pausar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Incidente/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Confirmar entrega/i })).toBeEnabled();
+  });
 });

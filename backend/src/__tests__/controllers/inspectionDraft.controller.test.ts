@@ -67,7 +67,7 @@ describe('atomic inspection draft save', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     stored = {
-      inspection: { id: 'inspection-1', inspectorId: 'inspector-1', tipoActor: 'GENERADOR', estado: 'EN_CAMPO', version: 7, observaciones: 'Anterior' },
+      inspection: { id: 'inspection-1', numero: 'GRP-2026-00001', inspectorId: 'inspector-1', tipoActor: 'GENERADOR', estado: 'EN_CAMPO', version: 7, observaciones: 'Anterior' },
       items: [
         { id: 'item-1', inspeccionId: 'inspection-1', resultado: 'PENDIENTE' },
         { id: 'foreign-item', inspeccionId: 'inspection-2', resultado: 'PENDIENTE' },
@@ -90,8 +90,9 @@ describe('atomic inspection draft save', () => {
     mocks.updateItem.mockImplementation(async (args) => updateOwned(staged.items, args));
     mocks.updateComparison.mockImplementation(async (args) => updateOwned(staged.comparaciones, args));
     mocks.createEvent.mockImplementation(async ({ data }) => {
-      staged.eventos.push(data);
-      return data;
+      const event = { id: `event-${staged.eventos.length + 1}`, ...data };
+      staged.eventos.push(event);
+      return event;
     });
     mocks.readSaved.mockImplementation(async () => structuredClone({ ...staged.inspection, items: staged.items.filter((row) => row.inspeccionId === 'inspection-1'), comparaciones: staged.comparaciones.filter((row) => row.inspeccionId === 'inspection-1'), eventos: staged.eventos }));
     mocks.transaction.mockImplementation(async (callback) => {
@@ -103,13 +104,14 @@ describe('atomic inspection draft save', () => {
         itemInspeccion: { count: mocks.countItems, updateMany: mocks.updateItem },
         comparacionInspeccion: { findMany: mocks.findComparisons, updateMany: mocks.updateComparison },
         eventoInspeccion: { create: mocks.createEvent },
+        usuario: { findMany: vi.fn().mockResolvedValue([]) },
       });
       stored = staged;
       return result;
     });
   });
 
-  it('commits metadata, checklist and comparisons with one version and one audit event', async () => {
+  it('commits metadata, checklist and comparisons with one version and atomic draft and schedule audit events', async () => {
     const { res, next } = await save();
 
     expect(next).not.toHaveBeenCalled();
@@ -119,7 +121,8 @@ describe('atomic inspection draft save', () => {
     expect(stored.items[1].resultado).toBe('PENDIENTE');
     expect(stored.comparaciones[1].resultado).toBe('PENDIENTE');
     expect(mocks.reserve).toHaveBeenCalledTimes(1);
-    expect(stored.eventos).toHaveLength(1);
+    expect(stored.eventos).toHaveLength(2);
+    expect(stored.eventos[1]).toMatchObject({ tipo: 'AGENDA_ACTUALIZADA', metadata: { fechaAnterior: null, fechaNueva: '2026-09-22T12:00:00.000Z', avisoAgenda: 'PROGRAMADA', versionBase: 7, versionNueva: 8 } });
     expect(stored.eventos[0]).toMatchObject({ tipo: 'BORRADOR_ACTUALIZADO', usuarioId: 'inspector-1', metadata: { versionBase: 7, versionNueva: 8 } });
     expect(res.json).toHaveBeenCalledWith({ success: true, data: expect.objectContaining({ version: 8, items: [expect.objectContaining({ resultado: 'CUMPLE' })] }) });
   });

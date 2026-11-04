@@ -33,9 +33,12 @@ export function MonitorPopupBounds() {
       }
       const container = map.getContainer(), box = container.getBoundingClientRect();
       const header = container.closest('.wr-layout')?.querySelector('.wr-layout-header')?.getBoundingClientRect();
+      const event = container.closest('.wr-layout-map')?.querySelector('.wr-current-event')?.getBoundingClientRect();
+      const eventBottom = event && event.width > 0 && event.height > 0 && event.bottom > box.top && event.top < box.bottom
+        && event.right > box.left && event.left < box.right ? event.bottom : 0;
       const viewportTop = window.visualViewport?.offsetTop ?? 0;
       const viewportBottom = viewportTop + (window.visualViewport?.height ?? innerHeight);
-      const topPadding = Math.max(12, Math.max(viewportTop, header?.bottom ?? viewportTop) - box.top + 12);
+      const topPadding = Math.max(12, Math.max(viewportTop, header?.bottom ?? viewportTop, eventBottom) - box.top + 12);
       const bottomPadding = Math.max(32, box.bottom - viewportBottom + 32);
       const margin = parseFloat(getComputedStyle(element).marginBottom) || 0;
       const chromeHeight = Math.max(0, element.offsetHeight - nextContent.offsetHeight) + margin;
@@ -43,7 +46,9 @@ export function MonitorPopupBounds() {
       active.options.maxHeight = Math.min(220, Math.max(44, Math.floor(available)));
       active.options.autoPanPaddingTopLeft = [12, topPadding];
       active.options.autoPanPaddingBottomRight = [12, bottomPadding];
+      const scrollTop = nextContent.scrollTop;
       active.update();
+      nextContent.scrollTop = scrollTop;
     };
     const handlers = {
       popupopen: (event: PopupEvent) => { active = event.popup; constrain(); },

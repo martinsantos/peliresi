@@ -48,7 +48,7 @@ export const exceptionalEventSchema = z.object({
 });
 export type ExceptionalInput = z.infer<typeof exceptionalCreateSchema>;
 export type ExceptionalCommand = z.infer<typeof exceptionalEventSchema>;
-export type ExceptionalEvent = ExceptionalCommand & { autorId: string; impersonadoPorId?: string; fecha: string };
+export type ExceptionalEvent = ExceptionalCommand & { autorId: string; autorRol?: string; autorActorId?: string; impersonadoPorId?: string; fecha: string };
 export type ExceptionalStage = 'REGISTRADO' | 'RETIRADO' | 'RECIBIDO' | 'TRATADO';
 export function exceptionalPending(id: string, events: ExceptionalEvent[]) {
   return [id, ...events.filter(e => e.tipo === 'DIFERENCIA').map(e => e.id)].map(objetivo => {

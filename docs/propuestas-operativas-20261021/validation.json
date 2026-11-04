@@ -1,0 +1,639 @@
+{
+  "at": "2026-10-21T11:11:13.438Z",
+  "base": "edb36dc40d7f40f078aa0a904608a7fb2c522e71",
+  "sourceFiles": 2322,
+  "productSourceHashesVerified": true,
+  "suites": {
+    "backend-all": {
+      "tests": 1438,
+      "passed": 1438,
+      "failed": 0,
+      "pending": 0,
+      "startTime": 1792578828866
+    },
+    "frontend-all": {
+      "tests": 1790,
+      "passed": 1790,
+      "failed": 0,
+      "pending": 0,
+      "startTime": 1792578906172
+    },
+    "proposal-unit-final": {
+      "tests": 33,
+      "passed": 33,
+      "failed": 0,
+      "pending": 0,
+      "startTime": 1792579826380
+    },
+    "ui-targeted-final": {
+      "tests": 65,
+      "passed": 65,
+      "failed": 0,
+      "pending": 0,
+      "startTime": 1792579844884
+    },
+    "driver-continuity-unit": {
+      "tests": 6,
+      "passed": 6,
+      "failed": 0,
+      "pending": 0,
+      "startTime": 1792580506166
+    }
+  },
+  "lint": {
+    "files": 14,
+    "errors": 0,
+    "warnings": 59
+  },
+  "browserV3": {
+    "stats": {
+      "startTime": "2026-10-21T10:54:41.663Z",
+      "duration": 354038.491,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "rows": [
+      {
+        "title": "ordinary proposal: generador creates; each party approves, inbox updates, transport starts",
+        "project": "web-desktop",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 49708,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: transportista creates; each party approves, inbox updates, transport starts",
+        "project": "web-desktop",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 40713,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: operador creates; each party approves, inbox updates, transport starts",
+        "project": "web-desktop",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 40642,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "operational proposal manual is available to all three roles, with stable navigation",
+        "project": "web-desktop",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 2375,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: generador creates; each party approves, inbox updates, transport starts",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 35205,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: transportista creates; each party approves, inbox updates, transport starts",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 39181,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: operador creates; each party approves, inbox updates, transport starts",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 32428,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "operational proposal manual is available to all three roles, with stable navigation",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 2240,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: generador creates; each party approves, inbox updates, transport starts",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 33792,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: transportista creates; each party approves, inbox updates, transport starts",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 26533,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: operador creates; each party approves, inbox updates, transport starts",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 42592,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "operational proposal manual is available to all three roles, with stable navigation",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 2155,
+            "errors": []
+          }
+        ]
+      }
+    ]
+  },
+  "browserV4": {
+    "stats": {
+      "startTime": "2026-10-21T11:06:20.009Z",
+      "duration": 233531.24800000002,
+      "expected": 8,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "rows": [
+      {
+        "title": "ordinary proposal: generador creates; each party approves, inbox updates, transport starts",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 35422,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: transportista creates; each party approves, inbox updates, transport starts",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 39074,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: operador creates; each party approves, inbox updates, transport starts",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 43082,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "operational proposal manual is available to all three roles, with stable navigation",
+        "project": "web-responsive",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 2421,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: generador creates; each party approves, inbox updates, transport starts",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 34047,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: transportista creates; each party approves, inbox updates, transport starts",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 31881,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "ordinary proposal: operador creates; each party approves, inbox updates, transport starts",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 40588,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "operational proposal manual is available to all three roles, with stable navigation",
+        "project": "app",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "retry": 0,
+            "duration": 2216,
+            "errors": []
+          }
+        ]
+      }
+    ]
+  },
+  "http": {
+    "passed": [
+      "generador: creation -> own explicit approval -> concurrent unanimity -> future agenda -> coordination -> physical pickup; 15 deduplicated notices",
+      "transportista: creation -> own explicit approval -> concurrent unanimity -> future agenda -> coordination -> physical pickup; 15 deduplicated notices",
+      "operador: creation -> own explicit approval -> concurrent unanimity -> future agenda -> coordination -> physical pickup; 15 deduplicated notices",
+      "foreign, inactive or missing actor, forged ownership, invalid dates and foreign/inactive fleet denied; actors and proposal immutable",
+      "reasoned rejection persists and blocks other approval, pickup and removal",
+      "cancellation preserves immutable history and rejects subsequent approval",
+      "existing in-situ two-party creation, signature and reception unchanged",
+      "legacy historical manifest unchanged byte-for-byte"
+    ],
+    "pendingId": "cmvhzvq7y0047ws4vkf964mby",
+    "cancelledId": "cmvhzvqty0059ws4vc86kz0t6",
+    "records": [
+      {
+        "id": "cmvhzvond0004ws4vujrlihyq",
+        "numero": "2026-000009"
+      },
+      {
+        "id": "cmvhzvpee001lws4v44vl07uj",
+        "numero": "2026-000010"
+      },
+      {
+        "id": "cmvhzvpuu002wws4vutq001py",
+        "numero": "2026-000011"
+      }
+    ],
+    "capClosed": true,
+    "externalDelivery": false
+  },
+  "flagsOff": {
+    "passed": [
+      "disabled feature closes proposal APIs; persisted approvals cannot be bypassed; legacy create/sign remains available"
+    ]
+  },
+  "audit": {
+    "checks": [
+      "actual runtime: isolated database, proposals enabled, CAP closed, email and push disabled, providers empty",
+      "all four CAP aliases refuse login with 403",
+      "proposal notices resolve to the three current parties; every phase renders simulated mail; actual relay queues/sends nothing",
+      "original historical manifest retained byte-for-byte"
+    ],
+    "noticeCount": 354,
+    "simulatedMail": 354,
+    "phases": [
+      "creada",
+      "aprobacion-OPERADOR",
+      "aprobacion-TRANSPORTISTA",
+      "aprobada",
+      "iniciada",
+      "aprobacion-GENERADOR",
+      "rechazada"
+    ],
+    "emailQueue": 0,
+    "attempts": 0,
+    "sent": 0
+  },
+  "protectedTables": 295,
+  "phases": {
+    "compile": {
+      "phase": "compile",
+      "passed": true,
+      "at": "2026-10-21T11:03:13.805Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 2246\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "build": {
+      "phase": "build",
+      "passed": true,
+      "at": "2026-10-21T11:04:22.620Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 3532\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "api": {
+      "phase": "api",
+      "passed": true,
+      "at": "2026-10-21T10:54:15.394Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 2125\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "api-off": {
+      "phase": "api-off",
+      "passed": true,
+      "at": "2026-10-21T11:01:12.586Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 2246\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "audit-final": {
+      "phase": "audit-final",
+      "passed": true,
+      "at": "2026-10-21T11:10:43.471Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 3532\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "audit-protected": {
+      "phase": "audit-protected",
+      "passed": true,
+      "at": "2026-10-21T11:10:45.230Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 3532\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "browser-continuity": {
+      "phase": "browser-continuity",
+      "passed": true,
+      "at": "2026-10-21T11:10:13.572Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 3532\noom 0\noom_kill 0\noom_group_kill 0\n"
+    },
+    "driver-continuity-unit": {
+      "phase": "driver-continuity-unit",
+      "passed": true,
+      "at": "2026-10-21T11:01:54.342Z",
+      "memoryEvents": "low 0\nhigh 0\nmax 2246\noom 0\noom_kill 0\noom_group_kill 0\n"
+    }
+  },
+  "resources": {
+    "cpu": "100000 100000",
+    "memory": "2147483648",
+    "swap": "0",
+    "events": "low 0\nhigh 0\nmax 3532\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "verifiedProductFileCount": 1236,
+  "changedProductFiles": [
+    {
+      "path": "backend/src/__tests__/manifestProposal.test.ts",
+      "sha256": "a8a3fbc8142d93232d42676a3ea4bfbe5800df255cec4023b107259cdd2eb3dd"
+    },
+    {
+      "path": "backend/src/controllers/manifest-proposal.controller.ts",
+      "sha256": "0865050803bf561bc239d169b65139deba7b77e0d94088c8d0a72954a604beff"
+    },
+    {
+      "path": "backend/src/controllers/manifiesto-workflow.controller.ts",
+      "sha256": "98f70e757b27928876bdef131e6dddf184eff35e19b8cad671dda3bc2abc974f"
+    },
+    {
+      "path": "backend/src/controllers/manifiesto.controller.ts",
+      "sha256": "34364c0a7766b5ee4703a90600dca0fc6a15a0a82bcdd83ff1bb0cc62ea389b9"
+    },
+    {
+      "path": "backend/src/domain/manifestProposal.ts",
+      "sha256": "e18a17337958dd9444aa2b5b81e5436e81e44da010b199b81be9edc82cf58b74"
+    },
+    {
+      "path": "backend/src/services/manifestIntegrity.service.ts",
+      "sha256": "95e7eed2b5a15f8c01fcd38f3639b65723a7b9669716ac85190e6eb6ecf9f751"
+    },
+    {
+      "path": "backend/src/services/manifestProposal.service.ts",
+      "sha256": "bbe542557e3c530f25ba8baef8e0e2d816d2b1583d861cbb63655b351d545ded"
+    },
+    {
+      "path": "docs/manual/help-data.js",
+      "sha256": "25db894bb38952b787fbc6e43dabc6e4bf8d2a93230187aa84c0dc8d62d13043"
+    },
+    {
+      "path": "docs/manual/index.html",
+      "sha256": "9c029f078453b1180a25368c16663eeea09ac1c1f15c910ee1022962235fd9ac"
+    },
+    {
+      "path": "docs/manual/search.html",
+      "sha256": "ebaa2ae537cfeaed7d8a29370cc651bc3465e7fc61cc1a59f4962b98b47eae0e"
+    },
+    {
+      "path": "docs/manual/tutorial.html",
+      "sha256": "79ae13d0c9972b4cdd324c91ed40e558692f704381e0242e1511be4d5ef00713"
+    },
+    {
+      "path": "frontend/src-v6/__tests__/components/ManifestProposalApprovals.test.tsx",
+      "sha256": "df717abf26fc877bf2337e77ed94aced977754e797b1607fa757bac5edbf605a"
+    },
+    {
+      "path": "frontend/src-v6/__tests__/components/TrainingTaskQueue.test.tsx",
+      "sha256": "963c5f62e5bdf7c404cc43d0a9352ac315b37045da46c685782f4f43aed52c7b"
+    },
+    {
+      "path": "frontend/src-v6/__tests__/manual/manualDocumentation.test.ts",
+      "sha256": "c10c55380efe249b9330eb98989cff044f053a44652b6d4cad27a5c236fce48f"
+    },
+    {
+      "path": "frontend/src-v6/__tests__/pages/mobile/MobileProposalContinuity.test.tsx",
+      "sha256": "3a847c21050797ed889c91fd1ec89926a0db03adeff3a3f148db6a76c87c719e"
+    },
+    {
+      "path": "frontend/src-v6/__tests__/utils/manifestActions.test.ts",
+      "sha256": "8d318e545b545c7a191781b0e26496b8a995deed96b39b4444a1875f4735cad1"
+    },
+    {
+      "path": "frontend/src-v6/components/TrainingTaskQueue.tsx",
+      "sha256": "f318dc09582de83d669df89e00e66cd567e27335d5f47d63f00a83371d3823d2"
+    },
+    {
+      "path": "frontend/src-v6/hooks/useManifiestoWorkflow.ts",
+      "sha256": "d4bcea51df57f54b5bc327224e813827e5fb9774cb6f71232b8ec60f35a95ece"
+    },
+    {
+      "path": "frontend/src-v6/pages/dashboard/DashboardPage.tsx",
+      "sha256": "34f5a188fa6f174b862c8ee9a4d4e25931d8984801101af691bc0cfb57181d04"
+    },
+    {
+      "path": "frontend/src-v6/pages/manifiestos/ManifiestosPage.tsx",
+      "sha256": "7f86a90f97d1e92c6b94761fbd512ea21081c2dc3e00870c981ef6b4770d147c"
+    },
+    {
+      "path": "frontend/src-v6/pages/manifiestos/NuevoManifiestoPage.tsx",
+      "sha256": "1f89a55f31768607122ae311dff699cfbefebe698d2f3354e10e71b9e96e3378"
+    },
+    {
+      "path": "frontend/src-v6/pages/manifiestos/components/ManifestAgenda.tsx",
+      "sha256": "1bd57f6a42b11a16f79309eaabe27186528e94467183ae56f68b935942e48e33"
+    },
+    {
+      "path": "frontend/src-v6/pages/manifiestos/components/ManifestProposalApprovals.tsx",
+      "sha256": "2eb5c602df5e2dcf6a0a5399894b3ca16893d8b48f8a5306d0fc2be0c4c928dc"
+    },
+    {
+      "path": "frontend/src-v6/pages/manifiestos/components/ManifiestoActions.tsx",
+      "sha256": "b71789c91a0df9167ec225607d0ae762c1930ea5bfa3f0deecd4771b0be7cacc"
+    },
+    {
+      "path": "frontend/src-v6/pages/manifiestos/components/ManifiestoTimeline.tsx",
+      "sha256": "3e3047e3bf8889b3fe1901d669a2834a4bbe7be4d3e92c51e2f1b9ee56b48c29"
+    },
+    {
+      "path": "frontend/src-v6/pages/mobile/MobileDashboardPage.tsx",
+      "sha256": "9ef30af7a11a4dfe26397bac46a1deeea96ec2250ba13e9d14669957eacee8ad"
+    },
+    {
+      "path": "frontend/src-v6/pages/transporte/ViajeEnCursoTransportista.tsx",
+      "sha256": "e89ea278779c6a5879ef1aa5f00a99db6913918b85e0503a51bc60fc1a86900f"
+    },
+    {
+      "path": "frontend/src-v6/utils/manifestActions.ts",
+      "sha256": "2bd01b6448b43ccd6dfe3e59959924bf50d0df5023407f724ae6abb2fa9d904d"
+    },
+    {
+      "path": "frontend/src-v6/utils/manifestFeatures.ts",
+      "sha256": "e452e0f94c8ee9c28ffbaecf18c7ec6a0c2a85a0a5611914150bf3e58b247171"
+    },
+    {
+      "path": "frontend/src-v6/utils/notificationNavigation.ts",
+      "sha256": "c1d19ca0fdcc01492ddd007f2fff053420eedc5b99b65bb53b6b8b014f61e3e0"
+    }
+  ],
+  "finalTestSourceHashes": {
+    "frontend/cloud-qa/e2e/proposal-operations.spec.ts": "312a53adafbc709e9bcda398bb4e9d4bc38a3f3e41f9f25a07a4cb6ab352a501",
+    "frontend/cloud-qa/proposal-integration.ts": "53e35304480b096c38b5521f3e78560afa7c87097c9fa263304472d3a4860a1c",
+    "frontend/cloud-qa/proposal-audit.ts": "90983c98dd84f02214a21a9f0acbecd4e8db6ed3f1a8955e5985bd44e40da60c"
+  },
+  "closure": {
+    "at": "2026-10-21T11:11:31.827Z",
+    "stopped": [
+      {
+        "pid": 4878,
+        "file": "runtime.ts"
+      },
+      {
+        "pid": 4879,
+        "file": "server.ts"
+      }
+    ],
+    "forced": []
+  },
+  "container": {
+    "name": "sitrep-qa-training-20261018",
+    "running": false,
+    "pid": 0,
+    "oomKilled": false,
+    "finishedAt": "2026-10-21T11:11:50.796558273Z",
+    "postgresStopped": true
+  },
+  "limits": [
+    "Synthetic operational users, not CAP",
+    "No production calls or real records",
+    "No workflows or push to Git",
+    "Final desktop E2E v3; mobile and app rerun v4 after mobile dashboard change",
+    "Complete unit suites predate final refinements; targeted final suites stated separately",
+    "Browser emulation is not a physical Android or GPS certification",
+    "Seven mail phases rendered for 354 notices; zero delivery attempts"
+  ],
+  "screenshots": [
+    {
+      "file": "unanimous-web.png",
+      "sha256": "0e0e4590fcfd30fd62d831ce4751f5f3b035e3e2d71ebc51ce995b9fc7f8c55b",
+      "syntheticData": true,
+      "edited": false
+    },
+    {
+      "file": "unanimous-web-mobile.png",
+      "sha256": "e269171dc6385534241b61c11617aa9308161bfa6ed4bdff2adf256c256b7fa5",
+      "syntheticData": true,
+      "edited": false
+    },
+    {
+      "file": "waiting-app.png",
+      "sha256": "8cedb6a85867dcb3c9ea7617fec2c49d304ff46c6d02bc6e72fde46b0ce45c37",
+      "syntheticData": true,
+      "edited": false
+    },
+    {
+      "file": "manual-web.png",
+      "sha256": "5658e52e35460e3cbd30cf9597e6973c51e664df7508a2cf103d2f7f27ff3d97",
+      "syntheticData": true,
+      "edited": false
+    }
+  ],
+  "postValidationWhitespaceOnly": [
+    {
+      "path": "backend/src/services/manifestIntegrity.service.ts",
+      "testedSha256": "95e7eed2b5a15f8c01fcd38f3639b65723a7b9669716ac85190e6eb6ecf9f751",
+      "commitSha256": "9cba2d31177da5742875c4661a1ccb0592e7273fabe3ff67f2299029ee4b8de1",
+      "change": "Remove exactly one extra newline at EOF; all other bytes identical"
+    }
+  ]
+}

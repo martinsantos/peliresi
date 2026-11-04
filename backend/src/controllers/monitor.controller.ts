@@ -11,6 +11,8 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import type { AuthRequest } from '../middlewares/auth.middleware';
 import { canAccessManifiesto } from '../utils/roleFilter';
+import { readTransportAssignment } from '../domain/manifiestoTransportAssignment';
+import { declaredTransportLabel } from '../domain/transportHandoff';
 
 // ─── Timeline (PLAYBACK mode) ─────────────────────────────────────────────────
 
@@ -242,11 +244,22 @@ export async function getMonitorLive(req: Request, res: Response) {
         numero: true,
         generador: { select: { razonSocial: true, latitud: true, longitud: true } },
         operador: { select: { razonSocial: true, latitud: true, longitud: true } },
-        transportista: {
+        transportistaId: true,
+        asignacionTransporte: true,
+        transportista: { select: { razonSocial: true } },
+        // A replacement owns its own positions. Never present an earlier
+        // carrier's GPS as the current vehicle while waiting for its first point.
+        tramosTransporte: {
+          where: { fin: null },
+          orderBy: { orden: 'desc' },
+          take: 1,
           select: {
-            razonSocial: true,
-            vehiculos: { where: { activo: true }, select: { patente: true, marca: true, modelo: true }, take: 1 },
-            choferes: { where: { activo: true }, select: { nombre: true, apellido: true }, take: 1 },
+            id: true, orden: true, tipo: true, transportistaId: true, datos: true, inicio: true,
+            tracking: {
+              orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
+              take: 30,
+              select: { latitud: true, longitud: true, velocidad: true, direccion: true, timestamp: true },
+            },
           },
         },
         residuos: {
@@ -258,7 +271,8 @@ export async function getMonitorLive(req: Request, res: Response) {
         },
         fechaRetiro: true,
         tracking: {
-          orderBy: { timestamp: 'desc' },
+          where: { tramoId: null },
+          orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
           take: 30,
           select: { latitud: true, longitud: true, velocidad: true, direccion: true, timestamp: true },
         },
@@ -392,42 +406,61 @@ export async function getMonitorLive(req: Request, res: Response) {
           toneladas: Math.round(toneladas * 100) / 100,
           enTransitoActivos: porEstado['EN_TRANSITO'] || 0,
         },
-        enTransito: enTransito.map(m => ({
-          manifiestoId: m.id,
-          numero: m.numero,
-          transportista: m.transportista?.razonSocial || 'Sin asignar',
-          origen: {
-            razonSocial: m.generador.razonSocial,
-            lat: m.generador.latitud,
-            lng: m.generador.longitud,
-          },
-          destino: {
-            razonSocial: m.operador.razonSocial,
-            lat: m.operador.latitud,
-            lng: m.operador.longitud,
-          },
-          residuos: (m.residuos || []).map(r => ({
-            codigo: r.tipoResiduo?.codigo || '',
-            nombre: r.tipoResiduo?.nombre || '',
-            cantidad: r.cantidad,
-            unidad: r.unidad,
-          })),
-          vehiculo: m.transportista?.vehiculos?.[0] ? {
-            patente: m.transportista.vehiculos[0].patente,
-            descripcion: `${m.transportista.vehiculos[0].marca} ${m.transportista.vehiculos[0].modelo}`,
-          } : null,
-          chofer: m.transportista?.choferes?.[0] ? {
-            nombre: `${m.transportista.choferes[0].nombre} ${m.transportista.choferes[0].apellido}`,
-          } : null,
-          fechaRetiro: m.fechaRetiro,
-          ultimaPosicion: m.tracking[0] || null,
-          ruta: m.tracking.reverse().map(t => ({
-            lat: t.latitud,
-            lng: t.longitud,
-            velocidad: t.velocidad,
-            timestamp: t.timestamp,
-          })),
-        })),
+        enTransito: enTransito.map(m => {
+          const activeLeg = m.tramosTransporte[0];
+          const declared = activeLeg?.datos && typeof activeLeg.datos === 'object' && !Array.isArray(activeLeg.datos)
+            ? activeLeg.datos : {};
+          const original = readTransportAssignment(m.asignacionTransporte, m.transportistaId);
+          const assignment = activeLeg && activeLeg.tipo !== 'ORIGINAL'
+            ? readTransportAssignment(declared.registro, activeLeg.transportistaId) : original;
+          const declaredText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
+          const vehicle = assignment?.vehiculo;
+          const driver = assignment?.chofer;
+          const plate = vehicle?.patente || declaredText(declared.patente);
+          const driverName = driver ? `${driver.nombre} ${driver.apellido}`.trim() : declaredText(declared.chofer);
+          const points = activeLeg ? activeLeg.tracking : m.tracking;
+          return {
+            manifiestoId: m.id,
+            numero: m.numero,
+            transportista: activeLeg ? declaredTransportLabel(activeLeg.datos) : m.transportista?.razonSocial || 'Sin asignar',
+            transportistaOriginal: m.transportista?.razonSocial || null,
+            tramoActual: activeLeg ? {
+              id: activeLeg.id, orden: activeLeg.orden, tipo: activeLeg.tipo,
+              inicio: activeLeg.inicio, gpsRecibido: points.length > 0,
+            } : null,
+            origen: {
+              razonSocial: m.generador.razonSocial,
+              lat: m.generador.latitud,
+              lng: m.generador.longitud,
+            },
+            destino: {
+              razonSocial: m.operador.razonSocial,
+              lat: m.operador.latitud,
+              lng: m.operador.longitud,
+            },
+            residuos: (m.residuos || []).map(r => ({
+              codigo: r.tipoResiduo?.codigo || '',
+              nombre: r.tipoResiduo?.nombre || '',
+              cantidad: r.cantidad,
+              unidad: r.unidad,
+            })),
+            // Persisted assignments stay valid even if the fleet is later edited
+            // or deactivated. Missing historical data is not inferred from a fleet.
+            vehiculo: plate ? {
+              patente: plate,
+              descripcion: vehicle ? `${vehicle.marca} ${vehicle.modelo}`.trim() : '',
+            } : null,
+            chofer: driverName ? { nombre: driverName } : null,
+            fechaRetiro: m.fechaRetiro,
+            ultimaPosicion: points[0] || null,
+            ruta: [...points].reverse().map(t => ({
+              lat: t.latitud,
+              lng: t.longitud,
+              velocidad: t.velocidad,
+              timestamp: t.timestamp,
+            })),
+          };
+        }),
         eventosRecientes: eventosRecientes.map(e => ({
           id: e.id,
           tipo: e.tipo,

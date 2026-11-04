@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const tipoActorRenovacionSchema = z.enum(['GENERADOR', 'OPERADOR']);
 export type TipoActorRenovacion = z.infer<typeof tipoActorRenovacionSchema>;
 
+export const ownRenovacionQuerySchema = z.object({ anio: z.string().regex(/^\d{4}$/).transform(Number).pipe(z.number().int().min(2020).max(2100)) }).strict();
+
 export const modalidadRenovacionSchema = z.enum(['SIN_CAMBIOS', 'CON_CAMBIOS']);
 
 const nullableMoney = z.coerce.number().finite().nonnegative().optional().nullable();

@@ -39,6 +39,7 @@ export const VerificarManifiestoPage = lazy(() => import('../pages/manifiestos/V
 // Tracking & Transporte
 export const ViajeEnCursoPage = lazy(() => import('../pages/tracking/ViajeEnCursoPage'));
 export const TransportePerfilPage = lazy(() => import('../pages/transporte/TransportePerfilPage'));
+export const CargasEnCursoPage = lazy(() => import('../pages/transporte/CargasEnCursoPage'));
 export const ViajeEnCursoTransportista = lazy(() => import('../pages/transporte/ViajeEnCursoTransportista'));
 
 // Actores

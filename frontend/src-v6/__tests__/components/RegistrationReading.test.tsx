@@ -31,3 +31,18 @@ describe('registration keeps information readable without repeating instructions
     expect(screen.queryByText(/Declarás los datos de tu establecimiento/)).not.toBeInTheDocument();
   });
 });
+
+
+describe('registration summary preserves document review and pending replacements', () => {
+  const original = { id:'doc', solicitudId:'alta', tipo:'FACTURA_ELECTRICA', nombre:'original.pdf', path:'qa.pdf', mimeType:'application/pdf', size:1024, estado:'APROBADO' as const, createdAt:'2026-10-26' };
+  const renderSummary = (estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO', replacement = false) => render(<StepResumen {...getReviewFixture('GENERADOR')} tipoActor="GENERADOR" isGenerador isOperador={false} isTransportista={false} regError={null} uploadedDocs={{ FACTURA_ELECTRICA: { ...original, estado } }} adjuntos={replacement ? { FACTURA_ELECTRICA: new File(['new'], 'reemplazo.pdf') } : {}} />);
+  it.each([['PENDIENTE','Pendiente de revisión'], ['APROBADO','Documento aprobado'], ['RECHAZADO','Documento rechazado']] as const)('shows administrative state %s separately from storage', (state, label) => {
+    renderSummary(state);
+    expect(screen.getByText(new RegExp(`original.pdf.*Guardado.*${label}`))).toBeInTheDocument();
+  });
+  it('shows the pending replacement rather than claiming only the original is ready', () => {
+    renderSummary('APROBADO', true);
+    expect(screen.getByText(/reemplazo.pdf.*Reemplazo pendiente/)).toBeInTheDocument();
+    expect(screen.getByText(/original.pdf.*sigue guardado/)).toBeInTheDocument();
+  });
+});

@@ -1,13 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { login, prefix } from './helpers';
 
-test('real manifest UI completes approval, transport, receipt, treatment and certificate', async ({ page }, info) => {
+test.beforeAll(() => { expect(process.env.MANIFEST_PROPOSALS_ENABLED, 'Legacy lifecycle is not acceptance for mandatory party approvals').not.toBe('true'); });
+
+test('legacy manifest UI with proposals disabled completes signature, transport, receipt, treatment and certificate', async ({ page }, info) => {
   await login(page, info);
   if (info.project.name === 'app') {
     await page.goto(`${prefix(info)}/manifiestos`);
-    await page.getByRole('button', { name: 'Nuevo manifiesto', exact: true }).click();
+    await page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true }).click();
     await expect(page).toHaveURL(/\/app\/manifiestos\/nuevo$/);
-    await expect(page.getByRole('button', { name: 'Nuevo manifiesto', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true })).toHaveCount(0);
   } else {
     await page.goto(`${prefix(info)}/manifiestos/nuevo`);
   }
@@ -79,7 +81,7 @@ test('real manifest UI completes approval, transport, receipt, treatment and cer
   expect(signedResponse.status()).toBe(200);
   await expect(dialog).not.toBeVisible();
   for (const [button, endpoint] of [
-    ['Confirmar Retiro', 'confirmar-retiro'], ['Confirmar Entrega', 'confirmar-entrega'], ['Confirmar Recepcion', 'confirmar-recepcion'],
+    ['Confirmar Retiro', 'confirmar-retiro'], ['Confirmar Entrega', 'confirmar-entrega'], ['Confirmar recepción', 'confirmar-recepcion'],
   ]) {
     const changed = page.waitForResponse(res => res.url().endsWith(`/api/manifiestos/${record.id}/${endpoint}`) && res.request().method() === 'POST');
     await page.getByRole('button', { name: button, exact: true }).click();
@@ -104,7 +106,7 @@ test('real manifest UI completes approval, transport, receipt, treatment and cer
   await page.reload();
   await expect(page.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
   if (info.project.name === 'app') {
-    await expect(page.getByRole('button', { name: 'Nuevo manifiesto', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true })).toHaveCount(0);
   }
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Descargar Certificado', exact: true }).click();

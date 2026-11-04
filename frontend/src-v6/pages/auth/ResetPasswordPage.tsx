@@ -43,15 +43,16 @@ const ResetPasswordPage: React.FC = () => {
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 size={32} className="text-green-600" />
           </div>
-          <h2 className="text-xl font-bold text-neutral-900 mb-2">Contraseña restablecida</h2>
+          <h1 className="text-xl font-bold text-neutral-900 mb-2">Contraseña restablecida</h1>
           <p className="text-neutral-600 mb-6">Tu contraseña fue actualizada correctamente.</p>
           <Link to="/login" className="inline-flex items-center gap-2 bg-[#1B5E3C] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#164D32] transition-colors">
-            Ir al login
+            Iniciar sesión
           </Link>
         </div>
       ) : (
         <>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Nueva contraseña</h2>
+          <Link to="/login" className="inline-flex min-h-11 items-center text-sm text-primary-800 underline mb-4">Volver a iniciar sesión</Link>
+          <h1 className="text-2xl font-bold text-neutral-900 mb-2">Nueva contraseña</h1>
           <p className="text-sm text-neutral-500 mb-6">Ingresá tu nueva contraseña</p>
 
           {error && (

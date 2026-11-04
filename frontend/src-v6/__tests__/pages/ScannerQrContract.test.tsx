@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useHref, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import EscanerQRPage from '../../pages/escaner/EscanerQRPage';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { parseQrPayload } from '../../pages/escaner/qrParser';
 
 const id = `cm${'0'.repeat(22)}1`;
@@ -72,7 +73,7 @@ describe('scanner contract with issued manifest QR payloads', () => {
     scan(payload);
     fireEvent.click(screen.getByRole('button', { name: 'Ver Manifiesto' }));
     expect(await screen.findByRole('link', { name: 'Destino del QR' })).toHaveAttribute('href', `/app/manifiestos/${id}`);
-    expect(mock.cached).toHaveBeenCalledWith('inspector-1');
+    expect(mock.cached).toHaveBeenCalledWith('inspector-1', inspectionWorkspaceOwner({ id: 'inspector-1' }));
   });
   it('stays on the recognized QR when offline without a cached manifest', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);

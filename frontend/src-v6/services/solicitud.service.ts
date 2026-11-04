@@ -1,4 +1,5 @@
 import api from './api';
+import type { ConfirmPaymentInput } from '../types/documentAnalysis';
 import type {
   SolicitudInscripcion,
   DocumentoSolicitud,
@@ -38,8 +39,8 @@ export const solicitudService = {
     return data.data.solicitud;
   },
 
-  async enviar(id: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/enviar`);
+  async enviar(id: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/enviar`, expectedUpdatedAt ? { expectedUpdatedAt } : undefined);
     return data.data.solicitud;
   },
 
@@ -60,7 +61,11 @@ export const solicitudService = {
     const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/analizar`);
     return data.data.documento;
   },
-  async downloadDocumento(solicitudId: string, item: DocumentoSolicitud): Promise<void> {
+  async confirmarPago(solicitudId: string, docId: string, input: ConfirmPaymentInput): Promise<DocumentoSolicitud> {
+    const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/identidad-pago`, input);
+    return data.data.documento;
+  },
+  async downloadDocumento(solicitudId: string, item: Pick<DocumentoSolicitud, 'id' | 'nombre'>): Promise<void> {
     const { data } = await api.get(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(item.id)}/download`, { responseType: 'blob' });
     const url = URL.createObjectURL(data);
     const link = document.createElement('a');
@@ -74,8 +79,8 @@ export const solicitudService = {
     return data.data.mensajes;
   },
 
-  async enviarMensaje(id: string, contenido: string): Promise<MensajeSolicitud> {
-    const { data } = await api.post(`/solicitudes/${id}/mensajes`, { contenido });
+  async enviarMensaje(id: string, contenido: string, clientMessageId?: string): Promise<MensajeSolicitud> {
+    const { data } = await api.post(`/solicitudes/${id}/mensajes`, { contenido, clientMessageId });
     return data.data.mensaje;
   },
 
@@ -96,28 +101,28 @@ export const solicitudService = {
     };
   },
 
-  async revisar(id: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/revisar`);
+  async revisar(id: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/revisar`, { expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async observar(id: string, mensaje: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/observar`, { observaciones: mensaje });
+  async observar(id: string, mensaje: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/observar`, { observaciones: mensaje, expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async aprobar(id: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/aprobar`);
+  async aprobar(id: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/aprobar`, { expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async rechazar(id: string, motivoRechazo: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/rechazar`, { motivoRechazo });
+  async rechazar(id: string, motivoRechazo: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/rechazar`, { motivoRechazo, expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async revisarDocumento(solicitudId: string, docId: string, estado: 'APROBADO' | 'RECHAZADO', observaciones?: string): Promise<DocumentoSolicitud> {
-    const { data } = await api.patch(`/solicitudes/${solicitudId}/documentos/${docId}/revisar`, { estado, observaciones });
+  async revisarDocumento(solicitudId: string, docId: string, estado: 'APROBADO' | 'RECHAZADO', observaciones?: string, expectedDocument?: { estado: string; sha256: string | null }): Promise<DocumentoSolicitud> {
+    const { data } = await api.patch(`/solicitudes/${solicitudId}/documentos/${docId}/revisar`, { estado, observaciones, expectedDocument });
     return data.data.documento;
   },
 };

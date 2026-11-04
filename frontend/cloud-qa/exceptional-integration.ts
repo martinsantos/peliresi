@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { assertCloudDatabase, backendRequire } from './safety.ts';
+import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 await assertCloudDatabase();
+assert.ok(['circuit_review_20261020', 'reactivation_20261022'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
 const { PrismaClient } = backendRequire('@prisma/client');
 const db = new PrismaClient();
 const url = 'http://127.0.0.1:3037/api';
@@ -26,7 +27,7 @@ try {
   const operator = await login('operador'), outsider = await login('operador2'), admin = await login('admin');
   const generator = await login('generador'), sector = await login('jefe-operadores');
   const before = await db.manifiesto.findMany({ orderBy: { id: 'asc' }, include: { residuos: true, eventos: true } });
-  const userCount = await db.usuario.count(), notifications = await db.notificacion.count();
+  const userCount = await db.usuario.count(), notifications = await db.notificacion.findMany({ orderBy: { id: 'asc' } });
   const actor = { nombre: 'QA sin alta', identificacion: 'Identidad declarada QA, no validada', domicilio: 'Sólo nube 123' };
   const data = { id: randomUUID(), generador: actor, transportista: actor, patente: 'QA-EXT', motivo: 'Actividad sin alta SITREP',
     residuos: [{ corriente: 'Y1', cantidad: 10, unidad: 'kg' }] };
@@ -133,6 +134,9 @@ try {
   await step(generator, { tipo: 'AVANCE', etapa: 'RETIRADO' });
   await step(operator, { tipo: 'AVANCE', etapa: 'RECIBIDO' });
   assert.equal(eventual.etapa, 'RECIBIDO');
+  await step(operator, { tipo: 'DIFERENCIA', residuos: [{ corriente: 'Y2', cantidad: 6, unidad: 'kg' }] });
+  await step(operator, { tipo: 'AVANCE', etapa: 'TRATADO' });
+  assert.equal(eventual.etapa, 'TRATADO');
 
   // Every slot except its own external: the creator alone approves; the external operator leaves operadorId empty.
   let alone = (await call(generator, 'POST', '', { ...byGenerator, id: randomUUID(), operador: { nombre: 'QA planta sin alta', identificacion: 'QA-EXT-OPERATOR', domicilio: '' } }, 201)).registro;
@@ -164,18 +168,67 @@ try {
   assert.equal(byAdmin.etapa, 'RETIRADO');
 
   // Spec v2 §7: a row written before this change (manifest-migration) keeps advancing without approvals.
-  const legacy = (await call(operator, 'GET', '/qa-legacy-exceptional')).registro;
+  // A fresh compatibility fixture makes repeated verification preserve every prior row.
+  const legacyId = 'qa-legacy-' + randomUUID();
+  const template = await db.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: 'qa-legacy-exceptional' } });
+  await db.registroManifiestoExcepcional.create({ data: { id: legacyId, operadorId: template.operadorId,
+    creadoPorId: template.creadoPorId, huellaSolicitud: legacyId, datos: template.datos,
+    etapa: 'RETIRADO', version: 1, eventos: [template.eventos[0]] } });
+  const legacy = (await call(operator, 'GET', '/' + legacyId)).registro;
   assert.equal(legacy.aprobacion.estado, 'NO_REQUIERE'); assert.equal(legacy.autorRol, null); assert.equal(legacy.puedeRegistrar, true);
-  const legacyNext = (await call(operator, 'POST', '/qa-legacy-exceptional/eventos', { id: randomUUID(), version: legacy.version, tipo: 'AVANCE', etapa: 'RECIBIDO', nota: '' })).registro;
+  const legacyNext = (await call(operator, 'POST', '/' + legacyId + '/eventos', { id: randomUUID(), version: legacy.version, tipo: 'AVANCE', etapa: 'RECIBIDO', nota: '' })).registro;
   assert.equal(legacyNext.etapa, 'RECIBIDO'); assert.deepEqual(legacyNext.datos, legacy.datos);
   assert.deepEqual(await db.manifiesto.findMany({ orderBy: { id: 'asc' }, include: { residuos: true, eventos: true } }), before);
+  // A role without its actor relation cannot read eventuales, even if it created one in the past.
+  // Exercise the compiled predicate against PostgreSQL, then roll back the artificial account.
+  const { eventualNoticeAudience } = backendRequire(path.join(root, 'backend/dist/services/eventualNotice.service.js'));
+  await assert.rejects(db.$transaction(async tx => {
+    const user = await tx.usuario.create({ data: { email: randomUUID() + '@night-qa.invalid', nombre: 'QA relación revocada', password: 'not-a-login-hash', rol: 'GENERADOR', activo: true, emailVerified: false } });
+    const source = { ...created, creadoPorId: user.id, operadorId: null, datos: { generador: actor, transportista: actor } };
+    const audience = await eventualNoticeAudience(tx, source, 'RECHAZADO', fixture.users.admin);
+    assert.ok(!audience.some(recipient => recipient.id === user.id), 'Creator without an actor cannot receive a notice linking to an inaccessible eventual');
+    throw Error('QA_RECIPIENT_ROLLBACK_EXPECTED');
+  }), /QA_RECIPIENT_ROLLBACK_EXPECTED/);
   assert.equal(await db.usuario.count(), userCount);
-  assert.equal(await db.notificacion.count(), notifications);
+  const priorIds = notifications.map(notice => notice.id);
+  assert.deepEqual(await db.notificacion.findMany({ where: { id: { in: priorIds } }, orderBy: { id: 'asc' } }), notifications);
+  const newNotices = await db.notificacion.findMany({ where: { id: { notIn: priorIds } } });
+  assert.ok(newNotices.length > 0, 'External participants create inspection intake notices under the current contract');
+  for (const notice of newNotices) {
+    const metadata = JSON.parse(notice.datos!);
+    if (metadata.tipo === 'manifiesto_eventual') {
+      const source = await db.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: metadata.registroId } });
+      const event = metadata.eventoId === 'creacion' ? null : source.eventos.find(e => e.id === metadata.eventoId);
+      assert.ok(metadata.eventoId === 'creacion' || event);
+      const author = event?.autorId || source.creadoPorId;
+      const or: any[] = [{ id: source.creadoPorId, OR: [{ rol: 'ADMIN' }, { rol: 'GENERADOR', generador: { isNot: null } }, { rol: 'TRANSPORTISTA', transportista: { isNot: null } }, { rol: 'OPERADOR', operador: { isNot: null } }] }];
+      for (const role of ['generador', 'transportista']) if (source.datos[role]?.padronId)
+        or.push({ rol: role.toUpperCase(), [role]: { is: { id: source.datos[role].padronId } } });
+      if (source.operadorId) or.push({ rol: 'OPERADOR', operador: { is: { id: source.operadorId } } });
+      if (event?.tipo === 'SOLICITAR_REVISION') {
+        if (process.env.MANIFEST_REVIEW_AUTHORITY_BY_ROLE === 'true') or.push({ rol: 'ADMIN', id: { notIn: [source.creadoPorId, source.impersonadoPorId].filter(Boolean) } });
+        else if (source.creadoPorId !== fixture.users.admin && source.impersonadoPorId !== fixture.users.admin) or.push({ id: fixture.users.admin, rol: 'ADMIN' });
+      }
+      const expected = await db.usuario.findMany({ where: { activo: true, id: { not: author }, OR: or }, select: { id: true } });
+      assert.deepEqual(newNotices.filter(row => { const d=JSON.parse(row.datos!); return d.tipo === 'manifiesto_eventual' && d.registroId === source.id && d.eventoId === metadata.eventoId; }).map(row => row.usuarioId).sort(), expected.map(row => row.id).sort());
+      assert.equal(metadata.correoVersion, 1); assert.equal(metadata.version, 1);
+      continue;
+    }
+    assert.equal(metadata.tipo, 'antecedente_fiscalizacion');
+    const intake = await db.antecedenteFiscalizacion.findUniqueOrThrow({ where: { id: metadata.antecedenteId } });
+    assert.equal(intake.origen, 'PARTICIPANTE_EVENTUAL');
+    const source = await db.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: intake.origenId } });
+    assert.ok(source.datos); assert.equal(source.creadoPorId, intake.creadoPorId);
+    const expected = await db.usuario.findMany({ where: { activo: true, rol: { in: ['ADMIN', `ADMIN_${intake.tipoActor}`] }, id: { not: source.creadoPorId } }, select: { id: true } });
+    assert.deepEqual(newNotices.filter(row => JSON.parse(row.datos!).antecedenteId === intake.id).map(row => row.usuarioId).sort(), expected.map(row => row.id).sort());
+  }
+  const eventualKinds = new Set(newNotices.filter(row => JSON.parse(row.datos!).tipo === 'manifiesto_eventual').map(row => JSON.parse(row.datos!).evento));
+  for (const kind of ['CREADO','APROBACION','APROBADO','RECHAZADO','RETIRADO','RECIBIDO','TRATADO','DIFERENCIA','SOLICITAR_REVISION','APROBADA_POST_FACTO','OBSERVADA_POST_FACTO','RECHAZADA_POST_FACTO']) assert.ok(eventualKinds.has(kind), kind);
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'exceptional-http.json'), JSON.stringify({
     passed: true, reference: created.id, cases: ['external identity/no official number', 'idempotency and conflicting replay',
       'ownership/reviewer/sector permissions', 'mixed participants canonical identity and restricted read access',
       'facts wait for party approvals; legacy rows advance unchanged', 'independent addendum review',
       'generator/admin start eventuals; own slot from session; external operator; rejection kept and blocking',
-      'post-facto observation preserves treated fact', 'concurrent version conflict', 'legacy/users/notifications unchanged'],
+      'post-facto observation preserves treated fact', 'concurrent version conflict', 'creator without actor relation excluded, with atomic rollback', 'legacy/users/prior notifications unchanged; intake and eventual notices have exact current recipients and no duplicate on replay'],
   }, null, 2));
 } finally { await db.$disconnect(); }

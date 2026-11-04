@@ -10,12 +10,9 @@ import {
   Search,
   BookOpen,
   FileText,
-  Video,
   MessageCircle,
   ChevronRight,
   ArrowLeft,
-  Play,
-  ExternalLink,
   HelpCircle,
   GitBranch
 } from 'lucide-react';
@@ -24,6 +21,8 @@ import { Input } from '../../components/ui/Input';
 import WorkflowDiagram from '../../components/docs/WorkflowDiagram';
 import { SupportEntry } from '../../components/SupportReportDialog';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useAuth } from '../../contexts/AuthContext';
+import { workspaceNavigation } from '../../utils/workspaceNavigation';
 
 // FAQ data
 const faqs = [
@@ -32,23 +31,23 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo creo un nuevo manifiesto?',
-        a: 'Ve a Manifiestos → Nuevo Manifiesto. El formulario multi-paso te guiará: selecciona el tipo de residuo, ingresa la cantidad, elige el transportista y el operador destino, y revisa el resumen antes de guardar como Borrador.'
+        a: 'Ingresá con tu propia cuenta y el rol correcto. Generador, transportista u operador pueden iniciar una propuesta: elegí las partes, declará los residuos y revisá el resumen. Queda Pendiente de aprobación hasta que las tres partes confirmen. En origen también elegís un transporte aprobador: aprueba junto con generador y operador, aunque no haya viaje ni GPS. Un borrador anterior puede requerir una nueva propuesta; su historial se conserva.'
       },
       {
         q: '¿Qué estados puede tener un manifiesto?',
-        a: 'El ciclo completo es: Borrador → Aprobado → En tránsito → Entregado → Recibido → En tratamiento → Tratado. También puede ser Rechazado o Cancelado en determinadas condiciones.'
+        a: 'Una propuesta nueva pasa de Pendiente de aprobación a Aprobado cuando confirman generador, transporte y operador, tanto con traslado como en origen. Después inician la coordinación. Con traslado siguen retiro, En tránsito, Entregado, Recibido, En tratamiento y Tratado. En origen el operador confirma directamente la recepción: no hay viaje ni GPS. El detalle indica quién debe actuar; los registros anteriores conservan sus decisiones y algunos borradores pueden requerir una nueva propuesta.'
       },
       {
         q: '¿Cómo descargo el certificado de disposición final?',
-        a: 'El certificado solo está disponible cuando el manifiesto alcanza el estado TRATADO. Abre el detalle del manifiesto y haz clic en "Descargar Certificado" (botón verde).'
+        a: 'Abrí Certificaciones en el detalle del manifiesto. El operador emite y firma los certificados parciales y el final cuando se cumplen sus requisitos. El final requiere el cierre, las adendas resueltas y el tratamiento completo de las corrientes halladas: Tratado no significa que ya esté emitido. Una vez liberado, las partes involucradas reciben un aviso en la campana y pueden descargar el mismo documento. Los documentos históricos conservan su acceso.'
       },
       {
         q: '¿Cómo edito un manifiesto?',
-        a: 'Solo los manifiestos en estado BORRADOR pueden editarse. Abre el detalle y usa el botón de edición. Una vez aprobado, el manifiesto no puede modificarse.'
+        a: 'Los borradores del circuito anterior pueden editarse si tu rol tiene permiso. Una propuesta presentada conserva lo acordado: para corregirla, creá otra propuesta. Las diferencias constatadas durante el circuito se registran mediante una adenda, con su informe de hallazgo y las revisiones que correspondan; no se sobrescribe la declaración original.'
       },
       {
         q: '¿Cómo cancelo un manifiesto?',
-        a: 'Un manifiesto puede cancelarse desde cualquier estado, excepto CANCELADO o TRATADO. Abre el detalle y usa la opción "Cancelar Manifiesto". Se solicitará confirmación.'
+        a: 'Abrí el detalle y revisá las acciones disponibles para tu rol y el estado actual. Si aparece Cancelar Manifiesto, indicá el motivo y confirmá. En una propuesta, rechazar la participación es una decisión distinta de cancelar. Las decisiones y el historial se conservan.'
       },
       {
         q: '¿Cómo verifico un manifiesto con QR?',
@@ -61,15 +60,15 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo inicio el tracking GPS de un viaje?',
-        a: 'El transportista debe ir a Transporte → Perfil → tab Viaje. Si hay manifiestos APROBADOS asignados, aparece el botón "Tomar Viaje". Al confirmar el retiro, el GPS comienza a registrar la posición cada 30 segundos.'
+        a: 'Abrí Mis viajes y elegí el manifiesto. Primero deben estar las aprobaciones necesarias. Confirmá el retiro sólo cuando recibas la carga y permití el acceso a ubicación. Revisá el indicador de GPS: iniciar la coordinación no inicia el viaje. Con varios viajes simultáneos, verificá cuáles están seleccionados para compartir ubicación.'
       },
       {
         q: '¿Qué hago si el GPS falla durante el viaje?',
-        a: 'La app almacena los puntos GPS pendientes localmente y los envía automáticamente al recuperar la conexión. El viaje no se interrumpe. Si la señal es persistentemente baja, ve a Configuración del teléfono y activa el modo de ubicación de alta precisión.'
+        a: 'Revisá el indicador de ubicación y la conexión. Si se denegó el permiso, habilitalo en el navegador o teléfono. En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece. Al reconectar, revisá los puntos pendientes y la confirmación del envío; en el detalle del viaje revisá la hora de la última sincronización. Si la pantalla indica que una ubicación anterior no puede confirmarse, conservá este dispositivo y consultá a soporte antes de entregar. No se garantiza conservar todas las lecturas durante una desconexión. Administración puede consultar la posición recibida en Monitor, que puede ser anterior. Mantené la app abierta: no se garantiza GPS con la app cerrada.'
       },
       {
         q: '¿Cómo registro un incidente durante el transporte?',
-        a: 'En la pantalla de Viaje en Curso, usa el botón "Registrar Incidente". Ingresa el tipo de incidente (avería, accidente, etc.) y una descripción. El incidente queda registrado en el timeline del manifiesto sin cambiar su estado.'
+        a: 'En Viaje en curso, abrí Incidente y elegí el tipo. El registro no cambia el estado del manifiesto. Si no llega la confirmación, usá Comprobar envío desde el mismo dispositivo, cuenta y actividad antes de registrar otro; si no puede comprobarse, conservá el dispositivo y consultá a soporte.'
       }
     ]
   },
@@ -103,15 +102,15 @@ const faqs = [
       },
       {
         q: '¿Cuáles son los roles del sistema?',
-        a: 'Existen 4 roles principales (ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR) y 3 sub-roles administrativos delegados (ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR). Cada rol tiene acceso a un subconjunto diferente de páginas.'
+        a: 'Hay generadores, transportistas, operadores, inspección, administración general, administraciones delegadas de cada actividad y auditoría. Una razón social puede tener varias actividades aprobadas. Elegí el rol y establecimiento correctos antes de actuar; cambiar de contexto no amplía tus permisos.'
       },
       {
-        q: '¿Qué es la función Acceso Comodín?',
-        a: 'El ADMIN puede "impersonar" a cualquier usuario activo para ver la aplicación exactamente como la ve ese usuario, sin necesitar su contraseña. Aparece un banner naranja durante la sesión de impersonación. Usar el botón "Volver a mi cuenta" para salir.'
+        q: '¿Qué permite la Vista temporal (Acceso Comodín)?',
+        a: 'La administración puede abrir una Vista temporal para asistir a un usuario, identificada por una banda amarilla. No sustituye la cuenta real para crear propuestas ni aprobar la participación de las partes. El formulario explica esta limitación antes de cargar datos. Usá Volver a mi cuenta para recuperar tu identidad administrativa y el contexto de origen.'
       },
       {
         q: '¿Cómo uso la búsqueda global (Cmd+K)?',
-        a: 'Presiona Cmd+K (macOS) o Ctrl+K (Windows/Linux) desde cualquier página autenticada. El panel de búsqueda global te permite encontrar manifiestos, generadores, transportistas y operadores de forma instantánea.'
+        a: 'Presioná Cmd+K (macOS) o Ctrl+K (Windows/Linux). El panel busca información disponible para tu cuenta, como manifiestos o actores autorizados.'
       }
     ]
   },
@@ -120,15 +119,15 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo exporto datos a CSV?',
-        a: 'En la sección Reportes, usa el botón "Exportar" en la barra superior. Puedes exportar manifiestos, generadores, transportistas u operadores. El límite es 10,000 filas por exportación.'
+        a: 'En Reportes, elegí la sección y los filtros que necesitás. Si está disponible para tu cuenta, usá Exportar para descargar los datos de tu alcance.'
       },
       {
         q: '¿Qué reportes están disponibles?',
-        a: 'Hay 8 pestañas en el Centro de Reportes: Manifiestos, Residuos Tratados, Transporte, Generadores, Operadores, Tratamientos, Departamentos (mapa coroplético), y Mapa de Actores (Leaflet). Todos con gráficos interactivos y exportación PDF/CSV.'
+        a: 'Las secciones y los datos disponibles en Reportes dependen de tu función. Abrí la sección que necesitás y revisá los filtros y las opciones de exportación disponibles para tu cuenta.'
       },
       {
         q: '¿Cómo configuro mis notificaciones por email?',
-        a: 'Ve a Configuración → pestaña Notificaciones. Activa o desactiva el toggle "Recibir alertas por email". Los administradores tienen un toggle adicional para notificaciones de nuevos usuarios pendientes.'
+        a: 'En Configuración → Notificaciones podés guardar tus preferencias. La entrega depende también de que el canal esté habilitado por la administración: activar una preferencia no habilita correos ni push del sistema. Si están apagados, no se envía nada por esos canales. Los avisos internos se consultan en la campana.'
       }
     ]
   },
@@ -147,33 +146,43 @@ const faqs = [
   }
 ];
 
-// Videos data
-const videos = [
-  { title: 'Login y Dashboard', animation: '/manual/screenshots/animations/login_dashboard.webp', duration: 'Demo' },
-  { title: 'Navegacion del Admin', animation: '/manual/screenshots/animations/admin_menu_navegacion.webp', duration: 'Demo' },
-  { title: 'Viaje del Transportista', animation: '/manual/screenshots/animations/transportista_viaje.webp', duration: 'Demo' },
-  { title: 'Tracking GPS en Mapa', animation: '/manual/screenshots/animations/tracking_gps_mapa.webp', duration: 'Demo' },
-  { title: 'Recepcion del Operador', animation: '/manual/screenshots/animations/operador_recepcion.webp', duration: 'Demo' },
-  { title: 'Reportes y Exportacion', animation: '/manual/screenshots/animations/reportes_exportacion.webp', duration: 'Demo' },
-  { title: 'Cambio de Perfil', animation: '/manual/screenshots/animations/cambio_perfil_menu.webp', duration: 'Demo' },
-  { title: 'Onboarding de la App', animation: '/manual/screenshots/animations/demoapp_selector_onboarding.webp', duration: 'Demo' },
-];
+const requirementFaq = {
+  category: 'Requerimientos recibidos',
+  questions: [{ q: '¿Cómo respondo un requerimiento?', a: 'Abrí el aviso recibido desde la campana o Avisos. Revisá el pedido y su plazo, elegí Responder y comprobá la confirmación. Podés volver al mismo aviso para consultar la decisión; la respuesta no cierra el expediente por sí sola.' }],
+};
 
 const AyudaPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+  const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-  const filteredFaqs = faqs.map(cat => ({
+  const navigation = workspaceNavigation(currentUser);
+  const canInspect = navigation.some(item => item.path === '/inspecciones');
+  const canManageFleet = navigation.some(item => item.path === '/transporte/perfil');
+  const canTrack = canManageFleet || navigation.some(item => item.path === '/monitor');
+  const actor = !!(currentUser?.actorId || currentUser?.empresaContexto?.actorId)
+    && !!currentUser && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol);
+  const availableFaqs = faqs.filter(cat => (cat.category !== 'Inspecciones' || canInspect)
+    && (cat.category !== 'Administración de Flota (Transportista)' || canManageFleet)
+    && (cat.category !== 'Transporte y GPS' || canTrack));
+  if (actor) availableFaqs.splice(1, 0, requirementFaq);
+  const filteredFaqs = availableFaqs.map(cat => ({
     ...cat,
-    questions: cat.questions.filter(
-      q => q.q.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           q.a.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    questions: cat.questions.filter(q => (q.q !== '¿Qué permite la Vista temporal (Acceso Comodín)?' || currentUser?.rol === 'ADMIN')
+      && (q.q.toLowerCase().includes(searchTerm.toLowerCase()) || q.a.toLowerCase().includes(searchTerm.toLowerCase())))
   })).filter(cat => cat.questions.length > 0);
+
+  const guides = [
+    { title: 'Proponer y aprobar un manifiesto', id: 'manifiestos-tres-partes' },
+    ...(actor ? [{ title: 'Responder un requerimiento desde Avisos', id: 'actor-mis-inspecciones' }] : []),
+    ...(canInspect ? [{ title: 'Inspecciones, plazos y requerimientos', id: 'psip-flujo-inspecciones' }] : []),
+    ...(canManageFleet ? [{ title: 'GPS y relevo de transporte', id: 'transporte-relevo' }] : []),
+    { title: 'Continuar si el sistema pide esperar', id: 'resolver-espera-reintento' },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -183,16 +192,14 @@ const AyudaPage: React.FC = () => {
           {isMobile && (
             <button 
               onClick={() => navigate(-1)}
-              className="p-2 hover:bg-neutral-100 rounded-lg"
+              className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
+              aria-label="Volver"
             >
               <ArrowLeft size={20} />
             </button>
           )}
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Centro de Ayuda</h2>
-            <p className="text-neutral-600 mt-1">
-              Encuentra respuestas y aprende a usar SITREP
-            </p>
+            <p className="text-neutral-600">Encontrá respuestas y guías para tu trabajo en SITREP.</p>
           </div>
         </div>
       </div>
@@ -200,6 +207,7 @@ const AyudaPage: React.FC = () => {
       {/* Search */}
       <div className="max-w-2xl">
         <Input
+          aria-label="Buscar en la ayuda"
           placeholder="Buscar en la ayuda..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -208,30 +216,15 @@ const AyudaPage: React.FC = () => {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {[
-          { icon: BookOpen, label: 'Manual completo', color: 'bg-primary-50 text-primary-600', href: '/manual/' },
-          { icon: FileText, label: 'Guía de inspecciones', color: 'bg-success-50 text-success-600', href: '/manual/#inspecciones' },
-          { icon: Video, label: 'Tutoriales', color: 'bg-secondary-50 text-secondary-600', href: undefined },
-          { icon: MessageCircle, label: 'Mis tickets de soporte', color: 'bg-primary-50 text-primary-800', href: mp('/soporte') },
-          { icon: FileText, label: 'Guías PDF', color: 'bg-success-50 text-success-600', href: undefined },
-        ].map((item) => (
-          <Card
-            key={item.label}
-            className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => item.href && (item.href.includes('/soporte') ? navigate(item.href) : (window.location.href = item.href))}
-          >
-            <div className={`w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mb-3`}>
-              <item.icon size={24} />
-            </div>
-            <p className="font-medium text-neutral-900">{item.label}</p>
-            {item.href && (
-              <p className="text-xs text-neutral-400 mt-1 flex items-center gap-1">
-                <ChevronRight size={11} /> Ver manual del sistema
-              </p>
-            )}
-          </Card>
-        ))}
+      <div className="grid grid-cols-2 gap-4 md:max-w-2xl">
+        <a href="/manual/" className="min-h-11 rounded-xl border border-neutral-200 bg-white p-4 hover:border-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+          <BookOpen size={24} className="mb-3 text-primary-700" aria-hidden="true" />
+          <span className="font-medium text-neutral-900">Manual completo</span>
+        </a>
+        <Link to={mp('/soporte')} className="min-h-11 rounded-xl border border-neutral-200 bg-white p-4 hover:border-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+          <MessageCircle size={24} className="mb-3 text-primary-700" aria-hidden="true" />
+          <span className="font-medium text-neutral-900">Mis tickets de soporte</span>
+        </Link>
       </div>
 
       {/* Workflow Diagram */}
@@ -266,8 +259,8 @@ const AyudaPage: React.FC = () => {
                       {category.category}
                     </h4>
                     <div className="space-y-2 animate-fade-in">
-                      {category.questions.map((faq, idx) => {
-                        const key = `${category.category}-${idx}`;
+                      {category.questions.map((faq) => {
+                        const key = `${category.category}-${faq.q}`;
                         const isExpanded = expandedFaq === key;
                         
                         return (
@@ -277,7 +270,8 @@ const AyudaPage: React.FC = () => {
                           >
                             <button
                               onClick={() => setExpandedFaq(isExpanded ? null : key)}
-                              className="w-full flex items-center justify-between p-4 text-left hover:bg-neutral-50 transition-colors"
+                              aria-expanded={isExpanded}
+                              className="flex min-h-11 w-full items-center justify-between p-4 text-left hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                             >
                               <span className="font-medium text-neutral-900">{faq.q}</span>
                               <ChevronRight 
@@ -312,45 +306,18 @@ const AyudaPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Videos sidebar */}
+        {/* Relevant guides use the same manual in web and app. */}
         <div>
           <Card className="p-6">
             <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-              Videos tutoriales
+              Guías paso a paso
             </h3>
-            <div className="space-y-4 animate-fade-in">
-              {videos.map((video) => (
-                <div
-                  key={video.title}
-                  className="group cursor-pointer"
-                  onClick={() => window.open(video.animation, '_blank')}
-                >
-                  <div className="relative aspect-video bg-neutral-100 rounded-lg mb-2 overflow-hidden">
-                    <img
-                      src={video.animation}
-                      alt={video.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover object-top"
-                    />
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                        <ExternalLink className="text-primary-600" size={16} />
-                      </div>
-                    </div>
-                    <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded">
-                      {video.duration}
-                    </span>
-                  </div>
-                  <p className="font-medium text-neutral-900 text-sm group-hover:text-primary-600 transition-colors">
-                    {video.title}
-                  </p>
-                </div>
-              ))}
+            <div className="space-y-1">
+              {guides.map(guide => <a key={guide.id} href={`/manual/tutorial.html?guide=${guide.id}`}
+                className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                <FileText size={18} className="shrink-0" aria-hidden="true" />{guide.title}
+              </a>)}
             </div>
-            <a href="/manual/#gal-acceso" className="w-full mt-4 flex items-center justify-center gap-2 text-primary-600 font-medium text-sm hover:underline">
-              Ver galeria completa
-              <ExternalLink size={14} />
-            </a>
           </Card>
         </div>
       </div>

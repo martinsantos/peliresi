@@ -6,9 +6,11 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiErrorResponse, RefreshTokenResponse } from '../types/api';
 import { toast } from '../components/ui/Toast';
+import { rateLimitMessage } from '../utils/rateLimitMessage';
 import { ACTIVITY_HEADER, readActorActivity } from './actorActivity';
 import { readCompanyContext,companyHeaders } from './companyContext';
 import { readSessionCheckpoint, writeSessionCheckpoint, type SessionCheckpoint } from './sessionCheckpoint';
+import { syntheticPreviewHeaders } from './syntheticPreviewHeaders';
 
 const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
@@ -17,7 +19,7 @@ const MAX_RENEWALS = 4;
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...syntheticPreviewHeaders() },
   timeout: 30000,
 });
 
@@ -184,7 +186,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const company=readCompanyContext(token);
     const companyManagement=config.url?.startsWith('/empresas');
     const accountRoute=config.url?.startsWith('/auth/')&&config.url!=='/auth/profile';
-    if(company&&!companyManagement&&!accountRoute&&!config.headers.has('X-SITREP-Empresa'))for(const [key,value] of Object.entries(companyHeaders(company)))config.headers.set(key,value);
+    if(company&&!companyManagement&&!accountRoute&&!config.headers.has('X-SITREP-Empresa')&&!config.headers.has(ACTIVITY_HEADER))for(const [key,value] of Object.entries(companyHeaders(company)))config.headers.set(key,value);
     const activity = !company&&!config.headers.has('X-SITREP-Empresa')&&!companyManagement&&!accountRoute?readActorActivity(token):null;
     if (activity && !config.headers.has(ACTIVITY_HEADER)) config.headers.set(ACTIVITY_HEADER, activity);
   }
@@ -296,8 +298,15 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
         processQueue(attempt, refreshError, null);
+        // A temporary admission/service/network failure cannot revoke a valid
+        // refresh credential. Reject the queue without replaying writes; a later
+        // explicit request may retry renewal. Invalid credentials still clear.
+        const temporaryRefreshFailure = axios.isAxiosError(refreshError) && (
+          refreshError.response?.status === 429 || refreshError.response?.status === 503
+          || (!refreshError.response && ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'].includes(refreshError.code || ''))
+        );
         // A late response from the previous session cannot erase a new login.
-        if (activeRefresh === attempt && getRefreshToken() === refreshToken
+        if (!temporaryRefreshFailure && activeRefresh === attempt && getRefreshToken() === refreshToken
           && !(refreshError instanceof Error && refreshError.name === 'SessionCheckpointConflict')) clearTokens();
         // Don't hard-redirect — let React Router handle it
         // The ProtectedRoute will redirect to /login when currentUser is null
@@ -309,7 +318,7 @@ api.interceptors.response.use(
 
     // Rate limit — show user-friendly message
     if (error.response?.status === 429) {
-      toast.warning('Demasiadas solicitudes', 'Espere unos segundos antes de intentar nuevamente.');
+      toast.warning('Esperá un momento', rateLimitMessage(error.response.headers));
       return Promise.reject(error);
     }
 

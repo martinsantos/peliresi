@@ -1,3 +1,6 @@
+import SharedInspectionActPage from './pages/inspecciones/SharedInspectionActPage';
+import OpenLinkPage from './pages/notificaciones/OpenLinkPage';
+import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
  * SITREP v6 - Mobile App Router
  * ==============================
@@ -9,11 +12,13 @@ import React, { Suspense } from 'react';
 import { PageLoader } from './components/ui/LoadingState';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+const RelevoGpsPage=React.lazy(()=>import('./pages/transporte/RelevoGpsPage'));
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { canAccessMobilePath } from './utils/mobileAccess';
 import { postLoginDestination } from './utils/authRedirect';
+import AccessUnavailable from './components/AccessUnavailable';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
@@ -23,7 +28,7 @@ import {
   InspeccionadoParticipacionPage,
   ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   VerificarInspeccionPage,
-  TransportePerfilPage, ViajeEnCursoTransportista,
+  TransportePerfilPage, CargasEnCursoPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
@@ -47,42 +52,25 @@ const ViajeRedirectMobile: React.FC = () => {
   return <Navigate to={`/manifiestos/${id}`} replace />;
 };
 
-// Auto-redirect to active trip when PWA reopens
+// Open the trip list when the PWA reopens. One saved trip cannot represent
+// several concurrent manifests, and each device must choose its GPS session.
 const ActiveTripGuard: React.FC = () => {
-  const activeTripId = localStorage.getItem('sitrep_active_trip_id');
-  if (activeTripId) {
-    // A3: Verify trip hasn't ended — if status is terminal, clean up and go to dashboard
-    const savedStatus = localStorage.getItem(`viaje_status_${activeTripId}`);
-    const snapshot = localStorage.getItem(`viaje_snapshot_${activeTripId}`);
-    let snapshotEstado: string | null = null;
-    if (snapshot) {
-      try { snapshotEstado = JSON.parse(snapshot)?.estado; } catch { /* ignore */ }
-    }
-    const terminalStates = ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
-    if ((snapshotEstado && terminalStates.includes(snapshotEstado)) || savedStatus === 'COMPLETED') {
-      localStorage.removeItem('sitrep_active_trip_id');
-      localStorage.removeItem(`viaje_snapshot_${activeTripId}`);
-      localStorage.removeItem(`viaje_status_${activeTripId}`);
-      localStorage.removeItem(`gps_pending_${activeTripId}`);
-      return <Navigate to="/dashboard" replace />;
-    }
-    return <Navigate to={`/transporte/viaje/${activeTripId}`} replace />;
-  }
   return <Navigate to="/dashboard" replace />;
 };
 
 /** Auth gate: single source of truth for public/private routing */
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, isLoading, isRestricted } = useAuth();
+  const { currentUser, isLoading, isRestricted, signOutRedirectPending } = useAuth();
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
-  const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
+  const publicPaths = ['/acta-compartida/', '/relevo/', '/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
+  const isPublic = location.pathname === '/abrir' || publicPaths.some(p => location.pathname.startsWith(p));
 
-  // While auth state is loading, show loader (even for public routes,
-  // so we can redirect logged-in users away from /login once resolved)
-  if (isLoading) return <PageLoader />;
+  // Keep public forms mounted while validating a session or login attempt.
+  // Replacing them with the loader discards the user's input on a failed login.
+  // Private content still waits for authentication to finish.
+  if (isLoading) return isPublic ? <>{children}</> : <PageLoader />;
 
   // Logged-in user on /login → resume a safe local deep link when available
   if (currentUser && location.pathname === '/login') {
@@ -96,7 +84,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // Private route without auth → redirect to login
   if (!currentUser) {
     const from = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to="/login" state={{ from }} replace />;
+    return <Navigate to="/login" state={signOutRedirectPending ? null : { from }} replace />;
   }
 
   // Keep the standalone PWA aligned with ProtectedRoute in the web build.
@@ -105,19 +93,23 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   }
 
   if (!canAccessMobilePath(currentUser, location.pathname)) {
-    return <Navigate to="/dashboard" replace />;
+    return <AccessUnavailable />;
   }
 
   return <>{children}</>;
 };
 
 function AppMobile() {
+  const location=useLocation();
+  if(location.pathname.startsWith('/relevo/'))return <ErrorBoundary><Suspense fallback={<PageLoader/>}><Routes><Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/></Routes></Suspense></ErrorBoundary>;
   return (
     <ErrorBoundary>
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <AuthGate>
         <Routes>
+          <Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/>
+          <Route path="/abrir" element={<OpenLinkPage />} />
           {/* Auth — public, sin layout */}
           <Route path="/l" element={<Navigate to="/login" replace />} />
           <Route path="/l/" element={<Navigate to="/login" replace />} />
@@ -150,7 +142,9 @@ function AppMobile() {
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
+            <Route path="/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             {/* Actores overview */}
             <Route path="/actores" element={<ActoresPage />} />
@@ -182,6 +176,7 @@ function AppMobile() {
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/alertas" element={<AlertasPage />} />
             <Route path="/notificaciones" element={<NotificacionesPage />} />
+            <Route path="/notificaciones/:id" element={<AvisoPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mi-perfil" element={<PerfilPage />} />
             <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
@@ -218,6 +213,7 @@ function AppMobile() {
 
           {/* Verificación pública de manifiesto (QR) */}
           <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
+          <Route path="/acta-compartida/:accesoId" element={<SharedInspectionActPage />} />
           <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
           {/* Root redirect */}

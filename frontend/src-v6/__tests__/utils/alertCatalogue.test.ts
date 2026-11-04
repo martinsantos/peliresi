@@ -5,8 +5,8 @@ const raw = (value: object) => JSON.stringify({ familia: 'catalogo_verificable',
 it('administration opens the inspection but its actor opens the participation surface', () => {
   const data = raw({ tipo: 'requerimiento_inspeccion', inspeccionId: 'own-inspection', destino: 'participacion' });
   expect(cataloguePath(data)).toBe('/inspecciones/own-inspection');
-  expect(cataloguePath(data, true)).toBe('/mis-inspecciones/own-inspection');
-  expect(resolveNotificationPath({ datos: data } as never, '/app')).toBe('/app/mis-inspecciones/own-inspection');
+  expect(cataloguePath(data, true)).toBe('/requerimientos/own-inspection');
+  expect(resolveNotificationPath({ datos: data } as never, '/app')).toBe('/app/requerimientos/own-inspection');
 });
 it('operator/transport owners open their own profile, not an admin-only destination', () => {
   expect(cataloguePath(raw({ tipo: 'vencimiento_documental', tipoActor: 'OPERADOR', actorId: 'op', destino: 'perfil' }), true)).toBe('/mi-perfil');

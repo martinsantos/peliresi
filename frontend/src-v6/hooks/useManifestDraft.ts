@@ -1,0 +1,197 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
+import { draftConflicts, type DraftConflict } from '../utils/draftConflicts';
+
+export interface ManifestFormData {
+  generador: string; generadorId: string; modalidad: 'FIJO' | 'IN_SITU';
+  transportista: string; vehiculoId: string; choferId: string; operador: string;
+  fechaRetiro: string; observaciones: string;
+  residuos: Array<{ tipo: string; cantidad: string; unidad: string }>;
+}
+export interface ManifestDraft { step: number; form: ManifestFormData; pendingCreate?: { id: string; form: ManifestFormData } }
+type DraftOwner = { id: number | string; rol: string; actorId?: string; training?: boolean; empresaContexto?: { empresaId: string; actividadId: string; establecimientoId?: string } };
+export function manifestDraftScope(user: DraftOwner | null) {
+  return user ? JSON.stringify([user.id, user.rol, user.actorId || '', !!user.training, user.empresaContexto?.empresaId || '', user.empresaContexto?.actividadId || '', user.empresaContexto?.establecimientoId || '']) : '';
+}
+const lifetime = 7 * 24 * 60 * 60 * 1000;
+type StoredDraft = { version: 1; savedAt: number; draft: ManifestDraft | null };
+// Never describe the memory fallback as durable storage.
+const pendingDrafts = new Map<string, StoredDraft>();
+// Memory fallback is used only if saving the separate conflict copy fails.
+const pendingConflicts = new Map<string, StoredDraft>();
+function validForm(form: ManifestFormData): boolean {
+  return !!form && ['FIJO', 'IN_SITU'].includes(form.modalidad)
+    && ['generador', 'generadorId', 'transportista', 'vehiculoId', 'choferId', 'operador', 'fechaRetiro', 'observaciones'].every(key => typeof form[key as keyof ManifestFormData] === 'string')
+    && Array.isArray(form.residuos) && form.residuos.length > 0 && form.residuos.length <= 1000
+    && form.residuos.every(row => row && ['tipo', 'cantidad', 'unidad'].every(key => typeof row[key as keyof typeof row] === 'string'));
+}
+function validDraft(value: unknown): value is ManifestDraft {
+  if (!value || typeof value !== 'object') return false;
+  const { step, form, pendingCreate } = value as ManifestDraft;
+  return [1, 2, 3].includes(step) && validForm(form) && (pendingCreate === undefined ||
+    !!pendingCreate && typeof pendingCreate.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pendingCreate.id) && validForm(pendingCreate.form));
+}
+
+function parseRecord(raw: string | null): StoredDraft | null {
+  try {
+    const value = JSON.parse(raw || 'null');
+    return value?.version === 1 && Number.isFinite(value.savedAt) && value.savedAt <= Date.now()
+      && Date.now() - value.savedAt < lifetime && (value.draft === null || validDraft(value.draft)) ? value : null;
+  } catch { return null; }
+}
+
+/** One durable draft per person/role/actor on this browser, shared by web/app.
+ * The form is keyed by scope so role/company changes unmount this state first. */
+export function useManifestDraft(scope: string, initial: ManifestDraft) {
+  const key = 'sitrep:manifest-form:v1:' + scope;
+  const journal = useMemo(() => draftConflicts(key, validDraft), [key]);
+  const writer = useRef(crypto.randomUUID());
+  const [loaded] = useState(() => {
+    let durable: StoredDraft | null = null, legacy: StoredDraft | null = null, error = false;
+    if (!scope) return { record: null, error: false, migrate: false };
+    try { durable = parseRecord(localStorage.getItem(key)); } catch { error = true; }
+    try { legacy = parseRecord(sessionStorage.getItem(key)); } catch { /* Session storage is no longer required. */ }
+    const conflict = pendingConflicts.get(key);
+    if (conflict && Date.now() - conflict.savedAt < lifetime) return { record: conflict, reference: durable, error, migrate: false, conflict: true };
+    pendingConflicts.delete(key);
+    try {
+      const entries = journal.list();
+      if (entries[0]) return { record: { version: 1 as const, savedAt: entries[0].savedAt, draft: entries[0].value }, reference: durable, error, migrate: false, conflict: true, entry: entries[0], count: entries.length };
+    } catch { error = true; }
+    const pending = pendingDrafts.get(key);
+    if (pending && Date.now() - pending.savedAt < lifetime) return { record: pending, reference: durable, error: true, migrate: true };
+    pendingDrafts.delete(key);
+    // A durable clear marker prevents old tabs from resurrecting legacy drafts.
+    const migrate = !!legacy && (!durable || legacy.savedAt > durable.savedAt);
+    return { record: migrate ? legacy : durable, error, migrate };
+  });
+  const initialRef = useRef(initial);
+  const [draft, setDraft] = useState(loaded.record?.draft || initial);
+  const current = useRef(draft);
+  const edited = useRef(!!loaded.conflict);
+  const fingerprint = useRef(JSON.stringify('reference' in loaded ? loaded.reference : loaded.record));
+  const conflicted = useRef(!!loaded.conflict);
+  const [conflict, setConflict] = useState(!!loaded.conflict);
+  const selected = useRef<DraftConflict<ManifestDraft> | null>(loaded.entry ?? null);
+  const written = useRef<DraftConflict<ManifestDraft> | null>(null);
+  const [conflictSaved, setConflictSaved] = useState(!!loaded.entry);
+  const [conflictCount, setConflictCount] = useState(loaded.count ?? (loaded.conflict ? 1 : 0));
+  const [restored, setRestored] = useState(!!loaded.record?.draft);
+  const [saved, setSaved] = useState(!!loaded.record?.draft && !loaded.error && !loaded.migrate && !loaded.conflict);
+  const [error, setError] = useState(loaded.error);
+  const errorRef = useRef(error);
+  const [dirty, setDirty] = useState(!!loaded.record?.draft);
+  const preserveConflict = useCallback(() => {
+    pendingConflicts.set(key, { version: 1, savedAt: Date.now(), draft: current.current });
+    conflicted.current = true; setConflict(true); setSaved(false);
+    try {
+      written.current = journal.save(current.current, writer.current);
+      journal.remove(selected.current); selected.current = null;
+      pendingConflicts.delete(key); setConflictSaved(true); setConflictCount(journal.list().length);
+      errorRef.current = false; setError(false);
+    } catch { errorRef.current = true; setError(true); setConflictSaved(false); }
+  }, [journal, key]);
+  const resolveConflict = useCallback(() => {
+    journal.remove(written.current); journal.remove(selected.current);
+    written.current = null; selected.current = null; pendingConflicts.delete(key);
+    const entries = journal.list(); const next = entries[0];
+    setConflictCount(entries.length); setConflictSaved(!!next);
+    if (!next) return false;
+    selected.current = next; writer.current = crypto.randomUUID();
+    current.current = next.value; edited.current = true; conflicted.current = true;
+    setDraft(next.value); setConflict(true); setSaved(false); setRestored(true); setDirty(true);
+    return true;
+  }, [journal, key]);
+  const persist = useCallback((next: ManifestDraft | null, force = false) => {
+    const record: StoredDraft = { version: 1, savedAt: Date.now(), draft: next };
+    try {
+      if (!scope) throw new Error('Missing owner');
+      const latest = parseRecord(localStorage.getItem(key));
+      if (!force && (conflicted.current || JSON.stringify(latest) !== fingerprint.current)) {
+        preserveConflict(); return false;
+      }
+      // Mobile shutdown does not guarantee unload. Persist on every input.
+      localStorage.setItem(key, JSON.stringify(record));
+      fingerprint.current = JSON.stringify(record); conflicted.current = false; setConflict(false);
+      pendingDrafts.delete(key);
+      try { sessionStorage.removeItem(key); } catch { /* Durable record supersedes the legacy copy. */ }
+      errorRef.current = false; setSaved(!!next); setError(false);
+      return !resolveConflict();
+    } catch {
+      if (next) pendingDrafts.set(key, record);
+      errorRef.current = true; setSaved(false); setError(true);
+      return false;
+    }
+  }, [key, scope, preserveConflict, resolveConflict]);
+  useEffect(() => {
+    if (loaded.migrate && loaded.record?.draft) persist(loaded.record.draft, true);
+  }, [loaded, persist]);
+  const update = useCallback((change: SetStateAction<ManifestDraft>) => {
+    if (current.current.pendingCreate) return; // Recover the result before changing the submitted payload.
+    let previous = current.current;
+    if (!errorRef.current && !edited.current) {
+      try {
+        const latest = parseRecord(localStorage.getItem(key));
+        fingerprint.current = JSON.stringify(latest);
+        if (latest) previous = latest.draft || initialRef.current;
+      } catch { /* Keep current input and retry persistence below. */ }
+    }
+    const next = typeof change === 'function' ? change(previous) : change;
+    current.current = next; edited.current = true; setDraft(next); setDirty(true);
+    persist(next);
+  }, [key, persist]);
+  const prepareCreate = useCallback(() => {
+    if (conflicted.current) return null;
+    const pendingCreate = current.current.pendingCreate || { id: crypto.randomUUID(), form: structuredClone(current.current.form) };
+    const next = { ...current.current, pendingCreate };
+    current.current = next; edited.current = true; setDraft(next); setDirty(true);
+    if (persist(next)) return pendingCreate;
+    // Keep the identity in memory on storage failure, but never dispatch until
+    // this exact command is durably saved. Do not replace a newly found conflict.
+    return null;
+  }, [persist]);
+  const releaseCreate = useCallback(() => {
+    const next = { ...current.current }; delete next.pendingCreate;
+    current.current = next; setDraft(next); return persist(next);
+  }, [persist]);
+  const clear = useCallback(() => {
+    // A tombstone also invalidates copies still open in other tabs.
+    if (!persist(null)) return false;
+    current.current = initialRef.current;
+    edited.current = false;
+    setDraft(initialRef.current); setRestored(false); setDirty(false);
+    return true;
+  }, [persist]);
+  const checkConflict = useCallback(() => {
+    try {
+      const changed = JSON.stringify(parseRecord(localStorage.getItem(key))) !== fingerprint.current;
+      if (changed) preserveConflict();
+      return changed || conflicted.current;
+    } catch { return false; } // Storage errors are reported by persistence; they do not erase input.
+  }, [key, preserveConflict]);
+  const reload = useCallback(() => {
+    try {
+      const record = parseRecord(localStorage.getItem(key));
+      const next = record?.draft || initialRef.current;
+      fingerprint.current = JSON.stringify(record); current.current = next; edited.current = false;
+      pendingDrafts.delete(key); conflicted.current = false; errorRef.current = false;
+      setDraft(next); setRestored(!!record?.draft); setSaved(!!record?.draft); setDirty(!!record?.draft); setConflict(false); setError(false);
+      resolveConflict();
+    } catch { setError(true); }
+  }, [key, resolveConflict]);
+  useEffect(() => {
+    const synchronize = (event: StorageEvent) => {
+      if (event.key !== key || (event.storageArea && event.storageArea !== localStorage) || errorRef.current) return;
+      // Never replace input already edited here, including when another tab cleared its copy.
+      if (edited.current) checkConflict(); else reload();
+    };
+    window.addEventListener('storage', synchronize);
+    return () => window.removeEventListener('storage', synchronize);
+  }, [key, checkConflict, reload]);
+  useEffect(() => {
+    if (!dirty || !(error || (conflict && !conflictSaved))) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty, error, conflict, conflictSaved]);
+  return { draft, update, clear, saved, restored, error, dirty, conflict, conflictSaved, conflictCount, checkConflict, reload, prepareCreate, releaseCreate, overwrite: () => persist(current.current, true) };
+}

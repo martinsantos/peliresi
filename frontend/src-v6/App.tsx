@@ -1,3 +1,6 @@
+import SharedInspectionActPage from './pages/inspecciones/SharedInspectionActPage';
+import OpenLinkPage from './pages/notificaciones/OpenLinkPage';
+import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
  * SITREP v6 - App Router
  * ======================
@@ -14,6 +17,7 @@ import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-do
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+const RelevoGpsPage=React.lazy(()=>import('./pages/transporte/RelevoGpsPage'));
 
 // ========================================
 // LAYOUTS
@@ -33,7 +37,7 @@ import {
   VerificarInspeccionPage,
   InspeccionadoParticipacionPage,
   ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
-  TransportePerfilPage, ViajeEnCursoTransportista,
+  TransportePerfilPage, CargasEnCursoPage, ViajeEnCursoTransportista,
   ActoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
@@ -77,11 +81,16 @@ const ViajeRedirect: React.FC = () => {
 // APP COMPONENT
 // ========================================
 function App() {
+  const location=useLocation();
+  // A per-leg GPS capability never inherits, refreshes or switches a stored user session.
+  if(location.pathname.startsWith('/relevo/'))return <ErrorBoundary><Suspense fallback={<PageLoader/>}><Routes><Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/></Routes></Suspense></ErrorBoundary>;
   return (
     <ErrorBoundary>
     <AuthProvider>
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        <Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/>
+        <Route path="/abrir" element={<OpenLinkPage />} />
         {/* Public Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/l" element={<Navigate to="/login" replace />} />
@@ -101,8 +110,10 @@ function App() {
           <Route element={<MobileLayout />}>
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/mobile/actores" element={<ActoresPage />} />
             <Route path="/mobile/empresas" element={<EmpresasPage />} />
             <Route path="/mobile/centro-control" element={<CentroControlPage />} />
+            <Route path="/mobile/monitor" element={<WarRoomPage />} />
             <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
             <Route path="/mobile/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
@@ -114,12 +125,15 @@ function App() {
             <Route path="/mobile/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mobile/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mobile/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
+            <Route path="/mobile/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/mobile/reportes" element={<ReportesPage />} />
             <Route path="/mobile/alertas" element={<AlertasPage />} />
             <Route path="/mobile/notificaciones" element={<NotificacionesPage />} />
+            <Route path="/mobile/notificaciones/:id" element={<AvisoPage />} />
             <Route path="/mobile/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mobile/mi-perfil" element={<PerfilPage />} />
             <Route path="/mobile/ayuda" element={<AyudaPage />} />
@@ -136,6 +150,9 @@ function App() {
         {/* Admin Mobile Routes - ADMIN only */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/blockchain" element={<AdminBlockchainPage />} />
+            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
+            <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
             <Route path="/mobile/admin/solicitudes" element={<AdminSolicitudesPage />} />
             <Route path="/mobile/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
           </Route>
@@ -143,8 +160,6 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores" element={<ActoresPage />} />
-            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
-            <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
           </Route>
         </Route>
 
@@ -181,6 +196,13 @@ function App() {
           </Route>
         </Route>
 
+        {/* Renewal review is shared by the two authorized actor sectors. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
+          </Route>
+        </Route>
+
         {/* Sub-Admin Operador Mobile */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
           <Route element={<MobileLayout />}>
@@ -189,7 +211,7 @@ function App() {
             <Route path="/mobile/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
 
-            <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
+            <Route path="/mobile/admin/tratamientos" element={<AdminTratamientosPage />} />
           </Route>
         </Route>
 
@@ -231,6 +253,7 @@ function App() {
           <Route element={<MainLayout />}>
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/actores" element={<ActoresPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
             <Route path="/centro-control/viaje/:id" element={<ViajeRedirect />} />
 
@@ -245,9 +268,11 @@ function App() {
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
+            <Route path="/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
 
             {/* Reportes */}
@@ -256,6 +281,7 @@ function App() {
             {/* Alertas */}
             <Route path="/alertas" element={<AlertasPage />} />
             <Route path="/notificaciones" element={<NotificacionesPage />} />
+            <Route path="/notificaciones/:id" element={<AvisoPage />} />
 
             {/* Configuración */}
             <Route path="/configuracion" element={<ConfiguracionPage />} />
@@ -334,6 +360,13 @@ function App() {
           </Route>
         </Route>
 
+        {/* Renewal review is shared by the two authorized actor sectors. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
+          </Route>
+        </Route>
+
         {/* Sub-Admin Operador */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
           <Route element={<MainLayout />}>
@@ -343,13 +376,13 @@ function App() {
             <Route path="/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
 
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
-            <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
         </Route>
 
         {/* Verificación pública de manifiesto (QR) */}
         <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
-        <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
+        <Route path="/acta-compartida/:accesoId" element={<SharedInspectionActPage />} />
+          <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
         {/* Legacy /v6/ QR redirect — QR codes ya impresos apuntan a /v6/manifiestos/verificar/... */}
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />
@@ -365,7 +398,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* Legacy actores redirects */}
-        <Route path="/actores" element={<Navigate to="/admin/actores" replace />} />
+
         <Route path="/actores/*" element={<Navigate to="/admin/actores" replace />} />
         <Route path="/admin/generadores" element={<Navigate to="/admin/actores" replace />} />
         <Route path="/admin/operadores" element={<Navigate to="/admin/actores" replace />} />

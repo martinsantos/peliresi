@@ -1,10 +1,21 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '../../contexts/AuthContext';
+import { inspectionDeadlineDate } from '../../pages/inspecciones/inspectionProcess';
 import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExchangePanel';
 import type { InspectionExchangeTimeline } from '../../types/inspection';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { webcrypto } from 'node:crypto';
+import { claimExchangeCommand } from '../../services/inspectionExchangeCommand';
+import { loadDraftAlternatives, preserveDraftAlternative } from '../../services/inspectionDraftAlternatives';
+
+const localCommands = vi.hoisted(() => new Map<string, unknown>());
+vi.mock('../../services/indexeddb', () => ({
+  getOffline: async (_store: string, key: string) => localCommands.get(key) || null,
+  updateOffline: async (_store: string, key: string, update: (old: unknown) => unknown) => { const next = update(localCommands.get(key) || null); if (next) localCommands.set(key, next); else localCommands.delete(key); return next; },
+}));
 
 const auth = vi.hoisted(() => ({
   currentUser: {
@@ -18,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   attachmentUrl: vi.fn(),
   loadDraft: vi.fn(),
   saveDraft: vi.fn(),
+  replaceDraft: vi.fn(),
   removeDraft: vi.fn(),
 }));
 
@@ -26,7 +38,8 @@ vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: mocks }
 vi.mock('../../services/inspectionOfflineExchange', () => ({
   loadOfflineExchangeDraft: mocks.loadDraft,
   saveOfflineExchangeDraft: mocks.saveDraft,
-  removeOfflineExchangeDraft: mocks.removeDraft,
+  replaceOfflineExchangeDraft: mocks.replaceDraft,
+  removeOfflineExchangeDraftRevision: mocks.removeDraft,
 }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
@@ -65,7 +78,8 @@ function renderPanel() {
 describe('InspectionExchangePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle });
+    localStorage.clear(); localCommands.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     auth.currentUser = { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [] };
     mocks.getExchanges.mockResolvedValue(timeline);
@@ -73,16 +87,255 @@ describe('InspectionExchangePanel', () => {
     mocks.decideExchange.mockResolvedValue({ id: 'exchange-3' });
     mocks.loadDraft.mockResolvedValue(null);
     mocks.saveDraft.mockResolvedValue(undefined);
+    mocks.replaceDraft.mockImplementation((...args: unknown[]) => mocks.saveDraft(...args.slice(0, 5)));
     mocks.removeDraft.mockResolvedValue(undefined);
+  });
+
+  it('acknowledges a matching timeline after reopening without posting again', async () => {
+    const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
+    const original = timeline.intercambios[1];
+    mocks.loadDraft.mockResolvedValue({ revision: 'recovered-before-send', savedAt: '2026-10-25T18:00:00Z', files: [],
+      draft: { tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId, plazoRespuestaAt: '' } });
+    await claimExchangeCommand(scope, { kind: 'presentation', input: { clienteId: 'reopened-send', version: 8,
+      tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId!, files: [] } });
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0], { ...original, clienteId: 'reopened-send' }] });
+    renderPanel();
+    expect(await screen.findByText('Presentación registrada')).toBeVisible();
+    expect(screen.queryByText('Confirmación pendiente')).not.toBeInTheDocument();
+    expect(screen.queryByText('Borrador local recuperado')).not.toBeInTheDocument();
+    expect(screen.queryByText(/todavía no integra el expediente/)).not.toBeInTheDocument();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('blocks autosave after a recovery conflict and explicitly reloads the newer draft', async () => {
+    const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
+    const old = { tipo: 'DESCARGO' as const, asunto: 'Alternativa antigua', cuerpo: 'Texto antiguo conservado.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    await preserveDraftAlternative(scope, old, []);
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const user = userEvent.setup(); renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Texto actual sin enviar.');
+    mocks.replaceDraft.mockRejectedValueOnce(new Error('Otra pestaña cambió el borrador.'));
+    await user.click(screen.getByRole('button', { name: 'Recuperar borrador 1' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Otra pestaña cambió');
+    const writes = mocks.saveDraft.mock.calls.length;
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 400)); });
+    expect(mocks.saveDraft).toHaveBeenCalledTimes(writes);
+    expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeDisabled();
+    mocks.loadDraft.mockResolvedValue({ revision: 'new', draft: { ...old, cuerpo: 'Versión más nueva de otra pestaña.' }, files: [], savedAt: '' });
+    await user.click(screen.getByRole('button', { name: 'Revisar borrador local' }));
+    await waitFor(() => expect(screen.getByLabelText('Contenido')).toHaveValue('Versión más nueva de otra pestaña.'));
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+    expect((await loadDraftAlternatives(scope)).some(item => item.draft.cuerpo === 'Texto actual sin enviar.')).toBe(true);
+  });
+
+  it('recovers a legacy response with its file while preserving current work and the original, without posting', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:original'); URL.revokeObjectURL = vi.fn();
+    const old = { tipo: 'DESCARGO' as const, asunto: 'Respuesta anterior', cuerpo: 'Texto de una versión anterior con su documento.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    const original = { id: 'actor-user-1:inspection-1', userId: 'actor-user-1', inspectionId: 'inspection-1', draft: old,
+      savedAt: '2026-10-24T12:00:00Z', files: [{ name: 'original.pdf', type: 'application/pdf', lastModified: 1, blob: new Blob(['original']) }] };
+    localCommands.set(original.id, original);
+    localStorage.setItem('sitrep_exchange_draft_actor-user-1_inspection-1', JSON.stringify(old));
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const user = userEvent.setup(); const view = renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Trabajo nuevo que debe conservarse.');
+    await user.click(screen.getByText('Copias de respuestas anteriores'));
+    const search = screen.getByRole('button', { name: 'Buscar respuestas guardadas' });
+    await waitFor(() => expect(search).toBeEnabled()); await user.click(search);
+    await user.click(await screen.findByRole('button', { name: 'Recuperar para revisar' }));
+    await waitFor(() => expect(screen.getByLabelText('Contenido')).toHaveValue(old.cuerpo));
+    await waitFor(() => expect(screen.getByLabelText('Contenido')).toHaveFocus());
+    expect(mocks.saveDraft).toHaveBeenCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), old, [expect.objectContaining({ name: 'original.pdf', size: 8 })]);
+    const alternatives = await loadDraftAlternatives({ userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' });
+    expect(alternatives.some(item => item.draft.cuerpo === 'Trabajo nuevo que debe conservarse.')).toBe(true);
+    expect(localCommands.get(original.id)).toBe(original);
+    expect(localStorage.getItem('sitrep_exchange_draft_actor-user-1_inspection-1')).toBe(JSON.stringify(old));
+    view.unmount();
+    mocks.loadDraft.mockResolvedValue({ draft: old, files: [new File(['original'], 'original.pdf')], savedAt: original.savedAt });
+    renderPanel();
+    expect(await screen.findByLabelText('Contenido')).toHaveValue(old.cuerpo);
+    expect(mocks.presentExchange).not.toHaveBeenCalled(); expect(mocks.decideExchange).not.toHaveBeenCalled();
+  });
+
+  it('does not archive the text-only fallback again when the full alternative has attachments', async () => {
+    const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
+    const original = timeline.intercambios[1];
+    const other = { tipo: 'DESCARGO' as const, asunto: 'Versión pendiente', cuerpo: 'Texto alternativo con documentación.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    localStorage.setItem('sitrep_exchange_draft_v2_' + inspectionContextKey(scope.userId, scope.owner, scope.inspectionId), JSON.stringify(other));
+    mocks.loadDraft.mockResolvedValue({ draft: other, files: [new File(['pdf'], 'otro.pdf')], revision: 'alternative', savedAt: '' });
+    await claimExchangeCommand(scope, { kind: 'presentation', input: { clienteId: 'reopened-send', version: 8,
+      tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId!, files: [] } });
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0], { ...original, clienteId: 'reopened-send' }] });
+    renderPanel();
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
+    await screen.findByRole('button', { name: 'Recuperar borrador 1' });
+    expect(screen.queryByRole('button', { name: 'Recuperar borrador 2' })).toBeNull();
+    expect((await loadDraftAlternatives(scope))[0].files).toHaveLength(1);
+  });
+
+  it('retains a different shared draft and restores it after acknowledging and reopening', async () => {
+    const user = userEvent.setup();
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const view = renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Contenido enviado desde la primera pestaña.');
+    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    const other = { tipo: 'DESCARGO' as const, asunto: 'Otra pestaña', cuerpo: 'Contenido distinto que todavía no fue enviado.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    mocks.loadDraft.mockResolvedValue({ revision: 'other-revision', draft: other, files: [new File(['pdf alternativo'], 'alternativo.pdf')], savedAt: '2026-10-25T12:00:00Z' });
+    await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
+    expect(await screen.findByRole('button', { name: 'Recuperar borrador 1' })).toBeVisible();
+    expect(mocks.removeDraft).not.toHaveBeenCalled();
+    view.unmount(); mocks.loadDraft.mockResolvedValue(null);
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Recuperar borrador 1' }));
+    expect(await screen.findByLabelText('Contenido')).toHaveValue(other.cuerpo);
+    expect(screen.getByLabelText('Asunto')).toHaveValue(other.asunto);
+    expect(mocks.saveDraft).toHaveBeenLastCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), other, [expect.objectContaining({ name: 'alternativo.pdf', size: 15 })]);
+    expect(mocks.presentExchange).toHaveBeenCalledOnce();
+    expect(await loadDraftAlternatives({ userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' })).toHaveLength(1);
+  });
+
+  it('does not reuse another activity timeline or open draft for the same account and case', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => <QueryClientProvider client={client}><InspectionExchangePanel inspectionId="inspection-1" /></QueryClientProvider>;
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const view = render(tree());
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Borrador exclusivo del generador.');
+    auth.currentUser = { ...auth.currentUser, rol: 'OPERADOR' };
+    mocks.getExchanges.mockRejectedValue({ response: { status: 403 } });
+    view.rerender(tree());
+    expect(await screen.findByRole('alert')).toHaveTextContent('Requerimiento no disponible para esta cuenta');
+    expect(screen.queryByDisplayValue('Borrador exclusivo del generador.')).not.toBeInTheDocument();
+    expect(mocks.getExchanges).toHaveBeenCalledTimes(2);
+    auth.currentUser = { ...auth.currentUser, rol: 'GENERADOR' };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    view.rerender(tree());
+    expect(await screen.findByDisplayValue('Borrador exclusivo del generador.')).toBeVisible();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('does not leak a pending decision when the authorization revision changes', async () => {
+    auth.currentUser = { ...auth.currentUser, rol: 'ADMIN', empresaContexto: { empresaId: 'company-1', actividadId: 'activity-1', autorizacionId: 'grant-1', revision: 1 } as any };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, parteActual: 'AUTORIDAD' });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => <QueryClientProvider client={client}><InspectionExchangePanel inspectionId="inspection-1" /></QueryClientProvider>;
+    const view = render(tree()), user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Derivar a Legales' }));
+    await user.type(screen.getByLabelText('Fundamento de la decisión'), 'Fundamento exclusivo de la autorización anterior.');
+    auth.currentUser = { ...auth.currentUser, empresaContexto: { ...auth.currentUser.empresaContexto!, revision: 2 } };
+    view.rerender(tree());
+    expect(await screen.findByRole('button', { name: 'Derivar a Legales' })).toBeVisible();
+    expect(screen.queryByDisplayValue('Fundamento exclusivo de la autorización anterior.')).not.toBeInTheDocument();
+    expect(mocks.decideExchange).not.toHaveBeenCalled();
+  });
+
+  it('explains a different account or role without offering administrative access', async () => {
+    mocks.getExchanges.mockRejectedValue({ response: { status: 403 } });
+    renderPanel();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Requerimiento no disponible para esta cuenta');
+    expect(screen.getByRole('alert')).toHaveTextContent('Volvé a Avisos');
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull();
+  });
+
+  it('recovers a failed requirement request in place', async () => {
+    mocks.getExchanges.mockRejectedValueOnce(new Error('offline'));
+    renderPanel();
+    const retry = await screen.findByRole('button', { name: 'Reintentar' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Comprobá tu conexión');
+    await userEvent.setup().click(retry);
+    expect(await screen.findByRole('region', { name: 'Requerimiento de la autoridad' })).toBeVisible();
+  });
+
+  it('waits for in-flight draft writes before removing a successfully submitted response', async () => {
+    let finishWrite!: () => void;
+    mocks.saveDraft.mockImplementationOnce(() => new Promise<void>((resolve) => { finishWrite = resolve; }));
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Constancia completa para presentar sin recuperar después un borrador ya enviado.');
+    await waitFor(() => expect(mocks.saveDraft).toHaveBeenCalled(), { timeout: 2500 });
+    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    await waitFor(() => expect(mocks.presentExchange).toHaveBeenCalledOnce());
+    expect(mocks.removeDraft).not.toHaveBeenCalled();
+    const sent = mocks.presentExchange.mock.calls[0][1];
+    mocks.loadDraft.mockResolvedValue({ revision: 'sent-revision', draft: { ...sent, respondeAId: sent.respondeAId || '', plazoRespuestaAt: '' }, files: [] });
+    await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
+    await act(async () => finishWrite());
+    await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), 'sent-revision'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument());
+    expect(localStorage.getItem('sitrep_exchange_draft_v2_' + inspectionContextKey(auth.currentUser.id, inspectionWorkspaceOwner(auth.currentUser), 'inspection-1'))).toBeNull();
+  });
+
+  it('never autosaves the text-only fallback or allows sending before attachment recovery completes', async () => {
+    let finishLoad!: (value: unknown) => void;
+    mocks.loadDraft.mockImplementationOnce(() => new Promise((resolve) => { finishLoad = resolve; }));
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const draft = { tipo: 'DESCARGO', respondeAId: 'exchange-1', asunto: 'Constancia guardada', cuerpo: 'Borrador con adjunto pendiente de recuperar.', plazoRespuestaAt: '' };
+    localStorage.setItem('sitrep_exchange_draft_v2_' + inspectionContextKey(auth.currentUser.id, inspectionWorkspaceOwner(auth.currentUser), 'inspection-1'), JSON.stringify(draft));
+    renderPanel();
+    expect(await screen.findByLabelText('Contenido')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeDisabled();
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 450)); });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); });
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+    await act(async () => finishLoad({ draft, files: [new File(['pdf'], 'guardado.pdf')], savedAt: '2026-10-20T10:00:00Z' }));
+    expect(screen.getByLabelText('Contenido')).toBeEnabled();
+    expect(screen.getByText('guardado.pdf')).toBeVisible();
+    await waitFor(() => expect(mocks.saveDraft).toHaveBeenCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), draft, [expect.objectContaining({ name: 'guardado.pdf' })]));
+    expect(mocks.removeDraft).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unreadable local copy intact and retries the read explicitly', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    mocks.loadDraft.mockRejectedValueOnce(new Error('IndexedDB unavailable')).mockResolvedValue(null);
+    renderPanel();
+    await screen.findByRole('button', { name: 'Revisar borrador local' });
+    expect(screen.getByRole('button', { name: 'Responder requerimiento #1' })).toBeDisabled();
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Revisar borrador local' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Responder requerimiento #1' })).toBeEnabled());
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('retains the historical deadline when the real closure clears the active deadline', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'CERRADA_CONFORME', plazoRespuestaAt: null } });
+    renderPanel();
+    expect((await screen.findByTestId('inspection-deadline-value')).textContent).toBe(inspectionDeadlineDate(timeline.intercambios[0].plazoRespuestaAt));
+    expect(screen.getByText('Último plazo · histórico')).toBeInTheDocument();
+  });
+
+  it('offers the actor a direct reply to the unanswered requirement', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-next-step')).toHaveTextContent('Tenés requerimientos por responder');
+    expect(screen.getAllByRole('button', { name: /^Responder/ })).toHaveLength(1);
+    expect(screen.queryByRole('button', {name:'Nuevo requerimiento'})).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Responder requerimiento #1' }));
+    expect(screen.getByLabelText('Asunto')).toHaveValue('Respuesta a presentación #1: Acompañar constancia vigente');
+  });
+
+  it('shows a historical deadline after closure without warning that the case is overdue', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'CERRADA_CONFORME', plazoRespuestaAt: '2020-01-01T12:00:00Z' } });
+    renderPanel();
+    expect(await screen.findByText('Último plazo · histórico')).toBeInTheDocument();
+    expect(screen.getByTestId('inspection-next-step')).toHaveTextContent('Seguimiento cerrado conforme');
+    expect(screen.queryByText('Plazo vencido')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tu respuesta queda registrada/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Responder requerimiento/ })).not.toBeInTheDocument();
   });
 
   it('requires an inspected-party response to be linked to the authority presentation', async () => {
     const user = userEvent.setup();
     renderPanel();
 
-    expect(await screen.findByRole('heading', { name: 'Presentaciones y respuestas' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Requerimiento de la autoridad' })).toBeInTheDocument();
     expect(screen.getByText('Acompañar constancia vigente')).toBeInTheDocument();
-    expect(screen.getByText(/no envía correos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tu respuesta queda registrada/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Ciclo 1:/ })).toBeInTheDocument();
     expect(screen.getByText('2 actuaciones vinculadas')).toBeInTheDocument();
     expect(screen.getByText(/Responde a actuación #1 · Acompañar constancia vigente/)).toBeInTheDocument();
@@ -159,6 +412,7 @@ describe('InspectionExchangePanel', () => {
     await waitFor(() => expect(mocks.saveDraft).toHaveBeenCalledWith(
       'actor-user-1',
       'inspection-1',
+      inspectionWorkspaceOwner(auth.currentUser),
       expect.objectContaining({ respondeAId: 'exchange-1' }),
       [file],
     ));
@@ -166,7 +420,7 @@ describe('InspectionExchangePanel', () => {
   });
 
   it('keeps the linked response and attachment editable after a rejected presentation', async () => {
-    mocks.presentExchange.mockRejectedValueOnce(new Error('La versión del expediente cambió'));
+    mocks.presentExchange.mockRejectedValueOnce({ response: { data: { code: 'INSPECTION_COMMAND_NOT_APPLIED', message: 'La versión del expediente cambió' } } });
     const user = userEvent.setup();
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Responder esta actuación' }));
@@ -176,6 +430,7 @@ describe('InspectionExchangePanel', () => {
     await user.upload(screen.getByLabelText(/Adjuntos probatorios/), file);
     await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
     await waitFor(() => expect(mocks.presentExchange).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole('button', { name: 'Revisar presentación' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeEnabled());
     expect(screen.getByRole('textbox', { name: 'Contenido' })).toHaveValue(content);
     expect(screen.getByText('constancia-conservada.pdf')).toBeInTheDocument();
@@ -183,10 +438,23 @@ describe('InspectionExchangePanel', () => {
     expect(mocks.removeDraft).not.toHaveBeenCalled();
   });
 
+  it('retains the draft without sending a file exceeding the per-file limit', async () => {
+    const user = userEvent.setup(); renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder esta actuación' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Texto conservado cuando un archivo supera el límite individual.');
+    const file = new File(['%PDF'], 'exceeds-limit.pdf', { type: 'application/pdf' });
+    Object.defineProperty(file, 'size', { value: 26 * 1024 * 1024 });
+    await user.upload(screen.getByLabelText(/Adjuntos probatorios/), file);
+    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Contenido')).toHaveValue('Texto conservado cuando un archivo supera el límite individual.');
+    expect(screen.getByText('exceeds-limit.pdf')).toBeInTheDocument();
+  });
+
   it.each(['CERRADA_CONFORME', 'DERIVADA_LEGALES'])('does not offer a new response on a %s dossier', async (estado) => {
     mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado } });
     renderPanel();
-    await screen.findByRole('heading', { name: 'Presentaciones y respuestas' });
+    await screen.findByRole('heading', { name: 'Requerimiento de la autoridad' });
     expect(screen.queryByRole('button', { name: 'Responder esta actuación' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument();
     expect(mocks.presentExchange).not.toHaveBeenCalled();
@@ -217,8 +485,54 @@ describe('InspectionExchangePanel', () => {
     await user.type(screen.getByRole('textbox', { name: 'Fundamento de la decisión' }), reason);
     await user.click(submit);
     await waitFor(() => expect(mocks.decideExchange).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(submit).toBeEnabled());
-    expect(screen.getByRole('textbox', { name: 'Fundamento de la decisión' })).toHaveValue(reason);
+    expect(await screen.findByRole('button', { name: 'Reintentar confirmación' })).toBeEnabled();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Fundamento de la decisión' })).not.toBeInTheDocument();
     expect(mocks.decideExchange).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ decision: 'CERRADA_CONFORME', fundamento: reason }));
   });
+  it('does not keep an overdue absence warning after the linked actor response', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, plazoRespuestaAt: '2020-01-01T12:00:00Z' } });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-responsible')).toHaveTextContent('Debe actuar: Autoridad');
+    expect(screen.queryByTestId('inspection-overdue')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('inspection-pending-request')).not.toBeInTheDocument();
+  });
+  it('offers the older expired request before a newer one and shows both concrete dates', async () => {
+    const first = { ...timeline.intercambios[0], plazoRespuestaAt: '2020-01-01T12:00:00Z' };
+    const second = { ...first, id: 'new-request', secuencia: 3, asunto: 'Otro pedido todavía vigente', plazoRespuestaAt: '2030-01-01T12:00:00Z' };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, plazoRespuestaAt: second.plazoRespuestaAt }, intercambios: [first, second] });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-overdue')).toHaveTextContent('1 requerimiento vencido sin respuesta');
+    expect(screen.getByTestId('inspection-responsible')).toHaveTextContent('Debe actuar: Inspeccionado');
+    expect(screen.getAllByTestId('inspection-pending-request')).toHaveLength(2);
+    expect(screen.getAllByTestId('inspection-pending-request')[0]).toHaveTextContent(first.asunto);
+    await userEvent.click(screen.getByRole('button', { name: 'Responder requerimiento #1' }));
+    expect(screen.getByTestId('inspection-reply-deadline')).toHaveTextContent('Vencido');
+    expect(screen.getByTestId('inspection-reply-deadline')).toHaveTextContent('Mendoza');
+  });
+  it('does not borrow the dossier deadline for a request with no date', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, plazoRespuestaAt: '2020-01-01T12:00:00Z' }, intercambios: [{ ...timeline.intercambios[0], plazoRespuestaAt: null }] });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-deadline-value')).toHaveTextContent('Sin plazo registrado');
+    expect(screen.queryByTestId('inspection-overdue')).not.toBeInTheDocument();
+    expect(screen.getByTestId('inspection-pending-request')).toHaveTextContent('Sin plazo registrado');
+  });
+
+  it('shows only the explicitly public administrative result returned for a finalized file', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'FINALIZADA', plazoRespuestaAt: null },
+      resultadoAdministrativo: { id: 'public-final', detalle: 'Resultado documentado y visible al inspeccionado.', createdAt: '2026-10-20T15:00:00Z' } });
+    renderPanel();
+    const result = await screen.findByTestId('inspection-public-result');
+    expect(result).toHaveTextContent('Resultado documentado y visible al inspeccionado.');
+    expect(result).toHaveTextContent('no acredita por sí solo sanción ni firmeza');
+    expect(screen.queryByTestId('inspection-overdue')).not.toBeInTheDocument();
+  });
+
+  it('does not invent a public result for a finalized file without a public event', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'FINALIZADA' }, resultadoAdministrativo: null });
+    renderPanel();
+    await screen.findByTestId('inspection-next-step');
+    expect(screen.queryByTestId('inspection-public-result')).not.toBeInTheDocument();
+  });
+
 });

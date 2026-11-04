@@ -11,7 +11,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model InspectionStaffRole {
+  usuarioId String @id
+  role String @default("ADMIN_INSPECCIONES")
+  activo Boolean @default(true)
+  asignadoPorId String
+  updatedAt DateTime @default(now()) @db.Timestamp(3)
+  usuario Usuario @relation("InspectionManagementMember", fields: [usuarioId], references: [id], onDelete: Restrict)
+  asignadoPor Usuario @relation("InspectionManagementGrantor", fields: [asignadoPorId], references: [id], onDelete: Restrict)
+  @@map("inspection_staff_roles")
+}
+
 model Usuario {
+  inspectionManagementRole InspectionStaffRole? @relation("InspectionManagementMember")
+  inspectionManagementGrants InspectionStaffRole[] @relation("InspectionManagementGrantor")
   id                     String    @id @default(cuid())
   email                  String    @unique
   password               String
@@ -29,6 +42,7 @@ model Usuario {
   dosFaVerificado        Boolean   @default(false)
   notifNuevoRegistro     Boolean   @default(true)
   notifEmail             Boolean   @default(true)
+  preferenciaEnlaces      String    @default("AUTO")
   notifWhatsapp          Boolean   @default(false)
   notifTelegram          Boolean   @default(false)
   telegramChatId         String?
@@ -46,6 +60,8 @@ model Usuario {
   operador                     Operador?
   refreshTokens                RefreshToken[]
   manifiestosCreados           Manifiesto[]            @relation("UsuarioManifiestos")
+  certificadosEmitidos         CertificadoManifiesto[]
+  borradoresActor              ActorFormDraft[]
   eventos                      EventoManifiesto[]
   auditorias                   Auditoria[]             @relation("UsuarioAuditorias")
   notificaciones               Notificacion[]
@@ -311,6 +327,8 @@ model AdendaManifiesto {
   huellaSolicitud String
   declaracion Json
   residuos Json
+  // Immutable operator finding at destination; legacy addenda remain NULL.
+  informeHallazgo Json?
   motivo String
   rectificaId String?
   revisiones Json
@@ -320,6 +338,35 @@ model AdendaManifiesto {
 
   @@index([manifiestoId, createdAt])
   @@map("adendas_manifiesto")
+}
+
+// An operational observation is an intake, never an infraction or an inspection.
+// Source evidence is immutable; evaluations append to eventos using version checks.
+model AntecedenteFiscalizacion {
+  id String @id
+  claveOrigen String @unique
+  origen String
+  origenId String
+  referencia String
+  tipoActor TipoActorInspeccion
+  actorId String?
+  actorNombre String
+  motivos String[]
+  evidencia Json
+  huellaEvidencia String
+  creadoPorId String
+  estado String @default("PENDIENTE")
+  version Int @default(0)
+  eventos Json
+  inspeccionId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  inspeccion Inspeccion? @relation(fields: [inspeccionId], references: [id], onDelete: Restrict)
+
+  @@index([estado, tipoActor, createdAt])
+  @@index([origen, origenId])
+  @@index([inspeccionId])
+  @@map("antecedentes_fiscalizacion")
 }
 
 model Manifiesto {
@@ -362,8 +409,10 @@ model Manifiesto {
   creadoPor        Usuario              @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
   creadoPorId      String
   residuos         ManifiestoResiduo[]
+  certificados     CertificadoManifiesto[]
   eventos          EventoManifiesto[]
   tracking         TrackingGPS[]
+  tramosTransporte  TramoTransporte[]
   auditorias       Auditoria[]
   notificaciones   Notificacion[]
   alertas          AlertaGenerada[]
@@ -440,15 +489,47 @@ model TrackingGPS {
   velocidad    Float?
   direccion    Float?
   precision    Float?
+  tramoId      String?
+  emisor       String?
   isDemoData   Boolean  @default(false)
   timestamp    DateTime @default(now())
 
   // Relaciones
   manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  tramo      TramoTransporte? @relation(fields: [tramoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([manifiestoId])
   @@index([manifiestoId, timestamp])
+  @@index([tramoId, timestamp])
   @@map("tracking_gps")
+}
+
+// Original assignment stays immutable. Each handoff is declared by the original
+// carrier, never an automatic registration/approval of an external carrier.
+model TramoTransporte {
+  id               String   @id
+  manifiestoId     String
+  orden            Int
+  tipo             String
+  transportistaId  String?
+  datos            Json
+  creadoPorId      String
+  impersonadoPorId String?
+  motivo           String
+  huellaSolicitud  String
+  inicio           DateTime
+  fin              DateTime?
+  latitud          Float?
+  longitud         Float?
+  accesoVersion    String?
+  accesoHasta      DateTime?
+  createdAt        DateTime @default(now())
+
+  manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tracking   TrackingGPS[]
+  @@unique([manifiestoId, orden])
+  @@index([manifiestoId, inicio])
+  @@map("tramos_transporte")
 }
 
 model TratamientoAutorizado {
@@ -571,6 +652,7 @@ model Inspeccion {
   evidencias    EvidenciaInspeccion[]
   eventos       EventoInspeccion[]
   intercambios  IntercambioInspeccion[]
+  antecedentes AntecedenteFiscalizacion[]
 
   @@index([estado, createdAt])
   @@index([inspectorId, estado])
@@ -1316,6 +1398,50 @@ model HuellaRecibo {
   @@map("huellas_recibo")
 }
 
+// Payment allocation is independent of attachment bytes and survives replacement.
+// No foreign key to a removable attachment/application; events retain provenance.
+model RegistroPagoComprobante {
+  id String @id @default(cuid())
+  ambito String
+  origen String
+  documentoId String
+  sha256 String
+  cuit String
+  identidad Json
+  estado String @default("CONFIRMADO")
+  confirmadoPor String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  claves ClavePagoComprobante[]
+  eventos EventoPagoComprobante[]
+  @@index([ambito])
+  @@index([origen, documentoId])
+  @@map("registros_pago_comprobante")
+}
+
+model ClavePagoComprobante {
+  clave String @id
+  registroId String
+  createdAt DateTime @default(now())
+  registro RegistroPagoComprobante @relation(fields: [registroId], references: [id], onDelete: Restrict)
+  @@index([registroId])
+  @@map("claves_pago_comprobante")
+}
+
+model EventoPagoComprobante {
+  id String @id @default(cuid())
+  registroId String
+  documentoId String
+  sha256 String
+  accion String
+  usuarioId String
+  datos Json
+  createdAt DateTime @default(now())
+  registro RegistroPagoComprobante @relation(fields: [registroId], references: [id], onDelete: Restrict)
+  @@unique([registroId, documentoId, sha256, accion])
+  @@map("eventos_pago_comprobante")
+}
+
 model MensajeSolicitud {
   id          String    @id @default(cuid())
   solicitudId String
@@ -1390,6 +1516,60 @@ model EmailQueue {
 }
 
 // Additive enterprise boundary. Legacy actor/account links are retained.
+// Immutable issued PDF and signed declaration; no editing endpoint.
+model ActorFormDraft {
+  id String @id
+  ownerId String
+  scope String
+  version Int @default(1)
+  data Json
+  requestId String
+  requestHash String
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime
+  owner Usuario @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  files ActorFormDraftFile[]
+  @@unique([ownerId, scope])
+  @@index([expiresAt])
+  @@map("actor_form_drafts")
+}
+
+model ActorFormDraftFile {
+  id String @id
+  draftId String
+  kind String
+  name String
+  mime String
+  path String
+  sha256 String
+  size Int
+  year Int?
+  draft ActorFormDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  @@unique([draftId, kind])
+  @@map("actor_form_draft_files")
+}
+
+model CertificadoManifiesto {
+  id String @id
+  manifiestoId String
+  autorId String
+  tipo String
+  numero String @unique
+  finalKey String?
+  documento Json
+  pdf Bytes
+  pdfSha256 String
+  firmaImagen String
+  firmaSha256 String
+  solicitudSha256 String
+  createdAt DateTime @default(now())
+  manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Restrict)
+  autor Usuario @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  @@unique([manifiestoId, finalKey])
+  @@index([manifiestoId, createdAt])
+  @@map("certificados_manifiesto")
+}
+
 model Empresa {
   id String @id @default(cuid())
   cuit String @unique
@@ -1497,4 +1677,14 @@ model FuentePadronEmpresa {
   createdAt DateTime @default(now())
   @@unique([sha256, hoja, fila])
   @@map("empresas_fuentes_padron")
+}
+
+// Short-lived shared admission counters; no account identifiers are stored.
+model RateLimitCounter {
+  key     String   @id
+  hits    Int
+  resetAt DateTime @db.Timestamptz(3)
+
+  @@index([resetAt])
+  @@map("rate_limit_counters")
 }

@@ -5,16 +5,18 @@
  * Pure mousedown/mousemove drag — no external libraries.
  */
 
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   GripVertical, X, Minus, Maximize2,
-  ArrowRight, Package, MapPin, Truck, CheckCircle,
+  ArrowRight, Package, Truck, CheckCircle,
   FileText, Zap, FlaskConical, Box,
 } from 'lucide-react';
 import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
 import { formatTimeShort } from '../utils/formatters';
 import type { EnTransitoItem } from '../api/monitor-api';
 import { MonitorActorRow } from './MonitorActorRow';
+import { MonitorPosition } from './MonitorPosition';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,7 @@ export interface ManifiestoFPData {
 export type ViajeFPData = EnTransitoItem;
 
 export interface FloatingPanel {
+  context?: string;
   id: string;
   type: FPType;
   data: ManifiestoFPData | ViajeFPData;
@@ -79,9 +82,9 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
           className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
           style={{ backgroundColor: color + '20' }}
         >
-          {tipo || 'EVENTO'}
+          {manifestEventLabel(tipo)}
         </span>
-        <span className="text-[10px] font-mono text-neutral-400 tabular-nums">
+        <span className="shrink-0 whitespace-nowrap text-[10px] font-mono text-neutral-600 tabular-nums">
           {formatTimeShort(data.timestamp)}
         </span>
       </div>
@@ -159,8 +162,8 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       )}
 
       {/* Description */}
-      <p className="text-[10px] text-neutral-400 truncate border-t border-black/5 pt-1.5">
-        {data.descripcion}
+      <p className="break-words text-xs leading-relaxed text-neutral-700 border-t border-black/5 pt-1.5">
+        {manifestEventDescription(tipo, data.descripcion)}
       </p>
     </div>
   );
@@ -168,11 +171,11 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
 
 // ─── ViajeContent ─────────────────────────────────────────────────────────────
 
-const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
-  const vel = data.ultimaPosicion?.velocidad;
+const ViajeContent: React.FC<{ data: ViajeFPData; now?: number }> = ({ data, now }) => {
 
   return (
     <div className="space-y-2.5">
+      {data.esHistorial && <p className="text-xs text-neutral-700">Historial · detalle al abrir</p>}
       {/* Manifest number */}
       <p className="text-2xl font-black font-mono text-neutral-900 tracking-tight leading-none pl-2"
          style={{ borderLeft: '3px solid #f97316' }}>
@@ -210,26 +213,8 @@ const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
         <span className="text-[10px] text-neutral-600 truncate flex-1">{data.destino.razonSocial || '—'}</span>
       </div>
 
-      {/* GPS status */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1">
-          <MapPin size={10} className="text-neutral-400" />
-          <span className="text-[10px] text-neutral-500">
-            {data.ruta.length > 0 ? `${data.ruta.length} pts GPS` : 'Sin GPS'}
-          </span>
-        </div>
-        {vel != null && vel > 0 && (
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-            <span className="text-[10px] font-mono font-bold text-orange-600">{vel.toFixed(0)} km/h</span>
-          </div>
-        )}
-        {data.ultimaPosicion && (
-          <span className="text-[9px] text-neutral-400 font-mono ml-auto">
-            {formatTimeShort(data.ultimaPosicion.timestamp)}
-          </span>
-        )}
-      </div>
+      <MonitorPosition position={data.ultimaPosicion} now={now} historic={data.esHistorial} />
+      <p className="text-xs text-neutral-600">{data.ruta.length} {data.ruta.length === 1 ? 'punto GPS incluido' : 'puntos GPS incluidos'} en la consulta</p>
 
       {/* Residuos */}
       {data.residuos && data.residuos.length > 0 && (
@@ -259,16 +244,18 @@ const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
 
 const PANEL_TYPE_LABELS: Record<FPType, string> = {
   manifiesto: 'Manifiesto',
-  viaje: 'En Tránsito',
+  viaje: 'Viaje',
 };
 
 const FloatingPanelWindow: React.FC<{
   panel: FloatingPanel;
+  tripState?: 'current' | 'stale' | 'absent';
+  now?: number;
   onClose: () => void;
   onBringToFront: () => void;
   onMove: (pos: { x: number; y: number }) => void;
   onMinimize: () => void;
-}> = ({ panel, onClose, onBringToFront, onMove, onMinimize }) => {
+}> = ({ panel, tripState, now, onClose, onBringToFront, onMove, onMinimize }) => {
   const dragCleanup=useRef<(()=>void)|null>(null);
   useEffect(()=>()=>dragCleanup.current?.(),[]);
 
@@ -334,7 +321,10 @@ const FloatingPanelWindow: React.FC<{
       {!panel.minimized && (
         <div className="fp-content">
           {panel.type === 'manifiesto' && <ManifiestoContent data={panel.data as ManifiestoFPData} />}
-          {panel.type === 'viaje' && <ViajeContent data={panel.data as ViajeFPData} />}
+          {panel.type === 'viaje' && <>
+            {tripState === 'stale' && <p role="status" className="mb-3 rounded bg-amber-50 p-2 text-xs text-amber-900">Sin actualizar. Se muestra la última lectura recibida; no confirma la ubicación actual.</p>}
+            {tripState === 'absent' ? <div className="space-y-2 text-sm text-neutral-800"><p className="font-semibold">{(panel.data as ViajeFPData).numero}</p><p role="status">Este viaje ya no figura en tránsito en la última consulta. Su ausencia no confirma entrega ni finalización.</p></div> : <ViajeContent data={panel.data as ViajeFPData} now={now} />}
+          </>}
         </div>
       )}
     </div>
@@ -345,16 +335,21 @@ const FloatingPanelWindow: React.FC<{
 
 export const FloatingPanelLayer: React.FC<{
   panels: FloatingPanel[];
+  liveTrips?: EnTransitoItem[];
+  liveCurrent?: boolean;
+  now?: number;
   onClose: (id: string) => void;
   onBringToFront: (id: string) => void;
   onMove: (id: string, pos: { x: number; y: number }) => void;
   onMinimize: (id: string) => void;
-}> = ({ panels, onClose, onBringToFront, onMove, onMinimize }) => (
+}> = ({ panels, liveTrips, liveCurrent = true, now, onClose, onBringToFront, onMove, onMinimize }) => (
   <div className="fp-layer">
     {panels.map(panel => (
       <FloatingPanelWindow
         key={panel.id}
-        panel={panel}
+        panel={panel.type === 'viaje' && liveTrips?.some(trip => trip.manifiestoId === (panel.data as ViajeFPData).manifiestoId) ? { ...panel, data: liveTrips.find(trip => trip.manifiestoId === (panel.data as ViajeFPData).manifiestoId)! } : panel}
+        tripState={liveTrips === undefined ? undefined : !liveCurrent ? 'stale' : liveTrips.some(trip => trip.manifiestoId === (panel.data as ViajeFPData).manifiestoId) ? 'current' : 'absent'}
+        now={now}
         onClose={() => onClose(panel.id)}
         onBringToFront={() => onBringToFront(panel.id)}
         onMove={pos => onMove(panel.id, pos)}
@@ -366,7 +361,7 @@ export const FloatingPanelLayer: React.FC<{
 
 // ─── useFloatingPanels hook ───────────────────────────────────────────────────
 
-export function useFloatingPanels() {
+export function useFloatingPanels(context = '') {
   const [panels, setPanels] = useState<FloatingPanel[]>([]);
   const topZRef = useRef(1100);
 
@@ -381,19 +376,19 @@ export function useFloatingPanels() {
       if (existing) {
         topZRef.current++;
         const z = topZRef.current;
-        return prev.map(p => p.id === id ? { ...p, zIndex: z, minimized: false } : p);
+        return prev.map(p => p.id === id ? { ...p, data, context, zIndex: z, minimized: false } : p);
       }
       // New panel — stagger position
       const offset = (prev.length % 5) * 28;
       topZRef.current++;
       return [...prev, {
-        id, type, data,
+        id, type, data, context,
         pos: { x: Math.max(8, Math.min(12 + offset, window.innerWidth - 288)), y: 12 + offset },
         zIndex: topZRef.current,
         minimized: false,
       }];
     });
-  }, []);
+  }, [context]);
 
   const closePanel = useCallback((id: string) => {
     setPanels(p => p.filter(x => x.id !== id));
@@ -413,5 +408,5 @@ export function useFloatingPanels() {
     setPanels(p => p.map(x => x.id === id ? { ...x, minimized: !x.minimized } : x));
   }, []);
 
-  return { panels, openPanel, closePanel, bringToFront, movePanel, minimizePanel };
+  return { panels: panels.filter(panel => panel.context === context), openPanel, closePanel, bringToFront, movePanel, minimizePanel };
 }

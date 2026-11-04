@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from './ui/Input';
 import { NativeSelect } from './ui/NativeSelect';
 import { Button } from './ui/ButtonV2';
 
 export type CompanySummary={id:string;cuit:string;razonSocial:string};
 export type CompanyPagination={page:number;limit:number;total:number;totalPages:number};
-export function CompanyPicker({companies,selected,pagination,busy,onChoose,onSearch,onPage}:{
- companies:CompanySummary[];selected?:CompanySummary;pagination:CompanyPagination;busy:boolean;
+export function CompanyPicker({companies,selected,pagination,busy,onChoose,onSearch,onPage,appliedSearch=''}:{
+ appliedSearch?:string;companies:CompanySummary[];selected?:CompanySummary;pagination:CompanyPagination;busy:boolean;
  onChoose:(id:string)=>void;onSearch:(search:string)=>void;onPage:(page:number)=>void;
 }) {
- const [search,setSearch]=useState('');
+ const [search,setSearch]=useState(appliedSearch);
+ useEffect(()=>setSearch(appliedSearch),[appliedSearch]);
  // Keep the selected record visible even when it is outside the current search/page.
  const options=selected&&!companies.some(c=>c.id===selected.id)?[selected,...companies]:companies;
  const {page,limit,total,totalPages}=pagination;
@@ -20,14 +21,14 @@ export function CompanyPicker({companies,selected,pagination,busy,onChoose,onSea
    <Button type="submit" disabled={busy}>Buscar</Button>
    {search&&<Button type="button" variant="outline" disabled={busy} onClick={()=>{setSearch('');onSearch('');}}>Limpiar búsqueda</Button>}
   </form>
-  {options.length>0&&<NativeSelect label="Empresa" value={selected?.id||''} onChange={onChoose}>{options.map(c=><option key={c.id} value={c.id}>{c.razonSocial} · {c.cuit}</option>)}</NativeSelect>}
+  {options.length>0&&<NativeSelect label="Empresa" value={selected?.id||''} onChange={onChoose}>{!selected&&<option value="" disabled>Elegí una empresa</option>}{options.map(c=><option key={c.id} value={c.id}>{c.razonSocial} · {c.cuit}</option>)}</NativeSelect>}
   <div className="flex flex-wrap items-center justify-between gap-2">
    <p className="text-sm text-neutral-600" role="status" aria-live="polite">{busy?'Consultando empresas…':total===0?'Sin coincidencias':`${start}–${end} de ${total} empresas`}</p>
-   <nav className="flex items-center gap-2" aria-label="Páginas de empresas">
+   {totalPages>1&&<nav className="flex items-center gap-2" aria-label="Páginas de empresas">
     <Button type="button" variant="outline" disabled={busy||page<=1} onClick={()=>onPage(page-1)}>Anterior</Button>
     <span className="whitespace-nowrap text-sm">{page} / {totalPages}</span>
     <Button type="button" variant="outline" disabled={busy||page>=totalPages} onClick={()=>onPage(page+1)}>Siguiente</Button>
-   </nav>
+   </nav>}
   </div>
  </section>;
 }

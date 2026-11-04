@@ -75,7 +75,7 @@ test('carrier and modality changes clear only fleet selections and never infer r
   await page.getByRole('button', { name: 'Vehículo (opcional)', exact: true }).click();
   await expect(page.getByRole('option', { name: /^QA002ZZ/ })).toHaveCount(0);
   await page.getByRole('option', { name: /^QA0002/ }).click();
-  await page.getByRole('button', { name: /In Situ/ }).click();
+  await page.getByRole('button', { name: /^En origen/ }).click();
   await expect(page.getByRole('button', { name: 'Vehículo (opcional)', exact: true })).toHaveCount(0);
   await choose(page, 'Operador / Destino *', /^QA Operador 1 /);
   const creation = page.waitForResponse(r => r.url().endsWith('/api/manifiestos') && r.request().method() === 'POST');

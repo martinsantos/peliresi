@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Operador Hooks
  */
@@ -12,18 +13,21 @@ const KEYS = {
 };
 
 export function useOperadores(filters?: ActorFilters) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.operadores(filters),
+    queryKey: [...KEYS.operadores(filters), owner],
     queryFn: () => actoresService.listOperadores(filters),
     staleTime: 60_000,
+    enabled: Boolean(owner),
   });
 }
 
 export function useOperador(id: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.operador(id),
+    queryKey: [...KEYS.operador(id), owner],
     queryFn: () => actoresService.getOperador(id),
-    enabled: !!id,
+    enabled: Boolean(owner && id),
   });
 }
 

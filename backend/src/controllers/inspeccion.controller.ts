@@ -1,4 +1,10 @@
+import { validateInspectionMap } from '../services/inspectionMap.service';
+import { inspectionCurrentSignatures } from '../domain/inspectionSignature';
+import { createInspectionAgendaNotices, recordInspectionScheduleChange, INSPECTION_AGENDA_LABELS, type InspectionAgendaEvent } from '../services/inspectionAgendaNotice.service';
 import fs from 'fs';
+import { inspectionFieldExtensions } from '../domain/inspectionFieldModel';
+import { intakeScope } from '../domain/inspectionIntake';
+import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import type { NextFunction, Request, Response } from 'express';
 import {
   EstadoInspeccion,
@@ -10,6 +16,7 @@ import {
 } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { inspectionFollowUp, inspectionFollowUpSelect } from '../services/inspectionFollowUp.service';
 import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
 import type { AuthRequest } from '../middlewares/auth.middleware';
@@ -68,7 +75,7 @@ export const CHECKLIST_BY_ACTOR: Record<TipoActorInspeccion, ChecklistDefinition
   ],
 };
 
-const inspectionInclude = {
+export const inspectionInclude = {
   inspector: { select: { id: true, nombre: true, apellido: true, email: true, esInspector: true } },
   generador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, activo: true } },
   transportista: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, activo: true } },
@@ -128,6 +135,7 @@ const ENVIRONMENTAL_CHECKLIST: Record<'PETROLEO' | 'AIRE', ChecklistDefinition[]
 };
 
 export const actaDataSchema = z.object({
+  ...inspectionFieldExtensions,
   codigoPostal: z.string().trim().max(20).optional(),
   departamento: z.string().trim().max(120).optional(),
   calle: z.string().trim().max(200).optional(),
@@ -269,12 +277,12 @@ export function hasSingleEvidenceTarget(targets: Array<string | null | undefined
 }
 
 function isAuthorizedAdmin(user: any): boolean {
-  return ADMIN_ROLES.has(String(user?.rol));
+  return Boolean(user?.esJefeInspecciones) || ADMIN_ROLES.has(String(user?.rol));
 }
 
 function isSectorReviewer(user: any, tipoActor?: TipoActorInspeccion | null): boolean {
   if (!isAuthorizedAdmin(user)) return false;
-  return user.rol === 'ADMIN' || user.rol === `ADMIN_${tipoActor}`;
+  return Boolean(user.esJefeInspecciones) || user.rol === 'ADMIN' || user.rol === `ADMIN_${tipoActor}`;
 }
 
 type InspectionAccessTarget = {
@@ -289,7 +297,7 @@ type InspectionAccessTarget = {
  */
 export function canAccessInspection(user: any, inspection: InspectionAccessTarget): boolean {
   const role = String(user?.rol || '');
-  if (role === 'ADMIN') return true;
+  if (role === 'ADMIN' || user?.esJefeInspecciones) return true;
   if (role.startsWith('ADMIN_')) return role === `ADMIN_${inspection.tipoActor}`;
   return Boolean(user?.esInspector) && user?.id === inspection.inspectorId;
 }
@@ -363,6 +371,9 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const estado = req.query.estado && Object.values(EstadoInspeccion).includes(req.query.estado as EstadoInspeccion)
       ? req.query.estado as EstadoInspeccion : undefined;
+    // Multi-state navigation is applied before pagination, under the same scope.
+    const estados = req.query.estados === undefined ? undefined : z.string().transform((value) => value.split(','))
+      .pipe(z.array(z.nativeEnum(EstadoInspeccion)).min(1).max(Object.values(EstadoInspeccion).length)).parse(req.query.estados);
     const tipoActor = req.query.tipoActor && Object.values(TipoActorInspeccion).includes(req.query.tipoActor as TipoActorInspeccion)
       ? req.query.tipoActor as TipoActorInspeccion : undefined;
     const actorId = String(req.query.actorId || '').trim();
@@ -388,7 +399,9 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
         ],
       } : {}),
     };
-    const where: Prisma.InspeccionWhereInput = { ...baseWhere, ...(estado ? { estado } : {}) };
+    const where: Prisma.InspeccionWhereInput = { ...baseWhere,
+      ...(estados ? { estado: { in: estados.filter((value) => !estado || value === estado) } } : estado ? { estado } : {}),
+    };
     const [items, total, groupedStates, openDeadlines] = await prisma.$transaction([
       prisma.inspeccion.findMany({
         where,
@@ -401,6 +414,7 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
           transportista: { select: { id: true, razonSocial: true, cuit: true } },
           operador: { select: { id: true, razonSocial: true, cuit: true } },
           _count: { select: { items: true, evidencias: true, eventos: true } },
+          intercambios: { select: inspectionFollowUpSelect },
         },
       }),
       prisma.inspeccion.count({ where }),
@@ -408,15 +422,19 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
       prisma.inspeccion.count({
         where: {
           ...baseWhere,
-          plazoRespuestaAt: { gt: new Date() },
           estado: { in: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION'] },
+          intercambios: { some: {
+            tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', destinatario: 'INSPECCIONADO',
+            plazoRespuestaAt: { gte: new Date() },
+            respuestas: { none: { parte: 'INSPECCIONADO', tipo: { in: ['RESPUESTA', 'DESCARGO', 'SUBSANACION'] } } },
+          } },
         },
       }),
     ]);
     res.json({
       success: true,
       data: {
-        items,
+        items: items.map(({ intercambios, ...inspection }) => ({ ...inspection, seguimiento: inspectionFollowUp(inspection.estado, intercambios || []) })),
         total,
         page,
         limit,
@@ -529,6 +547,16 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
         }
       }
       const numero = await nextInspectionNumber(tx, input.tipoActor, input.tipoInspeccion);
+      const antecedent = input.antecedenteId ? await tx.antecedenteFiscalizacion.findFirst({ where: { AND: [{ id: input.antecedenteId }, intakeScope(req.user)] } }) : null;
+      if (input.antecedenteId) {
+        if (!isAuthorizedAdmin(req.user) || req.user.impersonatedBy) throw new AppError('La administración competente decide la apertura desde un antecedente', 403);
+        if (!antecedent) throw new AppError('Antecedente no encontrado', 404);
+        if (!['PENDIENTE', 'EN_EVALUACION'].includes(antecedent.estado)) throw new AppError('El antecedente ya fue resuelto; actualizá la cola', 409);
+        assertIntakeInspection(antecedent, { tipoActor: input.tipoActor || null, generadorId: input.tipoActor === 'GENERADOR' ? input.actorId || null : null,
+          transportistaId: input.tipoActor === 'TRANSPORTISTA' ? input.actorId || null : null, operadorId: input.tipoActor === 'OPERADOR' ? input.actorId || null : null });
+        if (!input.tipoActor && req.user.rol !== 'ADMIN') throw new AppError('Un externo sin responsable vinculado requiere jefatura general', 403);
+        if (!input.tipoActor && inspectionType !== 'ESPONTANEA') throw new AppError('Un externo sin identidad se abre como hallazgo espontáneo', 400);
+      }
       const snapshot = input.tipoActor && input.actorId ? await buildDeclaredInspectionSnapshot(tx, input.tipoActor, input.actorId) : null;
       const inspection = await tx.inspeccion.create({
         data: {
@@ -557,16 +585,19 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
           },
         },
       });
-      await tx.eventoInspeccion.create({
-        data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'CREADA', titulo: 'Inspeccion creada' },
+      const createdEvent = await tx.eventoInspeccion.create({
+        data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'CREADA', titulo: 'Inspeccion creada', metadata: { avisoAgenda: input.fechaProgramada ? 'PROGRAMADA' : 'CREADA' } },
       });
-      if (inspectorId !== req.user.id || input.fechaProgramada) {
-        await tx.notificacion.create({ data: {
-          usuarioId: inspectorId, tipo: 'INFO_GENERAL', titulo: `Inspección asignada · ${numero}`,
-          mensaje: input.fechaProgramada ? 'Tiene una inspección programada. Revise la fecha y el expediente.' : 'Tiene una nueva inspección asignada.',
-          datos: JSON.stringify({ inspeccionId: inspection.id, evento: 'ASIGNADA' }),
+      if (antecedent) {
+        const linked = await tx.antecedenteFiscalizacion.updateMany({ where: { id: antecedent.id, version: antecedent.version, estado: { in: ['PENDIENTE', 'EN_EVALUACION'] } }, data: {
+          inspeccionId: inspection.id, estado: 'VINCULADA', version: { increment: 1 }, eventos: [...antecedent.eventos as Prisma.JsonArray,
+            { id: input.clienteId || inspection.id, accion: 'VINCULADA', motivo: 'Apertura de expediente desde el antecedente', autorId: req.user.id, fecha: new Date().toISOString(), version: antecedent.version, inspeccionId: inspection.id }],
         } });
+        if (linked.count !== 1) throw new AppError('Otro administrador evaluó el antecedente; actualizá', 409);
+        await tx.eventoInspeccion.create({ data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'ANTECEDENTE_VINCULADO', titulo: 'Origen del expediente: antecedente de fiscalización', visibleActor: false,
+          detalle: antecedent.referencia, metadata: { antecedenteId: antecedent.id, origen: antecedent.origen, origenId: antecedent.origenId, huellaEvidencia: antecedent.huellaEvidencia } } });
       }
+      await createInspectionAgendaNotices(tx, inspection, { evento: input.fechaProgramada ? 'PROGRAMADA' : 'CREADA', eventoId: createdEvent.id, autorId: req.user.id, assignedSelf: Boolean(input.fechaProgramada && inspectorId === req.user.id) });
       return inspection;
     });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: created.id }, include: inspectionInclude });
@@ -642,14 +673,17 @@ export async function agregarEventoInspeccion(req: AuthRequest, res: Response, n
 export async function actualizarInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = updateSchema.parse(req.body);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true, estado: true, version: true } });
+    await validateInspectionMap(input.datosActa?.ubicacionCampo?.mapaImagen);
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { id: true, numero: true, inspectorId: true, tipoActor: true, estado: true, version: true, fechaProgramada: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
     const { version, datosActa, informeTecnico, ...fields } = input;
-    const result = await prisma.inspeccion.updateMany({
+    await prisma.$transaction(async tx => {
+    const result = await tx.inspeccion.updateMany({
       where: { id: req.params.id, version, estado: { in: Array.from(EDITABLE_STATES) } },
       data: {
         ...fields,
+        ...(datosActa?.ubicacionCampo ? { latitud: datosActa.ubicacionCampo.latitud, longitud: datosActa.ubicacionCampo.longitud } : {}),
         datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
         informeTecnico: informeTecnico === undefined ? undefined : informeTecnico === null ? Prisma.DbNull : informeTecnico as Prisma.InputJsonValue,
         fechaProgramada: fields.fechaProgramada === undefined ? undefined : fields.fechaProgramada ? new Date(fields.fechaProgramada) : null,
@@ -658,6 +692,8 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
       },
     });
     if (result.count !== 1) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
+    await recordInspectionScheduleChange(tx, inspection, fields.fechaProgramada, req.user.id, version);
+    });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
     res.json({ success: true, data: full });
   } catch (error) { next(error); }
@@ -666,9 +702,10 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
 export async function guardarBorradorInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = draftSchema.parse(req.body);
+    await validateInspectionMap(input.datosActa?.ubicacionCampo?.mapaImagen);
     const inspection = await prisma.inspeccion.findUnique({
       where: { id: req.params.id },
-      select: { inspectorId: true, tipoActor: true, estado: true, version: true },
+      select: { id: true, numero: true, inspectorId: true, tipoActor: true, estado: true, version: true, fechaProgramada: true },
     });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
@@ -697,7 +734,8 @@ export async function guardarBorradorInspeccion(req: AuthRequest, res: Response,
         where: { id: req.params.id },
         data: {
           ...fields,
-          datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
+          ...(datosActa?.ubicacionCampo ? { latitud: datosActa.ubicacionCampo.latitud, longitud: datosActa.ubicacionCampo.longitud } : {}),
+        datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
           informeTecnico: informeTecnico === undefined ? undefined : informeTecnico === null ? Prisma.DbNull : informeTecnico as Prisma.InputJsonValue,
           fechaProgramada: fields.fechaProgramada === undefined ? undefined : fields.fechaProgramada ? new Date(fields.fechaProgramada) : null,
           plazoRespuestaAt: fields.plazoRespuestaAt === undefined ? undefined : fields.plazoRespuestaAt ? new Date(fields.plazoRespuestaAt) : null,
@@ -739,6 +777,7 @@ export async function guardarBorradorInspeccion(req: AuthRequest, res: Response,
           metadata: { schemaVersion: 1, versionBase: version, versionNueva: version + 1, itemIds, comparacionIds, contenidoSha256: hashCanonicalPayload(input) },
         },
       });
+      await recordInspectionScheduleChange(tx, inspection, fields.fechaProgramada, req.user.id, version);
       return tx.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
     });
     res.json({ success: true, data: full });
@@ -897,7 +936,7 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
         },
       });
       if (updated.count !== 1) throw new AppError('La inspeccion cambio mientras se procesaba la accion', 409);
-      await tx.eventoInspeccion.create({
+      const stateEvent = await tx.eventoInspeccion.create({
         data: {
           inspeccionId: inspection.id,
           usuarioId: req.user.id,
@@ -908,14 +947,18 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
           estadoHasta: input.estado,
           visibleActor: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION', 'CERRADA_CONFORME', 'DERIVADA_LEGALES', 'FINALIZADA'].includes(input.estado),
           metadata: fieldClosureSnapshot ? {
+            avisoAgenda: input.estado,
             schemaVersion: 1,
             versionBase: input.version,
             versionNueva: input.version + 1,
             actaSha256: hashCanonicalPayload(fieldClosureSnapshot),
             actaSnapshot: fieldClosureSnapshotJson,
-          } as Prisma.InputJsonValue : undefined,
+          } as Prisma.InputJsonValue : { avisoAgenda: input.estado },
         },
       });
+      if (Object.prototype.hasOwnProperty.call(INSPECTION_AGENDA_LABELS, input.estado)) {
+        await createInspectionAgendaNotices(tx, inspection, { evento: input.estado as InspectionAgendaEvent, eventoId: stateEvent.id, autorId: req.user.id });
+      }
     });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, include: inspectionInclude });
     res.json({ success: true, data: full, message: 'Estado actualizado. No se envio ninguna comunicacion externa.' });
@@ -1128,7 +1171,7 @@ export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, 
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanAccess(req, inspection);
-    await streamInspectionActPdf(res, inspection, resolveInspectionEvidence);
+    await streamInspectionActPdf(res, { ...inspection, firmasCapturadas: inspectionCurrentSignatures(inspection) }, resolveInspectionEvidence);
   } catch (error) { next(error); }
 }
 
@@ -1167,4 +1210,21 @@ export async function descargarEvidencia(req: AuthRequest, res: Response, next: 
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(evidence.nombreOriginal)}`);
     res.sendFile(filePath);
   } catch (error) { next(error); }
+}
+
+export async function describirEvidencia(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = z.object({ version: z.number().int().positive(), descripcion: z.string().trim().max(2000) }).strict().parse(req.body);
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id } });
+    if (!inspection) throw new AppError('Inspección no encontrada', 404); assertCanEdit(req, inspection);
+    const evidence = await prisma.evidenciaInspeccion.findFirst({ where: { id: req.params.evidenciaId, inspeccionId: inspection.id, anuladaAt: null, intercambioId: null, tipo: 'FOTO' } });
+    if (!evidence) throw new AppError('Fotografía de campo no encontrada', 404);
+    await prisma.$transaction(async tx => {
+      await reserveFieldMutation(tx, inspection.id, input.version);
+      const changed = await tx.evidenciaInspeccion.updateMany({ where: { id: evidence.id, inspeccionId: inspection.id, anuladaAt: null, intercambioId: null }, data: { descripcion: input.descripcion || null } });
+      if (!changed.count) throw new AppError('La fotografía cambió; actualizá antes de continuar.', 409);
+      await tx.eventoInspeccion.create({ data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'EVIDENCIA_DESCRIPCION', titulo: 'Descripción de fotografía actualizada', metadata: { evidenciaId: evidence.id, anterior: evidence.descripcion, nueva: input.descripcion, archivoSha256: evidence.sha256 } } });
+    });
+    res.json({ success: true, data: { descripcion: input.descripcion, version: input.version + 1 } });
+  } catch (e) { next(e); }
 }

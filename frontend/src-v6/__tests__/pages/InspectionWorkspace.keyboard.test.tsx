@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionWorkspace } from '../../pages/inspecciones/InspectionWorkspace';
@@ -14,6 +14,38 @@ function setup() {
 describe('inspection workspace follows the keyboard without floating save controls', () => {
   beforeEach(() => { vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; }); });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  it('scrolls identity, recovery and navigation with the page and preserves each section position', () => {
+    const viewport = new VisibleViewport(); vi.stubGlobal('visualViewport', viewport);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return { top: this.hasAttribute('data-inspection-page-scroll') ? 80 : 380, height: 600 } as DOMRect;
+    });
+    render(<MemoryRouter><div data-testid="page" data-inspection-page-scroll data-inspection-scroll>
+      <header>Identidad y copias anteriores</header>
+      <InspectionWorkspace pageScroll guided defaultStep="acta" onBeforeNavigate={() => true}
+        steps={[
+          { id: 'acta', label: 'Registro', title: 'Observaciones', description: '', content: <textarea aria-label="Nota" /> },
+          { id: 'resumen', label: 'Visita', title: 'Visita', description: '', content: <p>Datos de visita</p> },
+        ]} reference={[]} saveAction={<button>Guardar cambios</button>} />
+    </div></MemoryRouter>);
+    const page = screen.getByTestId('page'), content = screen.getByTestId('inspection-scroll-region');
+    expect(page.style.maxHeight).toBe('');
+    expect(screen.getByTestId('inspection-workspace').style.maxHeight).toBe('');
+    expect(content).not.toHaveAttribute('data-inspection-scroll');
+    expect(content.className).not.toContain('overflow-y-auto');
+    expect(screen.getByTestId('inspection-navigation').className).not.toContain('sticky');
+    const note = screen.getByRole('textbox', { name: 'Nota' });
+    fireEvent.change(note, { target: { value: 'Texto conservado' } });
+    page.scrollTop = 240; fireEvent.scroll(page);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getByRole('link', { name: 'Visita y lugar' }));
+    expect(page.scrollTop).toBe(0);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getByRole('link', { name: 'Constataciones' }));
+    expect(page.scrollTop).toBe(240);
+    expect(screen.getByRole('textbox', { name: 'Nota' })).toBe(note);
+    expect(note).toHaveValue('Texto conservado');
+    act(() => { viewport.height = 400; viewport.dispatchEvent(new Event('resize')); });
+    expect(page.style.maxHeight).toBe('');
+    expect(note).toHaveValue('Texto conservado');
+  });
   it('caps the complete panel at the actual visible bottom, including viewport panning', () => {
     const viewport = new VisibleViewport(); vi.stubGlobal('visualViewport', viewport);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 100 } as DOMRect);
@@ -76,9 +108,10 @@ describe('inspection workspace follows the keyboard without floating save contro
     expect(panel.className).toContain('overflow-y-auto');
     expect(content.className).toContain('shrink-0 overflow-visible');
     expect(screen.getByTestId('inspection-navigation').className).not.toContain('sticky');
-    // Regression: the real Android keyboard left Save below the scrolled
-    // editor after the success notice changed the available height.
-    expect(screen.getByTestId('inspection-action-bar')).toHaveClass('sticky', 'bottom-0', 'z-20');
+    // Save occupies its own space in the same scroll surface; it must not overlay the editor.
+    expect(screen.getByTestId('inspection-action-bar')).toHaveClass('shrink-0');
+    expect(screen.getByTestId('inspection-action-bar').className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     panel.scrollTop = 37; fireEvent.scroll(panel);
     // Parent layout can settle after the visualViewport event. Observe that
     // geometry rather than retaining the obsolete keyboard cap indefinitely.

@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { GpsStatusPanel } from '../../../components/mobile/GpsStatusPanel';
 
 describe('GpsStatusPanel', () => {
@@ -18,9 +18,32 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByText('GPS activo')).toBeInTheDocument();
     expect(screen.getByText(/-32.92871, -68.85352/)).toBeInTheDocument();
     expect(screen.getByText('3 pendientes')).toBeInTheDocument();
+    expect(screen.getByText('Sin confirmar')).toBeInTheDocument();
+    expect(screen.queryByText('Sin enviar')).not.toBeInTheDocument();
   });
 
-  it('shows Android recovery guidance when GPS is denied', () => {
+  it('offers a direct retry for a saved point without claiming that it was never sent', () => {
+    const retrySend = vi.fn();
+    const props = { status: 'acquiring' as const, sendStatus: 'error' as const,
+      sendError: 'No se pudo confirmar el envío de las ubicaciones.', position: null,
+      details: { accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null },
+      pendingCount: 1, lastSyncAt: null, onRetrySend: retrySend };
+    const view = render(<GpsStatusPanel {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar envío GPS', exact: true }));
+    expect(retrySend).toHaveBeenCalledOnce();
+    view.rerender(<GpsStatusPanel {...props} retryingSend />);
+    expect(screen.getByRole('button', { name: 'Comprobando envío GPS', exact: true })).toBeDisabled();
+  });
+
+  it('labels the confirmation using the device clock rather than a server receipt time', () => {
+    render(<GpsStatusPanel status="active" sendStatus="ok" position={[-33, -69]}
+      details={{ accuracy: 10, speed: null, heading: null, altitude: null, lastUpdate: null }}
+      pendingCount={0} lastSyncAt={new Date('2026-11-01T12:00:00Z')} />);
+    expect(screen.getByText(/Última confirmación .*hora de este dispositivo/)).toBeVisible();
+    expect(screen.queryByText(/Última recepción/)).not.toBeInTheDocument();
+  });
+
+  it('shows one GPS permission status, a direct retry and optional recovery guidance', () => {
     render(
       <GpsStatusPanel
         status="denied"
@@ -29,11 +52,99 @@ describe('GpsStatusPanel', () => {
         details={{ accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null }}
         pendingCount={0}
         lastSyncAt={null}
+        onRetry={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('Permiso GPS denegado')).toBeInTheDocument();
-    expect(screen.getByText('Permiso de ubicacion bloqueado')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Permiso GPS denegado');
+    expect(screen.getByRole('button', { name: 'Reintentar GPS', exact: true })).toBeVisible();
+    expect(screen.queryByText('Permiso de ubicación bloqueado')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Cómo habilitar la ubicación'));
+    expect(screen.getByText('Permiso de ubicación bloqueado')).toBeVisible();
+    expect(screen.getByText(/permisos de ubicación de SITREP en el navegador o teléfono/)).toBeVisible();
+  });
+
+  it('uses the singular for one point waiting to be sent', () => {
+    render(<GpsStatusPanel status="active" sendStatus="error" position={[-33,-69]}
+      details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} />);
+    expect(screen.getByText('1 pendiente')).toBeInTheDocument();
+  });
+
+  it('offers a direct retry when GPS is active but its storage failed', () => {
+    const retry = vi.fn();
+    render(<GpsStatusPanel status="active" sendStatus="error" position={[-33,-69]}
+      details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} storageError storageIssue="storage" onRetry={retry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar guardado', exact: true }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('explains when older positions need review without offering an ineffective GPS retry', () => {
+    render(<GpsStatusPanel status="error" sendStatus="error" position={null}
+      details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={0} lastSyncAt={null} storageError storageIssue="unscoped" onRetry={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('sin actividad identificada');
+    expect(screen.getByRole('alert')).toHaveTextContent('contactá a soporte');
+    expect(screen.queryByRole('button', {name:'Reintentar GPS'})).toBeNull();
+    expect(screen.queryByText('Error GPS')).toBeNull();
+  });
+
+  it('offers a single retry after a GPS permission failure', () => {
+    const retry=vi.fn();
+    const props={status:'denied' as const,sendStatus:'idle' as const,position:null,details:{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null},pendingCount:0,lastSyncAt:null,onRetry:retry};
+    const view=render(<GpsStatusPanel {...props} />);
+    fireEvent.click(screen.getByRole('button',{name:'Reintentar GPS',exact:true}));
+    expect(retry).toHaveBeenCalledOnce();
+    view.rerender(<GpsStatusPanel {...props} retrying />);
+    expect(screen.getByRole('button',{name:'Reintentando GPS',exact:true})).toBeDisabled();
+  });
+
+  it.each(['unavailable','error'] as const)('offers retry when GPS is %s', status => {
+    const retry=vi.fn();
+    render(<GpsStatusPanel status={status} sendStatus="idle" position={null}
+      details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={0} lastSyncAt={null} onRetry={retry} />);
+    fireEvent.click(screen.getByRole('button',{name:'Reintentar GPS',exact:true}));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['stale', 'Última ubicación sin actualizar'],
+    ['unknown', 'Hora de ubicación no verificable'],
+  ] as const)('explains a %s device fix and offers one retry', (status, label) => {
+    const retry = vi.fn();
+    render(<GpsStatusPanel status={status} sendStatus="idle" position={[-33,-69]}
+      details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={0} lastSyncAt={null} onRetry={retry} />);
+    expect(screen.getByRole('status')).toHaveTextContent(label);
+    expect(screen.queryByText('GPS activo')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar GPS' }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('does not present a stopped tracker as active while the trip is paused', () => {
+    render(<GpsStatusPanel status="active" sendStatus="ok" position={[-33,-69]}
+      details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={0} lastSyncAt={new Date()} paused onRetry={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Seguimiento GPS pausado');
+    expect(screen.queryByText('GPS activo')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Reintentar GPS'})).not.toBeInTheDocument();
+  });
+
+  it('keeps a storage failure visible even when the trip is paused', () => {
+    render(<GpsStatusPanel status="active" sendStatus="error" position={null}
+      details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} paused storageError />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar el recorrido');
+    expect(screen.getByRole('alert')).toHaveTextContent('Mantené esta pantalla abierta');
+  });
+
+  it('keeps an actionable upload error visible while the trip is paused', () => {
+    render(<GpsStatusPanel status="active" sendStatus="error" sendError="No se pudo verificar el viaje o el servidor. Contactá a soporte."
+      position={null} details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} paused />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo verificar el viaje o el servidor');
   });
 
   it('reports Android GPS as searching instead of off while waiting for a fix', () => {
@@ -48,8 +159,17 @@ describe('GpsStatusPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Buscando senal GPS')).toBeInTheDocument();
-    expect(screen.getByText('Ubicacion activa. Esperando primer punto GPS del dispositivo.')).toBeInTheDocument();
+    expect(screen.getByText('Buscando señal GPS')).toBeInTheDocument();
+    expect(screen.getByText('Esperando el primer punto GPS del dispositivo.')).toBeInTheDocument();
     expect(screen.queryByText('GPS no disponible')).not.toBeInTheDocument();
   });
+});
+
+
+it('identifies a verified earlier location without claiming a new GPS send', () => {
+  render(<GpsStatusPanel status="acquiring" sendStatus="verified" position={null}
+    details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+    pendingCount={0} lastSyncAt={null} />);
+  expect(screen.getByText('Ubicación anterior confirmada')).toBeVisible();
+  expect(screen.queryByText('Última confirmación')).toBeNull();
 });

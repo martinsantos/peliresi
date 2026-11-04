@@ -9,6 +9,7 @@ export type DomainEvent =
       estadoNuevo: string;
       numero: string;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'INCIDENTE_REGISTRADO';
@@ -16,6 +17,7 @@ export type DomainEvent =
       tipoIncidente: string;
       descripcion: string;
       userId: string;
+      avisosConfirmados?: boolean;
       latitud?: number;
       longitud?: number;
     }
@@ -25,6 +27,7 @@ export type DomainEvent =
       motivo: string;
       numero: string;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'DIFERENCIA_PESO';
@@ -34,14 +37,17 @@ export type DomainEvent =
       delta: string;
       deltaPorcentaje: number;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'ANOMALIA_GPS';
       manifiestoId: string;
+      numero?: string;
       tipoAnomalia: string;
       descripcion: string;
       severidad: string;
-      userId: string;
+      userId?: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'TIEMPO_EXCESIVO';
@@ -49,6 +55,13 @@ export type DomainEvent =
       horasTransito: number;
       numero: string;
       userId: string;
+    }
+  | {
+      type: 'DURACION_TRANSITO_OBSERVADA';
+      manifiestoId: string;
+      horasTransito: number;
+      numero: string;
+      userId?: string;
     }
   | {
       type: 'DESVIO_RUTA';

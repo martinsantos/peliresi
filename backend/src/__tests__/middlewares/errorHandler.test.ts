@@ -19,6 +19,7 @@ function createMocks() {
   const res = {
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
+    setHeader: vi.fn().mockReturnThis(),
   } as unknown as Response;
   const next = vi.fn() as NextFunction;
   return { req, res, next };
@@ -76,6 +77,17 @@ describe('errorHandler middleware', () => {
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
+  it.each(['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'SUPPORT_ACTION_NOT_APPLIED', 'PRIVATE_INTERNAL_CODE'])('exposes only safe recovery codes: %s', code => {
+    process.env.NODE_ENV = 'production';
+    const { req, res, next } = createMocks();
+    const err = new AppError('Revise la presentación', 409);
+    err.code = code;
+    errorHandler(err, req, res, next);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: code === 'PRIVATE_INTERNAL_CODE' ? undefined : code,
+    }));
+  });
+
   it.each(['test', 'production'])('returns a safe 400 for schema validation in %s', (environment) => {
     process.env.NODE_ENV = environment;
     const { req, res, next } = createMocks();
@@ -125,6 +137,36 @@ describe('errorHandler middleware', () => {
         message: 'Recurso no encontrado',
       })
     );
+  });
+
+  it('gives a safe recovery response when a transaction cannot start', () => {
+    process.env.NODE_ENV = 'production';
+    const { req, res, next } = createMocks();
+    const err = new PrismaClientKnownRequestError('Transaction API error', {
+      code: 'P2028', clientVersion: '5.22.0',
+      meta: { error: 'Unable to start a transaction in the given time.' },
+    });
+    errorHandler(err as unknown as AppError, req, res, next);
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '5');
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'TRANSACTION_BUSY', retryAfterSeconds: 5,
+      message: expect.stringContaining('revisá el estado'),
+    }));
+  });
+
+  it('does not imply a safe retry for another transaction error', () => {
+    process.env.NODE_ENV = 'production';
+    const { req, res, next } = createMocks();
+    const err = new PrismaClientKnownRequestError('Transaction already closed', {
+      code: 'P2028', clientVersion: '5.22.0', meta: { error: 'Transaction already closed' },
+    });
+    errorHandler(err as unknown as AppError, req, res, next);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.setHeader).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Error interno del servidor', code: undefined,
+    }));
   });
 
   it('returns 413 with a safe message when an upload exceeds its limit', () => {

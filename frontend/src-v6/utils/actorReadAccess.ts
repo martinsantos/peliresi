@@ -42,10 +42,10 @@ export function canReadActorInspectionHistory(user: Reader, type: ActorReadType)
   return user.esInspector === true;
 }
 
-export function actorInspectionAccess(user: Reader, type: ActorReadType, id?: string): 'staff' | 'participation' | null {
+export function actorInspectionAccess(user: Reader, type: ActorReadType, id?: string): 'staff' | null {
   if (!canReadActorDetail(user, type, id)) return null;
   if (canReadActorInspectionHistory(user, type)) return 'staff';
-  return user?.rol === type && user.actorId === id ? 'participation' : null;
+  return null;
 }
 
 /** Keep React Router's basename; reject external or malformed history state. */

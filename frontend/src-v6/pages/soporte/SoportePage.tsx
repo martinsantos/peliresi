@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, LifeBuoy, Download, UserRoundCheck, LockKeyhole, Search, MessageSquare, ArrowRightLeft, MessageCircleQuestion, CircleCheck, RotateCcw, Tags, Bell } from 'lucide-react';
@@ -9,10 +9,14 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { SupportEntry } from '../../components/SupportReportDialog';
 import { supportService, supportError } from '../../services/support.service';
-import { supportStates, supportCategories, supportTypes, supportPriorities, supportFileAccept, type SupportAction, type SupportMutation, type SupportTicket, type SupportType, type SupportPriority, type SupportCategory } from '../../types/support';
-import { assertSupportSession, supportSessionMatches } from '../../utils/supportSession';
+import { supportStates, supportCategories, supportTypes, supportPriorities, supportFileAccept, type SupportAction, type SupportTicket, type SupportType, type SupportPriority, type SupportCategory } from '../../types/support';
+import { assertSupportSession, supportRequestContext, SupportSessionChangedError, supportSessionMatches } from '../../utils/supportSession';
 import { SupportAudioInput } from '../../components/SupportAudioInput';
 import { SupportAudioPlayer } from '../../components/SupportAudioPlayer';
+import { useSupportCommand } from '../../hooks/useSupportCommand';
+import { useSupportActionDraft } from '../../hooks/useSupportActionDraft';
+import { emptySupportActionDraft, type SupportActionDraft } from '../../services/supportActionDraft';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
 const name = (user: { nombre: string; apellido?: string | null }) => [user.nombre, user.apellido].filter(Boolean).join(' ');
 const date = (value: string) => new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Argentina/Mendoza' }).format(new Date(value));
@@ -27,9 +31,10 @@ export default function SoportePage() {
   const { currentUser } = useAuth();
   const { id } = useParams();
   // A session change must not reuse another user's ticket query or draft.
-  return currentUser ? <SupportWorkspace key={String(currentUser.id)} owner={String(currentUser.id)} id={id} /> : null;
+  const context = inspectionWorkspaceOwner(currentUser);
+  return currentUser ? <SupportWorkspace key={context} owner={String(currentUser.id)} context={context} id={id} /> : null;
 }
-function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
+function SupportWorkspace({ owner, context, id }: { owner: string; context: string; id?: string }) {
   const mp = useMobilePrefix();
   const [scope, setScope] = useState<string | null>(null);
   const [state, setState] = useState('');
@@ -37,12 +42,14 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [triageFilters, setTriageFilters] = useState({ categoria: '', tipo: '', prioridad: '', clasificado: '' });
-  const access = useQuery({ queryKey: ['soporte', owner, 'acceso'], queryFn: supportService.access, retry: false });
+  const access = useQuery({ queryKey: ['soporte', owner, context, 'acceso'], queryFn: supportService.access, retry: false });
   const selectedScope = scope || (access.data?.puedeGestionar ? 'mesa' : 'mis');
-  const list = useQuery({ queryKey: ['soporte', owner, 'lista', selectedScope, state, appliedSearch, page, triageFilters], enabled: !id && access.isSuccess,
+  const list = useQuery({ queryKey: ['soporte', owner, context, 'lista', selectedScope, state, appliedSearch, page, triageFilters], enabled: !id && access.isSuccess,
     queryFn: () => supportService.list({ scope: selectedScope, estado: state || undefined, search: appliedSearch, page, ...triageFilters }), retry: false, refetchInterval: 30000 });
-  const detail = useQuery({ queryKey: ['soporte', owner, 'ticket', id], enabled: !!id, queryFn: () => supportService.get(id!), retry: false, refetchInterval: 30000 });
+  const detail = useQuery({ queryKey: ['soporte', owner, context, 'ticket', id], enabled: !!id, queryFn: () => supportService.get(id!), retry: false, refetchInterval: 30000 });
   const [teamOpen, setTeamOpen] = useState(false);
+  const detailStatus = (detail.error as { response?: { status?: number } } | null)?.response?.status;
+  const accessLost = [401, 403, 404].includes(detailStatus ?? 0);
   return <section aria-label="Soporte de SITREP" className="min-w-0 space-y-5 pb-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><h2 className="flex items-center gap-2 text-2xl font-bold text-neutral-900"><LifeBuoy size={24} className="shrink-0 text-primary-800" />Soporte</h2>
@@ -52,8 +59,9 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
     {access.isError && <p role="alert" className="text-error-700">{supportError(access.error)} <Button variant="outline" onClick={() => void access.refetch()}>Reintentar acceso</Button></p>}
     {id ? <>
       <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-primary-800 hover:bg-primary-50 focus-visible:outline-primary-700" to={mp('/soporte')}><ArrowLeft size={18} />Volver a tickets</Link>
-      {detail.isPending ? <p role="status">Cargando ticket…</p> : detail.isError ? <div role="alert" className="space-y-3 text-error-700"><p>{supportError(detail.error)}</p><Button variant="outline" onClick={() => void detail.refetch()}>Reintentar ticket</Button></div>
-        : <TicketDetail key={detail.data.id} ticket={detail.data} owner={owner} refresh={() => detail.refetch()} />}
+      {detail.isPending && !detail.data ? <p role="status">Cargando ticket…</p> : detail.isError && (!detail.data || accessLost) ? <div role="alert" className="space-y-3 text-error-700"><p>{supportError(detail.error)}</p><Button variant="outline" onClick={() => void detail.refetch()}>Reintentar ticket</Button></div>
+        : detail.data ? <>{detail.isError && <p role="alert" className="text-warning-800">La lectura más reciente falló. Se muestra la última consulta disponible.</p>}
+          <TicketDetail key={detail.data.id} ticket={detail.data} owner={owner} context={context} refresh={detail.refetch} /></> : null}
     </> : <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div role="group" aria-label="Vistas de soporte" className="flex flex-wrap gap-1">
@@ -62,7 +70,7 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
         </div>
         {access.data?.puedeConfigurar && <Button variant="outline" aria-expanded={teamOpen} onClick={() => setTeamOpen(value => !value)}>Equipo de soporte</Button>}
       </div>
-      {teamOpen && access.data?.puedeConfigurar && <TeamSettings owner={owner} />}
+      {teamOpen && access.data?.puedeConfigurar && <TeamSettings owner={owner} context={context} />}
       <form onSubmit={event => { event.preventDefault(); setAppliedSearch(search); setPage(1); }} className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_14rem_auto] md:items-end">
         <Input label="Buscar por número o asunto" maxLength={180} value={search} onChange={event => setSearch(event.target.value)} />
         <Select label="Estado del ticket" value={state} onChange={value => { setState(value); setPage(1); }} options={[{ value: '', label: 'Todos los estados' }, ...Object.entries(supportStates).map(([value, label]) => ({ value, label }))]} />
@@ -93,15 +101,39 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
     </>}
   </section>;
 }
-function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner: string; refresh: () => Promise<unknown> }) {
+type SupportRefresh = () => Promise<{ data: SupportTicket | undefined; isError: boolean }>;
+function TicketDetail({ ticket, owner, context, refresh }: { ticket: SupportTicket; owner: string; context: string; refresh: SupportRefresh }) {
   const mp = useMobilePrefix();
   const query = useQueryClient();
   const [error, setError] = useState('');
-  const changed = async () => {
-    if (!supportSessionMatches(owner)) return;
-    await query.invalidateQueries({ queryKey: ['soporte', owner] });
-    if (supportSessionMatches(owner)) await refresh();
-  };
+  const journal = useSupportCommand({ userId: owner, context, ticketId: ticket.id });
+  const changed = useCallback(async (minimumVersion?: number) => {
+    assertSupportSession(owner);
+    const requestContext = supportRequestContext();
+    if (!requestContext) throw new SupportSessionChangedError();
+    await query.invalidateQueries({ queryKey: ['soporte', owner, context], refetchType: 'none' });
+    if (!supportSessionMatches(owner) || requestContext !== supportRequestContext()) throw new SupportSessionChangedError();
+    const result = await refresh();
+    if (!supportSessionMatches(owner) || requestContext !== supportRequestContext()) throw new SupportSessionChangedError();
+    if (result.isError || !result.data || result.data.id !== ticket.id) throw new Error('No pudimos actualizar el ticket. Conservamos el resultado; reintentá.');
+    if (minimumVersion !== undefined && result.data.version < minimumVersion) throw new Error('El ticket todavía no refleja la acción confirmada. Conservamos el resultado; reintentá.');
+  }, [context, owner, query, refresh, ticket.id]);
+  const confirmation = journal.command?.status === 'confirmed' ? journal.command : null;
+  const confirmedKey = confirmation?.key;
+  const confirmedVersion = confirmation?.receipt?.version;
+  const unverified = !!confirmation && (!confirmation.receipt || confirmation.receipt.id !== ticket.id
+    || !Number.isSafeInteger(confirmedVersion) || ticket.version < confirmation.receipt.version);
+  const automaticRefresh = useQuery({
+    queryKey: ['support-confirmation-refresh', owner, context, ticket.id, confirmedKey, confirmedVersion],
+    enabled: !!confirmation && !journal.busy, retry: false, staleTime: Infinity,
+    refetchOnWindowFocus: false, refetchOnReconnect: false,
+    queryFn: async () => {
+      if (!confirmation?.receipt || confirmation.receipt.id !== ticket.id || !Number.isSafeInteger(confirmedVersion)) throw new Error('Confirmación incompleta');
+      await changed(confirmedVersion);
+      return true;
+    },
+  });
+  const refreshing = !!confirmation && (automaticRefresh.isFetching || (automaticRefresh.isPending && !automaticRefresh.isError));
   const download = async (file: { id: string; nombre: string }) => {
     try {
       assertSupportSession(owner);
@@ -112,17 +144,18 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
     } catch (failure) { setError(supportError(failure)); }
   };
   return <article className="space-y-5">
+    {unverified && <p role={automaticRefresh.isError ? 'alert' : 'status'} className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900">{automaticRefresh.isError ? 'No pudimos actualizar el ticket. La acción sigue confirmada; reintentá para ver sus datos actuales.' : 'Acción confirmada. Actualizando el ticket…'}</p>}
     <header className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap items-center gap-2"><span className="font-mono font-semibold text-primary-800">{ticket.referencia}</span><State ticket={ticket} /></div>
+      <div className="flex flex-wrap items-center gap-2"><span className="font-mono font-semibold text-primary-800">{ticket.referencia}</span>{unverified ? <span className="text-sm text-neutral-700">Pendiente de actualización</span> : <State ticket={ticket} />}</div>
       <h3 className="break-words text-xl font-bold text-neutral-900">{ticket.asunto}</h3>
       <dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-neutral-600">Reportado por</dt><dd className="font-medium text-neutral-900">{name(ticket.autor)}</dd></div>
-        <div><dt className="text-neutral-600">Responsable</dt><dd className="font-medium text-neutral-900">{ticket.responsable ? name(ticket.responsable) : 'Pendiente de asignación'}</dd></div></dl>
+        <div><dt className="text-neutral-600">Responsable</dt><dd className="font-medium text-neutral-900">{unverified ? 'Pendiente de actualización' : ticket.responsable ? name(ticket.responsable) : 'Pendiente de asignación'}</dd></div></dl>
       {ticket.registradoPor && <p className="text-sm text-neutral-700">Registrado por {name(ticket.registradoPor)} en nombre de {name(ticket.autor)}.</p>}
       <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-700"><Tags size={16} className="shrink-0" />{ticket.tipo ? `${supportCategories[ticket.categoria]} · ${supportTypes[ticket.tipo]} · Prioridad ${supportPriorities[ticket.prioridad]}` : 'Pendiente de triaje'}</p>
       {ticket.esAutor && <Link to={mp('/notificaciones')} className="inline-flex min-h-11 items-center gap-2 text-sm text-primary-800 hover:underline"><Bell size={16} />Las respuestas llegan a tus avisos</Link>}
       {ticket.contexto.ruta && <p className="text-sm text-neutral-600">Pantalla del reporte: <code className="[overflow-wrap:anywhere]">{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? <> · <span className="whitespace-nowrap">{ticket.contexto.ancho} × {ticket.contexto.alto}</span></> : null}</p>}
     </header>
-    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} changed={changed} />}
+    {(!ticket.esAutor || ticket.puedeAtender) && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} refreshFailed={automaticRefresh.isError} />}
     <section aria-label="Conversación" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <h4 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">Conversación</h4>
       <ol className="divide-y divide-neutral-200">{ticket.mensajes.map(message => <li key={message.id} className={'p-4 ' + (message.interno ? 'border-l-4 border-warning-600 bg-warning-50' : '')}>
@@ -134,7 +167,7 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
           <Button variant="outline" className="max-w-full [overflow-wrap:anywhere]" onClick={() => void download(file)} leftIcon={<Download size={16} />}>{file.nombre} · {(file.bytes / 1024).toFixed(0)} KB</Button></li>)}</ul>}
       </li>)}</ol>
     </section>
-    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} changed={changed} />}
+    {ticket.esAutor && !ticket.puedeAtender && <TicketActions ticket={ticket} owner={owner} context={context} journal={journal} changed={changed} refreshing={refreshing} refreshFailed={automaticRefresh.isError} />}
     {error && <p role="alert" className="text-error-700">{error}</p>}
     <details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Historial del ticket</summary>
       <ol className="mt-3 space-y-3 text-sm text-neutral-700"><li>Creado · {date(ticket.createdAt)}</li>{ticket.eventos.map(event => <li key={event.id}>
@@ -145,45 +178,7 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
     </details>
   </article>;
 }
-function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owner: string; changed: () => Promise<void> }) {
-  const [action, setAction] = useState<SupportAction>('RESPONDER');
-  const [body, setBody] = useState('');
-  const [target, setTarget] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [audio, setAudio] = useState<File | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [category, setCategory] = useState(ticket.categoria);
-  const [type, setType] = useState<SupportType>(ticket.tipo || 'PROBLEMA');
-  const [priority, setPriority] = useState<SupportPriority>(ticket.prioridad || 'NORMAL');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [pending, setPending] = useState<{ input: SupportMutation; key: string; files: File[] } | null>(null);
-  const inFlight = useRef(false);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const bodyInput = useRef<HTMLTextAreaElement>(null);
-  const team = useQuery({ queryKey: ['soporte', owner, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
-  const recipient = team.data?.find(user => user.id === target);
-  const send = async (chosen = action) => {
-    if (inFlight.current || recording) return;
-    if (!pending && !['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(chosen) && !body.trim()) { setError('Escribí un mensaje o una resolución.'); bodyInput.current?.focus(); return; }
-    if (!pending && chosen === 'DERIVAR' && !target) { setError('Elegí el nuevo responsable antes de confirmar la derivación.'); return; }
-    inFlight.current = true; setBusy(true); setError('');
-    try {
-      assertSupportSession(owner);
-      const frozen = pending || { key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
-        version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}), ...(chosen === 'CLASIFICAR' ? { categoria: category, tipo: type, prioridad: priority } : {}) },
-        files: chosen === 'RESPONDER' || chosen === 'NOTA' ? [...files, ...(audio ? [audio] : [])] : [] };
-      if (frozen.files.length > 3) throw new Error('Hasta 3 archivos, incluido el audio.');
-      setPending(frozen);
-      await supportService.act(ticket.id, frozen.input, frozen.files, frozen.key);
-      if (!supportSessionMatches(owner)) return;
-      setPending(null); setBody(''); setFiles([]); setAudio(null); if (fileInput.current) fileInput.current.value = ''; setTarget(''); setAction('RESPONDER'); await changed();
-    } catch (failure) {
-      setError(failure instanceof Error && failure.message.startsWith('Hasta 3 archivos') ? failure.message : supportError(failure));
-      const status = (failure as { response?: { status?: number } }).response?.status;
-      if ([400, 403, 409, 413, 422].includes(status || 0)) { setPending(null); if (status === 409) await changed(); }
-    } finally { inFlight.current = false; setBusy(false); }
-  };
+function ticketActions(ticket: SupportTicket) {
   const actions: Array<{ value: SupportAction; label: string }> = [];
   if (ticket.esAutor || (ticket.puedeAtender && ticket.estado !== 'CERRADO')) actions.push({ value: 'RESPONDER', label: ticket.estado === 'CERRADO' ? 'Responder y reabrir' : 'Respuesta visible al usuario' });
   if (ticket.puedeAtender) actions.push({ value: 'NOTA', label: 'Nota interna de soporte' });
@@ -193,22 +188,95 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
     if (ticket.puedeAtender && !ticket.esAutor) actions.push({ value: 'ESPERAR', label: 'Solicitar respuesta al usuario' });
   }
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
-  const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
+  return actions;
+}
+function TicketActions({ ticket, owner, context, journal, changed, refreshing, refreshFailed }: { ticket: SupportTicket; owner: string; context: string; journal: ReturnType<typeof useSupportCommand>; changed: (minimumVersion?: number) => Promise<void>; refreshing: boolean; refreshFailed: boolean }) {
+  const scope = { userId: owner, context, ticketId: ticket.id };
+  const recovery = useSupportActionDraft(scope);
+  const pending = journal.command;
+  const query = useQueryClient();
+  useEffect(() => {
+    if (pending?.status === 'confirmed' && supportSessionMatches(owner)) {
+      void query.invalidateQueries({ queryKey: ['attention'] });
+    }
+  }, [pending?.status, pending?.key, owner, query]);
+  const action = recovery.workspace.action;
+  const actions = ticketActions(ticket);
+  const selected = pending && pending.input.accion !== 'TOMAR' ? pending.input.accion : actions.some(option => option.value === action) ? action : actions[0]?.value;
+  const draftAction = selected || 'TOMAR';
+  const draft = recovery.workspace.drafts[draftAction] || emptySupportActionDraft(ticket.version);
+  const { body, files, audio } = pending ? { body: pending.input.cuerpo, files: pending.files, audio: null } : draft;
+  const updateDraft = (patch: Partial<SupportActionDraft>) => recovery.update(draftAction, ticket.version, patch);
+  const setBody = (body: string) => updateDraft({ body });
+  const setFiles = (files: File[]) => updateDraft({ files });
+  const setAudio = (audio: File | null) => { if (audio && files.length >= 3) { setError('Hasta 3 archivos, incluido el audio. Quitá un adjunto antes de grabar.'); return; } updateDraft({ audio }); };
+  const target = draft.target || '', category = draft.category || ticket.categoria;
+  const type = draft.type || ticket.tipo || 'PROBLEMA', priority = draft.priority || ticket.prioridad;
+  const [recording, setRecording] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const submitting = useRef(false);
+  const busy = journal.busy || preparing;
+  const canEdit = journal.ready && recovery.ready && recovery.ownership.status === 'owned';
+  const staleDraft = !!recovery.workspace.drafts[draftAction] && draft.version !== ticket.version;
+  const [error, setError] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
+  const bodyInput = useRef<HTMLTextAreaElement>(null);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pending?.status === 'confirmed') confirmationRef.current?.focus();
+  }, [pending?.status, pending?.key]);
+  const team = useQuery({ queryKey: ['soporte', owner, context, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
+  const displayedTarget = pending?.input.responsableId ?? target;
+  const recipient = team.data?.find(user => user.id === displayedTarget);
+  const send = async (chosen = selected) => {
+    if (submitting.current || busy || recording || !canEdit || !recovery.canWrite() || !chosen) return;
+    if (pending) { await journal.retry(); return; }
+    if (chosen !== 'TOMAR' && staleDraft) { setError('El ticket cambió. Revisá la conversación antes de confirmar.'); return; }
+    if (!['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(chosen) && !body.trim()) { setError('Escribí un mensaje o una resolución.'); bodyInput.current?.focus(); return; }
+    if (chosen === 'DERIVAR' && !target) { setError('Elegí el nuevo responsable antes de confirmar la derivación.'); return; }
+    const outgoingFiles = chosen === 'RESPONDER' || chosen === 'NOTA' ? [...files, ...(audio ? [audio] : [])] : [];
+    if (outgoingFiles.length > 3) { setError('Hasta 3 archivos, incluido el audio.'); return; }
+    submitting.current = true; setPreparing(true); setError('');
+    try {
+      if (!await recovery.flush() || !recovery.canWrite()) return;
+      await journal.submit({ key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
+        version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}), ...(chosen === 'CLASIFICAR' ? { categoria: category, tipo: type, prioridad: priority } : {}) }, files: outgoingFiles });
+    } finally { submitting.current = false; setPreparing(false); }
+  };
+  const finishConfirmed = () => {
+    if (!recovery.canWrite()) return;
+    return journal.release(async saved => {
+      if (saved.status === 'confirmed' && (!saved.receipt || saved.receipt.id !== ticket.id || !Number.isSafeInteger(saved.receipt.version))) throw new Error('No pudimos verificar la confirmación. Conservamos el envío.');
+      await changed(saved.status === 'confirmed' ? saved.receipt?.version : undefined);
+      await recovery.finish(saved);
+      if (fileInput.current) fileInput.current.value = '';
+    });
+  };
   const canTake = ticket.puedeGestionar && ticket.responsableId !== owner && (!ticket.responsableId || ticket.puedeAtender) && ticket.estado !== 'CERRADO';
   const optionalBody = selected === 'DERIVAR' || selected === 'CLASIFICAR';
   const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
   const privateAction = selected === 'NOTA' || selected === 'DERIVAR' || selected === 'CLASIFICAR';
+  const confirmationError = pending?.status === 'confirmed' ? journal.error || (refreshFailed ? 'No pudimos actualizar el ticket. Reintentá sin volver a enviar.' : '') : '';
   return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
     <h4 className="font-semibold text-neutral-900">Atender ticket</h4>
-    {canTake && <Button disabled={busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
-    {pending?.input.accion === 'TOMAR' && <Button isLoading={busy} onClick={() => void send('TOMAR')}>Reintentar toma del ticket</Button>}
-    {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
+    {recovery.ownership.status === 'blocked' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Este ticket se está editando en otra pestaña. Cerrala para continuar aquí sin reemplazar su borrador.</p><Button variant="outline" onClick={recovery.ownership.retry}>Retomar edición aquí</Button></div>}
+    {recovery.ownership.status === 'unavailable' && <div role="alert" className="space-y-2"><p>Este navegador no pudo proteger la edición del borrador. Reintentá o abrí SITREP en un navegador actualizado.</p><Button variant="outline" onClick={recovery.ownership.retry}>Reintentar protección</Button></div>}
+    {recovery.ownership.status === 'owned' && !recovery.ready && <p role="status">Comprobando borradores… <Button variant="outline" onClick={() => void recovery.reload()}>Reintentar borrador</Button></p>}
+    {recovery.error && <div role="alert" className="space-y-2 text-error-700"><p>{recovery.error}</p>{recovery.ready && <Button variant="outline" disabled={!canEdit || recovery.saving} onClick={() => void recovery.flush()}>Reintentar guardado local</Button>}</div>}
+    {canEdit && !pending && Object.keys(recovery.workspace.drafts).length > 0 && !recovery.error && <p role="status" className="text-sm text-neutral-600">{recovery.saving ? 'Guardando borrador…' : recovery.restored ? 'Borrador recuperado en este dispositivo. Todavía no se envió.' : 'Borrador guardado en este dispositivo. Todavía no se envió.'}</p>}
+    {canEdit && !pending && staleDraft && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>El ticket cambió desde que preparaste este borrador. Revisá la conversación y el estado antes de confirmar.</p><Button variant="outline" onClick={() => { setError(''); updateDraft({ version: ticket.version }); }}>Revisé la conversación</Button></div>}
+    {canTake && <Button disabled={!canEdit || busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
+    {!journal.ready && <p role="status">Comprobando envíos guardados… <Button variant="outline" onClick={() => void journal.reload()}>Reintentar lectura</Button></p>}
+    {pending?.status === 'confirmed' && <div ref={confirmationRef} role="region" aria-label="Resultado de la acción" tabIndex={-1} className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><p role="status">Acción confirmada. No hace falta enviarla otra vez.</p>{confirmationError && <p role="alert" className="text-error-700">{confirmationError}</p>}<Button isLoading={busy || refreshing} disabled={!canEdit || refreshing} onClick={() => void finishConfirmed()}>{refreshFailed ? 'Reintentar actualización' : 'Continuar'}</Button></div>}
+    {pending?.status === 'rejected' && <div role="alert" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>La acción no se registró: {pending.rejection}</p><Button isLoading={busy} disabled={!canEdit} onClick={() => void finishConfirmed()}>Actualizar ticket y recuperar contenido</Button></div>}
+    {pending?.status === 'pending' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Envío sin confirmar. Conservamos el contenido y los archivos en este dispositivo.</p><div className="flex flex-wrap gap-2"><Button isLoading={busy} disabled={!canEdit} onClick={() => recovery.canWrite() && void journal.retry()}>Reintentar mismo envío</Button><Button variant="outline" disabled={!canEdit || busy} onClick={() => recovery.canWrite() && void journal.recover()}>Comprobar y corregir envío</Button></div><p className="text-sm">Para corregir, primero comprobamos si ya se registró. Si no se registró, retiramos ese envío y recuperamos el contenido.</p></div>}
+    {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : !recovery.ready || recovery.ownership.status !== 'owned' ? null : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
       <div role="group" aria-label="Acciones del ticket" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {actions.map(option => {
           const Icon = actionIcons[option.value];
           return <Button key={option.value} type="button" variant={selected === option.value ? 'primary' : 'outline'}
-            aria-pressed={selected === option.value} disabled={busy || !!pending || recording} leftIcon={<Icon size={18} />}
-            onClick={() => { setAction(option.value); if (option.value === 'CLASIFICAR') { setCategory(ticket.categoria); setType(ticket.tipo || 'PROBLEMA'); setPriority(ticket.prioridad || 'NORMAL'); } }}>{option.value === 'RESPONDER' && ticket.estado === 'CERRADO' ? 'Responder y reabrir' : actionLabels[option.value]}</Button>;
+            aria-pressed={selected === option.value} disabled={!canEdit || busy || !!pending || recording} leftIcon={<Icon size={18} />}
+            onClick={() => recovery.select(option.value)}>{option.value === 'RESPONDER' && ticket.estado === 'CERRADO' ? 'Responder y reabrir' : actionLabels[option.value]}</Button>;
         })}
       </div>
       <p id="support-action-audience" className={'flex items-start gap-2 text-sm ' + (privateAction ? 'text-warning-800' : 'text-neutral-700')}>
@@ -217,39 +285,42 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
           : selected === 'CERRAR' ? 'La resolución queda visible para el usuario y cierra el ticket.' : 'Este mensaje queda visible en la conversación del ticket.'}
       </p>
       {selected === 'CLASIFICAR' && <div className="grid gap-3 sm:grid-cols-3">
-        <Select label="Área del problema" value={category} onChange={value => setCategory(value as SupportCategory)} disabled={busy || !!pending} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
-        <Select label="Tipo de ticket" value={type} onChange={value => setType(value as SupportType)} disabled={busy || !!pending} options={Object.entries(supportTypes).map(([value, label]) => ({ value, label }))} />
-        <Select label="Prioridad" value={priority} onChange={value => setPriority(value as SupportPriority)} disabled={busy || !!pending} options={Object.entries(supportPriorities).map(([value, label]) => ({ value, label }))} />
+        <Select label="Área del problema" value={pending?.input.categoria ?? category} onChange={value => updateDraft({ category: value as SupportCategory })} disabled={!canEdit || busy || !!pending} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
+        <Select label="Tipo de ticket" value={pending?.input.tipo ?? type} onChange={value => updateDraft({ type: value as SupportType })} disabled={!canEdit || busy || !!pending} options={Object.entries(supportTypes).map(([value, label]) => ({ value, label }))} />
+        <Select label="Prioridad" value={pending?.input.prioridad ?? priority} onChange={value => updateDraft({ priority: value as SupportPriority })} disabled={!canEdit || busy || !!pending} options={Object.entries(supportPriorities).map(([value, label]) => ({ value, label }))} />
       </div>}
       {selected === 'DERIVAR' && <>{team.isError ? <p role="alert" className="text-error-700">{supportError(team.error)} <Button variant="outline" onClick={() => void team.refetch()}>Reintentar equipo</Button></p> :
-        <Select label="Nuevo responsable" value={target} onChange={setTarget} disabled={busy || !!pending || team.isPending} searchable
+        <Select label="Nuevo responsable" value={displayedTarget} onChange={target => updateDraft({ target })} disabled={!canEdit || busy || !!pending || team.isPending} searchable
           helperText={recipient ? 'Responsable seleccionado: ' + recipient.email : undefined}
           renderOption={option => <span className="block [overflow-wrap:anywhere]">{option.label}</span>}
           options={recipients.map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}
         {team.isSuccess && !recipients.length && <p role="status" className="text-sm text-neutral-700">No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.</p>}</>}
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{privateAction ? `Nota interna / motivo${optionalBody ? ' (opcional)' : ''}` : 'Mensaje o resolución'}</label>
-      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
+      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={!canEdit || busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
         className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
       <p id="support-reply-help" className="text-sm text-neutral-600">{optionalBody ? 'Podés confirmar sin escribir un motivo. La acción y el responsable quedan en el historial.' : 'El audio puede acompañar tu mensaje.'}</p>
       <div hidden={selected !== 'RESPONDER' && selected !== 'NOTA'} className="space-y-2"><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
         <p className="text-sm text-neutral-600">Opcional · podés enviar sólo texto.</p>
-        <SupportAudioInput value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!pending} />
-        <input ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={busy || !!pending}
+        <SupportAudioInput key={'audio:' + draftAction} value={audio} onChange={setAudio} recoveryEnabled onBusyChange={setRecording} disabled={!canEdit || busy || !!pending} />
+        <input key={'files:' + draftAction} ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={!canEdit || busy || !!pending}
           className="block min-h-11 w-full text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900" onChange={event => {
-            const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; setFiles([]); } else setFiles(chosen);
-          }} /></div>
-      {pending && <p className="text-sm text-neutral-700">Envío sin confirmar. El reintento conservará el contenido y la misma clave.</p>}
-      <Button type="submit" isLoading={busy} disabled={recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{pending ? 'Reintentar mismo envío' : selected ? submitLabels[selected] : 'Confirmar acción'}</Button>
+            const chosen = Array.from(event.target.files || []); if (chosen.length + (audio ? 1 : 0) > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; } else setFiles(chosen);
+          }} />
+        {!!files.length && <ul aria-label="Archivos de esta acción" className="space-y-2">{files.map((file, index) => <li key={index + ':' + file.name} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-1">
+          <span className="min-w-0 break-all text-sm text-neutral-800">{file.name}</span><Button type="button" variant="ghost" className="shrink-0" aria-label={'Quitar ' + file.name} disabled={!canEdit || busy || !!pending} onClick={() => { setFiles(files.filter((_, position) => position !== index)); if (fileInput.current) fileInput.current.value = ''; }}>Quitar</Button>
+        </li>)}</ul>}
+      </div>
+      {!pending && <Button type="submit" isLoading={busy} disabled={!canEdit || staleDraft || recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{selected ? submitLabels[selected] : 'Confirmar acción'}</Button>}
     </form>}
-    {error && <p role="alert" className="text-error-700">{error}</p>}
+    {(error || journal.error) && pending?.status !== 'confirmed' && <p role="alert" className="text-error-700">{error || journal.error}</p>}
   </section>;
 }
-function TeamSettings({ owner }: { owner: string }) {
+function TeamSettings({ owner, context }: { owner: string; context: string }) {
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const results = useQuery({ queryKey: ['soporte', owner, 'candidatos', applied], enabled: applied.length >= 2, queryFn: () => supportService.candidates(applied), retry: false });
+  const results = useQuery({ queryKey: ['soporte', owner, context, 'candidatos', applied], enabled: applied.length >= 2, queryFn: () => supportService.candidates(applied), retry: false });
   const change = async (id: string, enabled: boolean) => {
     if (busy) return; setBusy(true); setError('');
     try { await supportService.agent(id, enabled); await results.refetch(); } catch (failure) { setError(supportError(failure)); } finally { setBusy(false); }

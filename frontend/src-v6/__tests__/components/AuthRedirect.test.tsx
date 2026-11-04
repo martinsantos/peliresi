@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -92,7 +92,14 @@ describe('authenticated redirect destination', () => {
         '/inspecciones/INS-QR-123?origen=qr&vista=trazabilidad#evento-9',
       );
     });
-    expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123');
+    expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123', { deferWelcome: true });
+  });
+
+  it('does not defer the welcome for an ordinary dashboard login', async () => {
+    renderLogin('/dashboard');
+    await submitLogin();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/dashboard'));
+    expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123', { deferWelcome: false });
   });
 
   it('preserves the assigned inspection for a designated inspector with an actor base role', async () => {
@@ -106,7 +113,7 @@ describe('authenticated redirect destination', () => {
     loginMock.mockResolvedValue({ rol, esInspector: false });
     renderLogin('/inspecciones/INS-ASSIGNED?origen=correo#trazabilidad');
     await submitLogin();
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/mis-inspecciones/INS-ASSIGNED?origen=correo#trazabilidad'));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/requerimientos/INS-ASSIGNED?origen=correo#trazabilidad'));
   });
 
   it.each([
@@ -126,6 +133,7 @@ describe('authenticated redirect destination', () => {
 
 describe('standalone PWA AuthGate redirect destination', () => {
   beforeEach(() => {
+    loginMock.mockReset();
     authState = {
       currentUser: null,
       isLoading: false,
@@ -133,6 +141,39 @@ describe('standalone PWA AuthGate redirect destination', () => {
       login: loginMock,
       authError: null,
     };
+  });
+
+  it.each([401, 429])('keeps the same login form during validation and after HTTP %s', async status => {
+    let rejectLogin!: (error: unknown) => void;
+    loginMock.mockImplementation(() => new Promise((_resolve, reject) => { rejectLogin = reject; }));
+    const form = () => <MemoryRouter initialEntries={['/login']}><AuthGate><LoginPage /></AuthGate></MemoryRouter>;
+    const view = render(form());
+    const submitButton = screen.getByRole('button', { name: /ingresar/i });
+    await submitLogin();
+    const identifier = screen.getByLabelText('Correo electrónico o CUIT');
+    authState.isLoading = true;
+    view.rerender(form());
+    expect(screen.getByLabelText('Correo electrónico o CUIT')).toBe(identifier);
+    expect(identifier).toHaveValue('qa@example.com');
+    expect(submitButton).toBeDisabled();
+    const message = status === 401 ? 'Credenciales inválidas' : 'Demasiados intentos';
+    await act(async () => {
+      authState.isLoading = false;
+      authState.authError = message;
+      rejectLogin({ response: { status, data: { message } } });
+    });
+    view.rerender(form());
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByLabelText('Correo electrónico o CUIT')).toBe(identifier);
+    expect(identifier).toHaveValue('qa@example.com');
+    expect(screen.getByRole('button', { name: /ingresar/i })).toBeEnabled();
+  });
+
+  it('keeps private content hidden while the session is being resolved', () => {
+    authState.isLoading = true;
+    authState.currentUser = { rol: 'ADMIN' };
+    render(<MemoryRouter initialEntries={['/inspecciones']}><AuthGate><span>private inspection</span></AuthGate></MemoryRouter>);
+    expect(screen.queryByText('private inspection')).not.toBeInTheDocument();
   });
 
   it('does not downgrade an assigned inspector to actor participation after login', async () => {
@@ -187,7 +228,7 @@ describe('standalone PWA AuthGate redirect destination', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/mis-inspecciones/INS-PWA-1?origen=qr#trazabilidad',
+        '/requerimientos/INS-PWA-1?origen=qr#trazabilidad',
       );
     });
   });

@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Usuarios Hooks
  */
@@ -12,17 +13,20 @@ const KEYS = {
 };
 
 export function useUsuarios(filters?: UsuarioFilters) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.usuarios(filters),
+    queryKey: [...KEYS.usuarios(filters), owner],
     queryFn: () => usuarioService.list(filters),
+    enabled: Boolean(owner),
   });
 }
 
 export function useUsuario(id: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.usuario(id),
+    queryKey: [...KEYS.usuario(id), owner],
     queryFn: () => usuarioService.getById(id),
-    enabled: !!id,
+    enabled: Boolean(owner && id),
   });
 }
 

@@ -53,7 +53,7 @@ for (const [name, content, count] of [
 
 it('state labels use dark ink independently of the preserved colored status dot', () => {
   render(<MemoryRouter><ManifiestosTab {...props} data={{ manifiestos: ['BORRADOR', 'APROBADO', 'RECIBIDO', 'TRATADO'].map((estado, i) => ({ id: 'qa-' + i, numero: 'QA-' + i, estado, generador: 'QA' })) }} /></MemoryRouter>);
-  for (const status of ['BORRADOR', 'APROBADO', 'RECIBIDO', 'TRATADO']) {
+  for (const status of ['Borrador', 'Aprobado', 'Recibido', 'Tratado']) {
     const badge = screen.getByText(status, { exact: true });
     expect(badge).toHaveClass('text-neutral-700');
     expect((badge.querySelector('span') as HTMLElement).style.backgroundColor).not.toBe('');

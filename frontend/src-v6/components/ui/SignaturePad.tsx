@@ -3,8 +3,9 @@
  * Canvas-based signature input with touch + mouse support
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { Button } from './ButtonV2';
+import { holdNoticeLayout, reserveSignatureNoticeLayout } from './Toast';
 
 interface SignaturePadProps {
   onConfirm: (dataUrl: string) => void;
@@ -24,8 +25,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   lineWidth = 2,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+
+  // Keep new or expiring notices from moving the canvas before a stroke starts.
+  useLayoutEffect(() => reserveSignatureNoticeLayout(), []);
 
   const getCtx = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -44,6 +47,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const releaseNoticesRef = useRef<(() => void) | null>(null);
 
   const getPos = (e: MouseEvent | TouchEvent) => {
     const canvas = canvasRef.current!;
@@ -67,6 +71,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
   const startDraw = useCallback((e: MouseEvent | TouchEvent) => {
     e.preventDefault();
+    if (isDrawingRef.current) return;
     const ctx = getCtx();
     if (!ctx) return;
     const { x, y } = getPos(e);
@@ -74,7 +79,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     ctx.moveTo(x, y);
     lastPointRef.current = { x, y };
     isDrawingRef.current = true;
-    setIsDrawing(true);
+    releaseNoticesRef.current = holdNoticeLayout();
   }, [getCtx]);
 
   const draw = useCallback((e: MouseEvent | TouchEvent) => {
@@ -95,7 +100,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   const endDraw = useCallback(() => {
     isDrawingRef.current = false;
     lastPointRef.current = null;
-    setIsDrawing(false);
+    const release = releaseNoticesRef.current;
+    releaseNoticesRef.current = null;
+    release?.();
   }, []);
 
   // Register touch handlers with { passive: false } to allow preventDefault
@@ -112,6 +119,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     canvas.addEventListener('mousemove', draw as EventListener);
     canvas.addEventListener('mouseup', endDraw);
     canvas.addEventListener('mouseleave', endDraw);
+    const stopWhenHidden = () => { if (document.visibilityState === 'hidden') endDraw(); };
+    window.addEventListener('blur', endDraw);
+    document.addEventListener('visibilitychange', stopWhenHidden);
     return () => {
       canvas.removeEventListener('touchstart', startDraw);
       canvas.removeEventListener('touchmove', draw);
@@ -121,6 +131,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
       canvas.removeEventListener('mousemove', draw as EventListener);
       canvas.removeEventListener('mouseup', endDraw);
       canvas.removeEventListener('mouseleave', endDraw);
+      window.removeEventListener('blur', endDraw);
+      document.removeEventListener('visibilitychange', stopWhenHidden);
+      releaseNoticesRef.current?.();
+      releaseNoticesRef.current = null;
     };
   }, [startDraw, draw, endDraw]);
 
@@ -147,7 +161,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full flex-col gap-3" style={{ maxWidth: width }}>
       <div className="relative rounded-xl border-2 border-dashed border-neutral-300 overflow-hidden bg-white">
         <canvas
           ref={canvasRef}

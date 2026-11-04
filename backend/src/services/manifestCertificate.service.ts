@@ -1,0 +1,92 @@
+import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
+import { createHash } from 'node:crypto';
+import { institutionalPdf, PDF_STYLE } from './institutionalPdf.service';
+import { measureInspectionPdfBlocks } from './inspectionPdfLayout.service';
+import type { Prisma } from '@prisma/client';
+import { isTrainingSession } from '../lib/trainingScope';
+import { AppError } from '../middlewares/errorHandler';
+import type { CertificateRow } from '../domain/trainingCertificate';
+import { documentaryResolution } from '../domain/manifiestoAdendaDocument';
+import { certificateFindings, type CertificateFinding } from '../domain/certificateFindings';
+
+export const CERTIFICATE_EVENT = 'CERTIFICADO_OPERADOR_V1';
+export const CERTIFICATE_MANAGED = 'CERTIFICACION_OPERADOR_V1';
+export const certificatesEnabled = () => !isTrainingSession() && process.env.MANIFEST_CERTIFICATES_ENABLED === 'true';
+export const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
+export type CertificateSnapshot = {
+ version: 1; tipo: 'PARCIAL' | 'FINAL'; numero: string; manifiestoNumero: string;
+ generador: string; transportista: string; operador: string; autor: string; modalidad?: string | null;
+ fecha: string; metodo: string; nota: string; cantidades: CertificateRow[];
+ parcialesPrevios: string[]; adendas: {id:string;version:number}[]; firmaSha256: string; artificial: boolean;
+ hallazgosNoTratados?: CertificateFinding[];
+};
+export async function lockManifestDocuments(tx: Prisma.TransactionClient, id: string) {
+ const rows = await tx.$queryRaw<{id:string}[]>`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
+ if (!rows.length) throw new AppError('Manifiesto no encontrado',404);
+}
+export async function certificateReadiness(tx: Prisma.TransactionClient, id: string) {
+ const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},orderBy:[{createdAt:'asc'},{id:'asc'}],select:{id:true,version:true,rectificaId:true,revisiones:true,informeHallazgo:true,declaracion:true,residuos:true}});
+ const {counts}=documentaryResolution(adendas);
+ return {adendas, unresolved: counts.pendientes + counts.observadas + counts.rechazadas, ...certificateFindings(adendas)};
+}
+export async function notifyCertificateParties(tx: Prisma.TransactionClient, manifest: {id:string;numero:string;generadorId:string;transportistaId:string|null;operadorId:string}, record: {id:string;tipo:string;numero:string}, authorId:string) {
+ const select={activo:true,usuario:{select:{id:true,activo:true}}} as const;
+ const parties=await Promise.all([
+  tx.generador.findUnique({where:{id:manifest.generadorId},select}),
+  manifest.transportistaId ? tx.transportista.findUnique({where:{id:manifest.transportistaId},select}) : null,
+  tx.operador.findUnique({where:{id:manifest.operadorId},select}),
+ ]);
+ const companyRecipients=await manifestCompanyRecipients(tx,manifest.id);
+ const companyAccess=new Map(companyRecipients.map(p=>[p.usuarioId,p.accesosEmpresa]));
+ const recipients=[...new Set([...parties.filter(p=>p?.activo&&p.usuario?.activo).map(p=>p!.usuario!.id),...companyRecipients.map(p=>p.usuarioId)])].filter(id=>id!==authorId);
+ await tx.notificacion.createMany({skipDuplicates:true,data:recipients.map(usuarioId=>({
+  id:sha256('certificate:'+record.id+':'+usuarioId),usuarioId,tipo:'INFO_GENERAL',prioridad:'NORMAL',manifiestoId:manifest.id,
+  titulo:record.tipo==='FINAL'?'Certificación final total disponible':'Certificación parcial disponible',
+  mensaje:record.numero+'. Ya podés ver y descargar el documento firmado por el operador.',
+  datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:record.id,tipoCertificado:record.tipo,...(companyAccess.has(usuarioId)?{accesosEmpresa:companyAccess.get(usuarioId)}:{}),url:'/manifiestos/'+manifest.id+'?certificado='+record.id+'#certificaciones'}),
+ }))});
+}
+export function renderManifestCertificate(data: CertificateSnapshot, id: string, signature: string): Promise<Buffer> {
+ return institutionalPdf(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', data.numero, layout => {
+  const doc = layout.doc;
+  layout.text(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', true, 22, PDF_STYLE.green, 'H1');
+  layout.text(data.numero, true, 13);
+  layout.fields([{label: 'Manifiesto', value: data.manifiestoNumero}, {label: 'Emisión (Mendoza)', value: new Date(data.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza',hour12:false})}]);
+  layout.section('01  PARTES Y EMISOR');
+  layout.fields([{label:'Generador',value:data.generador}]);
+  layout.fields([{label:data.modalidad==='IN_SITU'?'Transporte aprobador':'Transporte',value:data.transportista}]);
+  if(data.modalidad==='IN_SITU')layout.text('Tratamiento en origen, sin traslado ni viaje.');
+  layout.fields([{label:'Operador',value:data.operador},{label:'Emitido por',value:data.autor}]);
+  layout.section('02  TRATAMIENTO CERTIFICADO');
+  layout.fields([{label:'Método declarado',value:data.metodo}]);
+  if (data.nota) layout.text('Observaciones: '+data.nota,false,9);
+  layout.text(data.tipo==='FINAL'?'Total recibido y tratado (incluye los parciales previos)':'Cantidad tratada certificada en este parcial',true,10);
+  layout.table(['Corriente','Cantidad','Unidad'],data.cantidades.map(row=>[row.corriente,String(row.cantidad),row.unidad]),[260,155,92]);
+  if(data.parcialesPrevios.length) layout.text('Parciales previos: '+data.parcialesPrevios.join(', '),false,9);
+  if(data.adendas.length) layout.text((data.tipo==='FINAL'?'Adendas resueltas: ':'Adendas vinculadas: ')+data.adendas.map((a,i)=>'Adenda '+(i+1)+' · versión '+a.version).join(' / '),false,9);
+  const fromFindings=data.cantidades.filter(row=>row.origen==='HALLAZGO');
+  if(fromFindings.length) {
+   layout.text('Origen de corrientes: '+fromFindings.map(row=>{
+    const labels=(row.adendas||[]).map(source=>data.adendas.findIndex(a=>a.id===source.id)).filter(index=>index>=0).map(index=>'adenda '+(index+1));
+    return row.corriente+' · '+(labels.length?labels.join(', '):'adenda vinculada');
+   }).join(' / '),false,9);
+  }
+  if(data.hallazgosNoTratados?.length) {
+   layout.text('No tratadas en esta certificación: '+data.hallazgosNoTratados.map(row=>row.corriente+' · observado: '+row.observado+' '+row.unidad).join(', '),false,9);
+  }
+  // Keep the signature and its integrity information together when they
+  // actually fit. The previous fixed reserve added a nearly empty page for
+  // short certificates with a partial and an approved finding.
+  const signatureLabel = { text: 'Firma manuscrita del operador', font: 'Helvetica-Bold', size: 10, color: PDF_STYLE.ink, gap: 7 };
+  const integrity = [
+   { text: 'Registro: ' + id, font: 'Helvetica', size: 8, color: PDF_STYLE.ink, gap: 7 },
+   { text: 'Huella de la firma: ' + data.firmaSha256, font: 'Helvetica', size: 8, color: PDF_STYLE.muted, gap: 7 },
+  ];
+  const signatureHeight = 40 + measureInspectionPdfBlocks(doc, [signatureLabel], 507) + 70
+   + measureInspectionPdfBlocks(doc, integrity, 507) + 2;
+  layout.section('03  FIRMA E INTEGRIDAD', signatureHeight);
+  layout.text('Firma manuscrita del operador',true,10);
+  const y=doc.y;layout.figure('Firma manuscrita del operador',()=>{doc.image(Buffer.from(signature.split(',')[1],'base64'),44,y,{fit:[220,60]});});doc.y=y+70;
+  layout.text('Registro: '+id,false,8);layout.text('Huella de la firma: '+data.firmaSha256,false,8,PDF_STYLE.muted);
+ }, new Date(data.fecha), data.artificial ? { notice: 'DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL' } : {});
+}

@@ -8,8 +8,58 @@ export function documentaryStatus(counts: DocumentaryCounts) {
   if (counts.pendientes) return 'PENDIENTE';
   return 'ADENDAS_REVISADAS';
 }
+
+type ResolutionItem = { id: string; rectificaId?: string | null; revisiones: unknown };
+/** A rectification changes neither the recorded decision nor the original annex. */
+export function documentaryResolution(items: ResolutionItem[]) {
+  const byId = new Map(items.map(item => [item.id, item]));
+  const decision = (item: ResolutionItem) => {
+    const last = Array.isArray(item.revisiones) ? item.revisiones.at(-1) : undefined;
+    const value = last && typeof last === 'object' ? (last as { decision?: unknown }).decision : undefined;
+    return value === 'APROBADA' || value === 'OBSERVADA' || value === 'RECHAZADA' ? value : 'PENDIENTE';
+  };
+
+  // A broken or cyclic lineage is never evidence that an observation was resolved.
+  // Iterative traversal and memoization also handle long histories without recursion.
+  const valid = new Map<string, boolean>();
+  for (const item of items) {
+    const path: string[] = [], seen = new Set<string>();
+    let cursor: string | null = item.id;
+    let intact = true;
+    while (cursor !== null) {
+      if (valid.has(cursor)) { intact = valid.get(cursor)!; break; }
+      if (seen.has(cursor)) { intact = false; break; }
+      const current = byId.get(cursor);
+      if (!current) { intact = false; break; }
+      seen.add(cursor); path.push(cursor); cursor = current.rectificaId ?? null;
+    }
+    for (const id of path) valid.set(id, intact);
+  }
+
+  const resolvedObservations = new Set<string>(), propagated = new Set<string>();
+  for (const item of items) {
+    if (decision(item) !== 'APROBADA' || !valid.get(item.id)) continue;
+    let parent = item.rectificaId ?? null;
+    while (parent !== null && !propagated.has(parent)) {
+      propagated.add(parent);
+      const ancestor = byId.get(parent)!;
+      if (decision(ancestor) === 'OBSERVADA') resolvedObservations.add(parent);
+      parent = ancestor.rectificaId ?? null;
+    }
+  }
+
+  const counts: DocumentaryCounts = { total: items.length, pendientes: 0, observadas: 0, rechazadas: 0 };
+  for (const item of items) {
+    const state = decision(item);
+    if (state === 'APROBADA' && !valid.get(item.id)) counts.pendientes++;
+    else if (state === 'OBSERVADA' && !resolvedObservations.has(item.id)) counts.observadas++;
+    else if (state === 'RECHAZADA') counts.rechazadas++;
+    else if (state === 'PENDIENTE') counts.pendientes++;
+  }
+  return { counts, resolvedObservations, invalidLineages: new Set(items.filter(item => !valid.get(item.id)).map(item => item.id)) };
+}
 type Record = { id: string; manifiestoId: string; creadoPorId: string; impersonadoPorId: string | null; createdAt: Date;
-  motivo: string; rectificaId: string | null; version: number; declaracion: unknown; residuos: unknown; revisiones: unknown };
+  motivo: string; rectificaId: string | null; version: number; declaracion: unknown; residuos: unknown; revisiones: unknown; informeHallazgo?: unknown };
 export function addendumDocument(record: Record, version: number) {
   if (!Number.isSafeInteger(version) || version < 0 || version > record.version) throw new Error('Versión de anexo inexistente');
   const reviews = (record.revisiones as AddendumReview[]).slice(0, version);
@@ -18,6 +68,7 @@ export function addendumDocument(record: Record, version: number) {
     version, creadoPorId: record.creadoPorId, impersonadoPorId: record.impersonadoPorId,
     fechaRegistro: record.createdAt.toISOString(), motivo: record.motivo, rectificaId: record.rectificaId,
     declaracion: record.declaracion, residuos: record.residuos, revisiones: reviews,
+    ...(record.informeHallazgo ? { informeHallazgo: record.informeHallazgo } : {}),
     estado: reviews[reviews.length - 1]?.decision || 'PENDIENTE' };
   return { ...content, huella: createHash('sha256').update(JSON.stringify(content)).digest('hex') };
 }

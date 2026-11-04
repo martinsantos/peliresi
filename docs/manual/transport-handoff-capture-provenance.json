@@ -1,0 +1,32 @@
+{
+  "capturedOn": "2026-10-19",
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "realBackend": true,
+  "gpsEmulated": true,
+  "browserTestsPassed": 2,
+  "files": [
+    {
+      "file": "desktop/transport-handoff-20261019.png",
+      "sha256": "55f94ad5ccd5d3e0ae6418884ae67c82032e51aec9a77f5db430ab80850f2845",
+      "width": 928,
+      "height": 392,
+      "project": "web"
+    },
+    {
+      "file": "mobile/transport-handoff-gps-20261019.png",
+      "sha256": "923765686e74642e371b9937e11bd7d83d48891285709928e5c0c3cd1526a368",
+      "width": 360,
+      "height": 800,
+      "project": "app"
+    },
+    {
+      "file": "mobile/transport-handoff-c3-20261019.png",
+      "sha256": "71dc392ffa205cea3c0bc6fb070701cf609d3bfd924464e3e32750b4d84fc5aa",
+      "width": 360,
+      "height": 800,
+      "project": "app"
+    }
+  ]
+}

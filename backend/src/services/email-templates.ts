@@ -1,11 +1,11 @@
-export const MAIL_TEMPLATE_VERSION = '20261012.8';
+export const MAIL_TEMPLATE_VERSION = '20261023.2';
 export function escapeMail(value: string): string {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 }
 export function mailLink(path: string, origin = process.env.FRONTEND_URL || 'https://sitrep.ultimamilla.com.ar'): string {
   const base = new URL(origin);
   if (base.protocol !== 'https:' && !(base.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(base.hostname))) throw new Error('MAIL_ORIGIN_INVALID');
-  if (base.username || base.password || !path.startsWith('/') || path.startsWith('//')) throw new Error('MAIL_LINK_INVALID');
+  if (base.username || base.password || !path.startsWith('/') || path.startsWith('//') || /[\\\s\u0000-\u001f]/.test(path) || /%(?:2f|5c|0[ad])/i.test(path.split(/[?#]/)[0])) throw new Error('MAIL_LINK_INVALID');
   const target = new URL(path, base);
   if (target.origin !== base.origin) throw new Error('MAIL_LINK_INVALID');
   return target.href;
@@ -29,15 +29,20 @@ export function mailShell(content: string): string {
 <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #dce5df;border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#172c24">
 <tr data-mail-header-row>
 <td data-mail-masthead width="50%" align="left" valign="middle" style="width:50%;padding:10px 12px;text-align:left;border-bottom:3px solid #174a7e;border-radius:10px 0 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td class="mail-logo-cell" width="100" valign="middle" style="width:100px;padding-right:12px"><img src="${logo}" width="100" height="32" alt="Gobierno de Mendoza" style="display:block;width:100px;height:32px;color:#174a7e;font-size:12px"></td><td class="mail-header-reference" valign="middle" align="left"><p data-mail-government-reference style="margin:0;color:#344c41;font:12px/15px Arial,Helvetica,sans-serif;text-align:left">Dirección General de Fiscalización Ambiental</p></td></tr></table></td>
-<td data-mail-brand width="50%" align="left" valign="middle" bgcolor="#1B5E3C" style="width:50%;background:#1B5E3C;padding:10px 12px;text-align:left;border-bottom:3px solid #0D8A4F;border-radius:0 10px 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td data-mail-brand-lockup class="mail-logo-cell" width="100" valign="middle" style="width:100px;padding-right:12px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td valign="middle" style="padding-right:6px"><img src="${brand}" width="22" height="22" alt="" role="presentation" style="display:block;width:22px;height:22px;border:0"></td><td valign="middle"><p data-mail-wordmark style="margin:0;color:#ffffff;font:700 20px/26px Arial,Helvetica,sans-serif">SITREP</p></td></tr></table></td><td class="mail-header-reference" valign="middle" align="left"><p data-mail-system-reference style="margin:0;color:#ffffff;font:12px/15px Arial,Helvetica,sans-serif;text-align:left">Sistema de Trazabilidad de Residuos Peligrosos</p></td></tr></table></td>
+<td data-mail-brand width="50%" align="left" valign="middle" bgcolor="#ffffff" style="width:50%;background:#ffffff;padding:10px 12px;text-align:left;border-bottom:3px solid #1B5E3C;border-radius:0 10px 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td data-mail-brand-lockup class="mail-logo-cell" width="100" valign="middle" style="width:100px;padding-right:12px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td valign="middle" style="padding-right:6px"><img src="${brand}" width="22" height="22" alt="" role="presentation" style="display:block;width:22px;height:22px;border:0"></td><td valign="middle"><p data-mail-wordmark style="margin:0;color:#1B5E3C;font:700 20px/26px Arial,Helvetica,sans-serif">SITREP</p></td></tr></table></td><td class="mail-header-reference" valign="middle" align="left"><p data-mail-system-reference style="margin:0;color:#344c41;font:12px/15px Arial,Helvetica,sans-serif;text-align:left">Sistema de Trazabilidad de Residuos Peligrosos</p></td></tr></table></td>
 </tr><!-- mail-header-end -->
 <tr><td colspan="2" style="padding:24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#172c24;overflow-wrap:anywhere">${content}</td></tr>
 <tr><td colspan="2" style="padding:20px 24px;border-top:1px solid #dce5df;font-size:12px;line-height:1.6;color:#526359"><span data-mail-institution>Gobierno de Mendoza</span><br>Dirección General de Fiscalización Ambiental<p style="margin:12px 0 0">Este aviso informativo no reemplaza las notificaciones formales del trámite.</p></td></tr>
 </table></td></tr></table></body></html>`;
 }
 
+/** Resolver reads the recipient's preference after login; explicit alternatives never depend on app installation. */
 export function mailAction(path: string, label: string): string {
-  return `<p style="margin:24px 0 8px"><a href="${escapeMail(mailLink(path))}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;line-height:24px">${escapeMail(label)}</a></p>`;
+  const canonical = path.replace(/^\/app(?=\/|$)/, '') || '/';
+  const web = escapeMail(mailLink(canonical));
+  const app = escapeMail(mailLink('/app' + canonical));
+  const preferred = escapeMail(mailLink('/app/abrir?destino=' + encodeURIComponent(canonical)));
+  return `<p style="margin:24px 0 8px"><a data-mail-action="preferred" href="${preferred}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;line-height:24px">${escapeMail(label)}</a></p><p style="font-size:14px;margin:8px 0"><a data-mail-action="web" href="${web}" style="color:#1B5E3C;text-decoration:underline">Abrir en la web</a> · <a data-mail-action="app" href="${app}" style="color:#1B5E3C;text-decoration:underline">Abrir en la app</a></p><p style="font-size:12px;color:#526359">El botón respeta tu preferencia de cuenta después de ingresar. Sin una preferencia, elige la vista según el dispositivo. La app también funciona en el navegador; abrir una app instalada depende del dispositivo.</p>`;
 }
 
 export type MailTemplateId = 'verify' | 'pending' | 'approved' | 'newAccount' | 'reset' | 'application' | 'observed' | 'response' | 'rejected' | 'modification' | 'modificationApproved' | 'modificationRejected';
@@ -52,24 +57,38 @@ const specs: Record<MailTemplateId, Spec> = {
   application: { title: 'Nueva solicitud de inscripción', body: 'Hay una solicitud presentada para revisar.', action: 'Revisar solicitudes', path: '/admin/solicitudes', required: 'role' },
   observed: { title: 'Tu solicitud necesita una corrección', body: 'Revisá la observación y respondé desde SITREP.', action: 'Ver mi solicitud', path: '/mi-solicitud', required: 'message' },
   response: { title: 'Respuesta a una observación', body: 'El solicitante respondió. La información está disponible para tu revisión.', action: 'Revisar solicitudes', path: '/admin/solicitudes' },
-  rejected: { title: 'Solicitud de inscripción rechazada', body: 'La administración resolvió tu solicitud. Si necesitás aclaraciones, consultá a la DGFA.', required: 'message' },
+  rejected: { action: 'Ver mi solicitud', path: '/mi-solicitud', title: 'Solicitud de inscripción rechazada', body: 'La administración resolvió tu solicitud. Si necesitás aclaraciones, consultá a la DGFA.', required: 'message' },
   modification: { title: 'Modificación de datos solicitada', body: 'Un actor solicita una modificación de sus datos.', action: 'Revisar modificaciones', path: '/admin/renovaciones', required: 'role' },
   modificationApproved: { title: 'Modificación de datos aprobada', body: 'Los cambios aprobados ya están disponibles en SITREP.', action: 'Ingresar a SITREP', path: '/login' },
-  modificationRejected: { title: 'Modificación de datos rechazada', body: 'Revisá el motivo de la resolución. Podés consultar a la DGFA si necesitás aclaraciones.', required: 'message' },
+  modificationRejected: { action: 'Consultar mis avisos', path: '/notificaciones', title: 'Modificación de datos rechazada', body: 'Revisá el motivo de la resolución. Podés consultar a la DGFA si necesitás aclaraciones.', required: 'message' },
 };
 export function renderMail(id: MailTemplateId, fields: Fields): { subject: string; html: string; text: string; version: string } {
   const spec = specs[id];
   if (!fields.name?.trim() || (spec.required && !fields[spec.required]?.trim())) throw new Error(`MAIL_FIELDS_REQUIRED:${id}`);
-  const link = spec.path ? mailLink(spec.path + (spec.required === 'token' ? '?token=' + encodeURIComponent(fields.token!) : '')) : '';
+  const link = spec.path ? spec.path + (spec.required === 'token' ? '?token=' + encodeURIComponent(fields.token!) : '') : '';
   const content = `<h1 style="font-size:22px;line-height:1.3;color:#1B5E3C;margin:0 0 16px">${spec.title}</h1>
 <p>${escapeMail(fields.name)}</p><p>${spec.body}</p>
 ${fields.role ? `<p>Perfil: <strong>${escapeMail(fields.role)}</strong></p>` : ''}
 ${fields.message ? `<p style="white-space:pre-wrap;border-left:3px solid #1B5E3C;padding:12px">${escapeMail(fields.message)}</p>` : ''}
-${link ? `<p><a href="${escapeMail(link)}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold">${spec.action}</a></p><p style="font-size:12px;word-break:break-all">${escapeMail(link)}</p>` : ''}`;
+${link ? mailAction(link, spec.action!) : ''}`;
   const html = mailShell(content);
   return { subject: '[SITREP] ' + spec.title, html, text: mailText(html), version: MAIL_TEMPLATE_VERSION };
 }
 
+/** Extract a controlled local action from a queued rendering; never follow arbitrary mail HTML. */
+export function mailItemAction(html: string): string {
+  const match = html.match(/<a\b[^>]*href="([^"]+)"/i);
+  if (match) {
+    try {
+      const url = new URL(match[1].replace(/&amp;/g, '&'));
+      if (url.origin === new URL(mailLink('/')).origin) {
+        const target = url.pathname === '/app/abrir' || url.pathname === '/abrir' ? url.searchParams.get('destino') : url.pathname + url.search + url.hash;
+        if (target && !/^\/(?:app\/)?abrir(?:[?#]|$)/.test(target)) return mailAction(target, 'Abrir este aviso');
+      }
+    } catch { /* An old/malformed rendering gets a safe inbox fallback. */ }
+  }
+  return mailAction('/notificaciones', 'Consultar mis avisos');
+}
 export function renderDigest(items: { subject: string; html: string }[]): string {
-  return mailShell(`<h1 style="font-size:22px;color:#1B5E3C">Resumen de alertas</h1><ul>${items.map(item => `<li style="margin-bottom:16px"><strong>${escapeMail(item.subject)}</strong><p>${escapeMail(mailText(item.html))}</p></li>`).join('')}</ul>${mailAction('/alertas', 'Revisar alertas en SITREP')}`);
+  return mailShell(`<h1 style="font-size:22px;color:#1B5E3C">Resumen de alertas</h1><ul>${items.map(item => `<li style="margin-bottom:16px"><strong>${escapeMail(item.subject)}</strong>${mailItemAction(item.html)}</li>`).join('')}</ul>${mailAction('/notificaciones', 'Consultar mis avisos')}`);
 }

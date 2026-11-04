@@ -1,26 +1,26 @@
 import React, { useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { solicitudService } from '../services/solicitud.service';
 import type { SolicitudInscripcion } from '../types/api';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { ACTIVITY_HEADER, saveActorActivity } from '../services/actorActivity';
-import { clearOfflineSession } from '../services/offlineSession';
+import { activateActorActivity } from '../services/activateActorActivity';
 import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { Card } from './ui/CardV2';
 import { Button } from './ui/ButtonV2';
 
 const labels = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' };
-export default function ActorActivities() {
+export default function ActorActivities({ mode = 'switch' }: { mode?: 'switch' | 'request' }) {
   const { currentUser } = useAuth();
   if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED !== 'true' || !currentUser || currentUser.empresaContexto || !(currentUser.rol in labels)) return null;
-  return <ActivityChoices key={currentUser.id} />;
+  return <ActivityChoices key={currentUser.id} mode={mode} />;
 }
-function ActivityChoices() {
+function ActivityChoices({ mode }: { mode: 'switch' | 'request' }) {
   const { currentUser, isRestricted } = useAuth();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+  const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const lock = useRef(false);
   const applications = useQuery({ queryKey: ['actor-activity-applications', currentUser?.id],
@@ -33,22 +33,20 @@ function ActivityChoices() {
     try {
       if (approved) {
         // Confirm on server first. New navigation discards the previous role's in-memory queries.
-        const result = await api.get('/auth/profile', { headers: { [ACTIVITY_HEADER]: type } });
-        if (result.data.data.user.id !== currentUser.id || result.data.data.user.rol !== type) throw new Error('Actividad incompatible');
-        saveActorActivity(String(currentUser.id), type);
-        clearOfflineSession();
+        await activateActorActivity(currentUser.id, type);
         window.location.replace((window.location.pathname.startsWith('/app/') ? '/app' : '') + mp('/mi-perfil'));
       } else if (application) {
         navigate(['BORRADOR', 'OBSERVADA'].includes(application.estado)
-          ? '/inscripcion/' + type.toLowerCase()
+          ? '/inscripcion/' + type.toLowerCase() + '?solicitud=' + encodeURIComponent(application.id)
           : mp('/mi-solicitud') + '?solicitud=' + encodeURIComponent(application.id));
       } else {
         const result = await api.post('/solicitudes/actividad-adicional', { tipoActor: type });
         const draft = result.data.data.solicitud;
         if (!draft?.id || draft.usuarioId !== currentUser.id) throw new Error('Solicitud incompatible');
-        // Existing wizard discovers the user's own draft; no identity or form is replaced.
+        await Promise.all([queryClient.invalidateQueries({ queryKey: ['solicitudes', 'mis'] }), queryClient.invalidateQueries({ queryKey: ['actor-activity-applications', currentUser.id] })]);
+        // Open exactly the draft returned by the server; never a remembered receipt.
         navigate(['BORRADOR', 'OBSERVADA'].includes(draft.estado)
-          ? '/inscripcion/' + type.toLowerCase()
+          ? '/inscripcion/' + type.toLowerCase() + '?solicitud=' + encodeURIComponent(draft.id)
           : mp('/mi-solicitud') + '?solicitud=' + encodeURIComponent(draft.id));
       }
     } catch (caught) {
@@ -56,12 +54,16 @@ function ActivityChoices() {
       setError(failure.response?.data?.message || 'No se pudo confirmar la actividad. Tu sesión sigue igual.');
     } finally { lock.current = false; setBusy(false); }
   }
-  return <Card><h2 className="font-semibold mb-3">Mis actividades</h2>
-    <div className="flex flex-wrap gap-2">{(Object.keys(labels) as Array<keyof typeof labels>).map(type => {
+  const choices = (Object.keys(labels) as Array<keyof typeof labels>).filter(type => mode !== 'request' || (!activities.includes(type) && !applications.data?.some(item => item.tipoActor === type && item.estado !== 'RECHAZADA')));
+  if (mode === 'request' && applications.isSuccess && !choices.length) return null;
+  const repeatApplication = mode === 'request' && choices.some(type => applications.data?.some(item => item.tipoActor === type && item.estado === 'RECHAZADA'));
+  return <Card><h2 className="font-semibold mb-3">{mode === 'request' ? repeatApplication ? 'Iniciar otra solicitud' : 'Sumar otra actividad' : 'Roles de mi cuenta'}</h2><p className="mb-3 text-sm text-neutral-600">{mode === 'request' ? 'Con la misma cuenta y CUIT. Cada actividad requiere aprobación.' : 'Elegí el rol con el que vas a trabajar.'}</p>
+    <div className="flex flex-wrap gap-2">{choices.map(type => {
       const approved = activities.includes(type);
       const inUse = !isRestricted && currentUser.rol === type;
       const application = applications.data?.find(item => item.tipoActor === type && item.estado !== 'RECHAZADA');
-      const action = application ? (['BORRADOR', 'OBSERVADA'].includes(application.estado) ? 'Continuar ' : 'Ver solicitud de ') : 'Solicitar ';
+      const rejected = applications.data?.some(item => item.tipoActor === type && item.estado === 'RECHAZADA');
+      const action = application ? (['BORRADOR', 'OBSERVADA'].includes(application.estado) ? 'Continuar ' : 'Ver solicitud de ') : rejected ? 'Nueva solicitud de ' : 'Solicitar ';
       return <Button key={type} variant="outline" disabled={busy || inUse || (!approved && !applications.isSuccess)}
         onClick={() => void choose(type, approved, application)}>{inUse ? labels[type] + ' · En uso' : approved ? 'Usar ' + labels[type] : action + labels[type]}</Button>;
     })}</div>

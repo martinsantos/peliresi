@@ -71,6 +71,7 @@ export interface ChangePasswordRequest {
 // ========================================
 
 export interface CreateManifiestoRequest {
+  idempotencyKey?: string;
   generadorId: string;
   transportistaId?: string;
   vehiculoId?: string;
@@ -133,6 +134,8 @@ export interface RegistrarIncidenteRequest {
 
 export interface ManifiestoFilters {
   estado?: EstadoManifiesto;
+  modalidad?: 'FIJO' | 'IN_SITU';
+  fase?: 'pendientes' | 'en_curso' | 'terminados' | 'post_entrega';
   generadorId?: string;
   transportistaId?: string;
   operadorId?: string;
@@ -397,6 +400,9 @@ export interface AuditoriaEntry {
 
 export interface ActorFilters {
   search?: string;
+  tipoOperador?: string;
+  corriente?: string;
+  localidad?: string;
   activo?: boolean;
   categoria?: string;
   rubro?: string;
@@ -510,6 +516,7 @@ export interface UpdateUsuarioRequest {
 }
 
 export interface UsuarioFilters {
+  estadoAcceso?: 'activo' | 'pendiente' | 'inactivo';
   rol?: Rol;
   roles?: Array<Rol | 'ADMIN_GENERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_OPERADOR'>;
   activo?: boolean;
@@ -589,7 +596,8 @@ export interface CatalogoItem {
   patente?: string;       // Vehiculo
   licencia?: string;      // Chofer
   metodo?: string;        // TratamientoAutorizado
-  usuario?: { email: string; nombre?: string };
+  usuario?: { email: string; nombre?: string; activo?: boolean };
+  aprobacionManifiesto?: { habilitada: boolean; motivo: 'ACTOR_NO_ENCONTRADO' | 'ACTOR_INACTIVO' | 'SIN_CUENTA' | 'CUENTA_INACTIVA' | null; mensaje: string | null };
   vehiculos?: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'activo'>[];
   choferes?: Pick<Chofer, 'id' | 'nombre' | 'apellido' | 'dni' | 'activo'>[];
   [key: string]: unknown;

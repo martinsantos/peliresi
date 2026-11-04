@@ -1,10 +1,12 @@
+import { toast } from '../components/ui/Toast';
+import { clearPreparedInvitations } from '../services/preparedCompanyInvitations';
 /**
  * SITREP v6 - Auth Context
  * ========================
  * Contexto de autenticacion contra API real
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,9 +24,11 @@ import type { Usuario } from '../types/models';
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
+  preferenciaEnlaces?: import('../utils/linkPreference').LinkPreference;
   empresaContexto?:import('../services/companyContext').CompanyContext;
   contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
   empresaContextoError?:string;
+  actividadContextoError?:string;
   actividades?: UserRole[];
   training?: boolean;
   id: number | string;
@@ -38,6 +42,7 @@ export interface User {
   permisos: string[];
   actorId?: string;
   esInspector?: boolean;
+  esJefeInspecciones?: boolean;
 }
 
 export interface AuthContextType {
@@ -54,8 +59,10 @@ export interface AuthContextType {
   isAdminOperador: boolean;
   isAnyAdmin: boolean;
   canAccess: (permission: string) => boolean;
-  login: (email: string, password: string) => Promise<User>;
-  logout: () => Promise<void>;
+  login: (email: string, password: string, options?: { deferWelcome?: boolean }) => Promise<User>;
+  logout: (options?: { reason: 'expired' }) => Promise<void>;
+  signOutRedirectPending: boolean;
+  finishSignOutRedirect: () => void;
   isRestricted: boolean;
   solicitudId: string | null;
   isDemo: boolean;
@@ -102,11 +109,12 @@ function apiUserToUser(u: Usuario): User {
 
   return {
     id: u.id,
+    preferenciaEnlaces: u.preferenciaEnlaces || 'AUTO',
     nombre: [u.nombre, u.apellido].filter(Boolean).join(' '),
     email: u.email,
     rol: u.rol as UserRole,
     actividades: u.actividades,
-    empresaContexto:u.empresaContexto,contextosEmpresa:u.contextosEmpresa,empresaContextoError:u.empresaContextoError,
+    empresaContexto:u.empresaContexto,contextosEmpresa:u.contextosEmpresa,empresaContextoError:u.empresaContextoError,actividadContextoError:u.actividadContextoError,
     sector: activeActor?.razonSocial || u.empresa || '',
     actorId: u.rol === 'GENERADOR' ? u.generador?.id : u.rol === 'TRANSPORTISTA' ? u.transportista?.id : u.rol === 'OPERADOR' ? u.operador?.id : undefined,
     avatar: initials,
@@ -114,6 +122,7 @@ function apiUserToUser(u: Usuario): User {
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
     esInspector: u.esInspector ?? false,
+    esJefeInspecciones: u.esJefeInspecciones ?? false,
     training: u.training === true,
   };
 }
@@ -162,8 +171,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isRestricted, setIsRestricted] = useState(false);
   const [solicitudId, setSolicitudId] = useState<string | null>(null);
   const authGeneration = useRef(0);
+  // Only a successful server validation (or its bounded offline snapshot) can
+  // bind the visible profile/draft to a token. A decoded JWT is never a profile.
+  const validatedToken = useRef<string | null>(null);
   const sessionChanging = useRef(false);
   const [offlineExpiresAt, setOfflineExpiresAt] = useState<number | null>(null);
+  const [signOutRedirectPending, setSignOutRedirectPending] = useState(false);
+  const finishSignOutRedirect = useCallback(() => setSignOutRedirectPending(false), []);
+
+  const toastIdentity = JSON.stringify([currentUser?.id ?? null, currentUser?.rol ?? null,
+    currentUser?.actorId ?? null, currentUser?.training === true, isRestricted,
+    currentUser?.empresaContexto?.empresaId ?? null,
+    currentUser?.empresaContexto?.actividadId ?? null,
+    currentUser?.empresaContexto?.establecimientoId ?? null]);
+  const previousToastIdentity = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    // Storage token rotation temporarily hides the profile until validation.
+    // Preserve notices if the server confirms the same user/activity afterwards.
+    if (isLoading && !currentUser && getAccessToken()) return;
+    if (previousToastIdentity.current !== toastIdentity) {
+      toast.clear();
+      previousToastIdentity.current = toastIdentity;
+    }
+  }, [toastIdentity, isLoading, currentUser]);
 
   // A saved profile only restores the same, unexpired session after a transport
   // failure. Reconnect/focus always asks the server again before renewing it.
@@ -181,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isCurrent = () => !disposed && generation === authGeneration.current && getAccessToken() === token;
       try {
         if (!token) {
+          validatedToken.current = null;
           clearOfflineSession();
           setCurrentUser(null);
           return;
@@ -189,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const response = await api.get(`/solicitudes/${encodeURIComponent(draftHint)}`);
           if (!isCurrent()) return;
           if (response.data?.data?.solicitud?.id !== draftHint) throw new Error('Solicitud incompatible');
+          validatedToken.current = token;
           clearOfflineSession();
           setCurrentUser(null); setOfflineExpiresAt(null);
           setIsRestricted(true); setSolicitudId(draftHint); setAuthError(null);
@@ -202,10 +234,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!restricted) setSolicitudId(null);
         if (apiUser.activo && !restricted) saveOfflineSession(mapped, token);
         else clearOfflineSession();
+        validatedToken.current = token;
         setOfflineExpiresAt(null);
         setCurrentUser(mapped);
+        setAuthError(null);
       } catch (error) {
         if (!isCurrent()) return;
+        const status = (error as { response?: { status?: number } } | null)?.response?.status;
+        if (status === 429 || status === 503) {
+          // Admission/availability is not a credential rejection. Keep an open
+          // form and the already-confirmed session, but never restore privileges
+          // from JWT hints or a cached profile after an HTTP failure.
+          if (validatedToken.current !== token) {
+            validatedToken.current = null;
+            setCurrentUser(null); setOfflineExpiresAt(null);
+            setIsRestricted(false); setSolicitudId(null);
+            qc.clear();
+          }
+          setAuthError(status === 429
+            ? 'La verificación de sesión está temporalmente limitada. Esperá unos segundos y volvé a intentar.'
+            : 'No pudimos verificar la sesión en este momento. Esperá unos segundos y volvé a intentar.');
+          return;
+        }
         if (draftHint && isOfflineNetworkError(error)) {
           // Preserve credentials for retry, granting no profile from a hint.
           clearOfflineSession(); setCurrentUser(null); setOfflineExpiresAt(null);
@@ -214,9 +264,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         const cached = token && isOfflineNetworkError(error) ? readOfflineSession(token) : null;
         if (cached) {
+          validatedToken.current = token;
           setCurrentUser(cached.user);
           setOfflineExpiresAt(cached.expiresAt);
         } else {
+          validatedToken.current = null;
           clearTokens();
           clearOfflineSession();
           localStorage.removeItem('sitrep_impersonation');
@@ -237,9 +289,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storage = (event: StorageEvent) => {
       if (event.key !== 'sitrep_access_token' && event.key !== null) return;
       if (event.oldValue === event.newValue && event.key !== null) return;
+      // A confirmed profile change clears in the layout effect. A token
+      // rotation for the same account must not clear a current action notice.
+      if (!event.newValue) toast.clear();
       // Another tab may have logged out or selected a different account.
       ++authGeneration.current;
       pendingToken = null;
+      validatedToken.current = null;
       clearOfflineSession();
       setCurrentUser(null);
       setOfflineExpiresAt(null);
@@ -256,6 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch(() => {
       if (disposed) return;
       sessionReady = true;
+      validatedToken.current = null;
       clearOfflineSession();
       setCurrentUser(null);
       setAuthError('No pudimos recuperar la sesión de forma segura. Ingresá nuevamente.');
@@ -279,6 +336,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (offlineExpiresAt === null) return;
     const timer = window.setTimeout(() => {
       ++authGeneration.current;
+      validatedToken.current = null;
       clearTokens();
       clearOfflineSession();
       localStorage.removeItem('sitrep_impersonation');
@@ -291,10 +349,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [offlineExpiresAt, qc]);
 
   // Real login via API — accepts email or CUIT
-  const login = useCallback(async (identifier: string, password: string) => {
+  const login = useCallback(async (identifier: string, password: string, options?: { deferWelcome?: boolean }) => {
+    toast.clear();
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
+    validatedToken.current = null;
     clearOfflineSession();
     setOfflineExpiresAt(null);
     setCurrentUser(null);
@@ -315,15 +375,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSolicitudId(response.solicitudId || null);
       }
       const user = apiUserToUser(response.user);
+      validatedToken.current = response.accessToken;
       if (!response.restricted && response.user.activo) saveOfflineSession(user, response.accessToken);
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
       // A verified applicant may edit drafts, but has no approved operational role.
       // Do not consume their first operational welcome before approval.
-      setShowOnboarding(!response.restricted && response.user.activo && (isFirstSession || isPostReset));
+      // A deep link is an explicit task; do not cover it with a welcome dialog.
+      // Deferring does not mark the introduction as completed.
+      setShowOnboarding(!options?.deferWelcome && !response.restricted && response.user.activo && (isFirstSession || isPostReset));
       return user;
     } catch (err: any) {
+      validatedToken.current = null;
       clearTokens();
       clearOfflineSession();
       const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';
@@ -336,11 +400,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [qc]);
 
   // Logout
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (options?: { reason: 'expired' }) => {
+    // Route guards can render before a layout's explicit navigation settles.
+    // Tell them whether this is an intentional exit or a session to resume.
+    setSignOutRedirectPending(options?.reason !== 'expired');
+    toast.clear();
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
+    validatedToken.current = null;
     const confirmation = authService.logout().catch(() => {});
+    clearPreparedInvitations();
     clearTokens();
     const localConfirmation = confirmSessionCheckpoint();
     clearOfflineSession();
@@ -354,7 +424,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const keysToClean: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('gps_pending_'))) keysToClean.push(key);
+      if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('sitrep_active_trip_v2_'))) keysToClean.push(key);
     }
     keysToClean.forEach(key => localStorage.removeItem(key));
     // Pending actions stay owner-scoped; only re-downloadable snapshots go.
@@ -369,13 +439,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await confirmation;
   }, [currentUser, qc]);
 
+  const expireSession = useCallback(() => { void logout({ reason: 'expired' }); }, [logout]);
+
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
   }, []);
 
   // Switch user — real API login with known credentials
   const switchUser = useCallback(async (userId: number) => {
+    toast.clear();
     ++authGeneration.current;
+    validatedToken.current = null;
     setIsLoading(true);
     setAuthError(null);
     if (currentUser) void clearUserOfflineData(currentUser.id);
@@ -446,6 +520,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canAccess,
     login,
     logout,
+    signOutRedirectPending,
+    finishSignOutRedirect,
     isRestricted,
     solicitudId,
     isDemo: false,
@@ -453,7 +529,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authError,
     showOnboarding,
     dismissOnboarding,
-  }), [currentUser, users, switchUser, getUsersByRole, canAccess, login, logout, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
+  }), [currentUser, users, switchUser, getUsersByRole, canAccess, login, logout, signOutRedirectPending, finishSignOutRedirect, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -468,7 +544,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onDismiss={dismissOnboarding}
         />
       )}
-      <SessionTimeoutGuard logout={logout} isAuthenticated={!!currentUser} />
+      <SessionTimeoutGuard logout={expireSession} isAuthenticated={!!currentUser} />
     </AuthContext.Provider>
   );
 };

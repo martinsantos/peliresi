@@ -9,9 +9,10 @@ import type { InspectionOperation } from '../../../services/inspectionOperations
 import React, { useMemo, useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import type { MonitorMode } from '../WarRoomPage';
 import type { ActorPosition, EnTransitoItem } from '../api/monitor-api';
+import type { TripState } from '../hooks/useTimeline';
 import {
   createGeneradorIcon,
   createTransportistaIcon,
@@ -21,6 +22,8 @@ import { EVENT_COLORS } from '../utils/war-room-icons';
 import { ACTOR_ICONS } from '../../../utils/map-icons';
 import { MapCategorySymbol, type MapCategory } from '../../../components/ui/MapLayerToggle';
 import { MonitorPopupBounds } from './MonitorPopupBounds';
+import { MonitorPopup } from './MonitorPopup';
+import { MonitorPosition } from './MonitorPosition';
 
 // Keep the Monitor on the same keyless base map already used by SITREP's
 // other map views. The former CARTO endpoint now paints API KEY REQUIRED.
@@ -45,15 +48,29 @@ function LivePopup({ category, name, children }: { category: Exclude<MapCategory
 
 const ADDRESS_STYLE: React.CSSProperties = { fontSize: 12, color: '#4b5563', marginTop: 6, whiteSpace: 'normal', overflowWrap: 'anywhere' };
 
-function tripPopup(id: string, points: number): HTMLElement {
+function tripPopup(trip: TripState): HTMLElement {
   const content = document.createElement('div');
-  content.style.cssText = 'color:#262626;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere';
+  content.style.cssText = 'color:#262626;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere;padding-right:20px';
   const heading = document.createElement('strong');
-  heading.textContent = 'EN TRÁNSITO';
+  heading.textContent = `Manifiesto ${trip.numero || 'sin número'}`;
   heading.style.cssText = 'display:block;color:#b91c1c';
   const detail = document.createElement('div');
-  detail.textContent = `${id.slice(0, 10).toUpperCase()} · ${points} puntos GPS`;
+  detail.textContent = trip.positionSource === 'retiro'
+    ? 'Retiro registrado · sin GPS recibido en la secuencia cargada.'
+    : trip.positionSource === 'generador'
+      ? 'Retiro registrado · marcador según datos actuales del generador; sin GPS recibido en la secuencia cargada.'
+      : `${trip.gpsCount} ${trip.gpsCount === 1 ? 'punto GPS recibido' : 'puntos GPS recibidos'}.`;
   content.append(heading, detail);
+  if (trip.lastGpsReceivedAt) {
+    const received = document.createElement('div');
+    const date = new Date(trip.lastGpsReceivedAt);
+    received.textContent = Number.isFinite(date.getTime())
+      ? `Recepción: ${new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Mendoza', dateStyle: 'short', timeStyle: 'medium' }).format(date)} · Mendoza`
+      : 'Hora de recepción no disponible.';
+    const note = document.createElement('div');
+    note.textContent = 'Hora de captura no disponible. Las líneas no prueban el recorrido.';
+    content.append(received, note);
+  }
   return content;
 }
 
@@ -81,7 +98,7 @@ function PlaybackCamera({ currentEvent }: { currentEvent: { lat: number; lng: nu
 
 // One selectable marker per trip; details open on demand, never competing labels.
 function PlaybackLayer({ trips }: {
-  trips: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
+  trips: Map<string, TripState>;
 }) {
   const map = useMap();
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
@@ -104,12 +121,12 @@ function PlaybackLayer({ trips }: {
       let marker = markersRef.current.get(id);
       if (marker) {
         marker.setLatLng(pos);
-        marker.setPopupContent(tripPopup(id, trip.trail.length));
+        marker.setPopupContent(tripPopup(trip));
       } else {
         marker = L.marker(pos, { icon: ACTOR_ICONS.enTransitoSelected, zIndexOffset: 3000,
-          keyboard: true, title: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase(),
-          alt: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase() })
-          .bindPopup(tripPopup(id, trip.trail.length), { minWidth: 160, maxWidth: 240, autoPan: true }).addTo(map);
+          keyboard: true, title: 'Viaje en historial: ' + (trip.numero || 'sin número'),
+          alt: 'Viaje en historial: ' + (trip.numero || 'sin número') })
+          .bindPopup(tripPopup(trip), { minWidth: 0, maxWidth: 240, maxHeight: 180, autoPan: true }).addTo(map);
         markersRef.current.set(id, marker);
       }
 
@@ -233,6 +250,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
 // ─── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
+  now?: number;
   inspections?: InspectionOperation[];
   cinemaMode: boolean;
   actores: { generadores: ActorPosition[]; transportistas: ActorPosition[]; operadores: ActorPosition[] } | null;
@@ -240,12 +258,12 @@ interface Props {
   mode: MonitorMode;
   currentHour?: number; // 0–23 — para overlay día/noche en PLAYBACK
   // Playback-specific
-  playbackTrips?: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
+  playbackTrips?: Map<string, TripState>;
   currentEvent?: { lat: number; lng: number; tipo: string; manifiestoNumero: string } | null;
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
 
-export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
+export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
 
   // Overlay día/noche — sutil, máx opacity 0.12
   const dayOverlayColor = useMemo(() => {
@@ -273,7 +291,7 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
   return (
     <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false}>
-      {mode === 'LIVE' && <MonitorPopupBounds />}
+      {(mode === 'LIVE' || mode === 'PLAYBACK') && <MonitorPopupBounds />}
       {mode === 'LIVE' && <InspectionMapLayer items={inspections} />}
       <TileLayer url={MAP_TILES} attribution={ATTRIBUTION} />
 
@@ -292,7 +310,7 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
           {/* Generadores — low z */}
           {visibleGeneradores.map(g => (
             <Marker key={`gen-${g.id}`} position={[g.lat!, g.lng!]} icon={createGeneradorIcon()} zIndexOffset={-1000} title={`Generador: ${g.razonSocial}`} alt={`Generador: ${g.razonSocial}`}>
-              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+              <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                 <LivePopup category="generador" name={g.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{g.razonSocial}</div>
                   {g.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 6 }}>CUIT {g.cuit}</div>}
@@ -322,14 +340,14 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
                   </div>
                   {g.domicilio && <div style={ADDRESS_STYLE}>{g.domicilio}</div>}
                 </LivePopup>
-              </Popup>
+              </MonitorPopup>
             </Marker>
           ))}
 
           {/* Transportistas — low z */}
           {actores?.transportistas.filter(t => t.lat && t.lng).map(t => (
             <Marker key={`trans-${t.id}`} position={[t.lat!, t.lng!]} icon={createTransportistaIcon()} zIndexOffset={-800} title={`Transportista: ${t.razonSocial}`} alt={`Transportista: ${t.razonSocial}`}>
-              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+              <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                 <LivePopup category="transportista" name={t.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{t.razonSocial}</div>
                   {t.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 6 }}>CUIT {t.cuit}</div>}
@@ -359,14 +377,14 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
                     </div>
                   </div>
                 </LivePopup>
-              </Popup>
+              </MonitorPopup>
             </Marker>
           ))}
 
           {/* Operadores — low z */}
           {actores?.operadores.filter(o => o.lat && o.lng).map(o => (
             <Marker key={`oper-${o.id}`} position={[o.lat!, o.lng!]} icon={createOperadorIcon()} zIndexOffset={-900} title={`Operador: ${o.razonSocial}`} alt={`Operador: ${o.razonSocial}`}>
-              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+              <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                 <LivePopup category="operador" name={o.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{o.razonSocial}</div>
                   {o.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 4 }}>CUIT {o.cuit}</div>}
@@ -401,7 +419,7 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
                   </div>
                   {o.domicilio && <div style={ADDRESS_STYLE}>{o.domicilio}</div>}
                 </LivePopup>
-              </Popup>
+              </MonitorPopup>
             </Marker>
           ))}
         </>
@@ -418,7 +436,7 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
             )}
             {lastPos && (
               <Marker position={[lastPos.latitud, lastPos.longitud]} icon={prominentIcon} zIndexOffset={2000} title={`Viaje en tránsito: ${trip.numero}`} alt={`Viaje en tránsito: ${trip.numero}`}>
-                <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+                <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                   <LivePopup category="enTransito" name={trip.numero}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{trip.numero}</div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>{trip.transportista}</div>
@@ -440,18 +458,11 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
                         ))}
                       </div>
                     )}
-                    <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
-                      <div style={{ background: '#fef2f2', padding: '4px 6px', borderRadius: 4 }}>
-                        <div style={{ color: '#b91c1c', fontWeight: 700 }}>Velocidad</div>
-                        <div style={{ fontFamily: 'monospace' }}>{lastPos.velocidad != null ? `${lastPos.velocidad} km/h` : '—'}</div>
-                      </div>
-                      <div style={{ background: '#fef2f2', padding: '4px 6px', borderRadius: 4 }}>
-                        <div style={{ color: '#b91c1c', fontWeight: 700 }}>GPS</div>
-                        <div style={{ fontFamily: 'monospace' }}>{trip.ruta.length} pts</div>
-                      </div>
-                    </div>
+                    <MonitorPosition position={lastPos} now={now} />
+                    <p className="text-xs text-neutral-600">{trip.ruta.length} {trip.ruta.length === 1 ? 'punto incluido' : 'puntos incluidos'} en la consulta</p>
+                    {trip.ruta.length > 1 && <p className="text-xs text-neutral-600">La línea une posiciones por orden de recepción; no confirma el recorrido.</p>}
                   </LivePopup>
-                </Popup>
+                </MonitorPopup>
               </Marker>
             )}
           </React.Fragment>

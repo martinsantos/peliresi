@@ -1,3 +1,4 @@
+import { hasInspectionManagementRole } from '../services/inspectionManagementRole.service';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Rol } from '@prisma/client';
@@ -9,6 +10,8 @@ import { verifiedImpersonator } from '../services/impersonationIdentity.service'
 import { accountActivities } from '../services/actorActivities.service';
 import { isActorActivity } from '../domain/actorActivities';
 import { resolveCompanyContext } from '../services/empresa.service';
+import { TRAINING_LOGINS, validateDirectTrainingClaim } from '../lib/trainingDirectLogin';
+import { isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 
 /** Shape of req.user set by isAuthenticated middleware. */
 export interface AuthUser {
@@ -18,6 +21,7 @@ export interface AuthUser {
   rol: Rol;
   activo: boolean;
   esInspector: boolean;
+  esJefeInspecciones?: boolean;
   generador: { id: string; [key: string]: unknown } | null;
   transportista: { id: string; [key: string]: unknown } | null;
   operador: { id: string; [key: string]: unknown } | null;
@@ -46,7 +50,13 @@ export const isAuthenticated = async (
     const token = authHeader.split(' ')[1];
     
     // Verificar el token
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
+    const decoded = jwt.verify(token, config.JWT_SECRET as string) as jwt.JwtPayload & { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
+    if (decoded.purpose !== undefined || typeof decoded.id !== 'string') throw new AppError('Este acceso no permite iniciar una sesión de usuario', 401);
+
+    if (decoded.trainingDirect !== undefined) validateDirectTrainingClaim(decoded);
+    if (decoded.realm !== undefined && (!isTrainingSession() || decoded.realm !== TRAINING_REALM)) {
+      throw new AppError('Ámbito de capacitación requerido', 401);
+    }
 
     // Before email verification this token may only operate on its own draft.
     // Do not grant access to another actor, inspection or admin endpoint.
@@ -79,6 +89,13 @@ export const isAuthenticated = async (
       throw new AppError('Usuario no autorizado', 401);
     }
 
+    if (decoded.trainingDirect !== undefined) {
+      validateDirectTrainingClaim(decoded);
+      const account = TRAINING_LOGINS.find(item => item.id === user.id);
+      if (!isTrainingSession() || !account || user.email !== account.id + '@capacitacion.invalid'
+        || user.rol !== account.rol || !user.activo || !user.emailVerified) throw new AppError('Sesión de capacitación inválida', 401);
+    }
+
     // Block inactive users UNLESS they have a restricted token
     if (!user.activo && (!decoded.restricted || user.motivoInactividad === 'SUSPENDIDA')) {
       throw new AppError('Usuario no autorizado o inactivo', 401);
@@ -94,7 +111,7 @@ export const isAuthenticated = async (
         generador:null,transportista:null,operador:null,[enterprise.key]:enterprise.actor,empresaContexto:enterprise.context };
       // These legacy sections lack a per-establishment historical contract.
       // Restricted delegates cannot inherit company-wide records through them.
-      if(!enterprise.context.todasSedes&&!/^\/api\/(?:auth\/profile|manifiestos|pdf|catalogos|notificaciones|soporte)(?:[/?]|$)/.test(req.originalUrl)) {
+      if(!enterprise.context.todasSedes&&!/^\/api\/(?:auth\/profile|manifiestos|pdf|catalogos|notificaciones|soporte|search)(?:[/?]|$)/.test(req.originalUrl)) {
         throw new AppError('Esta sección requiere autorización para todos los establecimientos de la empresa',403);
       }
     }
@@ -108,6 +125,11 @@ export const isAuthenticated = async (
       }
       req.user.rolBase = user.rol;
       req.user.rol = activity;
+    }
+    req.user.esJefeInspecciones = !req.user.restricted && !impersonatedBy && !enterprise && !activity && await hasInspectionManagementRole(user.id);
+    const operational = isActorActivity(req.user.rol) ? req.user[req.user.rol.toLowerCase() as 'generador'|'transportista'|'operador'] : null;
+    if (operational?.activo === false && !['GET','HEAD','OPTIONS'].includes(req.method) && !/^\/api\/(?:auth|solicitudes|empresas|notificaciones|soporte)(?:[/?]|$)/.test(req.originalUrl)) {
+      throw new AppError('Esta actividad está inactiva. Podés consultar el historial o elegir otra actividad aprobada desde Mi perfil.', 403);
     }
     next();
   } catch (error) {

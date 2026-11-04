@@ -6,9 +6,10 @@ import NuevoGeneradorPage from '../../pages/admin/NuevoGeneradorPage';
 import NuevoOperadorPage from '../../pages/admin/NuevoOperadorPage';
 
 const mock = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), uploadDoc: vi.fn(), success: vi.fn(), error: vi.fn(), existing: undefined as unknown }));
-vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn(), clear: vi.fn(), assertSession: vi.fn() }) }));
+vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn().mockResolvedValue(true), clear: vi.fn().mockResolvedValue(true), assertSession: vi.fn() }) }));
 vi.mock('../../services/generador-fiscal.service', () => ({ transportistaDocumentoService: { upload: mock.uploadDoc }, generadorFiscalService: { downloadDocumento: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: mock.success, error: mock.error } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-admin', rol: 'ADMIN' } }) }));
 vi.mock('../../hooks/useActores', () => {
   const create = () => ({ mutateAsync: mock.create, isPending: false });
   const update = () => ({ mutateAsync: mock.update, isPending: false });
@@ -18,7 +19,7 @@ vi.mock('../../hooks/useActores', () => {
     useUpdateTransportista: update, useUpdateGenerador: update, useUpdateOperador: update };
 });
 vi.mock('../../hooks/useEnrichment', () => ({ useGeneradoresEnrichment: () => ({ data: {} }), useOperadoresEnrichment: () => ({ data: {} }) }));
-vi.mock('../../hooks/useGeneradorFiscal', () => ({ useUploadDocumento: () => ({ isPending: false }), useUploadOperadorDocumento: () => ({ isPending: false }) }));
+vi.mock('../../hooks/useGeneradorFiscal', () => ({ useUploadDocumento: () => ({ isPending: false, mutateAsync: mock.uploadDoc }), useUploadOperadorDocumento: () => ({ isPending: false, mutateAsync: mock.uploadDoc }) }));
 vi.mock('../../components/CalculadoraTEF', () => ({ default: () => null }));
 
 function open(type: 'transportista' | 'generador' | 'operador' = 'transportista', edit = false, base = '') {
@@ -36,6 +37,15 @@ function vehicle() { step('Vehiculos'); step('Agregar'); fill(/Patente/, 'QA123Z
 
 describe('actor creation contract', () => {
   beforeEach(() => { vi.clearAllMocks(); mock.existing = undefined; mock.create.mockResolvedValue({ id: 'created' }); mock.update.mockResolvedValue({}); mock.uploadDoc.mockResolvedValue({ id: 'qa-doc', nombre: 'QA.pdf', tipo: 'OTRO', size: 100, estado: 'PENDIENTE' }); });
+  it.each([['generador', 'Factura de Luz'], ['operador', 'Factura eléctrica']] as const)('%s retains its bill attachment through administrative creation', async (type, label) => {
+    open(type); basics(); step('Regulatorio'); fill(/Password Inicial/, 'OnlyLocal-QA-secret!'); step('Adjuntos');
+    fireEvent.change(screen.getByLabelText('Adjuntar ' + label), { target: { files: [new File(['QA'], 'Factura-QA.pdf', { type: 'application/pdf' })] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Registro', exact: true }));
+    await waitFor(() => expect(screen.getByText('Listado')).toBeInTheDocument());
+    expect(mock.create).toHaveBeenCalledOnce(); expect(mock.uploadDoc).toHaveBeenCalledWith(expect.objectContaining({
+      [type + 'Id']: 'created', tipo: type === 'generador' ? 'FACTURA_LUZ' : 'FACTURA_ELECTRICA', file: expect.objectContaining({ name: 'Factura-QA.pdf' }),
+    }));
+  });
   it.each(['generador', 'operador', 'transportista'] as const)('%s focuses the first invalid field without taking focus back while typing', async type => {
     open(type); step(type === 'transportista' ? 'Siguiente' : 'Continuar');
     await waitFor(() => expect(screen.getByLabelText('Razon Social *')).toHaveFocus());
@@ -98,7 +108,8 @@ describe('actor creation contract', () => {
     open(); basics(); fill(/Password inicial|Contraseña inicial/, 'OnlyLocal-QA-secret!'); step('Confirmar');
     const button = screen.getByRole('button', { name: 'Crear Transportista' });
     act(() => { fireEvent.click(button); fireEvent.click(button); });
-    expect(mock.create).toHaveBeenCalledOnce();
+    // The synchronous submit guard covers both clicks while the draft checkpoint is awaited.
+    await waitFor(() => expect(mock.create).toHaveBeenCalledOnce());
     await act(async () => reject(new Error('QA failure')));
     fireEvent.click(button); await waitFor(() => expect(mock.create).toHaveBeenCalledTimes(2));
     expect(mock.create.mock.calls[1][0].razonSocial).toBe('QA Transporte');
@@ -119,7 +130,7 @@ describe('actor creation contract', () => {
       step(name);
       expect(screen.queryByRole('button', { name: 'Agregar' })).not.toBeInTheDocument();
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/admin/actores/transportistas/qa');
+      expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/admin/actores/transportistas/qa?tab=flota');
       expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('target', '_blank');
     }
     expect(mock.update).not.toHaveBeenCalled();
@@ -137,7 +148,7 @@ describe('actor creation contract', () => {
   it('keeps the fleet destination inside the app basename', () => {
     mock.existing = { id: 'qa', razonSocial: 'QA Transporte', cuit: '30-12345678-9', email: 'qa@night-qa.invalid', vehiculos: [], choferes: [] };
     open('transportista', true, '/app'); step('Vehiculos');
-    expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/app/admin/actores/transportistas/qa');
+    expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/app/admin/actores/transportistas/qa?tab=flota');
   });
   it.each(['generador', 'operador', 'transportista'] as const)('%s never edits an unavailable or mismatched registry record', type => {
     mock.existing = { id: 'wrong-actor', razonSocial: 'Do not reuse', cuit: '30-12345678-9', email: 'qa@night-qa.invalid' };

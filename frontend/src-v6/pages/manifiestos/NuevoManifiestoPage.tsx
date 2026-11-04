@@ -1,3 +1,5 @@
+import { useImpersonation } from '../../contexts/ImpersonationContext';
+import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Nuevo Manifiesto Page
  * ==================================
@@ -5,7 +7,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
@@ -13,7 +15,6 @@ import {
   Trash2,
   Truck,
   AlertTriangle,
-  CheckCircle2,
   Loader2,
   Info,
   MapPin,
@@ -21,16 +22,20 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-import { Badge } from '../../components/ui/BadgeV2';
+import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
+import { getApiErrorMessage } from '../../utils/api-error';
+import { manifestPartyErrors, partyApprovalMessage, partyApprovalSuffix, type ManifestPartyField } from '../../utils/manifestPartyEligibility';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
 import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 import type { CatalogoItem } from '../../types/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { companyGeneratorView } from '../../utils/enterprisePresentation';
+import { manifestDraftScope, useManifestDraft, type ManifestFormData } from '../../hooks/useManifestDraft';
+import { manifestListReturn, manifestWorkspaceReturn, previousManifestReturn } from '../../utils/manifestListReturn';
 
 function ActorSummary({ actor, label }: { actor?: CatalogoItem; label: string }) {
   if (!actor) return null;
@@ -58,30 +63,66 @@ function parseCorrientes(raw: string | string[] | null | undefined): string[] {
   return raw.split(/[,/]|(?<=\d)-(?=Y)/i).map(s => s.replace(/\s*e\s*$/, '').trim()).filter(Boolean);
 }
 
+/** Temporary access must explain the boundary before mounting a writable form. */
 export const NuevoManifiestoPage: React.FC = () => {
+  const { currentUser } = useAuth();
+  const { impersonationData, exitImpersonation } = useImpersonation();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+
+  if (impersonationData && !currentUser?.training) {
+    return (
+      <section className="mx-auto w-full max-w-xl space-y-4" aria-labelledby="temporary-manifest-title">
+        <Card>
+          <CardContent className="space-y-4 p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={24} className="mt-1 shrink-0 text-warning-700" aria-hidden="true" />
+              <div>
+                <h2 id="temporary-manifest-title" className="text-xl font-bold text-neutral-900">Estás en una vista temporal</h2>
+                <p className="mt-2 text-neutral-700">Para crear una propuesta, la persona responsable debe ingresar con su propia cuenta.</p>
+              </div>
+            </div>
+            <p className="text-sm text-neutral-700">Esta vista es de asistencia: no permite proponer ni aprobar en nombre del actor. No se creó ningún manifiesto.</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={exitImpersonation}>Volver a mi cuenta</Button>
+              <Button variant="outline" onClick={() => navigate(mp('/manifiestos'))}>Ver manifiestos</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+  return <NuevoManifiestoForm key={manifestDraftScope(currentUser)} />;
+};
+
+const NuevoManifiestoForm: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const mp = useMobilePrefix();
   const { currentUser, isAdmin, isGenerador } = useAuth();
-  const [step, setStep] = useState(1);
+  const proposalsAvailable = manifestProposalsVisible(currentUser) && ['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'].includes(currentUser?.rol || '');
+  const carrierProposal = proposalsAvailable && currentUser?.rol === 'TRANSPORTISTA';
+  const ownCarrierId = carrierProposal ? currentUser?.actorId || '' : '';
+  const operatorProposal = proposalsAvailable && currentUser?.rol === 'OPERADOR';
+  const ownOperatorId = operatorProposal ? currentUser?.actorId || '' : '';
+  const [confirmWithoutTransport, setConfirmWithoutTransport] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [refreshingParties, setRefreshingParties] = useState(false);
+  const [submitError, setSubmitError] = useState<string>();
+  const [serverPartyIssues, setServerPartyIssues] = useState<Partial<Record<ManifestPartyField, string>>>({});
   const formRef = useRef<HTMLDivElement>(null);
   const focusError = useRef(false);
   const submitting = useRef(false);
 
-  useEffect(() => {
-    if (!focusError.current) return;
-    focusError.current = false;
-    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
-    field?.focus({ preventScroll: true });
-    field?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [validationErrors, step]);
-
   // API hooks
   const createManifiesto = useCreateManifiesto();
   const { data: apiTiposResiduo } = useTiposResiduo();
-  const { data: apiGeneradores } = useCatalogoGeneradores();
-  const { data: apiTransportistas } = useCatalogoTransportistas();
-  const { data: apiOperadores } = useCatalogoOperadores();
+  const catalogoGeneradores = useCatalogoGeneradores();
+  const catalogoTransportistas = useCatalogoTransportistas();
+  const catalogoOperadores = useCatalogoOperadores();
+  const apiGeneradores = catalogoGeneradores.data;
+  const apiTransportistas = catalogoTransportistas.data;
+  const apiOperadores = catalogoOperadores.data;
 
   // Use API catalogos only
   const tiposResiduo = apiTiposResiduo || [];
@@ -89,24 +130,93 @@ export const NuevoManifiestoPage: React.FC = () => {
   const transportistasList = apiTransportistas || [];
   const operadoresList = apiOperadores || [];
 
-  // Form state
-  const [formData, setFormData] = useState({
+  const initialForm: ManifestFormData = {
     generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
     generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
     modalidad: 'FIJO' as 'FIJO' | 'IN_SITU',
-    transportista: '',
+    transportista: ownCarrierId,
     vehiculoId: '',
     choferId: '',
-    operador: '',
-    fechaRetiro: new Date().toISOString().split('T')[0],
+    operador: ownOperatorId,
+    fechaRetiro: new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Mendoza'}).format(new Date()),
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
-  });
+  };
+  const draft = useManifestDraft(manifestDraftScope(currentUser), { step: 1, form: initialForm });
+  const { step, form: formData } = draft.draft;
+  const setStep = (value: number) => draft.update(previous => ({ ...previous, step: value }));
+  const setFormData = (change: React.SetStateAction<ManifestFormData>) => draft.update(previous => ({ ...previous, form: typeof change === 'function' ? change(previous.form) : change }));
+  const listPath = mp('/manifiestos');
+  const returnTo = manifestListReturn(location.state, listPath);
+  const previousManifest = previousManifestReturn(location.state, listPath);
+  const returnToList = () => {
+    if (draft.error && draft.dirty && !window.confirm('No se pudo guardar el borrador en este dispositivo. Si cerrás la app, podrías perder lo cargado. ¿Salir igualmente?')) return;
+    if (previousManifest) {
+      const origin = manifestWorkspaceReturn(location.state, listPath);
+      navigate(previousManifest, { state: origin.label === 'Inicio' ? { manifestHomeReturn: origin.path } : { manifestListReturn: origin.path } });
+    } else navigate(returnTo);
+  };
+  const [discardDraft, setDiscardDraft] = useState(false);
+  const pendingSendNotice = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focusError.current) return;
+    focusError.current = false;
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled)') || formRef.current?.querySelector<HTMLElement>('[data-party-error]');
+    field?.focus({ preventScroll: true });
+    field?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [validationErrors, step]);
+
+  const partyProposal = proposalsAvailable;
+  const selectInSitu = () => {
+    setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: partyProposal ? prev.transportista : '', vehiculoId: '', choferId: '', operador: ownOperatorId }));
+    setConfirmWithoutTransport(false);
+    setValidationErrors(prev => { const next = { ...prev }; delete next.transportista; return next; });
+  };
 
   // Selected actor details (auto-populated from catalogs)
   const selectedGenerador = companyGeneratorView(generadoresList.find((g) => g.id === formData.generadorId),currentUser?.empresaContexto);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
+  const partyIssues: Partial<Record<ManifestPartyField, string>> = partyProposal ? {
+    generador: partyApprovalMessage(selectedGenerador),
+    transportista: partyApprovalMessage(selectedTransportista),
+    operador: partyApprovalMessage(selectedOperador),
+    ...serverPartyIssues,
+  } : {};
+  const hasPartyIssue = Object.values(partyIssues).some(Boolean) || !!submitError;
+  const clearPartyError = (field: ManifestPartyField) => {
+    setValidationErrors(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => key !== field)));
+    setServerPartyIssues(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => key !== field)));
+    setSubmitError(undefined);
+  };
+  const refreshPartyStates = async () => {
+    setRefreshingParties(true);
+    try {
+      const checks = [
+        ['generador', formData.generadorId, catalogoGeneradores],
+        ['transportista', formData.transportista, catalogoTransportistas],
+        ['operador', formData.operador, catalogoOperadores],
+      ] as const;
+      const results = await Promise.all(checks.map(async ([field, id, query]) => ({ field, id, result: await query.refetch() })));
+      setServerPartyIssues(prev => Object.fromEntries(Object.entries(prev).filter(([field]) => !results.some(check =>
+        check.field === field && !check.result.isError && check.result.data?.find((item: CatalogoItem) => item.id === check.id)?.aprobacionManifiesto?.habilitada === true))));
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        for (const { field, id, result } of results) {
+          if (result.isError) continue;
+          const actor = result.data?.find((item: CatalogoItem) => item.id === id);
+          if (actor?.aprobacionManifiesto?.habilitada === true) next[field] = '';
+          else if (actor?.aprobacionManifiesto?.mensaje) next[field] = actor.aprobacionManifiesto.mensaje;
+        }
+        return Object.fromEntries(Object.entries(next).filter(([, message]) => message));
+      });
+      if (results.some(({ result }) => result.isError)) toast.error('No se pudieron actualizar los estados', 'Revisá la conexión. Los datos del manifiesto siguen cargados.');
+      else setSubmitError(undefined);
+    } catch {
+      toast.error('No se pudieron actualizar los estados', 'Revisá la conexión. Los datos del manifiesto siguen cargados.');
+    } finally { setRefreshingParties(false); }
+  };
   const vehiculos = (selectedTransportista?.vehiculos || []).filter((v: { activo?: boolean }) => v.activo === true);
   const choferes = (selectedTransportista?.choferes || []).filter((c: { activo?: boolean }) => c.activo === true);
 
@@ -116,7 +226,7 @@ export const NuevoManifiestoPage: React.FC = () => {
     [formData.residuos]
   );
   const operadoresFiltrados = useMemo(() => {
-    let filtered = operadoresList;
+    let filtered = operatorProposal ? operadoresList.filter(o => o.id === ownOperatorId) : operadoresList;
 
     // Filter by modalidad: check modalidades array, tipoOperador, or categoria
     filtered = filtered.filter((op: any) => {
@@ -142,7 +252,7 @@ export const NuevoManifiestoPage: React.FC = () => {
     }
 
     return filtered;
-  }, [operadoresList, selectedResiduoIds, formData.modalidad]);
+  }, [operadoresList, selectedResiduoIds, formData.modalidad, operatorProposal, ownOperatorId]);
 
   // Cross-filter: residuos by generador's corrientesControl
   const genCorrientes = useMemo(() => {
@@ -165,13 +275,14 @@ export const NuevoManifiestoPage: React.FC = () => {
   }, [selectedResiduoIds, tiposResiduo]);
 
   const transportistasFiltrados = useMemo(() => {
+    if (formData.modalidad === 'IN_SITU') return transportistasList;
     if (selectedCodigos.length === 0) return transportistasList;
     return transportistasList.filter((t: any) => {
       const transCorrientes = parseCorrientes(t.corrientesAutorizadas);
       if (transCorrientes.length === 0) return true; // No data = don't filter out
       return selectedCodigos.every(c => transCorrientes.includes(c));
     });
-  }, [transportistasList, selectedCodigos]);
+  }, [transportistasList, selectedCodigos, formData.modalidad]);
 
   const handleAddResiduo = () => {
     setFormData({
@@ -197,8 +308,8 @@ export const NuevoManifiestoPage: React.FC = () => {
     if ((!targetStep || targetStep === 1) && !formData.generadorId && !formData.generador) {
       errors.generador = 'Seleccioná un generador para continuar.';
     }
-    if ((!targetStep || targetStep === 3) && formData.modalidad !== 'IN_SITU' && !formData.transportista) {
-      errors.transportista = 'Seleccioná el transportista.';
+    if ((!targetStep || targetStep === 3) && (partyProposal || formData.modalidad !== 'IN_SITU') && !formData.transportista) {
+      errors.transportista = 'Seleccioná el transportista que aprobará la propuesta.';
     }
     if ((!targetStep || targetStep === 3) && !formData.operador) {
       errors.operador = 'Seleccioná el operador de destino.';
@@ -211,6 +322,13 @@ export const NuevoManifiestoPage: React.FC = () => {
       errors.residuos = 'Completá el tipo y una cantidad mayor que cero en cada residuo, o quitá la fila que no corresponda.';
     }
 
+    if (partyProposal) {
+      if ((!targetStep || targetStep === 1) && partyIssues.generador) errors.generador = partyIssues.generador;
+      if (!targetStep || targetStep === 3) {
+        if (partyIssues.transportista) errors.transportista = partyIssues.transportista;
+        if (partyIssues.operador) errors.operador = partyIssues.operador;
+      }
+    }
     setValidationErrors(errors);
     if (Object.keys(errors).length) {
       focusError.current = true;
@@ -220,45 +338,75 @@ export const NuevoManifiestoPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (submitting.current) return;
-    if (!validateForm()) {
+    if (submitting.current || draft.conflict || draft.checkConflict()) return;
+    if (!draft.draft.pendingCreate && !validateForm()) {
       return;
     }
+    const pending = draft.prepareCreate();
+    if (!pending) {
+      toast.error('Todavía no se envió', 'No pudimos conservar la referencia del envío. Mantené esta pantalla abierta y revisá el almacenamiento del navegador.');
+      return;
+    }
+    const submittedForm = pending.form;
 
     submitting.current = true;
+    setSubmitError(undefined);
     try {
       const result = await createManifiesto.mutateAsync({
-        generadorId: formData.generadorId || formData.generador,
-        ...(formData.modalidad !== 'IN_SITU' && { transportistaId: formData.transportista }),
-        ...(formData.modalidad !== 'IN_SITU' && formData.vehiculoId ? { vehiculoId: formData.vehiculoId } : {}),
-        ...(formData.modalidad !== 'IN_SITU' && formData.choferId ? { choferId: formData.choferId } : {}),
-        operadorId: formData.operador,
-        modalidad: formData.modalidad,
-        fechaEstimadaRetiro: formData.fechaRetiro || undefined,
-        observaciones: formData.observaciones || undefined,
-        residuos: formData.residuos.map((r) => ({
+        idempotencyKey: pending.id,
+        generadorId: submittedForm.generadorId || submittedForm.generador,
+        // A pending create is an immutable command. Preserve its approving carrier
+        // even if this client now has a different proposal feature setting.
+        ...(submittedForm.transportista && (draft.draft.pendingCreate || partyProposal || submittedForm.modalidad !== 'IN_SITU') ? { transportistaId: submittedForm.transportista } : {}),
+        ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.vehiculoId ? { vehiculoId: submittedForm.vehiculoId } : {}),
+        ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.choferId ? { choferId: submittedForm.choferId } : {}),
+        operadorId: submittedForm.operador,
+        modalidad: submittedForm.modalidad,
+        fechaEstimadaRetiro: submittedForm.fechaRetiro || undefined,
+        observaciones: submittedForm.observaciones || undefined,
+        residuos: submittedForm.residuos.map((r) => ({
           tipoResiduoId: r.tipo,
           cantidad: Number(r.cantidad),
           unidad: r.unidad,
         })),
       });
 
-      toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
-      navigate(mp(`/manifiestos/${result.id}`));
+      if (result.creationRecovered) toast.success('Manifiesto recuperado', `${result.numero || result.id}. El envío ya se había guardado; no se creó otro ni se repitieron avisos.`);
+      else toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? 'Generador, transporte y operador deben aprobar desde sus cuentas.' : 'Para iniciar necesitás una nueva propuesta con las tres partes.'}`);
+      if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de este dispositivo. No vuelvas a enviar el formulario anterior.');
+      navigate(mp(`/manifiestos/${result.id}`), { state: { manifestListReturn: returnTo } });
     } catch (err: any) {
-      toast.error(
-        'Error al crear manifiesto',
-        err?.response?.data?.message || err?.message || 'Ocurrio un error inesperado'
+      // These responses definitively reject creation. Ambiguous/network failures
+      // retain the original payload and key until the person checks that same send.
+      const rejected = [400, 403, 422].includes(err?.response?.status);
+      if (rejected) draft.releaseCreate();
+      else {
+        pendingSendNotice.current?.focus({ preventScroll: true });
+        pendingSendNotice.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      const fields = manifestPartyErrors(err);
+      if (Object.keys(fields).length) {
+        setServerPartyIssues(fields);
+        setValidationErrors(fields);
+        setSubmitError('No se creó el manifiesto. Revisá las partes indicadas; todos los datos siguen cargados.');
+        focusError.current = true;
+        setStep(fields.generador ? 1 : 3);
+        return;
+      }
+      // The API client explains 429 with its retry time. Keep all fields and
+      // avoid a second, contradictory toast; only the user repeats the write.
+      if (err?.response?.status !== 429) toast.error(
+        rejected ? 'Revisá los datos del manifiesto' : 'Envío sin confirmar',
+        rejected ? getApiErrorMessage(err, 'Revisá los datos indicados; el formulario sigue cargado.')
+          : 'Revisá la conexión y usá Comprobar envío. Recuperaremos el mismo manifiesto si ya se guardó.'
       );
     } finally {
       submitting.current = false;
     }
   };
 
-  // Removed isMobile — React Router handles /app/ basename
-
-  // Only GENERADOR and ADMIN can create manifiestos
-  const canCreate = isAdmin || isGenerador;
+  // Preserve existing role and feature checks for the signed-in actor.
+  const canCreate = isAdmin || isGenerador || (operatorProposal && !!ownOperatorId) || (carrierProposal && !!ownCarrierId);
 
   if (!canCreate) {
     return (
@@ -282,9 +430,9 @@ export const NuevoManifiestoPage: React.FC = () => {
                 El perfil <span className="font-semibold">{currentUser?.rol || 'actual'}</span> no tiene permisos para crear manifiestos.
               </p>
               <p className="text-sm text-neutral-500 mb-6">
-                Solo los perfiles <span className="font-semibold">GENERADOR</span> y <span className="font-semibold">ADMIN</span> pueden crear nuevos manifiestos de residuos.
+                La creación depende del rol activo, su actor vinculado y las funciones habilitadas. Si tenés más de una actividad, seleccioná la que corresponde antes de continuar.
               </p>
-              <Button fullWidth onClick={() => navigate('/manifiestos')}>
+              <Button fullWidth onClick={() => navigate(mp('/manifiestos'))}>
                 Volver a Manifiestos
               </Button>
             </CardContent>
@@ -295,35 +443,57 @@ export const NuevoManifiestoPage: React.FC = () => {
   }
 
   return (
-    <div ref={formRef} className="mx-auto max-w-3xl min-w-0 pt-4 pb-6">
+    <div ref={formRef} className="mx-auto max-w-3xl min-w-0 pb-6" data-operational-page>
       {/* Header */}
       <header className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-col items-start gap-3 min-w-0">
             <Button
               variant="ghost"
-              size="sm"
               className="shrink-0"
-              aria-label="Volver a Manifiestos"
-              onClick={() => navigate('/manifiestos')}
+              aria-label={previousManifest ? 'Volver al manifiesto anterior' : 'Volver a Manifiestos'}
+              leftIcon={<ArrowLeft size={20} aria-hidden="true" />}
+              onClick={returnToList}
             >
-              <ArrowLeft size={20} />
+              {previousManifest ? 'Manifiesto anterior' : 'Manifiestos'}
             </Button>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Nuevo Manifiesto</h1>
-            </div>
           </div>
-          <Badge variant="soft" color="neutral" className="shrink-0">
-            Sin guardar
-          </Badge>
         </div>
       </header>
 
-      <ol aria-label="Etapas del formulario" className="flex gap-4 py-3 text-sm text-neutral-600">
-        {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={step === index + 1 ? 'font-semibold text-primary-800' : ''}>{index + 1}. {label}</li>)}
-      </ol>
+      {previousManifest && <div role="status" className="mb-3 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900">
+        <p className="font-semibold">Nueva propuesta para revisar</p>
+        <p className="mt-1">El manifiesto anterior se conserva. Sus datos y aprobaciones no se copian ni se vinculan automáticamente; revisá que no exista otra propuesta para evitar duplicados.</p>
+        {draft.restored && <p className="mt-1">Se recuperó un borrador de este dispositivo que puede pertenecer a otro manifiesto. Revisá sus datos antes de continuar.</p>}
+      </div>}
 
-      <div>
+      {!proposalsAvailable && <div role="status" className="mb-3 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+        <p className="font-semibold">Las propuestas de las tres partes no están habilitadas</p>
+        <p className="mt-1">Podés conservar un borrador, pero no iniciar la operación con una sola firma. Contactá a Ambiente para habilitar las propuestas.</p>
+      </div>}
+      {draft.conflict && <div className="mb-3"><DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} /></div>}
+      {draft.draft.pendingCreate && <div ref={pendingSendNotice} tabIndex={-1} role="status" className="mb-3 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+        <p className="font-semibold">{createManifiesto.isPending ? 'Enviando manifiesto…' : 'Envío sin confirmar'}</p>
+        <p className="mt-1">Conservamos el envío original. Comprobarlo recupera el manifiesto si ya se guardó, sin crear otro ni repetir avisos.</p>
+        <Button className="mt-3" onClick={handleSubmit} disabled={createManifiesto.isPending || draft.conflict}>Comprobar envío</Button>
+      </div>}
+      {((draft.saved && !draft.draft.pendingCreate) || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
+        <p role={draft.error ? 'alert' : 'status'} className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : <>{draft.restored ? 'Borrador recuperado' : 'Borrador guardado'}<span className="block text-xs text-neutral-600">En este dispositivo</span></>}</p>
+        {!discardDraft && !draft.draft.pendingCreate && <button type="button" aria-label="Descartar borrador" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar</button>}
+        {discardDraft && !draft.draft.pendingCreate && <div className="flex flex-wrap items-center gap-3 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span><Button size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button><Button size="sm" variant="outline" onClick={() => { if (draft.clear()) { setValidationErrors({}); setServerPartyIssues({}); setSubmitError(undefined); setConfirmWithoutTransport(false); setDiscardDraft(false); } }}>Sí, descartar</Button></div>}
+      </div>}
+
+      <ol aria-label="Etapas del formulario" className="mb-3 grid grid-cols-3 gap-2 text-sm text-neutral-600">
+        {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={`border-b-2 py-3 text-center ${step === index + 1 ? 'border-primary-700 font-semibold text-primary-800' : 'border-neutral-200'}`}>{index + 1}. {label}</li>)}
+      </ol>
+      {partyProposal && <details className="group mb-3 text-sm text-neutral-700"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se aprueba<ChevronDown size={16} aria-hidden="true" className="group-open:rotate-180"/></summary><p className="px-2 pb-3">{formData.modalidad==='IN_SITU'?'Generador, transporte y operador deben aprobar antes de comenzar el tratamiento en origen. El transporte aprueba aunque no haya viaje.':'Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro.'}{!isAdmin && ' Tu empresa queda vinculada a tu rol.'}</p></details>}
+      {hasPartyIssue && <div data-party-error tabIndex={-1} role="alert" className="mb-4 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-900">
+        <p className="font-semibold">Revisá las partes antes de crear</p>
+        <p className="mt-1">{submitError || 'Hay un actor o una cuenta que no puede aprobar. El motivo aparece junto a su selección.'}</p>
+        <Button variant="outline" className="mt-2" disabled={refreshingParties} onClick={refreshPartyStates}>{refreshingParties ? 'Actualizando estados…' : 'Actualizar estados'}</Button>
+      </div>}
+
+      <fieldset className="min-w-0" disabled={refreshingParties || !!draft.draft.pendingCreate} aria-busy={refreshingParties || createManifiesto.isPending}>
         {/* Step 1: Datos del Generador */}
         {step === 1 && (
           <Card className="p-4 sm:p-5">
@@ -337,14 +507,17 @@ export const NuevoManifiestoPage: React.FC = () => {
                   value={formData.generadorId}
                   onChange={(val) => {
                     if (val === formData.generadorId) return;
+                    clearPartyError('generador');
+                    setServerPartyIssues({});
+                    setValidationErrors({});
                     const gen = generadoresList.find((g: any) => g.id === val);
-                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: '', operador: '' });
+                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: ownCarrierId, operador: ownOperatorId });
                   }}
                   options={[...generadoresList]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                     .map((g: any) => ({
                       value: g.id,
-                      label: `${g.razonSocial || g.nombre || g.label} — ${g.cuit || ''}`,
+                      label: `${g.razonSocial || g.nombre || g.label} — ${g.cuit || ''}${partyProposal ? partyApprovalSuffix(g) : ''}`,
                     }))}
                   renderOption={(opt) => {
                     const gen = generadoresList.find((g: any) => g.id === opt.value) as any;
@@ -352,6 +525,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     return (
                       <div>
                         <div className="text-sm font-medium text-neutral-900 truncate">{gen?.razonSocial || opt.label}</div>
+                        {partyProposal && gen && partyApprovalSuffix(gen) && <p className="text-xs text-error-700">{partyApprovalSuffix(gen).replace(' · ', '')}</p>}
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-xs text-neutral-500 font-mono">{gen?.cuit || ''}</span>
                           {corrientes.length > 0 && (
@@ -369,17 +543,13 @@ export const NuevoManifiestoPage: React.FC = () => {
                   }}
                   placeholder="Buscar generador por nombre o CUIT..."
                   searchable
-                  errorMessage={validationErrors.generador}
+                  errorMessage={validationErrors.generador || partyIssues.generador}
                   size="base"
                   disabled={isGenerador}
                 />
               </div>
 
               <ActorSummary actor={selectedGenerador} label="Datos del generador" />
-
-              {!selectedGenerador && (
-                <p className="text-xs text-neutral-400 italic">Seleccioná un generador para ver sus datos</p>
-              )}
 
               <div className="flex justify-end pt-4">
                 <Button onClick={() => { if (validateForm(1)) setStep(2); }}>
@@ -394,17 +564,16 @@ export const NuevoManifiestoPage: React.FC = () => {
         {step === 2 && (
           <Card className="p-4 sm:p-5">
             <CardHeader 
-              title="Residuos a Transportar" 
+              title="Residuos declarados"
             />
             <CardContent className="space-y-4">
               {hasDeclaredResidueMatch && (
-                <div className="flex items-center gap-2 p-2.5 bg-primary-50 border border-primary-200 rounded-xl text-xs text-primary-700">
-                  <CheckCircle2 size={14} className="shrink-0" />
-                  <span>
-                    <strong>{residuosFiltrados.length}</strong> residuos inscriptos para {(selectedGenerador as any)?.razonSocial || 'el generador'}
-                    <span className="ml-1 text-primary-500">({genCorrientes.join(', ')})</span>
-                  </span>
-                </div>
+                <details className="group rounded-lg border border-neutral-200 text-sm">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+                    <span>{residuosFiltrados.length} tipos de residuos disponibles</span><ChevronDown size={16} className="shrink-0 group-open:rotate-180" aria-hidden="true"/>
+                  </summary>
+                  <p className="px-3 pb-3 text-neutral-700">Corrientes declaradas por el generador: {genCorrientes.join(', ')}.</p>
+                </details>
               )}
               {genCorrientes.length > 0 && !hasDeclaredResidueMatch && (
                 <div className="flex items-center gap-2 p-2.5 bg-warning-50 border border-warning-200 rounded-xl text-xs text-warning-700">
@@ -503,7 +672,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     setValidationErrors(prev => { const n = {...prev}; delete n.residuos; return n; });
                     // A previously selected transport must still support the updated residues.
                     if (formData.transportista && !transportistasFiltrados.some((t) => t.id === formData.transportista)) {
-                      setFormData(prev => ({ ...prev, transportista: '', vehiculoId: '', choferId: '' }));
+                      setFormData(prev => ({ ...prev, transportista: ownCarrierId, vehiculoId: '', choferId: '' }));
                     }
                     // Clear operador if no longer valid for the selected residuos
                     if (formData.operador) {
@@ -517,8 +686,8 @@ export const NuevoManifiestoPage: React.FC = () => {
                               .map((t: any) => t.tipoResiduoId)
                           );
                           const stillValid = curResiduoIds.every(id => opResiduoIds.has(id));
-                          if (!stillValid) {
-                            setFormData(prev => ({ ...prev, operador: '' }));
+                          if (!stillValid && !operatorProposal) {
+                            setFormData(prev => ({ ...prev, operador: ownOperatorId }));
                           }
                         }
                       }
@@ -543,15 +712,16 @@ export const NuevoManifiestoPage: React.FC = () => {
               {/* Modalidad selector */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Modalidad de operacion *
+                  ¿Dónde se realizará el tratamiento? *
                 </label>
                 <div role="group" aria-label="Modalidad de operación" className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     aria-pressed={formData.modalidad === 'FIJO'}
                     onClick={() => {
+                      setConfirmWithoutTransport(false);
                       if (formData.modalidad === 'FIJO') return;
-                      setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: '' }));
+                      setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: ownOperatorId }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
@@ -562,8 +732,8 @@ export const NuevoManifiestoPage: React.FC = () => {
                   >
                     <Truck size={20} className={formData.modalidad === 'FIJO' ? 'text-primary-600' : 'text-neutral-400'} />
                     <div>
-                      <p className={`text-sm font-semibold ${formData.modalidad === 'FIJO' ? 'text-primary-700' : 'text-neutral-700'}`}>Fijo</p>
-                      <p className="text-xs text-neutral-500">Requiere transporte</p>
+                      <p className={`text-sm font-semibold ${formData.modalidad === 'FIJO' ? 'text-primary-700' : 'text-neutral-700'}`}>Con traslado</p>
+                      <p className="text-xs text-neutral-600">En la planta del operador · Fijo</p>
                     </div>
                   </button>
                   <button
@@ -571,8 +741,8 @@ export const NuevoManifiestoPage: React.FC = () => {
                     aria-pressed={formData.modalidad === 'IN_SITU'}
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
-                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', vehiculoId: '', choferId: '', operador: '' }));
-                      setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
+                      if (formData.vehiculoId || formData.choferId || (!partyProposal && formData.transportista)) setConfirmWithoutTransport(true);
+                      else selectInSitu();
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
                       formData.modalidad === 'IN_SITU'
@@ -582,50 +752,59 @@ export const NuevoManifiestoPage: React.FC = () => {
                   >
                     <MapPin size={20} className={formData.modalidad === 'IN_SITU' ? 'text-emerald-600' : 'text-neutral-400'} />
                     <div>
-                      <p className={`text-sm font-semibold ${formData.modalidad === 'IN_SITU' ? 'text-emerald-700' : 'text-neutral-700'}`}>In Situ</p>
-                      <p className="text-xs text-neutral-500">Operador en sitio</p>
+                      <p className={`text-sm font-semibold ${formData.modalidad === 'IN_SITU' ? 'text-emerald-700' : 'text-neutral-700'}`}>En origen</p>
+                      <p className="text-xs text-neutral-600">El operador va al generador · In situ</p>
                     </div>
                   </button>
                 </div>
               </div>
 
+              {confirmWithoutTransport && <div role="alert" className="space-y-3 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+                {partyProposal?<p><strong>Ya asignaste vehículo o chofer.</strong> En origen no hay viaje: se quitan esas asignaciones y se conserva el transporte como aprobador.</p>:<p><strong>Ya asignaste un transporte.</strong> Pasar a tratamiento en origen lo quita del borrador, junto con su vehículo y chofer.</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setConfirmWithoutTransport(false)}>{partyProposal?'Mantener traslado':'Mantener transporte'}</Button>
+                  <Button onClick={selectInSitu}>{partyProposal?'Continuar en origen':'Continuar sin transporte'}</Button>
+                </div>
+              </div>}
+
               {/* In Situ note */}
               {formData.modalidad === 'IN_SITU' && (
                 <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
                   <MapPin size={16} className="shrink-0 mt-0.5" />
-                  <span>El operador trabajara directamente en el domicilio del generador. No se requiere transporte.</span>
+                  <span><strong>Sin traslado.</strong> El operador trabajará en el domicilio del generador. {partyProposal?'Las tres partes reciben un aviso y deben aprobar; el transporte no realiza un viaje.':'El borrador se conserva. Para iniciar necesitás una nueva propuesta con las tres partes.'}</span>
                 </div>
               )}
 
-              {/* Transportista - only shown for FIJO */}
-              {formData.modalidad === 'FIJO' && (
+              {/* In situ, the carrier approves without a vehicle or trip. */}
+              {(partyProposal || formData.modalidad === 'FIJO') && (
                 <>
                   {selectedCodigos.length > 0 && transportistasFiltrados.length < transportistasList.length && (
                     <div className="flex items-center gap-2 p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
                       <Info size={14} className="shrink-0" />
-                      <span>Mostrando <strong>{transportistasFiltrados.length}</strong> transportistas habilitados para los residuos seleccionados</span>
+                      <span>Mostrando <strong>{transportistasFiltrados.length}</strong> transportistas compatibles con los residuos seleccionados</span>
                     </div>
                   )}
                   <div>
                     <Select
-                      label="Transportista *"
+                      label={formData.modalidad === 'IN_SITU' ? 'Transportista aprobador *' : 'Transportista *'}
                       value={formData.transportista}
-                      onChange={(val) => setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' }))}
-                      options={[...transportistasFiltrados]
+                      disabled={carrierProposal}
+                      onChange={(val) => { clearPartyError('transportista'); setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' })); }}
+                      options={[...(carrierProposal ? transportistasFiltrados.filter(t => t.id === ownCarrierId) : transportistasFiltrados)]
                         .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                         .map((t: any) => ({
                           value: t.id,
-                          label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}`,
+                          label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}${partyProposal ? partyApprovalSuffix(t) : ''}`,
                         }))}
-                      placeholder={transportistasFiltrados.length === 0 ? 'No hay transportistas habilitados para estos residuos' : 'Buscar transportista por nombre o CUIT...'}
+                      placeholder={transportistasFiltrados.length === 0 ? 'No hay transportistas compatibles con estos residuos' : 'Buscar transportista por nombre o CUIT...'}
                       searchable
-                      errorMessage={validationErrors.transportista}
+                      errorMessage={validationErrors.transportista || partyIssues.transportista}
                       size="base"
                     />
                   </div>
 
                   <ActorSummary actor={selectedTransportista} label="Datos del transportista" />
-                  {selectedTransportista && <div className="grid gap-4 sm:grid-cols-2">
+                  {selectedTransportista && formData.modalidad === 'FIJO' && <div className="grid gap-4 sm:grid-cols-2">
                     <Select label="Vehículo (opcional)" value={formData.vehiculoId}
                       onChange={value => setFormData(prev => ({ ...prev, vehiculoId: value }))}
                       options={vehiculos.map((v: { id: string; patente: string; marca: string; modelo: string }) => ({ value: v.id, label: `${v.patente} · ${v.marca} ${v.modelo}`.trim() }))}
@@ -644,25 +823,26 @@ export const NuevoManifiestoPage: React.FC = () => {
                 {selectedResiduoIds.length > 0 && (
                   <div className="mb-2 text-sm text-neutral-600">
                     <span>
-                      Mostrando {operadoresFiltrados.length} operador{operadoresFiltrados.length !== 1 ? 'es' : ''} habilitado{operadoresFiltrados.length !== 1 ? 's' : ''} para los residuos seleccionados
+                      Mostrando {operadoresFiltrados.length} operador{operadoresFiltrados.length !== 1 ? 'es' : ''} compatible{operadoresFiltrados.length !== 1 ? 's' : ''} con los residuos seleccionados
                     </span>
                   </div>
                 )}
                 <Select
                   label="Operador / Destino *"
                   value={formData.operador}
-                  onChange={(val) => setFormData({ ...formData, operador: val })}
+                  disabled={operatorProposal}
+                  onChange={(val) => { clearPartyError('operador'); setFormData({ ...formData, operador: val }); }}
                   options={[...operadoresFiltrados]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                     .map((o: any) => ({
                       value: o.id,
-                      label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}`,
+                      label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}${partyProposal ? partyApprovalSuffix(o) : ''}`,
                     }))}
                   placeholder={operadoresFiltrados.length === 0 && selectedResiduoIds.length > 0
-                    ? 'No hay operadores habilitados para estos residuos'
+                    ? 'No hay operadores compatibles con estos residuos'
                     : 'Buscar operador por nombre o CUIT...'}
                   searchable
-                  errorMessage={validationErrors.operador}
+                  errorMessage={validationErrors.operador || partyIssues.operador}
                   size="base"
                 />
               </div>
@@ -671,7 +851,7 @@ export const NuevoManifiestoPage: React.FC = () => {
 
               <div>
                 <Input
-                  label="Fecha estimada de retiro"
+                  label={formData.modalidad==='IN_SITU'?'Fecha prevista de inicio':'Fecha estimada de retiro'}
                   type="date"
                   value={formData.fechaRetiro}
                   onChange={(e) => setFormData({ ...formData, fechaRetiro: e.target.value })}
@@ -699,7 +879,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <Button
                   leftIcon={createManifiesto.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   onClick={handleSubmit}
-                  disabled={createManifiesto.isPending}
+                  disabled={createManifiesto.isPending || refreshingParties || draft.conflict}
                 >
                   {createManifiesto.isPending ? 'Guardando...' : 'Crear Manifiesto'}
                 </Button>
@@ -707,7 +887,7 @@ export const NuevoManifiestoPage: React.FC = () => {
             </CardContent>
           </Card>
         )}
-      </div>
+      </fieldset>
     </div>
   );
 };

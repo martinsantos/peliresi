@@ -166,3 +166,38 @@ it.each(['login', 'logout'] as const)('forgets renewal proof on %s', async bound
   else clearTokens();
   expect(localStorage.getItem('sitrep_token_renewals')).toBeNull();
 });
+
+const refreshHttpError = (status: number) => new AxiosError('Temporary refresh rejection', 'ERR_BAD_RESPONSE', undefined, undefined,
+  { status, statusText: '', data: {}, headers: { 'retry-after': '5' }, config: {} as InternalAxiosRequestConfig });
+
+it.each([
+  ['429', () => refreshHttpError(429)],
+  ['503', () => refreshHttpError(503)],
+  ['network', () => new AxiosError('Network unavailable', 'ERR_NETWORK')],
+  ['timeout', () => new AxiosError('Request timed out', 'ECONNABORTED')],
+  ['connection timeout', () => new AxiosError('Connection timed out', 'ETIMEDOUT')],
+] as const)('retains refresh credentials on %s, rejects queued work without replay, and permits a later retry', async (_label, makeError) => {
+  const { adapter, first, second, failRefresh } = await queuedRequests();
+  const failure = makeError();
+  failRefresh(failure);
+  expect(await first).toBe(failure);
+  expect(await second).toBe(failure);
+  expect(adapter).toHaveBeenCalledTimes(2);
+  expect(getAccessToken()).toBe('inspector-access');
+  expect(localStorage.getItem('sitrep_refresh_token')).toBe('inspector-refresh');
+  vi.mocked(axios.post).mockResolvedValueOnce({ data: { data: { accessToken: 'inspector-recovered', refreshToken: 'recovered-refresh' } } });
+  expect((await api.get('/explicit-retry', { adapter })).status).toBe(200);
+  expect(adapter).toHaveBeenCalledTimes(4);
+  expect(getAccessToken()).toBe('inspector-recovered');
+});
+
+it.each([401, 403])('still clears the session when renewal rejects its credentials with HTTP %s', async status => {
+  const { adapter, first, second, failRefresh } = await queuedRequests();
+  const failure = refreshHttpError(status);
+  failRefresh(failure);
+  expect(await first).toBe(failure);
+  expect(await second).toBe(failure);
+  expect(adapter).toHaveBeenCalledTimes(2);
+  expect(getAccessToken()).toBeNull();
+  expect(localStorage.getItem('sitrep_refresh_token')).toBeNull();
+});

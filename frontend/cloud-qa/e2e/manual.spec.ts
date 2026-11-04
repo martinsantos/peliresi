@@ -1,7 +1,9 @@
+import { isolatedMapTiles } from './helpers';
 import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 
 test('packaged manual: home -> real alert tutorial -> captured sources -> mobile index and reload, without business writes', async ({ page }, info) => {
+  await isolatedMapTiles(page, info);
   const errors: string[] = [], businessRequests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });

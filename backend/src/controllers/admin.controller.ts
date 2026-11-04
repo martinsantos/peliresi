@@ -40,11 +40,11 @@ const updateUsuarioSchema = z.object({
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { search, rol, roles, activo, emailVerified, esInspector, excludeSelf, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    const { search, rol, roles, activo, estadoAcceso, emailVerified, esInspector, excludeSelf, page = 1, limit = 10, sortBy, sortOrder } = req.query;
     if (!/^\d+$/.test(String(page)) || !/^\d+$/.test(String(limit)) || !Number.isSafeInteger(Number(page)) || !Number.isSafeInteger(Number(limit)) || Number(page) < 1 || Number(limit) < 1) {
       throw new AppError('Paginación inválida', 400);
     }
-    for (const value of [esInspector, excludeSelf]) {
+    for (const value of [activo, esInspector, excludeSelf]) {
       if (value !== undefined && value !== 'true' && value !== 'false') throw new AppError('Filtro de usuarios inválido', 400);
     }
     const skip = (Number(page) - 1) * Number(limit);
@@ -93,6 +93,13 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
       if (emailVerified !== 'true' && emailVerified !== 'false') throw new AppError('Filtro de verificación inválido', 400);
       where.emailVerified = emailVerified === 'true';
     }
+    if (estadoAcceso !== undefined) {
+      if (typeof estadoAcceso !== 'string' || !['activo', 'pendiente', 'inactivo'].includes(estadoAcceso)) throw new AppError('Estado de cuenta inválido', 400);
+      const access = estadoAcceso === 'activo' ? { activo: true }
+        : estadoAcceso === 'pendiente' ? { activo: false, motivoInactividad: 'PENDIENTE_APROBACION' }
+        : { activo: false, OR: [{ motivoInactividad: null }, { motivoInactividad: { not: 'PENDIENTE_APROBACION' } }] };
+      where.AND = [...(where.AND || []), access];
+    }
 
     const [usuarios, total] = await Promise.all([
       prisma.usuario.findMany({
@@ -110,6 +117,7 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
           activo: true,
           esInspector: true,
           emailVerified: true,
+          motivoInactividad: true,
           notifNuevoRegistro: true,
           createdAt: true,
           generador: { select: { id: true, razonSocial: true } },

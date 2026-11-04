@@ -9,6 +9,8 @@ import { describeSupportFile, discardSupportFiles, persistSupportFiles, resolveS
 const userSelect = { id: true, nombre: true, apellido: true } as const;
 const fileSelect = { id: true, nombre: true, mime: true, bytes: true, sha256: true } as const;
 const ticketInclude = { autor: { select: userSelect }, responsable: { select: userSelect }, registradoPor: { select: userSelect } } as const;
+// Technical receipt, never a ticket workflow transition or a conversation event.
+const WITHDRAWN_SEND = 'ENVIO_RETIRADO';
 type Db = Prisma.TransactionClient;
 async function staff(user: AuthRequest['user'], db: Db = prisma) {
   if (!user || user.restricted || user.activo === false) return false;
@@ -37,14 +39,24 @@ function inputBody(req: AuthRequest) {
 function checkHash(old: { huella: string }, fingerprint: string) {
   if (old.huella !== fingerprint) throw new AppError('La clave de envío ya se usó para otro contenido', 409);
 }
-async function notices(db: Db, ticket: { id: string; numero: number }, recipients: string[], actorId: string, title: string, evento = 'ACTUALIZACION') {
+async function notices(db: Db, ticket: { id: string; numero: number }, recipients: string[], actorId: string, title: string, evento = 'ACTUALIZACION', message = 'Consultá el ticket en Soporte.') {
   const ids = Array.from(new Set(recipients)).filter(id => id !== actorId);
   if (!ids.length) return;
   // Deliberately direct durable in-app writes. No dispatcher, SMTP, push or jobs.
   await db.notificacion.createMany({ data: ids.map(usuarioId => ({ usuarioId, tipo: 'INFO_GENERAL', titulo: title,
-    mensaje: supportNumber(ticket.numero) + ' · Consultá el ticket en Soporte.',
+    mensaje: supportNumber(ticket.numero) + ' · ' + message,
     datos: JSON.stringify({ tipo: 'soporte', evento, interno: evento === 'NOTA' || evento === 'CLASIFICAR', ticketId: ticket.id, ruta: '/soporte/' + ticket.id }), prioridad: 'NORMAL' })) });
 }
+const supportNoticeCopy = {
+  RESPONDER: ['Nueva respuesta en el ticket', 'Abrí el ticket para leer la respuesta.'],
+  NOTA: ['Nueva nota interna de soporte', 'Abrí el ticket para consultar la nota.'],
+  TOMAR: ['Ticket con responsable asignado', 'Abrí el ticket para seguir su atención.'],
+  DERIVAR: ['Ticket derivado a tu atención', 'Abrí el ticket para continuar su atención.'],
+  ESPERAR: ['Se solicitó una respuesta', 'Revisá el ticket para continuar su atención.'],
+  CERRAR: ['Ticket cerrado', 'Abrí el ticket para consultar la resolución.'],
+  REABRIR: ['Ticket reabierto', 'Abrí el ticket para continuar su atención.'],
+  CLASIFICAR: ['Clasificación del ticket actualizada', 'Abrí el ticket para consultar la clasificación.'],
+} as const;
 async function team(db: Db = prisma) {
   // Directory is staff-only. Keep the public ticket/author projection unchanged.
   return db.usuario.findMany({ where: { activo: true, OR: [{ rol: 'ADMIN' }, { agenteSoporte: { habilitado: true } }] }, select: { ...userSelect, email: true }, orderBy: { nombre: 'asc' } });
@@ -129,7 +141,7 @@ export async function obtenerTicket(req: AuthRequest, res: Response, next: NextF
     const [mensajes, eventos] = await Promise.all([
       prisma.mensajeSoporte.findMany({ where: { ticketId: ticket.id, ...(managing ? {} : { interno: false }) },
         include: { autor: { select: userSelect }, adjuntos: { select: fileSelect } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
-      prisma.eventoSoporte.findMany({ where: { ticketId: ticket.id, ...(managing ? {} : { interno: false }) },
+      prisma.eventoSoporte.findMany({ where: { ticketId: ticket.id, accion: { not: WITHDRAWN_SEND }, ...(managing ? {} : { interno: false }) },
         select: { id: true, accion: true, estadoAnterior: true, estadoNuevo: true, version: true, createdAt: true, responsableAnteriorId: true, responsableNuevoId: true,
           usuario: { select: userSelect }, detalle: managing }, orderBy: { version: 'asc' } }),
     ]);
@@ -182,6 +194,30 @@ export async function crearTicket(req: AuthRequest, res: Response, next: NextFun
   } catch (error) { next(error); }
   finally { if (!committed && stored.length) await discardSupportFiles(stored); }
 }
+/** Reconcile an uncertain send before editing. The tombstone shares the action
+ * lock and unique key, so an older request cannot commit after recovery. */
+export async function recuperarAccionTicket(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const clienteId = key(req);
+    await access(req);
+    const result = await prisma.$transaction(async db => {
+      await db.$queryRaw`SELECT id FROM tickets_soporte WHERE id = ${req.params.id} FOR UPDATE`;
+      const { ticket } = await access(req, db);
+      const previous = await db.eventoSoporte.findUnique({ where: { ticketId_usuarioId_clienteId: { ticketId: ticket.id, usuarioId: req.user.id, clienteId } } });
+      if (previous && previous.accion !== WITHDRAWN_SEND) {
+        return { id: ticket.id, version: previous.version, status: 'confirmed', replay: true };
+      }
+      if (!previous) await db.eventoSoporte.create({ data: {
+        ticketId: ticket.id, usuarioId: req.user.id, clienteId, huella: '', accion: WITHDRAWN_SEND,
+        estadoAnterior: ticket.estado, estadoNuevo: ticket.estado, version: ticket.version,
+        responsableAnteriorId: ticket.responsableId, responsableNuevoId: ticket.responsableId,
+        interno: true, detalle: { motivo: 'Recuperación solicitada por el autor del envío' },
+      } });
+      return { id: ticket.id, version: ticket.version, status: 'rejected', replay: !!previous };
+    });
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+}
 export async function accionarTicket(req: AuthRequest, res: Response, next: NextFunction) {
   let stored: SupportFile[] = [];
   let committed = false;
@@ -202,7 +238,12 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
       await db.$queryRaw`SELECT id FROM tickets_soporte WHERE id = ${req.params.id} FOR UPDATE`;
       const { ticket, managing } = await access(req, db);
       const previous = await db.eventoSoporte.findUnique({ where: { ticketId_usuarioId_clienteId: { ticketId: ticket.id, usuarioId: req.user.id, clienteId } } });
-      if (previous) { checkHash(previous, huella); return { id: ticket.id, version: ticket.version, replay: true }; }
+      if (previous?.accion === WITHDRAWN_SEND) {
+        const rejected = new AppError('Este envío se retiró para corregirlo. Recuperá el contenido antes de preparar otro.', 409);
+        rejected.code = 'SUPPORT_ACTION_NOT_APPLIED';
+        throw rejected;
+      }
+      if (previous) { checkHash(previous, huella); return { id: ticket.id, version: previous.version, replay: true }; }
       if (ticket.version !== input.version) throw new AppError('El ticket cambió. Actualizá antes de volver a actuar.', 409);
       const own = ticket.autorId === req.user.id;
       const assigned = managing && (ticket.responsableId === req.user.id || req.user.rol === 'ADMIN');
@@ -264,12 +305,20 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
           ...(input.accion === 'DERIVAR' ? { desde: ticket.responsable?.nombre || 'Sin asignar', hacia: (await db.usuario.findUnique({ where: { id: responsableId! }, select: userSelect }))?.nombre || 'Responsable' } : {}) } } });
       const recipients = internal ? [responsableId].filter((id): id is string => !!id) : [ticket.autorId, responsableId].filter((id): id is string => !!id);
       if (own && !responsableId && !internal) recipients.push(...(await team(db)).map(user => user.id));
-      await notices(db, ticket, recipients, req.user.id, input.accion === 'DERIVAR' ? 'Ticket derivado a tu atención' : 'Actualización de soporte', input.accion);
+      // A response by the author to a closed ticket also reopens it. Describe
+      // the resulting state in both the bell and any future email template.
+      const noticeEvent = input.accion === 'RESPONDER' && own && ticket.estado === 'CERRADO' ? 'REABRIR' : input.accion;
+      const [noticeTitle, noticeMessage] = supportNoticeCopy[noticeEvent];
+      await notices(db, ticket, recipients, req.user.id, noticeTitle, noticeEvent, noticeMessage);
       return { id: ticket.id, version: updated.version, replay: false };
     });
     committed = !result.replay;
     res.json({ success: true, data: result });
-  } catch (error) { next(error); }
+  } catch (error) {
+    // Absence alone is not durable: another attempt may still be in flight.
+    // Only an existing withdrawal receipt proves this key cannot commit later.
+    next(error);
+  }
   finally { if (!committed && stored.length) await discardSupportFiles(stored); }
 }
 export async function descargarAdjuntoSoporte(req: AuthRequest, res: Response, next: NextFunction) {

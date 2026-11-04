@@ -202,7 +202,7 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
     await capture(page, info, surface);
     if (surface.name === 'manifests' && info.project.name === 'app') {
       const help = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
-      const create = page.getByRole('button', { name: 'Nuevo manifiesto', exact: true });
+      const create = page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true });
       await expect(help).toBeVisible(); await expect(create).toBeVisible();
       const helpBox = (await help.boundingBox())!, createBox = (await create.boundingBox())!;
       expect(createBox.y - helpBox.y - helpBox.height, 'Help must leave a real touch gap above the create action').toBeGreaterThanOrEqual(12);

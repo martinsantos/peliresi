@@ -6,11 +6,12 @@ import { parsePagination } from '../utils/pagination';
 import { applyRoleFilter, canAccessManifiesto } from '../utils/roleFilter';
 import { MANIFIESTO_DETAIL_INCLUDE } from '../utils/manifiestoIncludes';
 import { parseDateParam } from '../utils/dateRange';
+import { manifestReadiness } from '../domain/manifestProposal';
 
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page, limit, sortBy, sortOrder } = req.query;
+    const { estado, fase, modalidad, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page, limit, sortBy, sortOrder } = req.query;
     const { skip, take, page: pageNum, limit: limitNum } = parsePagination(
         { page: page as string, limit: limit as string },
         { limit: 10, maxLimit: 500 }
@@ -18,7 +19,25 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
 
     const where: any = {};
 
+    if (modalidad !== undefined) {
+      if (modalidad !== 'FIJO' && modalidad !== 'IN_SITU') throw new AppError('Filtro de modalidad inválido', 400);
+      // Older fixed-plant records may predate the explicit modalidad field.
+      if (modalidad === 'FIJO') where.AND = [{ OR: [{ modalidad: 'FIJO' }, { modalidad: null }] }];
+      else where.modalidad = 'IN_SITU';
+    }
+
+    const phaseStates: Record<string, string[]> = {
+      pendientes: ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO'],
+      en_curso: ['EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'],
+      terminados: ['TRATADO', 'RECHAZADO', 'CANCELADO'],
+      post_entrega: ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'RECHAZADO', 'CANCELADO'],
+    };
+    if (fase && (typeof fase !== 'string' || !Object.prototype.hasOwnProperty.call(phaseStates, fase))) {
+      throw new AppError('Filtro de etapa inválido', 400);
+    }
     if (estado) where.estado = estado;
+    else if (typeof fase === 'string') where.estado = { in: phaseStates[fase] };
+    if (!estado && fase === 'post_entrega') where.fechaEntrega = { not: null };
     if (generadorId) where.generadorId = generadorId;
     if (transportistaId) where.transportistaId = transportistaId;
     if (operadorId) where.operadorId = operadorId;
@@ -64,7 +83,7 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
             ? { generador: { razonSocial: dir } }
             : sortBy === 'operador'
               ? { operador: { razonSocial: dir } }
-              : estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
+              : fase === 'post_entrega' || estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
             : estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' }
             : estado === 'TRATADO' ? { fechaCierre: 'desc' }
             : { createdAt: 'desc' };
@@ -136,7 +155,7 @@ export const getManifiestoById = async (req: AuthRequest, res: Response, next: N
 
     res.json({
       success: true,
-      data: { manifiesto }
+      data: { manifiesto: { ...manifiesto, aprobacionOperacion: manifestReadiness(manifiesto, manifiesto.eventos) } }
     });
   } catch (error) {
     next(error);

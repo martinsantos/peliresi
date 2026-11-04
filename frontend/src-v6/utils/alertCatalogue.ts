@@ -6,7 +6,7 @@ export function cataloguePath(raw: string | null | undefined, recipient = false)
     const safe = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
     if (data.tipo === 'requerimiento_inspeccion' && safe(data.inspeccionId)) {
       if (recipient && !['participacion', 'inspeccion'].includes(data.destino)) return null;
-      return `/${recipient && data.destino === 'participacion' ? 'mis-inspecciones' : 'inspecciones'}/${data.inspeccionId}`;
+      return `/${recipient && data.destino === 'participacion' ? 'requerimientos' : 'inspecciones'}/${data.inspeccionId}`;
     }
     if (data.tipo === 'vencimiento_documental') {
       if (recipient && data.destino === 'perfil') {

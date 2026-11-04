@@ -28,6 +28,8 @@ export interface CRUDStatCard {
 // ========================================
 export interface CRUDFilter {
   key: string;
+  label?: string;
+  defaultValue?: string;
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
@@ -109,9 +111,6 @@ export interface CRUDPaginationConfig {
 export interface GenericCRUDConfig<T> {
   // Page metadata
   title: string;
-  subtitle: string;
-  icon: ReactNode;
-  iconBg: string;       // e.g. 'bg-purple-100'
 
   // Data
   data: T[];
@@ -125,6 +124,7 @@ export interface GenericCRUDConfig<T> {
   /** Bounded table sizing for pages with many responsive columns. */
   tableClassName?: string;
   getRowKey: (item: T) => string;
+  getRowLabel?: (item: T) => string;
   onRowClick?: (item: T) => void;
   emptyMessage?: string;
 
@@ -152,7 +152,6 @@ export interface GenericCRUDConfig<T> {
   // Actions — header buttons
   onNew?: () => void;
   newLabel?: string;     // e.g. "Nuevo Generador"
-  mobileNewLabel?: string;
 
   // Export
   csvExport?: CRUDExportConfig;

@@ -1,32 +1,519 @@
-# SITREP — traspaso vigente después del despliegue
+# SITREP — traspaso vigente de operación
 
-**Actualizado el 18/10/2026. Producto desplegado: `1ab057a57e07237625b3f9fb34d5e80623ecd4bf` en `sitrep.ultimamilla.com.ar`, backend, web y `/app`, a las 08:01:26 de Mendoza.** Integración a `main` completada. Este documento reemplaza el estado de candidato del 17/10; el cierre documental posterior no cambia el producto publicado.
+## Publicación vigente — padrones y navegación, 24/10/2026
 
-Última comprobación productiva: 18/10, 08:03:04 de Mendoza, dos instancias online sin reinicios imprevistos. Este cierre se elaboró desde la evidencia guardada: **no volvió a contactar producción**. Detalle, hashes, incidencias y rollback: [CIERRE-PRODUCCION-20261018.md](CIERRE-PRODUCCION-20261018.md).
+**7af655f7 publicado en backend, web, app y manual a las 17:52:58 Mendoza.** Incluye 7d2d943f: recorridos por rol, Inicio compacto, Listado/Programados separados, padrones/altas coherentes, filtros y regreso identificado. Backend recompilado sin diferencias de código. [Cierre, límites y reversión vigente](DESPLIEGUE-PADRONES-20261024.md).
 
-## 1. Fuente exacta y continuidad
+Preview: **463 frontend + 20 HTTP PASS**, 13 pruebas repetidas finales y recorridos reales web/app. Publicación: **2538 archivos Git exactos**, builds/tipos PASS, smoke **216/216 + externo 9/9 + PWA 8/8**, sólo GET sin logins ni operaciones de negocio. Dos workers online; .env/flags/esquema idénticos; CAP cerrado, correos/push apagados. Sin main, migraciones, datos reales, push ni workflows.
+
+Respaldo /var/backups/sitrep/20261024-producto-7af655f7; reversión preparada a **51e4271a**, SW **trazabilidad-rrpp-v175** y app **20261024205017**. Manual **2026.24.1**, SW **trazabilidad-rrpp-v174**, app **20261024204815**. Runtime QA cerrado. Pendientes del refactor y Android físico conservados en el cierre; no declarar todo el producto validado.
+
+## Publicación anterior — espacios por rol, 24/10/2026
+
+**51e4271a publicado en backend, web, app y manual a las 12:07:22 Mendoza.** Menú/permisos coherentes por función, Inicio con una lista de pendientes, Empresas sólo con acceso útil y actores respondiendo únicamente al requerimiento desde Avisos. Backend limita directorio/expediente; administradores e inspectores designados mantienen sus atribuciones.
+
+Preview: **330 frontend + 212 backend + 20 HTTP PASS**, recorridos web/app documentados. Publicación: **2.528 archivos Git exactos**, builds/tipos PASS, smoke productivo **187/187 + externo 9/9 + PWA 8/8**, sólo GET sin logins ni operaciones de negocio. Dos workers online; .env/flags/esquema idénticos; CAP cerrado, correos/push apagados; sin main, migraciones, datos reales, push ni workflows.
+
+[Cierre, límites y reversión vigente](DESPLIEGUE-ROLES-20261024.md). Respaldo privado /var/backups/sitrep/20261024-producto-51e4271a; reversión preparada a **75168a08**, SW **v173** y app **20261024150633**. No usar reversiones históricas. Manual **2026.24.1**, SW **v172**, app **20261024150317**. Runtime QA cerrado; Android físico sigue pendiente. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — último rol y borrador, 24/10/2026
+
+**75168a08 publicado en backend, web, app y manual a las 08:30:48 Mendoza.** Al reabrir se recupera el último rol G/T/O elegido y su borrador, por cuenta/contexto; cada pestaña mantiene su propio rol. Preferencia local, sujeta a permisos del servidor. Manual **2026.24.1**, SW **v170**, app **20261024112723**.
+
+Preview: **87 unitarias + 6 ciclos de reapertura web/app PASS**, 33 observaciones DOM/capturas; no son 33 E2E independientes. Build de **2.522 archivos Git exactos**; tipos/backend/web/app PASS. Producción: **187/187 + externo 9/9 + PWA 8/8 PASS**, sólo lectura, sin logins ni operaciones de negocio. Dos workers en línea, .env/flags/esquema idénticos; CAP cerrado, correos/push apagados; sin main, migraciones, datos reales, push ni workflows.
+
+[Cierre, límites y reversión vigente](ULTIMO-ROL-Y-BORRADOR-20261024.md). Respaldo privado en `/var/backups/sitrep/20261024-producto-75168a08`; reversión preparada a **462ad75a**, SW **v171**, app **20261024113005**. No usar reversiones históricas. Runtime QA cerrado; Android físico y cierre de PWA instalada siguen pendientes. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — borrador después del cierre, 24/10/2026
+
+**462ad75a publicado en backend, web, app y manual a las 06:52:10 Mendoza.** Nuevo Manifiesto recupera campos/paso después de cerrar y reabrir el mismo navegador/app, por cuenta/rol/actor/contexto; migra las copias abiertas de la versión anterior y no resucita lo creado/descartado. Manual **2026.24.1**, SW **v168**, app **20261024094810**.
+
+**190 unitarias únicas + 33 E2E PASS**, incluidos 12 cierres completos de Chromium y cuatro roles en web/web móvil/app. 10 unitarias repetidas finales, sin duplicarlas en el total. Build exacto de 2.520 archivos. Producción **187/187 + 9/9 + 8/8 PASS** en lectura. .env/flags iguales; CAP cerrado, correos/push apagados; sin main, datos reales, migración, push ni workflows.
+
+[Cierre y reversión vigente](BORRADOR-PERSISTENTE-20261024.md). Reversión a **dd4eb8bc**, respaldos en /var/backups/sitrep/20261024-producto-462ad75a; worker de reversión **v169**. El borrador vence tras siete días sin editar y no cruza dispositivos/perfiles. Android físico pendiente. Runtime QA cerrado. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — continuidad e Inspecciones móvil, 23/10/2026
+
+**dd4eb8bc publicado en backend, web, app y manual a las 22:44:34 Mendoza.** Borrador de nuevo manifiesto por pestaña/cuenta/rol/actor; regreso con filtros; panel expandido móvil desplazable; Inspecciones móvil compacta. Manual **2026.23.8**, SW **v166**, app **20261024014143**.
+
+**185 unitarias y 42 E2E únicos PASS** en preview artificial, cuatro roles, escritorio/web móvil/app. Build de 2.517 archivos Git exactos. Producción: **187/187 + externo 9/9 + PWA 8/8 PASS**; formulario/regreso con filtros web e Inspecciones móvil verificados en navegador real, sólo lectura. Dos workers en línea; .env/flags idénticos; CAP cerrado, correos/push apagados. Sin main, datos reales, migración, push ni workflows.
+
+[Cierre, evidencia y reversión vigente](DESPLIEGUE-CONTINUIDAD-20261023.md). Reversión a **b891e288** preparada en /var/backups/sitrep/20261023-producto-dd4eb8bc, con SW **v167**. Android físico pendiente; el borrador no se sincroniza entre dispositivos ni garantiza sobrevivir al cierre de la pestaña. Runtime de pruebas cerrado. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — elegibilidad, claridad y navegación, 23/10/2026
+
+**b891e288 publicado en backend, web, app y manual a las 21:30:00 Mendoza.** Incluye las tres tandas de preview de abajo: elegibilidad por parte, claridad de agenda/avisos y navegación/espaciado. [Cierre, evidencia y reversión vigente](DESPLIEGUE-NAVEGACION-20261023.md). Manual **2026.23.7**, SW **v164**, app **20261024002325**.
+
+Build de 2.509 archivos exactos; cambios de producto cotejados con 68 pruebas backend, 178 interfaz/manual y 21 E2E únicos del preview (6 repetidos finales). Producción sólo lectura: **187/187 + externo 9/9 + PWA 8/8 PASS**, dos workers en línea. .env/flags idénticos, CAP cerrado, correos/push apagados. Sin main, datos reales, migración, push ni workflows.
+
+Respaldo y reversión a **bc0e103b** en /var/backups/sitrep/20261023-producto-b891e288; frontend rollback con SW **v165**. No usar reversiones históricas. Android físico y pendientes de concurrencia siguen abiertos. Los apartados inferiores son antecedentes; sus indicaciones de «no publicado» quedan sustituidas para estas tres tandas.
+
+## Publicación anterior — aprobaciones y avisos, 23/10/2026
+
+**`bc0e103b` publicado en backend, web, app y manual a las 18:46:58 Mendoza.** Incluye `81c36219`, guardas de aprobaciones explícitas, avisos/campana, contexto de agenda, vista temporal, Ayuda, Monitor y Antecedentes integrado. [Cierre, evidencia, límites y reversión](DESPLIEGUE-APROBACIONES-20261023.md).
+
+**293 backend + 191 frontend/manual, 42 E2E únicos PASS**; ajuste visual final: 33 unitarias y 3 E2E repetidos. Smoke producción **182/182**, externo **9/9**, PWA **8/8**, agendas web/app y Monitor real verificados en lectura. Manual **2026.23.4**, SW **v162**, app **20261023214321**. `.env` y flags idénticos, CAP cerrado, correos/push apagados, sin main, datos reales, migración ni workflows.
+
+**Caso 2026-000197 histórico intacto, sin conversión ni aprobaciones retroactivas.** La regla nueva cubre nuevas propuestas; no declarar migrados los documentos anteriores. Pruebas de transiciones sólo en preview artificial; producción sólo lectura, Android físico pendiente. Reversión vigente a `6580c1ca` preparada en `/var/backups/sitrep/20261023-producto-bc0e103b`; frontend rollback específico con SW v163. Runtime QA cerrado. Las secciones inferiores son antecedentes, no reemplazan este cierre.
+
+## Publicación anterior — identidad, experiencia y concurrencia, 23/10/2026
+
+**`6580c1ca` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 23/10/2026 14:21:27 Mendoza.** Incluye toda la tanda acumulada desde `a7f20d2f`: identidad/PDF/correos/iconos, bienvenida por rol, preferencia web/app, ayuda contextual y cuatro correcciones de concurrencia. Leer [publicación, respaldo y reversión vigente](DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md).
+
+Build de **2.483 archivos Git exactos**, backend/Prisma/tipos/web/app PASS con API final y flags actuales. Backup completo verificado antes de las **dos migraciones aditivas**; operativo y CAP compatibles, sin habilitar CAP. Smoke **182/182**, externo **9/9**, PWA público **8/8**; sin logins ni operaciones de negocio. Workers 1/2 estables. `.env` idéntico, uploads conservados; **CAP cerrado, correos/push apagados**. Manual **2026.23.3**, SW **v160**, app **20261023171533**.
+
+**Reversión vigente a `a7f20d2f`**, preparada y no ejecutada, conserva base/migraciones/flags. Worker rollback **v161**. No usar reversiones históricas. Pruebas funcionales previas en preview: 1.653 backend, 132 frontend dirigidas, 15 grupos concurrentes y 12 E2E únicos, más revisión de identidad documentada. No repetirlas como pruebas productivas.
+
+**Pendientes explícitos:** limpieza de contadores abandonados bloqueada por el control automático (expiración funcional), carga sostenida, durabilidad de eventos/reconexión GPS y Android físico. Sin main, push ni workflows. Preview permanece activo. Los cierres inferiores describen antecedentes; esta sección sustituye las indicaciones de “sólo preview” y migraciones pendientes de esa tanda.
+
+## Correcciones de concurrencia — verificadas sólo en preview, 23/10/2026
+
+**Cuatro defectos corregidos:** vehículo/chofer de Monitor por asignación y tramo, últimos 500 puntos GPS sin perder el más reciente, incidencia única ante eventos simultáneos y cuotas compartidas por persona que no bloquean a todos los usuarios de una IP. Web/app conservan sesión y formularios ante esperas temporales. Leer [cambios, pruebas y pendientes](CORRECCIONES-CONCURRENCIA-20261023.md).
+
+**1.653 backend / 132 frontend dirigidas / 15 grupos concurrentes / 12 E2E únicos PASS**; builds/tipos/migración artificial PASS. Manual **2026.23.3**. Primeros fallos del guion GPS y del mensaje de login conservados; correcciones y repeticiones documentadas. Lint: 0 errores/68 advertencias. 64 tablas QA protegidas intactas; cero envíos.
+
+Preview activo en **http://127.0.0.1:4177**, serial/un worker/1 CPU/2 GiB/sin swap adicional; dos API dentro del mismo límite para probar coordinación. Sin producción, main, push ni workflows. CAP cerrado, correos/push apagados. **No acredita capacidad sostenida ni Android físico.**
+
+**Pendiente operativo:** limpieza de claves abandonadas de admisión bloqueada por el control automático; no se eludió ni se borraron registros. Expiración/reutilización sí funcionan, pero no se declara acotado el tamaño total. Migración nueva `20261023133000_shared_api_admission` y previa `20261023120000_user_link_preference` pendientes de una publicación futura autorizada. Publicación documentada sigue `a7f20d2f`; los cierres inferiores son antecedentes.
+
+## Revisión de identidad y concurrencia — preview activo, 23/10/2026
+
+**Antecedente: diagnóstico inicial; los cuatro fallos fueron corregidos en la tanda de concurrencia de arriba. Los cambios de identidad siguen sólo en preview.** Leer [identidad y experiencia](PRODUCTO-IDENTIDAD-AYUDA-20261023.md) y [auditoría operativa](CONCURRENCIA-OPERATIVA-20261023.md).
+
+SITREP y flecha verdes sobre blanco; cabecera PDF con Mendoza/DGFA a la izquierda y SITREP a la derecha, proporcional al correo. Incluye acceso público, recuperación, relevo externo, manual, favicon, icono maskable y página offline. Bienvenida por rol, preferencia web/app y ayuda disponibles en el preview.
+
+Validación nueva desde `df55126b`: **240 unitarias dirigidas / 54 E2E únicos PASS**, 22 secciones por superficie, 14 PDF/43 páginas, 198 escenarios de comunicaciones/614 renders. Backend/tipos/builds PASS; lint 37 archivos: 0 errores/36 advertencias. No confundir con las suites completas históricas de abajo.
+
+Carga sintética serial: tandas de **50/100/200 acciones HTTP** sin errores; aprobaciones repetidas y conflicto de adenda consistentes. **Pendientes confirmados:** Monitor muestra vehículo de la empresa en vez del asignado; incidente GPS duplicado 20 veces; endpoint de recorrido pierde el punto 501; límite por IP bloquea 100/700 solicitudes válidas. No hay certificación de capacidad productiva.
+
+**Preview disponible en http://127.0.0.1:4177 mediante túnel privado en esta Mac**, contenedor `sitrep-qa-training-20261018`, PostgreSQL/runtime conservados activos para revisión. Guardas verificadas: CAP cerrado, cero intentos/envíos/cola activa, correos/push apagados, 64 tablas QA protegidas intactas. 1 CPU/2 GiB/swap cero, sin OOM. Sin producción, main, push ni workflows; cierre con `[skip ci]`.
+
+La publicación documentada sigue siendo `a7f20d2f`; migración de preferencia `20261023120000_user_link_preference` pendiente de una publicación autorizada. No publicar bundles QA `/api`. Android físico, GPS de sensores, PWA instalada, clúster y entrega externa no certificados. Los cierres inferiores son históricos.
+
+## Identidad, bienvenida y enlaces — sólo preview, 23/10/2026
+
+**Corregido y probado; no publicado.** Leer [cambios, galería, pruebas y límites](PRODUCTO-IDENTIDAD-AYUDA-20261023.md). Cabecera PDF institucional compartida, flecha verde sobre blanco sin recuadro, paginado/documentos extensos, bienvenida por ocho perfiles, preferencia Web/App guardada por persona y ayuda contextual antes del reporte técnico. Corregidos títulos de secciones en web/app. Los documentos firmados existentes conservan sus bytes.
+
+**1.597 backend / 1.879 frontend / 141 E2E únicos PASS**; comprobaciones posteriores: 80 unitarias de layouts, 21 de enlaces y 8 del manual, más navegador afectado. **47 E2E por superficie**, sin contar repeticiones. 14 PDF/43 páginas, revisión de 22 secciones por superficie, galería 198 escenarios. Tipos/builds PASS. Lint de 31 archivos modificados: cero errores/31 advertencias; el lint global mantiene deuda preexistente, detallada en el informe.
+
+Manual **2026.23.1**, renderer/recorridos preservados y cabecera blanca. Nueva migración aditiva **20261023120000_user_link_preference**, probada sólo en base artificial; publicación futura requiere backup/migración y builds con API final. Los bundles QA no se publican.
+
+**CAP cerrado, correos/push apagados, cero envíos; sin producción, main, push ni workflows.** Preview serial/un worker/1 CPU/2 GiB/swap cero, cerrado **23/10/2026 11:00:33 Mendoza**, imagen/base/evidencias conservadas; límite de memoria alcanzado sin OOM. La publicación y reversión vigentes siguen siendo las de `a7f20d2f` de abajo. Android físico, sensores, captura por PWA instalada y entrega externa pendientes.
+
+## Validación adicional — web y app en preview, 23/10/2026
+
+**105/105 E2E y 382/382 unitarias dirigidas PASS** sobre producto `a7f20d2f`, sin cambios de producto ni despliegue. Leer [alcance, resultados y evidencia](VALIDACION-WEB-APP-PREVIEW-20261023.md). Login, una razón social con G/T/O y dos personas en total incluida la titular, representantes, propuestas por los tres actores, ciclo completo con certificados y enlaces exactos tras login. **35 E2E por superficie**: escritorio, web angosta y `/app`; 249 capturas. Se conserva el fallo inicial del guion de entrega y su corrección, seguida de 3/3 ciclos completos PASS.
+
+**CAP cerrado, correos/push apagados, cero envíos**. Preview serial/un worker/1 CPU/2 GiB/swap cero, detenido **23/10/2026 07:47:43 Mendoza**; bases artificiales e imagen conservadas, sin OOM. Sin producción, main, push ni workflows. Manual **2026.22.7** verificado, sin cambios. Android físico queda para cuando el dueño tenga el teléfono; no certifica PWA instalada, sensores ni entrega externa. La publicación y reversión vigentes de abajo no cambian.
+
+## Publicación vigente — empresa y multirol, 22/10/2026
+
+**`a7f20d2f` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 22:47:21 Mendoza.** Leer primero [resultado, respaldo y reversión vigente](DESPLIEGUE-MULTIROL-20261022.md). **Empresa y multirol habilitados** en backend/web/app; una razón social, varias actividades aprobadas y **dos personas en total incluida la titular**, sin sumar cupos por rol o sede. Sin vincular cuentas existentes por inferencia.
+
+Pruebas nuevas sobre el commit final: **1.582/1.582 backend, 1.862/1.862 frontend y 33/33 E2E PASS**, sin omitidos/reintentos; HTTP **131 + 133 solicitudes**, empresa **7 grupos** y multirol **8 grupos PASS**; 66 capturas. Compilación/tipos/builds PASS, **2.444 archivos Git exactos**, API final. Preview serial/un worker/1 CPU/2 GiB/swap cero, detenido **22:43:59 Mendoza**, bases artificiales e imagen conservadas; sin OOM.
+
+**CAP cerrado, correos/push apagados**; uploads, identidad y demás flags conservados. Sólo cambian empresa/multirol. Sin migraciones: **28/28 ya aplicadas**, esquema idéntico. Backup privado completo verificado antes de activar. Smoke no mutante **161/161 + externo 9/9 + PWA 8/8**, sin sesiones ni operaciones sobre datos de negocio. Dos workers estables. Manual **2026.22.7**, mismo renderer/CSS; SW **v158**, app **20261023014306**.
+
+**Reversión vigente a 712de167**, preparada y no ejecutada, con empresa/multirol apagados como antes, demás guardas conservadas, sin restaurar base ni borrar registros. Worker de reversión v159/app 20261023014611. No usar reversiones históricas. Main intacto; sin push/workflows, cierre `[skip ci]`. Android físico, PWA instalada y entrega externa siguen pendientes. Los cierres anteriores son antecedentes.
+
+## Validación previa — multirol y dos personas, 22/10/2026
+
+**Validación previa, incorporada en la publicación a7f20d2f de arriba.** Leer [correcciones, alcance y evidencia](MULTIROL-DOS-PERSONAS-20261022.md). Una razón social con G/T/O mantiene **dos personas en total, incluida la titular**, compartidas entre roles y sedes. Corregidos el bypass de tercera persona en alta/aprobación, la inferencia de solicitudes pendientes, invitaciones duplicadas o irrecuperables y una consulta blockchain ajena al alcance del representante de una sede. Sin ampliar permisos ni alterar históricos.
+
+**1.582 backend / 1.858 frontend / 33 E2E únicos PASS**; después del último ajuste de visibilidad, **30 unitarias y 3 E2E** finales PASS. Invitaciones y tres roles de la segunda persona repitieron otros **6 E2E PASS**; no suman casos únicos. HTTP **131 + 133 solicitudes**, empresa **7 grupos** y multirol **8 grupos PASS**. Tipos/builds PASS, lint 0 errores/42 advertencias, 84 capturas. Manual **2026.22.7**, mismo renderer/CSS. El informe conserva el timeout inicial de la suite completa y el detalle cosmético previo del encabezado de Transporte.
+
+**1.038 tablas QA previas intactas**, cero intentos/envíos/cola activa; CAP cerrado y correos/push apagados. Preview detenido **21:38:34 Mendoza**, imagen/base/evidencias preservadas, serial/un worker/1 CPU/2 GiB/swap cero, sin OOM ni presión. Main intacto; sin producción, push ni workflows; cierre `[skip ci]`.
+
+Al cerrar esa revisión, producción seguía en **712de167** con empresa/multirol apagados. La publicación a7f20d2f de arriba la incorpora y habilita. Android físico y entrega externa pendientes; los bundles QA `/api` no se publican.
+
+## Publicación anterior — comunicaciones, 22/10/2026
+
+**`712de167` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 20:15:03 Mendoza.** Leer [evidencia y reversión vigente](ENLACES-AVISOS-CORREOS-20261022.md). Incluye enlaces exactos de correos/campana, plazo PSIP, recordatorios desde la firma y las revisiones previas de formularios/representación. Manual **2026.22.6**, estilos y renderer conservados.
+
+Build serial remoto de **2.439 archivos Git exactos**, API final, 1 CPU/2 GiB/swap cero; backend, tipos, web y app PASS, sin OOM. Smoke no mutante **150/150 + externo 9/9 + PWA 8/8**, sin logins, consultas a datos de negocio ni mutaciones. Dos workers estables. `.env` idéntico; **CAP cerrado, correos/push apagados y flags actuales**. Empresa y multirol continúan apagados. Sin migraciones ni instalación de dependencias; archivos, cuentas y uploads conservados.
+
+**Reversión vigente a 8a4d8225 en los cuatro componentes**, sin restaurar la base. Respaldo privado de configuración verificado. SW raíz **v156**, app **20261022230746**. Un control detuvo la activación de frontend al observar reinicios concurrentes de SGI; PM2 confirma que nuestro comando sólo recargó SITREP (IDs 1/2). Se verificó estabilidad de SITREP y se completó frontend; incidencia y evidencias conservadas, sin administrar servicios ajenos.
+
+Preview detenido **20:16:27 Mendoza**; imagen/base/evidencia conservadas. Main intacto, sin push ni workflows, cierre documental `[skip ci]`. QA previa: **1.579 backend / 1.854 frontend / 45 E2E únicos**, no se vuelve a contar como prueba de producción. Android físico, captura del enlace por PWA instalada y entrega externa siguen sin certificar.
+
+Las secciones de QA que siguen son antecedentes; esta publicación las incorpora sin habilitar empresa/multirol.
+
+## Enlaces y comunicaciones verificados — sólo preview, 22/10/2026
+
+**Cerrado, no publicado.** Leer [contrato de enlaces, eventos, plazos y evidencia](ENLACES-AVISOS-CORREOS-20261022.md). Base `443cafe9`. Acceso principal `/app/` y alternativa web al mismo registro; destino conservado tras login, adenda exacta y ficha privada de aviso. Resúmenes con acceso por aviso; plazo PSIP conservado. **Los 30 días se cuentan desde la firma**, por decisión del dueño: fases idempotentes a los 23 y 30 días, con supresión al cerrar/cancelar/rechazar y revalidación antes de una entrega futura.
+
+**1579 backend / 1854 frontend / 45 E2E únicos PASS**, 75 capturas; tipos/builds y galería 198 escenarios PASS. Lint 0 errores/66 advertencias. Manual **2026.22.6**, renderer/CSS conservados. Galería en `test-results-communication-links-20261022/gallery/index.html`; 197 muestras de correo, 167 de campana, ocho perfiles; control de emisores nuevos sin catalogar.
+
+**975 tablas QA previas intactas**, cero intentos/entregas/cola activa; CAP cerrado y correos/push apagados. Preview detenido **22/10/2026 19:40:52 Mendoza**, imagen/base/evidencias conservadas. Serial/un worker/1 CPU/2 GiB/swap cero, sin OOM. Sin producción, main, datos reales, push ni workflows. Cierre `[skip ci]`.
+
+La publicación documentada permanece en **8a4d8225**. Esta tanda, ABM/representación y la revisión previa continúan sin publicar. No usar bundles QA `/api` en producción. **Android físico y apertura automática en PWA instalada siguen pendientes**; correo externo y push no se enviaron ni certificaron.
+
+## Revisión web/app cerrada — sólo preview, 22/10/2026
+
+**Cerrada, no publicada.** Leer [correcciones, matriz y evidencia](REVISION-WEB-APP-20261022.md). Base `891cfc86`; se corrige pérdida de texto al completar envíos/cambiar de actividad, controles pequeños, encabezados, prioridad de observaciones y contraste. Manual **2026.22.5**, mismo renderer/CSS.
+
+**316 E2E únicos PASS**, sin casos pendientes en el consolidado. Suites completas: **1542 backend / 1842 frontend** antes de los últimos ajustes; regresión final **122 unitarias PASS**. Tipos/builds PASS; lint 0 errores/43 advertencias. Representación 131 solicitudes HTTP, multirol 8 grupos, relevos 18, flota 8, seguimiento/conciliación 7+7. Las repeticiones no se suman como casos únicos.
+
+**912 tablas QA previas intactas**, cero intentos/entregas/cola activa; CAP cerrado y correos/push apagados. Preview cerrado **22/10/2026 18:32:36 Mendoza**, imagen/base/evidencias conservadas. Serial/un worker/1 CPU/2 GiB/swap cero; alcanzó el límite de memoria sin OOM. Sin producción, main, datos reales, push ni workflows; cierre `[skip ci]`.
+
+**Android físico queda al final por pedido del dueño.** No es certificación de dispositivos ni entrega externa. La publicación documentada sigue siendo `8a4d8225`; esta tanda y ABM/representación siguen sin publicar. No usar bundles QA `/api` para producción.
+
+## Revisión ABM y representación — sólo preview, 22/10/2026
+
+Leer primero [alcance, cambios, pruebas y cierre](ABM-MULTIROL-REPRESENTANTES-20261022.md). Identidad por CUIT con G/T/O aprobados; máximo **dos personas en total incluida la titular**, compartido entre roles/establecimientos; responsable explícito, invitaciones y revocaciones separadas. Altas revisadas y administrativas vinculan la entidad; no se duplican cuentas ni se cambian históricos por inferencia. Formularios conservan cambios ante avisos/conflictos. Campana y familia de correo `representacion`, sin activar entregas.
+
+**1.542 backend / 1.842 frontend / 105 E2E únicos PASS**; regresión final 68 backend, 26 frontend y 15 E2E, manual final 8 unit + 3 E2E (repeticiones). HTTP 7 grupos empresa + 8 multirol + 131 solicitudes. Manual **2026.22.4**, mismo renderer/CSS y dos capturas directas. Galería 20 plantillas / 40 vistas con logos locales, sin red ni envíos. Lint 0 errores/49 advertencias; builds/tipos PASS.
+
+**849 tablas QA previas intactas**, cero cola activa/intentos/entregas; CAP cerrado, proveedores/correos/push apagados. Preview cerrado **15:11:38 Mendoza**, 1 CPU/2 GiB/swap cero, sin OOM; alcanzó el límite de memoria en el bloque completo. Imagen/base/evidencias conservadas. No se accedió a producción ni se modificó main; sin push/workflows, commit `[skip ci]`.
+
+**No publicado.** Producción sigue en **8a4d8225** y su reversión vigente de abajo. Empresas y multirol permanecen apagados allí; publicar/activar esta tanda requiere autorización expresa. No usar bundles QA `/api` para producción. No certifica dispositivos físicos, documentos fiscales ni entrega externa de correo.
+
+## Publicación vigente — eventuales, 22/10/2026
+
+**`8a4d8225` publicado en backend, web, app y manual el 22/10/2026 12:18:43 Mendoza.** Búsqueda completa y etapas, retorno al filtro, actualización entre participantes y recuperación de acciones/notas sin pérdida ni duplicación. Leer primero [cambios, evidencia y reversión vigente](EVENTUALES-CONTINUIDAD-20261022.md).
+
+**1.497 backend / 1.818 frontend / 30 E2E únicos / 6 grupos HTTP PASS**; comprobaciones finales dirigidas y del manual detalladas en el informe. Manual **2026.22.3**, renderer/CSS conservados. Build de **2.397 blobs exactos**, API final y flags actuales. Smoke no mutante **144/144 + externo 9/9 + PWA 8/8**; dos workers estables. Sin migraciones ni cambios de configuración/datos de negocio. **CAP cerrado, correos/push apagados**, cuentas/uploads conservados. SW v154/app 20261022151220.
+
+**Reversión vigente a backend/web/app/manual 45c79bb9**, con idéntico esquema, flags y contratos de escritura; preparada, no ejecutada. No restaurar base ni usar reversiones anteriores. Preview detenido 22/10/2026 12:15:02 Mendoza; imagen/base/evidencias conservadas, sin OOM (el build alcanzó el límite de memoria y recuperó caché). Main intacto, commits `[skip ci]`, sin push/workflows. No certifica dispositivos físicos ni entrega externa.
+
+## Publicación anterior — circuitos y continuidad, 22/10/2026
+
+**`45c79bb9` publicado en backend, web, app y manual el 22/10/2026 10:34:40 Mendoza.** Leer primero [cambios, evidencia, respaldo y reversión vigente](REACTIVACION-CIRCUITOS-20261022.md). Incluye agenda completa, certificados pendientes y continuidad de formularios (`5080ee82`); **eventuales/adendas/revisión habilitados**. Autoridades de adendas por los cuatro roles activos, sin cambiar cuentas; eventuales conservan autoridad ADMIN.
+
+**1.481 backend / 1.811 frontend / 62 E2E únicos / 27 grupos HTTP PASS**, 171 capturas; manual 2026.22.2. Backup completo verificado antes de la única migración aditiva de borradores; public/CAP compatibles, CAP cerrado. Smoke no mutante **144/144 + externo 9/9 + PWA 8/8**. Dos workers estables, correos/push apagados, uploads y cuentas conservados. SW v152/app 20261022132606.
+
+**Reversión histórica de aquella publicación, sustituida por la de 8a4d8225: sólo de interfaz a 86a9b790**, conservando backend 45c79bb9, todos los flags y registros; preparada, no ejecutada. No usar reversiones antiguas ni restaurar base. Preview detenido 22/10/2026 10:28:46 Mendoza, sin OOM/presión; imagen/base/evidencias conservadas. Main intacto, cierre `[skip ci]`, sin push/workflows. No es certificación de dispositivos físicos ni entrega externa.
+
+## Revisión de agenda, certificados y continuidad — sólo preview, 22/10/2026
+
+**Validación previa de la primera tanda, incorporada en la publicación 45c79bb9 de arriba.** Leer [cambios, manual, evidencia y condiciones de publicación](AGENDA-CERTIFICADOS-CONTINUIDAD-20261022.md). Agenda de manifiestos paginada sin corte de cien, búsqueda/filtros completos y tareas de certificación final; recuperación de altas de G/T/O con datos, paso y adjuntos privados, guardado automático y conflictos explícitos. Históricos y permisos conservados. Manual **2026.22.1**, mismo renderer/CSS.
+
+**1.473/1.473 backend, 1.811/1.811 frontend y 32/32 navegador**, sin omitidos ni reintentos, en escritorio/web angosta/app; **99 capturas E2E**. Migración aditiva de dos tablas en esquema artificial y builds/tipos PASS; lint dirigido sin errores (47 advertencias). **660 tablas QA previas intactas**, cero intentos/cola activa de correo, cuatro alias CAP 403; canales apagados en ambos procesos.
+
+Preview serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG cerrados y contenedor detenido **09:06:57 Mendoza**. El cgroup tocó el límite de memoria sin OOM; imagen/base/evidencias preservadas. No se accedió a producción; `main` `c840219` intacto, sin push/workflows; cierre `[skip ci]`. No certifica teléfonos físicos ni entrega externa.
+
+**Condiciones de aquella validación, cumplidas en 45c79bb9:** autorización y respaldo antes de la migración `20261022130000_actor_form_drafts`. Adjuntos recuperables en el directorio privado hermano `${UPLOADS_DIR}-private-drafts`, que también debe conservarse y respaldarse. No usar bundles QA `/api` ni revertir borradores borrando tablas/archivos. La publicación y la reversión vigentes figuran en el cierre 45c79bb9 de arriba.
+
+## Publicación anterior — correos 86a9b790, 22/10/2026
+
+**`86a9b790` publicado en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el 22/10/2026 07:01:00 Mendoza.** Leer primero [despliegue, comprobaciones y reversión vigente](DESPLIEGUE-CORREOS-20261022.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión. Manual **2026.21.5**, renderer/CSS conservados.
+
+**Configuración íntegra conservada**: `.env` SHA `c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6`, uploads/identidades y todos los flags actuales. **CAP cerrado, correos/push apagados**; sin envíos. Respaldo de configuración y releases anteriores verificado; sin migraciones, instalaciones productivas, consultas o cambios de datos de negocio.
+
+Build exacto de **2.371 blobs**, API final, backend/tipos/web/app PASS; serial/un worker/1 CPU/2 GiB/swap cero. Smoke no mutante **139/139**, externo **9/9**, PWA **8/8**. Dos workers estables, SW raíz **v150** y app **20261022095612**. Preview detenido **06:56:51 Mendoza**, sin OOM; base/imagen/evidencias conservadas.
+
+**Reversión vigente: backend/web/app/manual 19230380, todos los flags actuales y guardas de certificados conservados**, SW v151/app 20261022095932; preparada, no ejecutada. No restaurar una base ni usar la reversión anterior que apagaba certificados. Main `c840219` intacto; cierre `[skip ci]`, sin push/workflows.
+
+## Validación previa — tres correcciones de correos, 21/10/2026
+
+**Validación previa de `86a9b790`, publicado según el cierre de arriba.** Leer [correcciones, galería, manual y evidencia](CORREOS-CLARIDAD-20261021.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión de certificados. Destinatarios, permisos, enlaces, controles y circuitos conservados. Manual **2026.21.5**, mismo renderer/CSS.
+
+Preview: **160 backend / 37 interfaz y manual / 15 E2E** PASS; backend y builds web/app PASS. Galería actualizada: **180 escenarios, 9/9 grupos**, cero desbordes/errores/solicitudes externas. **536 tablas QA previas intactas**, cero intentos/envíos/cola activa, cuatro alias CAP 403. Serial/un worker/1 CPU/2 GiB/swap cero; contenedor detenido **21:34:23 Mendoza**, sin OOM; base/imagen/evidencias conservadas.
+
+**En esa revisión no se accedió a producción. La publicación posterior figura arriba.** CAP cerrado y correos/push apagados. Main `c840219` intacto; commits `[skip ci]`, sin push/workflows. No certifica entrega externa ni dispositivos físicos. Galería local: `test-results-communications-20261021/index.html`.
+
+## Última publicación — certificados 19230380, 21/10/2026
+
+**`19230380` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 20:37:40 Mendoza**. **Certificados habilitados.** Leer primero [despliegue, respaldo, pruebas y reversión vigente](DESPLIEGUE-CERTIFICADOS-20261021.md). Operador firma parciales/final; partes vinculadas reciben avisos en campana y descargan el mismo PDF. No se enviaron correos ni push.
+
+**Backup verificado antes de migrar**: 23.787.087 bytes, SHA-256 `f103820b2b67f50e41ebb5c3c826789f1269a195ad0745a9608149ebf2f8cef3`, archivo privado en servidor y lectura completa sin restaurar. Única migración `20261021200000_manifest_certificates`, aplicada/verificada en public y CAP; historial anterior intacto, sin DML de negocio. No se consultaron registros reales.
+
+Única activación: `MANIFEST_CERTIFICATES_ENABLED=true` y par Vite true. Resto de bytes de `.env` conservados; nuevo SHA `c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6`. Propuestas/relevos/GPS múltiple true; adendas/revisión/eventuales false, autoridades sin asignar. **CAP cerrado, correos/push apagados**, uploads e identidades conservados; comprobado en ambos workers y PM2 guardado.
+
+Build de **2.366 blobs exactos**, API final, backend/tipos/web/app PASS; serial/un worker/1 CPU/2 GiB/swap cero. Smoke no mutante **138/138**, externo **9/9**, PWA **8/8**; dos workers estables, sin logins ni emisiones reales. Manual **2026.21.4**, renderer/CSS conservados; SW raíz **v148**, app **20261021233319**.
+
+**Reversión vigente: apagar emisión y conservar backend/interfaz/manual 19230380, documentos, descargas y guardas. No ejecutar reversiones anteriores ni restaurar una base antigua.** Preparada y verificada, sin ejecutar; SW v149/app 20261021233627. Preview detenido **20:34:59 Mendoza**, sin OOM; imagen/base/evidencias preservadas. Main `c840219` intacto; cierre documental `[skip ci]`, sin push ni workflows.
+
+## Validación previa — certificados ordinarios, 21/10/2026
+
+**Validación previa a la publicación 19230380 registrada arriba.** Leer [emisión, acceso, avisos, evidencia y límites](CERTIFICADOS-OPERATIVOS-20261021.md). Operador vinculado firma y emite parciales/final; generador y transporte reciben el aviso en la campana y descargan el mismo PDF conservado. Se corrigió el refresco de la bandeja abierta y el acceso al documento exacto. Totales, concurrencia, adendas y expediente firmado protegidos; históricos preservados.
+
+Preview: suites completas **1456 backend / 1801 frontend** antes de los últimos ajustes; regresión final **95 backend / 127 frontend** PASS. **6/6 E2E únicos** en web/web angosta/app, API **6 grupos**, flag off y dos PDF PASS. Manual **2026.21.4**, **6 unit + 3 E2E** finales (subconjunto repetido), mismo renderer/CSS y capturas directas. Tipos/builds/lint sin errores; alcance de cada revisión detallado en el informe, sin GO global ni certificación física.
+
+**475 tablas previas QA intactas**, 55 sobres de correo simulados, cero cola activa/intentos/envíos; cuatro alias CAP 403, proveedores/push apagados. Preview serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG/contenedor cerrados **20:09:40 Mendoza**, sin OOM/presión; base, imagen y evidencias preservadas.
+
+La revisión previa incorporó la migración aditiva `20261021200000_manifest_certificates` y flags independientes de certificados. La publicación autorizada y su nueva reversión están arriba; el informe conserva el alcance de las pruebas previas. Producción no se accedió durante esa revisión de QA. Main intacto, sin push/workflows.
+
+## Publicación anterior — autoridades 66a1c29e, 21/10/2026
+
+**`66a1c29e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 15:45:25 Mendoza**. Leer primero [publicación, evidencia y reversión vigente](DESPLIEGUE-AUTORIDADES-20261021.md). Soporte de cuatro funciones de autoridad incorporado, con designación explícita por ID; asignación de cuentas diferida por el dueño.
+
+**Configuración íntegra conservada**: adendas/revisión/eventuales false, propuestas/relevos/GPS múltiple true, autoridades sin asignar; CAP cerrado y correos/push apagados. `.env` idéntico por hash `97ef23d52f52f0f9b17ce26e467880670f264671c5a14acc8750feb94835d28f`, uploads/identidades y PM2 conservados. Sin consultas o modificaciones de negocio, main ni workflows.
+
+Build exacto de **2.350 blobs**, API final, backend/tipos/web/app PASS; serial/1 CPU/2 GiB/swap cero. **Sin migraciones o instalaciones productivas**; respaldo de release/configuración verificado. Smoke no mutante **132/132**, externo **9/9**, PWA **8/8**; dos workers estables. Manual **2026.21.3**, renderer/CSS conservados; SW raíz **v146**, app **20261021184131**.
+
+Reversión preparada a interfaz/manual **47ea8470**, conservando **backend 66a1c29e y todos los flags**. No usar reversiones anteriores que deshabilitan propuestas o degradan guardas; no restaurar base. Preview detenido **21/10/2026 15:42:23 Mendoza**, sin OOM/presión, evidencias preservadas. Cierre `[skip ci]`, sin push. Validación funcional previa: 1451 backend / 1796 frontend / 18 E2E, detallada abajo; no se repitió en producción.
+
+## Autoridades de adendas — candidato probado, sin publicar, 21/10/2026
+
+Leer primero [autoridades, validación y asignación diferida](AUTORIDADES-ADENDAS-20261021.md). Se completó el soporte solicitado para **ADMIN, ADMIN_GENERADOR, ADMIN_OPERADOR y ADMIN_TRANSPORTISTA**, activos y **designados por ID**. Autoridad de adendas ordinarias y destinatarios de nuevas Y; sin autoaprobación, suplantación ni promoción automática por rol. Eventuales conservan sus permisos. No se modificaron cuentas reales ni se accedió a producción en esta tanda.
+
+**1451/1451 backend, 1796/1796 frontend, 18/18 E2E únicos** en escritorio/web móvil/app. HTTP **10 + 5 grupos**, autoridad ausente y flags off PASS; builds/tipos/lint PASS. **415 tablas previas intactas**, 146 avisos de correo simulados, cero cola/intentos/envíos; CAP cerrado (cuatro alias 403), push/proveedores apagados. Manual **2026.21.3**, renderer/CSS conservados; sin migraciones. No certifica dispositivos físicos ni entrega externa.
+
+Preview serial/1 worker/1 CPU/2 GiB/swap cero, cerrado **10:51:57 Mendoza**, sin OOM/presión; imagen/base/evidencia conservadas. Main `c840219` intacto, sin push/workflows; commit `[skip ci]`. Sólo checkout activo `sitrep-production-source-20261001`.
+
+**Decisión del dueño — 21/10/2026:** por ahora alcanza con incorporar que autorizan Super Admin y las administraciones de Generadores, Operadores y Transporte. La identificación de cuentas concretas queda **diferida por pedido del dueño**, no como pregunta sin responder ni requisito para cerrar esta revisión. El soporte está probado en **f7b0ad60** y documentado en el manual. No volver a pedir correos en esta fase ni asignar cuentas o cambiar roles por inferencia. La implementación conserva la designación explícita por ID; su configuración se resolverá al preparar una futura activación. Esta aclaración no publica ni habilita nada. Los paquetes previos db68b24e no incluyen el cambio; no desplegar bundles `/api` de QA. Última versión productiva verificada previamente: **47ea8470**; reversión vigente intacta.
+
+## Publicación db68b24e preparada, sin activar — 21/10/2026
+
+Leer primero [preparación y bloqueo de autoridades](PREPARACION-ADENDAS-20261021.md). Producción verificada en **47ea8470**, sin cambios. Build de **db68b24e** terminado: backend/tipos/web/app, 2.339 blobs exactos, API final, manual 2026.21.2, SW v144/app 20261021124024; serial/1 CPU/2 GiB/swap cero. Preview detenido **09:44:13 Mendoza**.
+
+El dueño designó administradores de Generadores, Operadores y Transporte, más Super Admin. **db68b24e sólo admite ADMIN como autoridad**; no basta agregar IDs sectoriales al `.env`. Inspección limitada en lectura: 0 ADMIN_GENERADOR activos, 0 ADMIN_OPERADOR, 1 ADMIN_TRANSPORTISTA, 8 ADMIN; lista designada vacía. No elegir por defecto los ocho ADMIN, crear/activar cuentas, cambiar sus roles ni publicar un SHA diferente sin autorización. Pendiente elegir soporte de cuatro roles en nuevo commit probado en preview, o cuenta ADMIN explícita para publicar db68b24e. No hay smoke del candidato ni staging/recarga productiva. CAP/canales cerrados, main intacto, sin push/workflows.
+
+## Revisión vigente — adendas fuera de CAP, sólo preview, 21/10/2026
+
+**Revisión terminada sin publicar.** Leer [adendas: correcciones, circuito, pruebas y límites](ADENDAS-OPERATIVAS-20261021.md). Hallazgo del operador, observación/aprobación/rechazo individuales, rectificación, anexos y avisos entre partes y a autoridad. Actualización entre sesiones, protección del motivo contra versiones concurrentes, vínculo de rectificación corregido y autor visible. Sin modificar permisos, declaración/historial, regla de revisión ni habilitaciones.
+
+Preview: **36/36 backend, 57/57 interfaz/manual, 6/6 E2E únicos**, HTTP **10 grupos + autoridad ausente + flags off**. Backend/tipos/web/app/lint PASS; **355 tablas previas intactas**. Correo simulado: **112 avisos, cero cola/intentos/envíos**; CAP cerrado (cuatro alias 403), push/proveedores apagados. Manual **2026.21.2**, renderer/CSS conservados. No suites globales ni certificación física.
+
+QA serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG/contenedor detenidos **09:09:32 Mendoza**, sin OOM/presión. Base/imagen/evidencias preservadas. Main `c840219` intacto, sin push/workflows; cierre `[skip ci]`. **Producción no se inspeccionó ni modificó**: última publicación documentada `47ea8470`, abajo. Adendas/revisión siguen apagadas allí según ese cierre. Una futura activación exige autorización, build API final/SW y autoridad operativa activa designada para nuevas Y; no copiar la cuenta artificial QA ni desplegar bundles `/api`.
+
+## Última publicación — propuestas de tres partes 47ea8470, 21/10/2026
+
+**`47ea8470` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 08:31:08 Mendoza**, con autorización del dueño. Leer primero [despliegue, flags y reversión vigente](DESPLIEGUE-PROPUESTAS-20261021.md). Propuestas ordinarias habilitadas en backend/frontend: creación por G/T/O, aprobación expresa de cada parte, firma del generador, coordinación unánime y retiro físico posterior. Administración no reemplaza decisiones; históricos e in situ conservados.
+
+**Único cambio de configuración: `MANIFEST_PROPOSALS_ENABLED=true` / `VITE_MANIFEST_PROPOSALS_ENABLED=true`.** CAP cerrado, correos/push apagados, uploads y demás flags conservados. Eventuales/adendas/revisión posterior false; relevos/GPS múltiple true. Entorno nuevo SHA-256 `97ef23d52f52f0f9b17ce26e467880670f264671c5a14acc8750feb94835d28f`, resto de bytes intacto; comprobado en ambos workers y PM2 guardado.
+
+Build de **2.327 blobs exactos**, API final, serial/1 CPU/2 GiB/swap cero; backend/tipos/web/app PASS. **Sin migraciones ni instalaciones productivas**. Respaldo de release/configuración verificado antes de activar. Smoke no mutante **131/131**, externo **9/9**, PWA **8/8**; dos workers estables, cero logins/consultas de registros/mutaciones de negocio. Manual **2026.21.1**, renderer/CSS conservados; SW raíz **v142**, app **20261021112835**, actualización explícita y assets anteriores preservados.
+
+**Reversión: interfaz/manual a 13af2fb0, backend 47ea8470 conservado y propuestas apagadas. No usar reversiones anteriores ni degradar las guardas de aprobaciones persistidas.** SW reversión v143/app 20261021113031. No restaura base ni borra historial; preparada, no ejecutada.
+
+Preview detenido **08:30:15 Mendoza**, sin OOM ni presión de memoria; base/imagen/evidencia conservadas. `main` intacto, sin push/workflows; cierre `[skip ci]`. La revisión funcional previa está abajo; esta publicación no hizo E2E autenticado productivo ni certificación física.
+
+## Validación previa — propuestas ordinarias fuera de CAP, 21/10/2026
+
+**Revisión previa realizada sólo en preview, antes de la publicación registrada arriba.** Leer [circuito, pruebas y límites](PROPUESTAS-OPERATIVAS-20261021.md) y [plan ejecutado](PLAN-PROPUESTAS-OPERATIVAS-20261021.md). Generador, transportista u operador pueden proponer; cada parte aprueba expresamente, el generador firma y el retiro requiere unanimidad más inicio de coordinación. Agenda/campana y actualización entre sesiones en web/app; rechazos, concurrencia, historial y recorrido in situ protegidos. Flag nuevo independiente `MANIFEST_PROPOSALS_ENABLED` / `VITE_MANIFEST_PROPOSALS_ENABLED`, false por defecto; sólo true en QA. Sin migraciones.
+
+Validación: suites completas previas **1438/1438 backend y 1790/1790 frontend**; ajustes finales dirigidos **33 backend, 65 interfaz/manual y 6 continuidad del chofer**, todos PASS. **12 casos E2E únicos**: v3 12/12 y repetición final móvil/app v4 8/8; **8 grupos HTTP + 1 de flag apagado**. Tipos/builds/lint sin errores; advertencias y fallos de harness conservados en el informe. Manual **2026.21.1**, mismo renderer/CSS. No afirmar suites completas posteriores a los últimos ajustes ni certificación física.
+
+CAP cerrado, correos/push/proveedores apagados; cuatro alias rechazados con 403, **354 avisos de siete fases simulados, cero intentos/envíos**. **295 tablas previas de QA intactas**. Preview serial/un worker/1 CPU/2 GiB/swap cero, cerrado **08:11:50 Mendoza**, sin OOM; base/imagen/evidencia conservadas. `main` intacto (`c840219`), sin push/workflows, cierre `[skip ci]`. Producción **no se inspeccionó ni modificó**; última publicación documentada **13af2fb0**, abajo. No desplegar bundles `/api` de QA: una publicación requiere autorización, flags explícitos, API final y SW de release.
+
+## Última publicación — revisión integral 13af2fb0, 21/10/2026
+
+**`13af2fb0` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 07:00:01 Mendoza**, con autorización del dueño. Leer primero [despliegue, comprobaciones y reversión vigente](DESPLIEGUE-CIRCUITOS-20261021.md). Incluye la revisión integral y las altas pendientes; no amplía permisos ni activa flags.
+
+Build exacto de **2.310 blobs**, serial/1 CPU/2 GiB/swap cero, API final; tipos/backend/web/app PASS. **Sin migraciones**: Prisma y dependencias idénticos a c9cd877f. Smoke no mutante **120/120**, externo **9/9**, PWA **8/8**, dos workers estables. `.env` idéntico por hash `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`; uploads/flags conservados, **CAP/correos/push cerrados**. Adendas/eventuales/revisión de partes false; relevos/GPS múltiple true. Sin logins ni consultas/modificaciones de registros reales.
+
+Manual **2026.20.20**, renderer **2026.20.6**, CSS **2026.20.5**; inventario exacto. SW raíz **v140**, app **20261021095619**, assets previos y activación explícita conservados. Reversión preparada a **c9cd877f** compatible, sin restaurar base; SW v141/app **20261021095850**. Conserva informes, cola, pagos y tramos. No ejecutada.
+
+Preview detenido **06:57:26 Mendoza**, sin OOM; imagen/base/evidencia conservadas. `main` intacto, sin push/workflows; cierre `[skip ci]`. La aceptación previa completa se detalla abajo; esta publicación recompiló y verificó artefactos/smoke, no hizo E2E autenticado productivo ni certificación física.
+
+## Validación previa — revisión integral, 21/10/2026
+
+**Candidato `13af2fb02e02d9fd39b2d4471bc40c2505c8f060` validado antes de la publicación registrada arriba.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, incluye altas `4b5c8bdd` pendientes. Leer primero [circuitos, trece correcciones, validación y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md), luego [matriz](MATRIZ-CIRCUITOS-20261020.md) y [plan ejecutado](PLAN-REVISION-INTEGRAL-20261020.md). Durante esa revisión, producción seguía en **c9cd877f**, sin inspección ni modificación productiva.
+
+backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**; **107 variantes de correo simuladas**, auditoría **8/8**, tipos/builds/lint PASS. Casos únicos deduplicados: no sumar intentos ni pruebas dirigidas. Se corrigieron identidad/estado/errores de ABM, pérdida del formulario de login, avisos de agenda PSIP y eventuales, elegibilidad de correos, unidades de adendas, próxima acción por rol, documentos del transporte y navegación del manual. Sin migración nueva ni ampliación de permisos.
+
+Manual **2026.20.20**, renderer **2026.20.6**, CSS **2026.20.5** intacto; directorio conservado. Fuentes y capturas con hashes. CAP cerrado, correo/push/proveedores apagados; **235 tablas previas intactas, 224 correos suprimidos y cero intentos/envíos**. QA serial/un worker/1 CPU/2 GiB/swap cero. Servicios/PG cerrados y contenedor detenido **21/10/2026 02:46:53 Mendoza**, sin OOM; imagen/base/evidencia conservadas.
+
+Sólo checkout autorizado, `main` sigue `c8402190edfc36b5e5d0dee1337c24bd1689420d`; sin push/workflows. Commits `[skip ci]`. Builds v13 con `/api` local: **no desplegarlos**. Publicación requiere nueva autorización, API final y versiones SW propias. Propuesta ordinaria de tres partes limitada a CAP; no se reabrieron sus cuentas. Navegadores no certifican Android/iOS físico; correo simulado no acredita entrega; OCR/ATM no deciden categoría fiscal ni acreditación externa.
+
+## Revisión de altas — producto 4b5c8bdd sin publicar, 20/10/2026
+
+**Sólo preview, sin producción ni main.** Candidato **`4b5c8bdd3380beb3bc03674d902a31ff0b91f76e`**, rama `codex/sitrep-training-20261018`, checkout único de este traspaso. Leer [revisión integral de Generador, Transportista y Operador](REVISION-ALTAS-20261020.md) antes de continuar. La última publicación documentada sigue siendo `c9cd877f`; no se consultó producción durante esta revisión.
+
+Se corrigen entradas a borradores y solicitudes observadas, conservación de observaciones, renovación del acceso después de aprobar, destino/etiqueta de avisos de alta y guardia de administración de transporte en app. Se completa la consulta/revisión de documentos del operador y el OCR de Factura de Luz histórica sin cambiar el original. Permisos backend, requisitos, TEF/importes, pagos e históricos conservados; ninguna migración fuente nueva. Manual **2026.20.18**, misma guía y renderer, captura artificial original; CSS **2026.20.5** contiene URLs largas para evitar recortar los botones en móvil.
+
+Validación final: backend **169/169**, frontend **312/312**, navegador **60/60** (altas públicas/directas, ATM, electricidad, recibos, flota y manual entre web/web móvil/app), manual **25/25**, API/OCR **11 grupos**, auditoría **11 grupos**, tipos/builds/lint PASS y diff Prisma vacío. Cero omitidos/flaky/reintentos; **81 páginas instrumentadas** sin errores inesperados. **175 tablas previas** de QA conservan conteos/huellas; **311 correos suprimidos, cero intentos/envíos**, CAP expirado y flags/proveedores efectivos verificados.
+
+Servicios QA/PostgreSQL cerrados y contenedor propio detenido **20/10, 20:48:11 Mendoza**, `Running=false/Pid=0/OOMKilled=false`; imagen, base y evidencias conservadas. Serial/un worker/1 CPU/2 GiB/swap cero, `memory.events max=5970` por presión de memoria y `oom/oom_kill=0`. **46 blobs cambiados** coinciden con lo probado; builds sobre **2.277 fuentes**, API local `/api`, no son paquetes para producción. `main` sigue `c8402190edfc36b5e5d0dee1337c24bd1689420d`; sin push/workflows, commits `[skip ci]`.
+
+Límites: verificación de email con comprobante sintético y controlador real; correo/recuperación no llegan a usuarios con canales apagados. OCR sobre once encabezados y un PDF híbrido artificiales; no todas las facturas reales ni dispositivos físicos certificados. La categoría eléctrica para el test y la fórmula R requieren decisión fiscal separada. Publicar requiere autorización nueva, build de dominio final y versión SW de release, manteniendo CAP/canales/flags como se indique entonces.
+
+## Estado vigente — capacitación cerrada desde el 19/10/2026
+
+Al terminar la demo, se revocaron los cuatro accesos directos CAP de la pizarra. Los cuatro nuevos ingresos y los cuatro tokens emitidos antes del cierre devolvieron 403. El vencimiento pasado está tanto en `.env` como en PM2 y su estado guardado, también después de la publicación operativa siguiente. Los datos artificiales, manifiestos y credenciales históricas quedan preservados, sin poder usar el ingreso directo. Aquel cierre no cambió `main` ni frontend. [Cierre y auditoría](ACCESO-CAPACITACION-20261019.md).
+
+## Última publicación — informe de hallazgo y cola PSIP c9cd877f, 20/10/2026
+
+**Backend, web, app y manual `c9cd877f73ef4cac30cd751dfb1f396807c7ead5` publicados** en `sitrep.ultimamilla.com.ar` el **20/10 a las 18:15:18 Mendoza**, con autorización del dueño. Leer primero [publicación, respaldo verificado y reversión vigente](DESPLIEGUE-HALLAZGOS-PSIP-20261020.md), luego [definición del informe dentro de la adenda, fuentes y permisos](HALLAZGOS-ADENDAS-PSIP-20261020.md). Las diferencias declarado/observado, participantes eventuales sin alta y relevos externos alimentan la **Cola de revisión** interna de PSIP. Administración evalúa con motivo y vincula/abre una inspección; no se determina automáticamente una infracción ni se crean permisos o actores ficticios. Originales y decisiones de adenda conservados.
+
+Backup privado **23.750.117 bytes**, SHA-256 **`17e560c9f08d13f8103ff8efe669caebe266be4803c0dee382c95d4d56e87788`**, índice y decodificación íntegra verificados antes de migrar. Única migración **`20261020210000_inspection_intake`**, SQL SHA-256 **`83adb4d86cb0d4c1260335957dfdbed111f40ed61f258e94e2cd7be767d8d994`**: columna JSON nullable y tabla de antecedentes. `prisma migrate deploy` en `public`; mismo SQL aditivo con dueño restringido en CAP cerrado, sin baseline ficticio. **25 migraciones fuente anteriores y 16 entradas históricas** intactas. Sin seeds, backfill, restauraciones ni consultas/mutaciones de negocio de validación.
+
+Build nuevo sobre **2.262 blobs exactos**, API final y flags vigentes, serial/1 CPU/2 GiB/swap cero; tipos/backend/web/app PASS. **382 backend / 505 web-manual / 199 app / 14 Prisma** contrastados por hash. Manual **2026.20.17**, CSS/renderer idénticos, dos capturas originales y guía hallazgos→PSIP. SW raíz **v138**, app **20261020211008**, activación explícita y assets previos preservados. No se desplegaron los bundles QA con API `/api` ni flags de origen habilitados.
+
+Smoke no mutante publicado **103/103**, externo **9/9**, PWA **8/8**, cero logins/cargas/mutaciones. Dos workers estables después de recargar, PM2 guardado y otras aplicaciones/Nginx intactos. `.env` idéntico por hash `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`; uploads y todos los flags conservados. **CAP, correos y push cerrados. Adendas/eventuales/revisión de partes false; relevos/GPS múltiple true.** La publicación no habilita fuentes apagadas ni rellena una cola histórica.
+
+Reversión preparada y verificada, sin ejecutar: `ssh root@23.105.176.45 'node /var/backups/sitrep/20261020-hallazgos-psip-c9cd877f/publish-production.js rollback'`. **Sólo interfaz/manual** a `a6a5c005` / manual 2026.20.16, SW v139/app 20261020211357 y assets de ambas versiones. **Mantiene backend c9cd877f, informes/cola, reservas de pago, tramos y esquema.** No restaurar base, borrar evidencias o degradar a un backend que ignore las fuentes. Auditoría privada en esa carpeta; sólo reportes filtrados recuperados localmente.
+
+Aceptación previa en esquema artificial propio `inspection_intake_20261020`: backend **69/69**, frontend **43/43**, API **11 grupos**, alcance/rectificación/vínculo existente **4**, rollback forzado **3**, PDF **3**, flags/CAP **3**, navegador **9/9**, manual **24/24 + 3/3 navegador**, tipos/builds/lint y diff Prisma vacío PASS. **115 tablas** QA previas intactas, 49 antecedentes artificiales, cero correos encolados y 26 archivos de producto/manual contrastados. Sin suites globales o certificación física; límites e intentos fallidos documentados.
+
+Preview detenido de nuevo **18:11:42 Mendoza**, antes de migrar; sin servicios QA/PostgreSQL iniciados durante el build, sin OOM, imagen/base/evidencia conservadas. **main conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`**, sin push ni workflows. Evidencia ignorada `test-results-deploy-c9cd877f/`; cierre documental `[skip ci]` sobre el único checkout, producto aprobado intacto.
+
+## Antecedente publicado — control ATM y lectura eléctrica a6a5c005, 20/10/2026
+
+**Backend, web, app y manual `a6a5c005e94aa68ee20b6f410313515f094cb897` publicados** en `sitrep.ultimamilla.com.ar` el **20/10 a las 16:45:59 Mendoza**, con autorización del dueño. Leer primero [respaldo, migración, publicación y reversión actual](DESPLIEGUE-PAGOS-ATM-20261020.md). El pago se reserva por identidad antes de aprobarlo; otra foto/alta/CUIT/año no habilita un uso nuevo. OCR eléctrico con evidencia, sin transformar kWh/kW/tarifa a HP ni cambiar la TEF. Los históricos sin identificar quedan para conciliación administrativa; no se consultaron ni alteraron registros reales para esta publicación.
+
+Backup **23.735.483 bytes**, SHA-256 **`55a2e300216feda4950a34cec3f8c4ebb023788e81fa5161280e55bbf7871752`**, índice y decodificación completa verificados antes de migrar. Única migración **`20261020180000_payment_identity`** con `prisma migrate deploy` en `public`; mismo SQL aditivo con dueño restringido en CAP cerrado, sin baseline ficticio. Se conservaron 24 migraciones fuente anteriores y 16 entradas históricas fuera del checkout. Tres tablas nuevas por esquema; no seeds, backfill, conciliaciones ni restauración.
+
+Compilación nueva con API final y **2.235 blobs** exactos; tipos/backend/web/app PASS, **375 backend / 501 web-manual / 198 app / 14 Prisma** por hash. Smoke no mutante **95/95**, externo **9/9**, PWA PASS. SW raíz **v136**, app **20261020193942**, manual **2026.20.16**; activación explícita y assets anteriores conservados. Dos workers estables, PM2 guardado; `.env` idéntico por hash `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`, CAP cerrado, correos/push apagados y flags/uploads intactos. Sin logins, archivos reales ni mutaciones de negocio en el smoke; main intacto, sin push/workflows.
+
+Reversión preparada, **sin ejecutar y sólo de interfaz/manual**: `node /var/backups/sitrep/20261020-pagos-electricidad-a6a5c005/publish-production.js rollback` en el servidor. UI anterior `2200e955`, manual 2026.20.15, SW v137/app 20261020194343, **backend a6a5c005 retenido**. No volver a un backend que ignore las reservas ni restaurar la base. Preview detenido **16:43:41 Mendoza**, 1 CPU/2 GiB/swap cero, sin OOM; imagen/base/evidencias preservadas. Cierre `[skip ci]` posterior sólo documental.
+
+## Validación previa — control ATM y lectura eléctrica a6a5c005, 20/10/2026
+
+**Publicado después de esta validación, según el cierre de arriba.** Producto `a6a5c005e94aa68ee20b6f410313515f094cb897`, rama `codex/sitrep-training-20261018`, único checkout autorizado. Leer [control de comprobantes, facturas, fuentes y cierre](CONTROL-COMPROBANTES-ATM-Y-FACTURAS-20261020.md). El pago ATM se identifica y reserva por ID/operación revisados antes de aprobarlo; otra fotografía/alta/CUIT/año no constituye un pago nuevo. Reemplazo/retiro no libera la reserva. Control conservador dentro de SITREP, sin acreditar fondos ante ATM. Los históricos ilegibles requieren conciliación; sobre 500 pendientes por fuente se necesita una conciliación por lotes, sin herramienta masiva en esta entrega.
+
+OCR de factura para Generador/Operador: catálogo de once distribuidoras de Mendoza, categoría tarifaria literal, suministro/período, kWh y potencia en kW con evidencia. **El test vigente usa potencia instalada en HP**: no se transforma el consumo ni se cambia TEF. Once encabezados y un PDF híbrido artificiales probados con motores nativos; no se certifican todos los formatos reales. Manual **2026.20.16**, misma estructura/CSS/renderer. La fórmula R fiscal sigue pendiente de conciliación.
+
+Preview final: backend **166/166**, frontend **37/37**, API **11 grupos**, volumen **3 grupos** (501 indexados/501 sin identificar/rollback completo), migración final **3 grupos + diff Prisma vacío**, navegador **12/12**, regresión de recibos **15/15**, manual **21/21**, tipos/builds/lint y auditoría **5 grupos** PASS. **48 archivos** de producto coinciden con lo probado; **1.202 fuentes** de producto coinciden con los builds. Todos los registros previos del QA compartido conservaron hashes; 32 altas artificiales aprobadas con pagos reservados, doce facturas adjuntas y 81 correos suprimidos, cero intentos/envíos. CAP cerrado y cuatro alias 403, proveedores vacíos, flags conservados.
+
+Una migración nueva **`20261020180000_payment_identity`**, sólo en el esquema propio `payment_identity_20261020`; el QA `public`, CAP y producción no se migraron. Ensayo exacto final con rollback y nombre de índice corregido antes de publicar. Futuro despliegue requiere autorización, conciliación histórica cuando corresponda, backup verificado, migración, versiones SW y builds nuevos con API final. Los paquetes aceptados usan `/api` local. No borrar reservas/eventos ni volver a un backend que ignore el control para deshacer UI.
+
+Cierre de aquella validación **20/10, 16:23:08 Mendoza**: API/estático/PostgreSQL propios cerrados, contenedor `Running=false/Pid=0`, `max/oom/oom_kill=0`; imagen, base y evidencias preservadas. QA serial, un worker/1 CPU/2 GiB/swap cero. No producción, datos reales, `main`, push ni workflows durante ese QA; commits `[skip ci]`. Entonces `2200e955` era la última publicación documentada. La autorización e inspección/publicación posteriores se registran arriba.
+
+## Publicación anterior — PSIP Legales y comprobantes ATM 2200e955, 20/10/2026
+
+**Backend, web, app y manual `2200e9555e8e97d394c342f9ef519604ed1f365a` publicados** en `sitrep.ultimamilla.com.ar` el **20/10 a las 14:32:13 Mendoza**, con autorización del dueño. Rama `codex/sitrep-training-20261018`, checkout único del traspaso. Leer primero [publicación, controles y rollback actual](DESPLIEGUE-PSIP-LEGALES-20261020.md), después [revisión de Legales, comprobantes, fuentes oficiales y cierre](PSIP-LEGALES-ATM-20261020.md). Legales explicita quién actúa, permite a administración registrar avance/finalización y muestra al inspeccionado sólo el resultado marcado público. Los registros ATM existentes se conservan con alcance pendiente de validar; no se confunden con el control del pago del alta.
+
+Preview final: backend dirigido **190/190**, frontend dirigido **84/84**, recorridos Legales **9/9**, comprobantes **15/15**, capturas con geometría/oclusiones **3/3**, manual **20/20 + 6/6 navegador**, tipos/builds/lint y auditoría PASS. Manual candidato **2026.20.15**, mismo diseño. Las actuaciones originales de ambos lotes artificiales conservaron sus hashes. Cero correos pendientes/intentos/envíos; la tabla conserva 21 registros suprimidos, 19 nuevos por las altas artificiales. CAP cerrado, SMTP/VAPID vacíos, correos/push apagados y flags conservados. Servicios QA/PostgreSQL cerrados, contenedor detenido, evidencia/imagen/base preservadas; max/oom/oom_kill=0. Un worker/1 CPU/2 GiB/swap cero, sin suites globales ni certificación física.
+
+**Pendientes fiscales explícitos:** el mismo archivo ya dispara duplicado, otra foto del mismo ticket puede eludirlo. Falta el registro por identidad del pago ligado al obligado, concepto/período, liquidación y trámite; no se implementó ni se afirma una validación ATM. El anexo 2026 distingue inscripción/renovación de TEF; M coincide (162), pero la fórmula R del simulador difiere del anexo consultado y queda para conciliación, sin cambiar importes/reglas. El cierre documenta los campos del ticket oficial y un control propuesto, sin pedir al dueño un identificador que no conoce.
+
+Publicación recompilada con API final sobre **2.215 blobs** exactos: tipos/backend/web/app PASS, **368 backend / 500 web-manual / 197 app / 14 Prisma** verificados por hash. Smoke no mutante **78/78**, externo **9/9**, PWA PASS. SW raíz **v134**, app **20261020172055**, manual **2026.20.15**. Dos workers estables; `.env` idéntico por hash `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`, CAP cerrado, correos/push apagados y flags/uploads conservados. **Sin migración, consultas de registros reales ni logins; main intacto**, sin push/workflows. Preview detenido de nuevo **14:33:21 Mendoza**, sin OOM; imagen/evidencia/base artificial preservadas. Los bundles de aceptación QA usan `/api` local; se desplegaron los nuevos paquetes con el dominio final.
+
+Rollback preparado, sin ejecutar: backend `25b0c30c` y copia de su web/app/manual, assets de ambas versiones, SW v135/app 20261020172510. Comando: `ssh root@23.105.176.45 'node /var/backups/sitrep/20261020-psip-legales-2200e955/publish-production.js rollback'`. Sin restaurar base ni volver a un backend sin custodia por tramos. Primer intento detenido antes de activar por serialización de un PID ausente de PM2; control normalizado sin omitir procesos y segunda pasada correcta, con ambas evidencias conservadas. Cierre documental `[skip ci]`.
+
+## Antecedente publicado — PSIP plazos y responsables 25b0c30c, 20/10/2026
+
+**Backend, web, app y manual `25b0c30c860cc91091591ad51b9b2ab9dc72a0cf` publicados** en `sitrep.ultimamilla.com.ar` el **20/10 a las 12:57:42 Mendoza**, con autorización del dueño. Leer primero [publicación, controles y rollback actual](DESPLIEGUE-PSIP-PLAZOS-20261020.md), después [plazos por requerimiento, responsables y validación previa](PSIP-PLAZOS-RESPONSABLES-20261020.md). Corrige el cálculo de presentación tardía con el pedido respondido, el reintento de un pedido ya incorporado después de vencer, los falsos pendientes del plazo general y la hora de Mendoza independiente del dispositivo. Listados y expediente indican quién debe actuar; los pedidos conservan su fecha y respuesta propia. Se corrigió también un título aplastado en móvil y se repitió la aceptación sobre builds nuevos.
+
+Backend dirigido **177/177**, frontend **47/47**, navegador **12/12** (web, web móvil, app), manual **20/20 + 6/6**, tipos/builds/lint PASS. Catálogo artificial: **21 casos / 273 avisos**, nueve faltas de respuesta resueltas sin aceptar subsanación, doce pendientes, sin duplicados; **57 requerimientos originales** conservados, cola de correo sin cambios. Manual **2026.20.14**, mismo diseño. Fuentes finales **2.207 blobs** verificadas local/remoto; 1 worker/1 CPU/2 GiB/swap cero, sin OOM. No son suites globales ni certificación Android física.
+
+La aceptación anterior se realizó sin producción. Después se recompiló desde el SHA autorizado con API final: **2.207 blobs**, tipos/backend/web/app PASS, archivos por hash **368 backend / 500 web-manual / 197 app / 14 Prisma**. Smoke publicado no mutante **78/78**, externo **9/9**, controles PWA PASS. SW raíz **v132**, app **20261020155342**, manual **2026.20.14**; assets previos preservados y activación explícita. Dos workers estables, `.env` idéntico por hash `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`, CAP cerrado, correos/push apagados, flags/uploads conservados. **Sin migración, consultas de registros reales ni logins; `main` intacto**, sin push/workflows. Preview detenido de nuevo **12:59:11 Mendoza**, sin OOM; imagen/evidencia preservadas.
+
+Rollback preparado, sin ejecutar: backend `527d915c` y copia de su web/app/manual con assets de ambas versiones, SW v133/app 20261020155600. Comando: `ssh root@23.105.176.45 'node /var/backups/sitrep/20261020-psip-plazos-25b0c30c/publish-production.js rollback'`. Sin restaurar base ni volver a un backend sin custodia por tramos. La incidencia de cierre de locks en la preparación y su corrección antes de activar están registradas en el despliegue.
+
+## Antecedente publicado — PSIP 527d915c, 20/10/2026
+
+**Backend, web, app y manual `527d915cf600b793333fd4772ea7e8178cd77f0f` publicados** en `sitrep.ultimamilla.com.ar` el **20/10 a las 11:01:45 Mendoza**, con autorización explícita del dueño. Leer [publicación, comprobaciones y rollback actual](DESPLIEGUE-PSIP-20261020.md). Releases activos: `/var/www/sitrep-backend-releases/20261020-psip-527d915c` y `/var/www/sitrep-releases/20261020-psip-527d915c`; los tres identificadores de `/release.json` corresponden al SHA autorizado.
+
+Build serial en preview, 1 CPU/2 GiB/swap cero, API `https://sitrep.ultimamilla.com.ar/api`, **2.199 blobs** verificados antes/después. Manual **2026.20.13**, CSS/renderer conservados por hash; SW raíz **v130** (versión de caché del artefacto), app **20261020135436**. Activación explícita del usuario y assets anteriores preservados. Smoke no mutante **76/76**, externo **9/9**, PWA PASS; dos workers online y readiness PASS.
+
+CAP cerrado; correos/push apagados; flags y `UPLOADS_DIR` conservados. `.env` idéntico por hash **`618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`**, con respaldo privado y estado PM2 verificados. **Sin migración, consultas/modificaciones de registros de negocio ni logins.** No se dispararon workflows ni se hizo push; `main` conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`.
+
+Rollback preparado, **sin ejecutar**: backend compatible `d372ce6e` + interfaz `6788c82c` y manual anterior, SW raíz v131/app 20261020140009. Comando: `ssh root@23.105.176.45 'node /var/backups/sitrep/20261020-psip-527d915c/publish-production.js rollback'`. **No restaurar base ni volver a un backend sin custodia por tramos.** Auditoría privada en esa carpeta y copia local filtrada `test-results-deploy-527d915c/`. Preview detenido a las **11:05:12 Mendoza**, `Running=false`, `Pid=0`, sin OOM; imagen/artefactos preservados. El cierre posterior es sólo documental con `[skip ci]`.
+
+## Preparación PSIP — revisión de inspecciones, 20/10/2026
+
+Leer [PSIP: flujo, implementación, límites, validación y capturas](PSIP-FLUJO-INSPECCIONES-20261020.md). El seguimiento ya existía; ahora la interfaz agrupa Preparación y visita, Seguimiento, Derivaciones y Cerradas, conservando los 13 estados, permisos y transiciones. El filtro se aplica antes de paginar, también en exportación y copias offline. El intercambio señala quién debe actuar, permite responder directamente al pedido y conserva el último plazo histórico. Se corrigió la carrera que podía recuperar un borrador ya enviado y tapar la respuesta al requerimiento siguiente; se preserva el borrador si el servidor rechaza el envío.
+
+La primera agrupación PSIP (`85b5f5d5`, manual **2026.20.12**) se validó con **54/54 backend**, **80/80 frontend**, **18/18 recorridos únicos** entre web/web móvil/app, **20/20 manual**, **6/6 navegador de ayuda** y captura app **1/1**. Conserva sus capturas artificiales y el directorio §18; se eliminó una dependencia posicional del índice de guías para preservar la capacitación anterior.
+
+**Extensión actual: campana automática por cada actuación formal**, sin correo/push a nadie. Leer [avisos PSIP: destinatarios, persistencia, validación y cierre](PSIP-AVISOS-INTERNOS-20261020.md). Pedidos/respuestas/decisiones de autoridad avisan al inspeccionado vinculado; sus respuestas, descargos y subsanaciones avisan al inspector asignado y administraciones competentes, sólo cuentas activas, sin copia al autor. Se guardan en la misma transacción y los reintentos no duplican. Los enlaces abren el intercambio correcto en web y app y refrescan un expediente ya abierto; se corrigió el recorte izquierdo del panel móvil.
+
+Manual **2026.20.13**, misma guía y diseño. Ampliación validada en preview: **157/157 backend**, **79/79 frontend**, **9/9 recorridos finales** (3 roles × web/web móvil/app), **81 actuaciones / 432 avisos** con destinatarios exactos, rollback e inactivos verificados en PostgreSQL, **0 correos encolados**, **20/20 manual**, **6/6 navegador de ayuda**, TypeScript/builds/lint PASS. Se conserva la primera pasada funcional y el hallazgo visual que motivó el arreglo y la repetición. Un worker/1 CPU/2 GiB/swap cero; no suites globales ni certificación Android física. CAP, correos/push y flags conservados. Las reglas por vencimientos/falta de respuesta siguen separadas; el aviso o la apertura no acreditan notificación fehaciente ni dan acceso a un tercero sin cuenta/vínculo.
+
+**Candidato publicado después como `527d915c`, según el cierre de publicación de arriba.** La aceptación funcional se realizó antes de publicar, sin acceder a producción ni a registros reales. Evidencia inicial `test-results-psip-20261020/` / `.qa-psip-20261020/`, ampliación `test-results-psip-notices-20261020/` / `.qa-psip-notices-20261020/`. Cierre de esa validación: **20/10, 10:40:25 Mendoza**, servicios QA y PostgreSQL cerrados, contenedor detenido, imagen/evidencias preservadas; `max=0`, `oom=0`, `oom_kill=0`. No desplegar los bundles de QA (`/api` local): la publicación utilizó una compilación nueva con API final y versiones SW propias.
+
+## Antecedente — web y app 6788c82c, 20/10/2026
+
+**Web y app `6788c82c` publicados el 20/10 a las 07:20:58 Mendoza** en `sitrep.ultimamilla.com.ar`: viajes propios antes de relevos, **Reintentar GPS** en un toque conservando cargas/un único captor y **Reintentar envío** distinguido por carga. Incluye acciones/ayuda/reloj de `153ab704`. **Backend y manual `d372ce6e` conservados**, mismos procesos y configuración, sin restart/reload, migración o consulta de registros reales. Frontend activado entonces `/var/www/sitrep-releases/20261020-chofer-6788c82c-r2`; identificación pública en `/release.json`.
+
+Leer [publicación, incidencias, evidencia y rollback de aquella interfaz](REVISION-OPERACION-MANIFIESTOS-20261019.md). Smoke publicado no mutante **62/62**, HTTPS externo **9/9**, PWA PASS. Previo en preview: **146/146** dirigidas, **77 grupos API**, **12/12** navegador en web/web móvil/app. Recompilación final con API del dominio, flags actuales, fuentes del commit verificadas antes/después; 253 archivos web y 195 app verificados por SHA-256. No hubo login ni ejercicios/GPS/correos/push en producción; no se certificaron teléfonos físicos ni se repitieron suites completas al publicar.
+
+CAP cerrado, correos/push apagados, `UPLOADS_DIR` conservado; dos flags de transporte true y originales false, sin cambios. `.env` SHA-256 `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`. SW raíz **v128** (versión de caché del artefacto), app **20261020100715**; manual **2026.20.11** intacto. El aviso de nueva versión mantiene activación explícita del usuario. Preview serial, 1 CPU/2 GiB/swap cero, detenido a las **07:23:42 Mendoza**, sin OOM ni servicios QA/túnel; imagen/evidencia conservadas. Rama `codex/sitrep-training-20261018`, único checkout activo, `main` permanece `c840219`; cierre `[skip ci]`, sin push ni workflows.
+
+Rollback sólo frontend preparado en `/var/www/sitrep-releases/20261020-chofer-6788c82c-r2-rollback`: interfaz previa `d372ce6e` más assets de ambas versiones para clientes abiertos, mismos backend/flags/datos, caché raíz v129 y app 20261020102057. Comando guardado: `ssh root@23.105.176.45 'node /var/backups/sitrep/20261020-chofer-6788c82c/deploy-frontend.js rollback'`. No se ejecutó. **No restaurar base ni volver a un backend sin custodia por tramos.** La copia inactiva del primer intento se conservó; incidencias de telemetría PM2/extracción y protección local documentadas en la revisión. Auditoría privada productiva en esa carpeta; evidencia local `test-results-deploy-6788c82c/`.
+
+## Antecedente publicado — relevos y GPS múltiple, 19/10/2026
+
+**`d372ce6e` publicado** en backend, web, app y manual el **19/10/2026 a las 21:25:45 Mendoza**, en `sitrep.ultimamilla.com.ar`. Relevos y GPS múltiple habilitados en backend/Vite por autorización explícita. La transportista original define el traspaso, incluso a un externo sin alta con los datos disponibles; se conserva custodia por tramos, acceso GPS limitado y avisos internos a partes/C3. Acuerdo firmado y entrega de origen intactos; no se infiere habilitación de externos ni resolución de D10.
+
+Leer primero [despliegue, respaldo, configuración y contención](DESPLIEGUE-RELEVOS-20261019.md) y después [revisión funcional y QA](REVISION-OPERACION-MANIFIESTOS-20261019.md). Backend 1177/1177, frontend 1615/1615, API sintética 26 grupos, navegador web/app 6/6 y manual 15/15 previos. Nueva compilación en preview serial, 1 CPU/2 GiB/swap cero, API del dominio final y dos flags de transporte true. Migración aditiva única aplicada en `public` y CAP después de respaldo verificado; no repetir las doce históricas. Publicado: smoke no mutante **57/57**, HTTPS externo **9/9**, PWA PASS. SW raíz v127, app 20261020001844; manual 2026.20.11, CSS/renderer intactos. CAP cerrado, correos/push apagados, cuatro flags originales false, uploads conservados. `main` intacto; sin push ni workflows. Preview detenido y sin OOM. **No volver al backend anterior que desconoce tramos ni restaurar una base vieja para revertir interfaz.** La contención preparada conserva el backend compatible y los enlaces GPS; no se ejecutó.
+
+## Historial — aviso de acceso corregido, 19/10/2026
+
+Web/app **`75f3062`**, publicado 11:42:46 Mendoza: conserva el mensaje de error al volver al formulario después de un login fallido. Generador CAP confirmado por API y UI; los cuatro alias responden 200. Credenciales, límites y permisos sin cambios. Backend `8de58de` sin reinicio, manual `ea92004` conservado, SW v126. Unitarias dirigidas 33/33; navegador publicado 4/4 (401/429 inyectados, login real y recarga de sesión en web/app); build remoto serial y smoke 44/44. Rollback sólo frontend a `20261019-agenda-live-ea92004`. Sin datos reales, main ni workflows. Leer [incidente, pruebas y rollback](ACCESO-CAPACITACION-20261019.md).
+
+## Historial — agenda actualizada al crear, 19/10/2026
+
+Web/app/manual **`ea92004`** publicados a las 09:29:02 Mendoza. El recién creado aparece primero, actualiza agenda al crear y llega a otra sesión sin recargar; después de la aprobación propia queda **En espera**. Animación breve con movimiento reducido respetado. Aprobaciones y permisos conservados. Backend `8de58de` sin reinicio; SW v125, manual 2026.20.9. Preview: unitarias 22/22, manual 16/16, cuatro roles × web/app 8/8. Agenda publicada de sólo lectura 3/3, smoke 44/44. Gemelo detenido y relay cerrado. Rollback sólo frontend al release `20261019-icons-88b1a0e`. Sin datos reales, main ni workflows. Leer [pruebas y rollback](AGENDA-CAPACITACION-20261019.md).
+
+## Historial — simplificación visual, 19/10/2026
+
+Web/app `88b1a0e`: íconos compactos sin tilde/reloj, verde aprobado y gris pendiente. Manual `71780c6` actualizado; backend `8de58de` conservado, sin reinicio. Agenda publicada 3/3, smoke 44/44, manual 16/16 + 4/4 archivos. SW v124; mismos accesos CAP. Rollback sólo frontend al release `20261019-agenda-8de58de`. Sin datos reales, main ni workflows. Leer [estado, pruebas y rollback](AGENDA-CAPACITACION-20261019.md).
+
+## Historial — agenda de capacitación, 19/10/2026
+
+**Backend, web, app y manual publicados sobre `8de58de`, el 19/10/2026 07:23:27 Mendoza.** Leer [agenda, pruebas y rollback](AGENDA-CAPACITACION-20261019.md). Inicio compacto con filtros y tres aprobaciones visibles; certificados con íconos/estados; adenda con teclado de texto; contraste y diálogo de entrega corregidos. Circuito aprobado conservado.
+
+Publicado: circuito 2/2, eventual 2/2, manual 3/3, agenda 3/3, smoke 44/44. 83 manifiestos CAP anteriores intactos, mismos cuatro accesos simples. Sin datos reales, main, correos ni push productivo. SW v123; actualizar web/app y activar sonido. Rollback inmediato: ambos releases `20261018-proactivo-gps-312d6f2`; sin restaurar base. Gemelo detenido y relay cerrado. Los intentos fallidos y límites de QA se documentan en el cierre.
+
+## Historial — avisos proactivos y entrega GPS corregida
+
+**Backend, web, app y manual publicados sobre `312d6f239a015b0528218bf7d9a710fff4f36d04`, el 18/10/2026 a las 22:24:44 Mendoza.** Leer [afinamiento, pruebas, límites y rollback](AFINADO-CAPACITACION-20261018.md). Único checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; main permanece `c840219`, sin integración. Commits `[skip ci]`, sin workflows.
+
+Los cuatro accesos CAP del equipo 1 conservan sus claves simples. Abrir `/app/` o web, actualizar la versión y tocar **Activar sonido**. El aviso nuevo aparece con enlace al caso, sin cubrir botones. Cualquier rol CAP crea la propuesta; generador firma, transporte y operador aprueban. Con las tres decisiones, una parte pulsa **Iniciar coordinación**; luego transporte confirma el retiro físico y envía GPS. El cierre espera los envíos GPS pendientes antes de confirmar entrega. Operador recibe/pesa/trata, firma y publica parcial/final; los otros descargan desde el mismo manifiesto. Fechas futuras son los mismos manifiestos programados. Adendas y eventual conservan sus revisiones y límites.
+
+Comprobación publicada final: **circuito 2/2, eventual 2/2, manual 3/3 y smoke 44/44**. Incluye cuatro sesiones independientes, aviso visible, inicio idempotente, GPS hacia C3, entrega con envío en vuelo, adenda independiente y certificados firmados. Casos finales: CAP-2026-000046, CAP-2026-000041. El intento previo sobre `0e5ad03` tuvo web fallida por una carrera GPS; se conserva la evidencia y se corrigió el producto, sin excluir el error del test. GPS emulado; no certificación de sensores, Android ni segundo plano.
+
+Auditoría a las 22:34:26: **62 manifiestos CAP anteriores intactos**, incluido el cierre humano de `CAP-1-ENTREGADO`; 40 cuentas CAP activas. Veinte manifiestos propios de los dos ensayos publicados conservados, cuatro tratados, ocho certificados, dos eventuales tratados. Datos reales no consultados. `.env` SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`, UPLOADS_DIR, flags false, correos apagados y VAPID vacío conservados; sin migraciones ni seeds. Accesos hasta `2026-10-20T03:00:00Z` (fin del lunes 19, Mendoza).
+
+Releases activos `20261018-proactivo-gps-312d6f2`. SW raíz **v122**, app **20261019012304**. Hojas A4 privadas con QR/usuarios/claves: `test-results-proactivo-20261018/output/pdf/`; no incorporar claves a Git/manual. Auditoría privada `/var/backups/sitrep/20261018-proactivo-gps/`.
+
+Rollback inmediato: volver ambos enlaces a sus releases `20261018-proactivo-0e5ad03` y recargar sólo backend conservando configuración y vencimiento. Ese release incluye los avisos, pero conserva la carrera GPS corregida ahora. Para volver al producto anterior a todo este afinamiento, se conservan ambos `20261018-circuito-930d3e6`. **No restaurar base ni borrar prácticas.** Gemelo propio detenido, relay cerrado, imagen/evidencias conservadas. Límites 1 CPU/2 GiB/swap cero, un worker; sin OOM (contador `memory.events max` 12 durante el build final, sin kill).
+
+## Instantánea histórica — circuito completo publicado, 18/10 a las 19:49:28 Mendoza
+
+**Backend, web, app y manual publicados sobre `930d3e6ae7c363789d5474d4aa40b4242b860825`.** Leer primero [circuito completo, resultados y rollback vigente](CIRCUITO-CAPACITACION-20261018.md). Fuente única: `sitrep-production-source-20261001`; rama `codex/sitrep-training-20261018`. Main permanece en `c840219`, sin integración. Commits `[skip ci]`, sin workflows.
+
+El operador, generador, transporte o administrador CAP pueden iniciar. Generador firma; transporte y operador aprueban por separado. Hay avisos internos y agenda de retiros futuros. El retiro requiere las tres decisiones. Después del viaje/GPS/C3, recepción/pesaje/tratamiento, el operador libera parciales y final con firma; la adenda conserva el original, requiere revisión independiente y debe resolverse antes del final. Sólo sesiones CAP autenticadas; permisos operativos y flags siguen sin activarse.
+
+Prueba publicada: web completa aprobada y repetición app completa aprobada; eventual 2/2, manual 3/3 y smoke público 44/44. Los intentos fallidos de QA se conservan y explican en el cierre. A las 20:03:12: 40 cuentas CAP y 35 casos preparados intactos; 000015/000025 Tratados con dos posiciones GPS y certificados; 000020 quedó pendiente por una interrupción del test, sin viaje activo. Para mañana crear otro caso y compartir su número. El GPS fue emulado: comprobar el teléfono físico con la hoja.
+
+Los cuatro accesos y sus claves simples no cambiaron; no se usa administrador personal. Vencen al finalizar el lunes 19/10 en Mendoza (`2026-10-20T03:00:00Z`). Dos hojas A4 privadas con QR y pasos están en `test-results-circuito-20261018/output/pdf/`. Manual conserva diseño. SW raíz v120, app 20261018224742; recargar web/app o usar el aviso de nueva versión antes del ensayo.
+
+`.env` SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`, sin cambios. UPLOADS_DIR, flags false, correos apagados y VAPID vacío conservados. Sin migraciones, semillas ni restauraciones. Auditoría privada `/var/backups/sitrep/20261018-circuito/`.
+
+Rollback vigente: backend y frontend activos `20261018-circuito-930d3e6`; volver ambos enlaces a sus releases `20261018-direct-97c77be`, recargar sólo backend y conservar la variable de vencimiento y las claves. No restaurar base ni borrar prácticas. Gemelo propio detenido, relay cerrado, imagen y evidencias conservadas, sin OOM. Procedimiento y evidencias completos en el cierre enlazado.
+
+## Instantánea histórica — accesos directos, 18/10 a las 11:43:39
+
+**Lo que sigue conserva el cierre anterior. No sustituye el circuito, versión, resultados ni rollback vigente de arriba.**
+
+**Backend, web, app y manual publicados sobre `97c77beecce5a349e53d47d89ad35881a599253a` en `sitrep.ultimamilla.com.ar`.** Leer primero [accesos directos, resultados y rollback vigente](ACCESOS-DIRECTOS-CAPACITACION-20261018.md). El dueño pidió cuatro usuarios/contraseñas para la pizarra, sin su administrador personal en los teléfonos. Los alias `admin@capacitacion.invalid`, `generador@capacitacion.invalid`, `transporte@capacitacion.invalid` y `operador@capacitacion.invalid` autentican exclusivamente las cuatro cuentas CAP del equipo 1. Contraseñas privadas fuera de Git y del manual. Vencen al terminar el lunes 19/10 en Mendoza.
+
+Abrir `/app/`, entrar directamente y comprobar la banda amarilla «Capacitación · sin validez oficial». Seguir el manual «Un manifiesto, cuatro teléfonos»: crear y firmar → retirar y enviar GPS → observar el mismo número en C3/Hoy → entregar → recibir/pesar/tratar/cerrar. Cada persona conserva su rol. Eventuales y adendas mantienen el ámbito escolar y sus revisiones; los flags operativos, correos y push siguen apagados.
+
+Fuente única y rama sin cambios: este checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; main `c840219`, sin integrar. SW raíz v119, app `20261018143836`. Backend completo 1.112/1.112; frontend completo 1.568/1.568. Recorridos publicados 2/2, manual publicado 3/3 y smoke 44/44. A las 11:50:18: 40 cuentas CAP, 35 casos preparados intactos, casos nuevos 000009/000010 tratados y workers sin reinicios posteriores. Gemelo propio detenido y relay cerrado, imagen/evidencias conservadas. Evidencia completa y límites en el cierre enlazado. GPS probado con coordenadas emuladas; falta comprobar ubicación física con los teléfonos de la clase.
+
+Única variable nueva: `TRAINING_DIRECT_LOGIN_UNTIL=2026-10-20T03:00:00Z`. `.env` actual SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`; se conservan todas las variables anteriores y `UPLOADS_DIR`. No hubo migraciones/seeds ni cambios de permisos. Se respaldaron y verificaron los cuatro hashes CAP antes de reemplazarlos. Auditoría privada: `/var/backups/sitrep/20261018-direct-login/`.
+
+Rollback vigente: ambos enlaces activos apuntan a sus releases `20261018-direct-97c77be`; volver backend a `20261018-training-c819ecf` y frontend a `20261018-four-phones-f19d024`, con recarga exclusiva del backend y retiro de la variable nueva del entorno PM2. No restaurar la base ni borrar prácticas. El procedimiento exacto está en el cierre enlazado.
+
+## Instantánea histórica anterior — f19d024 / c819ecf
+
+**Todo lo que sigue conserva el cierre previo; sus hashes, rollback, cifras y forma de acceso no sustituyen el estado vigente de arriba.**
+
+**Web/app/manual publicados: `f19d024c534be146a4d7eb1a863410f556c2bf28`, el 18/10 a las 10:42:14 de Mendoza. Backend conservado: `c819ecfa275afe58d4e2d6d93119adccef073ea8`.** Dominio `sitrep.ultimamilla.com.ar`. Capacitación artificial; Eventuales y adendas disponibles sólo en sesiones CAP firmadas. Flags operativos, correos y push apagados.
+
+Leer [ensayo de cuatro teléfonos, resultados y rollback actual](ENSAYO-CUATRO-TELEFONOS-20261018.md). Comprobación posterior a las 10:49:30: dos procesos backend sin reinicio, 40 cuentas CAP y 35 casos preparados conservados, seis casos nuevos propios tratados; instructor QA suspendido y contraseña rotada. No es certificación global, de GPS/Android físico ni de concurrencia masiva. El [cierre anterior](CIERRE-CAPACITACION-20261018.md) conserva la evidencia de Eventuales, adendas y el despliegue backend.
+
+## 1. Fuente exacta
 
 | Referencia | Estado |
 | --- | --- |
 | Repositorio | `https://github.com/martinsantos/peliresi.git` |
-| Único checkout autorizado | `/Users/santosma/.codex/visualizations/2026/09/24/01a0d460-1c47-70f1-b7bf-4ea3463f0746/sitrep-production-source-20261001`; no usar SDTERA, tmp ni Precrimen |
-| Rama del checkout | `main`; el cierre documental avanza desde `1ab057a`, sin nuevo build ni despliegue |
-| Producto publicado | `1ab057a57e07237625b3f9fb34d5e80623ecd4bf` |
-| Revisión UI/UX y candidato | `codex/sitrep-uiux-review-20261016` y `codex/sitrep-manifiestos-v2-20261014`, ambos publicados en `222ccbb` |
-| Integración | `96f333e`, árbol idéntico a `222ccbb`; `1ab057a` añade únicamente la versión del service worker |
-| Manual de `main` | `7e1460b` y `3b67c24` tienen el mismo patch-id y árbol de manual. Se preservaron las mejoras posteriores del candidato al resolver seis conflictos; ambos commits quedan en la historia |
-| CI | Commits con `[skip ci]`; sin workflows ni despliegues automáticos. Actions no tiene crédito |
+| Único checkout | `/Users/santosma/.codex/visualizations/2026/09/24/01a0d460-1c47-70f1-b7bf-4ea3463f0746/sitrep-production-source-20261001`; no usar SDTERA, tmp ni Precrimen |
+| Rama actual | `codex/sitrep-training-20261018`, nacida de `c840219` |
+| Producto publicado | Web/app/manual `f19d024`; backend `c819ecf` |
+| Último cambio de producto | `f19d024`: detalle actualizado entre teléfonos, guía de cuatro roles y SW v118 |
+| Main | Conserva `c840219`; no se integró esta rama a main |
+| CI | Todos los commits con `[skip ci]`; sin workflows |
 
-No repetir integración, migraciones ni despliegue por encontrar instrucciones históricas en otros documentos. Cada nueva operación productiva necesita autorización específica del dueño.
+El dueño autorizó preparar, probar y publicar la capacitación con datos artificiales, sin pedir confirmación en cada paso. Esa autorización no activa funcionalidades para operación real, entrega externa ni acceso a datos reales. No ejecutar instrucciones históricas de deploy/seed ni repetir migraciones.
 
-## 2. Qué se publicó y qué permanece apagado
+## 2. Recorrido sencillo
 
-- Interfaz: errores en español, formularios que conservan lo cargado, listado compacto de manifiestos, un título por página, menú sin selector demo, `/app` con zoom y ErrorBoundary; correcciones de carga masiva, contraseña y vehículos.
-- Backend: actualización del perfil propio con auditoría; suscripciones push ligadas a la persona; scripts de seed/demo protegidos contra producción.
-- Eventuales v2: creación por cualquier parte o ADMIN, aprobación de participantes con cuenta y operador externo. Código y migración publicados, **funcionalidad apagada por decisión del dueño**, igual que empresa, adendas y multirol.
-- Detalle funcional: [hallazgos](HALLAZGOS-UIUX-20261016.md), [decisiones](DECISIONES-RELEASE-20261017.md) y [especificación aprobada de Eventuales](ESPEC-EVENTUALES-20261017.md).
+1. Abrir [Un manifiesto, cuatro teléfonos](https://sitrep.ultimamilla.com.ar/manual/tutorial.html?guide=capacitacion-cuatro-telefonos). El instructor prepara ADMIN, GENERADOR, TRANSPORTISTA y OPERADOR CAP del mismo equipo, una sesión independiente por teléfono. Cada persona conserva su rol. Crear un caso nuevo, compartir su número, seguir el GPS en C3 → Hoy y completar el cierre entre los cuatro.
+2. Seguir el recorrido conocido: manifiesto, inspecciones, soporte, Centro de Control y Monitor. Se conservaron seis pasos, enlaces por equipo y diseño.
+3. Abrir [Novedades](https://sitrep.ultimamilla.com.ar/manual/tutorial.html?guide=capacitacion-novedades): flota registrada, eventual incompleto, adenda con revisión de otra parte y declaración original intacta.
+4. Para consultar el ejemplo preparado, separado del viaje nuevo: ADMIN CAP → Centro de Control → 30 días → CAP-1-EN_TRANSITO. Monitor → Historial del día del ejercicio → pausa/recorrido/reproducción → Pendientes.
 
-Configuración aprobada y verificada en `.env` y en ambas instancias PM2:
+Equipo 1 para demostrar; 2–4 para practicar; 5 de reserva, con ensayos previos y los seis casos nuevos de esta etapa ya cerrados. Los 35 casos preparados de los cinco equipos mantienen sus estados. Para repetir un circuito terminado, crear otro manifiesto. Web y `/app` comparten la guía; el manual conserva la superficie seleccionada.
+
+## 3. Configuración preservada
 
 ```text
 UPLOADS_DIR=/var/lib/sitrep-uploads
@@ -41,84 +528,53 @@ VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 ```
 
-Frontend compilado con `VITE_API_URL=https://sitrep.ultimamilla.com.ar/api`; `VITE_ENTERPRISE_ENABLED`, `VITE_MANIFEST_EXCEPTIONAL_ENABLED`, `VITE_MANIFEST_ADDENDA_ENABLED`, `VITE_ACTOR_MULTIROLE_ENABLED` y `VITE_DEMO_MODE`, todos `false`. Cambiarlos requiere otro build autorizado. Las demás variables del servidor conservaron sus valores anteriores.
+`.env` SHA-256 `d34cc69b6c61d60059206ec58ba4a63eee2e3f50b5abddeb8aff17fc071d5815`, conservado exactamente. Las demás variables mantienen su valor anterior. Frontend: API `https://sitrep.ultimamilla.com.ar/api`; enterprise, exceptional, addenda, multirole y demo false. La excepción de aula depende del ámbito CAP autenticado y del principal/esquema escolar aislado; no de un parámetro del navegador.
 
-**Conservar `/var/lib/sitrep-uploads`**, fuera de releases. No sustituirlo por el default documental `/var/www/sitrep-uploads`. No se movieron archivos históricos; se preservó también el enlace fallback `uploads` del backend.
+Conservar `/var/lib/sitrep-uploads`, el fallback histórico y los releases anteriores. Anexos/documentos oficiales bloqueados en CAP. La simulación mantiene roles, vínculos, autoría y revisión independiente; registra al instructor, sin habilitar a todo ADMIN como revisor regulatorio.
 
-## 3. Validación y límites
+## 4. Validación de esta entrega
 
-| Validación | Fuente y resultado |
+| Verificación | Resultado |
 | --- | --- |
-| Unitarias completas backend | `21d9753`: **1.064/1.064**, 100 archivos |
-| Unitarias completas frontend | `21d9753`: **1.558/1.558**, 216 archivos, con flags de funcionalidad false |
-| Integraciones HTTP y perfil/push | `21d9753`: **7/7 + 4/4**, sin entrega externa |
-| E2E del candidato | `21d9753`: **45/45**, sin omisiones, inestables ni reintentos |
-| Pantallas | `222ccbb`: **20 aprobadas + 1 omisión prevista**, cero fallos/inestables/reintentos |
-| Builds finales web y `/app` | `1ab057a`: aprobados, API final y flags false; 243 y 186 archivos |
-| Backend final | `1ab057a`: compilado en preview en 26,44 s; 335 archivos verificados al preparar el release |
-| Smoke productivo final | **39/39**, sólo GET públicos y health (`SELECT 1`); sin login ni consultas de negocio |
-| Comprobación HTTPS externa | **4/4**: web, `/app`, identificación de commit y health |
-| Estabilidad posterior | Dos instancias online, mismos PID y contadores desde la activación final, comprobado a las 08:03:04 de Mendoza |
+| Backend completo | 1.074/1.074; backend sin cambios posteriores |
+| Frontend completo (baseline) | 1.561/1.561 antes de las últimas correcciones; no se repitió la suite completa sobre f19d024 |
+| Manual y Monitor posteriores | 14/14 estáticas, 43/43 manual, 70/70 Monitor |
+| Capacitación en preview | 36 recorridos aprobados; C3 repetido 3/3 sobre c819ecf; tres superficies |
+| Altas/OCR | 3/3 con Tesseract real y borradores recuperados, sin cuentas/solicitudes nuevas |
+| Build actual | Web/app f19d024; 2.090 fuentes verificadas antes/después; 244 + 187 archivos de artefactos. Backend c819ecf sin cambios |
+| Smoke actual | 44/44 públicos + cinco archivos del manual por hash; sin lectura de negocio |
+| Aula previa c819ecf | Primera corrida 5 aprobados/1 espera fallida; C3 web y app repetidos 2/2 con 420cdd3. Quedan cubiertos los seis recorridos, sin presentar el conjunto como una sola corrida 6/6 |
+| Cuatro teléfonos | Preview 2/2 y aula publicada 2/2: cuatro sesiones persistentes, dos ubicaciones enviadas por UI, C3 y cierre en todos los roles; GPS emulado |
+| Pruebas de la corrección y manual | 80/80 unitarias, 15/15 estáticas, 9/9 manual en preview y 3/3 manual publicado |
+| Estado posterior actual | 40 cuentas CAP, 35 casos preparados intactos; seis casos nuevos propios tratados, incluidos los dos interrumpidos recuperados por UI; dos workers sin reinicio e instructor QA suspendido |
 
-La primera corrida de unitarias frontend tuvo una falla por heredar un flag encendido del preview: se repitió completa con flags false y pasó sin cambiar producto ni expectativas. La primera corrida de pantallas dio 19 aprobadas, 1 fallida y 1 omitida por leer «Cargando SITREP…» antes del render. `222ccbb` corrigió únicamente la espera del test mediante `expect.poll`, manteniendo el umbral `rootText > 30`; la repetición completa pasó. No se ocultan esas fallas iniciales.
+Toda prueba pesada/build: preview remoto, serial, un worker, 1 CPU/2 GiB/swap cero. No OOM. El cierre detalla las fallas iniciales y sus correcciones, incluida la espera de autoplay, la falta de Tesseract en el gemelo y el cierre del instructor temporal. No se ocultaron fallos ni relajaron expectativas.
 
-Las suites completas no se repitieron bajo el SHA final `1ab057a`: desde `21d9753` sólo cambió la espera del test, el merge conservó el árbol del candidato y se versionó el service worker. Sí se compilaron y verificaron los artefactos finales de `1ab057a`. Las pruebas pesadas fueron seriales, un worker, 1 CPU/2 GiB/swap cero en el preview; no hubo OOM. Antes del último build se corrigió una divergencia del límite efectivo de swap del gemelo, detectada por el guard antes de compilar.
+Límites: navegadores con datos sintéticos; no certifica Android/APK, cámara física, GPS de fondo, batería, carga masiva simultánea ni entrega de correo/push. Tiles de mapas de QA identificados; consultas y movimientos del backend del entorno correspondiente. No se recorrieron cuentas operativas reales.
 
-No certificados: Android físico/APK, login y flujos por rol en producción, entrega de correos/push. `inbox.spec` y su fixture pendiente siguen fuera de la configuración E2E ejecutada. La asociación Android disponible no certifica el APK. No es un GO global.
+## 5. Release, respaldo y rollback
 
-## 4. Pasos autorizados: completados
-
-1. **Destino:** confirmado por el dueño `sitrep.ultimamilla.com.ar`; inspección inicial de sólo lectura. No se desplegó en `rptrazar.mendoza.gov.ar`.
-2. **Suites completas:** resultados y corrección aislada de pantallas en la sección 3.
-3. **Integración:** candidato avanzado a `222ccbb`; merge `96f333e` publicado en `main`; manual faltante reconciliado sin perder sus cambios posteriores.
-4. **Service worker:** commit `1ab057a`; cachés raíz `trazabilidad-rrpp-v116` y `runtime-cache-v116`. App versionada por build: `20261018001836`.
-5. **Build frontend:** web y `/app` de `1ab057a`, API final y cinco flags false, seriales en preview. Esos mismos paquetes fueron publicados.
-6. **Backup y migraciones:** backup verificado antes de cambios. De las 12 del lote, 2 ya estaban registradas; 4 ya existían físicamente y se reconciliaron con `migrate resolve --applied` tras comparar el esquema; 6 se aplicaron con `prisma migrate deploy`. Las 23 de la fuente tienen checksum exacto y estado aplicado; `Database schema is up to date!`. Se conservaron 16 registros históricos cuyos SQL no están en el checkout. No reejecutar las 12 como si estuvieran pendientes.
-7. **Entorno:** valores de la sección 2, `.env` conservado exactamente al desplegar. Correos y push apagados; archivos subidos intactos.
-8. **Preparación y despliegue:** backend compilado en preview; dependencias de runtime coincidentes con el lockfile copiadas a un release independiente; Prisma 5.22.0 generado para el servidor sin alterar el cliente anterior. Activación mediante enlaces atómicos y reload exclusivo de `sitrep-backend`. Manual incluido; Nginx sin cambios. Smoke final 39/39 y externo 4/4. Hubo dos rollbacks preventivos detallados abajo; el tercer intento quedó publicado.
-
-## 5. Rollback y respaldos
-
-| Componente | Activo tras el despliegue | Anterior conservado |
+| Enlace | Activo | Anterior exacto |
 | --- | --- | --- |
-| Backend (`/var/www/sitrep-backend`) | `/var/www/sitrep-backend-releases/20261018-1ab057a` | `/var/www/sitrep-backend-releases/20261012-training-r1` |
-| Web + app (`/var/www/sitrep`) | `/var/www/sitrep-releases/20261018-1ab057a` | `/var/www/sitrep-releases/20261013-attention-r1` |
+| `/var/www/sitrep-backend` | `/var/www/sitrep-backend-releases/20261018-training-c819ecf` | No cambia en esta entrega; `1ab057a` es fallback histórico |
+| `/var/www/sitrep` | `/var/www/sitrep-releases/20261018-four-phones-f19d024` | `/var/www/sitrep-releases/20261018-training-c819ecf` |
 
-Los dos primeros intentos restauraron esos destinos anteriores automáticamente:
+230 paquetes runtime iguales al lockfile; cliente Prisma 5.22 copiado desde esquema idéntico, sin compartir enlaces con el release anterior. SW raíz v118, app `20261018134006`. Nginx sin cambios. Auditoría actual: `/var/backups/sitrep/20261018-four-phones-release/`; anterior: `/var/backups/sitrep/20261018-training-release/`.
 
-1. El smoke esperaba JavaScript para un SVG del precache. Se corrigió el MIME del verificador, sin relajar el hash esperado.
-2. Readiness se comprobó cuando la segunda instancia aún tenía unos nueve segundos. Se agregó espera tras el reload de ambas; el contrato `uptime > 10s` y el producto no cambiaron.
+El esquema escolar anterior se respaldó y amplió con once tablas y dos columnas opcionales. Principal restringido, transacción con límites, rehearsal previo y diff Prisma sin diferencias. Huellas de las 44 tablas originales iguales antes/después. No se sembró ni reinició el aula. Backup escolar: `/var/backups/sitrep/20261018-training/training-before.dump`, 197.128 bytes, SHA-256 `fe0959459ff00243c13028c617165f8c20a59e9b20a4038de15ee0688ccfb109`. Índice y decodificación completa verificados; restauración no ensayada. Los respaldos permanecen en el servidor.
 
-**Procedimiento para un rollback futuro, sólo con nueva autorización:** verificar primero los destinos actuales y los releases conservados; reemplazar atómicamente ambos enlaces por los destinos anteriores exactos; recargar únicamente `sitrep-backend` conservando los flags y `UPLOADS_DIR` aprobados; esperar que ambas instancias superen diez segundos y comprobar health/readiness y archivos públicos. No deducir el release anterior por orden de directorios ni borrar releases. **Rollback de aplicación no significa deshacer migraciones ni restaurar la base.**
+Rollback de esta entrega: comprobar los enlaces actuales y sustituir **sólo `/var/www/sitrep`** atómicamente por `20261018-training-c819ecf`. Comprobar web, app, manual y service workers. No recargar backend ni restaurar base, retirar tablas o borrar prácticas. El rollback histórico de la entrega backend a `1ab057a` permanece en el cierre anterior. Toda operación futura fuera del alcance autorizado requiere una nueva decisión del dueño.
 
-- Backup de base: `/var/backups/sitrep/20261018-step6-1ab057a/trazabilidad_rrpp-before-1ab057a.dump`, 23.033.797 bytes, SHA-256 `75ac31216e042b96f4bed5a17ad5307e711f9999228675d9651c3477556a53f1`. Se verificaron índice y descompresión completa; no se ensayó restauración en otra base. Hash vuelto a verificar antes del deploy.
-- Respaldo previo del entorno: `/var/backups/sitrep/20261018-step7-env-1ab057a/.env.before`. Contiene el estado **anterior** a explicitar los cinco flags; no usarlo para rollback sin conservar la configuración aprobada.
-- `.env` desplegado: SHA-256 `d34cc69b6c61d60059206ec58ba4a63eee2e3f50b5abddeb8aff17fc071d5815`, permisos 0600. Mismo contenido que el paso 7.
-- Auditoría productiva guardada durante el despliegue: `/var/backups/sitrep/20261018-step8-1ab057a/`.
+El backup operativo del despliegue anterior sigue en `/var/backups/sitrep/20261018-step6-1ab057a/trazabilidad_rrpp-before-1ab057a.dump`, SHA-256 `75ac31216e042b96f4bed5a17ad5307e711f9999228675d9651c3477556a53f1`. Las 23 migraciones de fuente ya aplicadas y los 16 registros históricos se conservaron. **No repetir las doce migraciones del traspaso original.**
 
-Los respaldos con secretos y datos permanecen sólo en producción. Este cierre no los leyó ni modificó.
+## 6. Preview y continuidad
 
-## 6. Preview: gemelo retirado
+Gemelo nuevo `sitrep-qa-training-20261018`: detenido al cerrar, imagen y artefactos conservados. Contenedores ajenos sin modificaciones de esta tarea. Original `sitrep-qa-enterprise-20261016` detenido. Sin servidor QA, suites ni relay activo. Fuente y evidencias: `/opt/sitrep-qa-enterprise-20261016/source/.qa-training-final-20261018`, `.qa-release-training-20261018`, `.qa-published-training-20261018`, `.qa-published-training-c3-20261018`. Evidencia local ignorada: `test-results-training-20261018/` y `test-results-four-phones-20261018/`. Las nuevas corridas y artefactos están detallados en el [ensayo de cuatro teléfonos](ENSAYO-CUATRO-TELEFONOS-20261018.md).
 
-Limpieza autorizada y completada el **18/10/2026, 08:09:39 de Mendoza**, únicamente en `76.13.234.213`:
+El gemelo anterior `sitrep-qa-live-20261017` y su imagen sí fueron eliminados en el cierre previo; no confundirlo con el nuevo. No reutilizar los antiguos túneles como si siguieran vivos.
 
-- Eliminado `sitrep-qa-live-20261017`, ID `cc9c132b55efa02a7ea9683b5db2c014b77a1c944896d42da92ec84b4d615cb5`, después de cerrar QA y detenerlo.
-- Eliminada su imagen `sitrep-qa-enterprise-20261016:live-20261017`, ID `sha256:904b70752338dc0cc43a682f2c96d06352c348178798825e4983f207994fa5ca`.
-- Conservado el original `sitrep-qa-enterprise-20261016`, detenido, y su imagen. Los otros 74 contenedores mantuvieron identidad, imagen y estado; demás imágenes, redes y volúmenes sin cambios. Sin prune global, force ni eliminación de volúmenes.
-- Conservados la fuente y artefactos montados en `/opt/sitrep-qa-enterprise-20261016/source`; también los archivos de entorno del preview. El estado efímero dentro de la capa escribible del gemelo desapareció al eliminarlo; no afirmar que esa base viva sigue disponible.
-- **El antiguo túnel y las instrucciones de acceso al gemelo ya no sirven.** Para nueva QA hace falta preparar un entorno autorizado; no reiniciar el original ni recrear el gemelo automáticamente.
-- Evidencia local: `test-results-close-20261018/preview-cleanup.json`. No se contactó producción en esta limpieza ni se tocaron otros proyectos.
+## 7. Historia y pendientes conservados
 
-## 7. Evidencia y pendientes
+[CIERRE-PRODUCCION-20261018.md](CIERRE-PRODUCCION-20261018.md) documenta el despliegue previo de `1ab057a`, la integración `96f333e`, el manual de main reconciliado y los resultados históricos. Esos estados no sustituyen esta entrega. [Hallazgos](HALLAZGOS-UIUX-20261016.md), [decisiones](DECISIONES-RELEASE-20261017.md) y [especificación de Eventuales](ESPEC-EVENTUALES-20261017.md) conservan reglas y decisiones funcionales.
 
-El [cierre de producción](CIERRE-PRODUCCION-20261018.md) versiona el resumen operativo. Los artefactos completos se conservan en directorios ignorados del checkout: `test-results-step2-21d9753`, `test-results-screen-wait-222ccbb`, `test-results-integration-96f333e`, `test-results-sw-v116-1ab057a`, `test-results-build-1ab057a`, `test-results-migrations-1ab057a`, `test-results-env-1ab057a`, `test-results-deploy-1ab057a` y `test-results-close-20261018`. No son archivos publicados en Git; cada carpeta incluye resultados o evidencia JSON.
-
-Pendientes que este despliegue no resuelve:
-
-- Decisión futura del dueño para activar funcionalidades, correos o push; actualmente apagados según la sección 2.
-- Log de teléfono y chat de canales no implementados en `notification-dispatcher.service.ts` (S5), rotación de credenciales de scripts `capture-*` (S8), higiene S7/S9–S12 y 16 migraciones históricas sin SQL en este checkout.
-- Patrón compacto en otros listados, «Editar» en tratados, O3/O4/O5 y H03/H04/H13/H17/H19 según los hallazgos.
-- Instrucciones antiguas de seed en `DEPLOY-NUEVO-SERVIDOR.md` y `SETUP.html`: no ejecutarlas. Scripts de seed no son parte de un redeploy.
-- Android/APK, `inbox.spec`, correos y pruebas productivas por rol conservan los límites de la sección 3.
-
-Reglas vigentes: sin datos reales en QA, proveedores externos apagados, sin alterar reglas regulatorias/permisos/históricos para UI, Mac sólo verificaciones livianas, QA pesada remota serial con 1 CPU/2 GiB/swap cero. Cualquier nueva operación productiva o cambio de alcance requiere OK del dueño. No afirmar GO global ni certificar Android desde un viewport.
+Siguen pendientes fuera de esta capacitación: activación operativa de funcionalidades/correos/push, S5 en canales no implementados, rotación de credenciales de scripts capture, higiene S7/S9–S12, 16 SQL históricos ausentes, otros hallazgos UI y Android físico/concurrencia. No ejecutar seeds antiguos ni cambiar reglas regulatorias, permisos o históricos para facilitar pruebas. No afirmar GO global.

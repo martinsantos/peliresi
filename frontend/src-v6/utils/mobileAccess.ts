@@ -18,16 +18,26 @@ const hasRole = (user: User, roles: UserRole[]) => roles.includes(user.rol);
  * Backend authorization remains authoritative; this prevents inaccessible admin
  * screens from being rendered and issuing doomed/forbidden API requests.
  */
-export function canAccessMobilePath(user: User, path: string): boolean {
+export function canAccessMobilePath(user: User, pathname: string): boolean {
+  const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '').split(/[?#]/)[0];
   // Never render the administrator's user list or switcher for a sector user.
   // The API also enforces this, but the PWA must not issue a doomed request.
   if (path === '/switch-user' || path.startsWith('/switch-user/')) {
     return user.rol === 'ADMIN';
   }
 
-  if (path === '/mis-inspecciones' || path.startsWith('/mis-inspecciones/')) {
+  // Legacy links open a single notified requirement, never the inspection directory.
+  if (path === '/mis-inspecciones') return false;
+  if (path.startsWith('/mis-inspecciones/') || path.startsWith('/requerimientos/')) {
     return hasRole(user, ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
   }
+  if (path === '/requerimientos') return false;
+  if (startsWithAny(path, ['/transporte'])) return hasRole(user, ['ADMIN', 'TRANSPORTISTA']);
+  if (startsWithAny(path, ['/monitor', '/centro-control', '/tracking'])) {
+    return hasRole(user, [...ALL_ADMIN_ROLES, 'TRANSPORTISTA']);
+  }
+  if (path === '/alertas') return hasRole(user, ALL_ADMIN_ROLES);
+  if (path === '/actores') return user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
 
   if (path === '/inspecciones' || path.startsWith('/inspecciones/')) {
     return user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
@@ -64,12 +74,15 @@ export function canAccessMobilePath(user: User, path: string): boolean {
     return hasRole(user, ['ADMIN', 'ADMIN_GENERADOR']);
   }
 
-  if (path.startsWith('/admin/tratamientos') || path.startsWith('/admin/renovaciones')) {
+  if (path.startsWith('/admin/renovaciones')) {
+    return hasRole(user, ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']);
+  }
+  if (path.startsWith('/admin/tratamientos')) {
     return hasRole(user, ['ADMIN', 'ADMIN_OPERADOR']);
   }
 
   if (path.startsWith('/admin/solicitudes')) {
-    return hasRole(user, ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']);
+    return hasRole(user, ALL_ADMIN_ROLES);
   }
 
   if (startsWithAny(path, ['/admin/blockchain', '/admin/carga-masiva', '/admin/auditoria'])) {

@@ -30,7 +30,7 @@
 .institutional .text-neutral-500 { color: #626b7c; }
 .auth-shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(340px, .85fr) minmax(0, 1.4fr); }
 .auth-brand-panel { background: var(--brand-blue); color: white; padding: clamp(28px, 4vw, 64px); display: flex; flex-direction: column; justify-content: space-between; gap: 48px; }
-.auth-brand-panel h1 { color: white; font-size: clamp(30px, 3vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -.03em; margin: 32px 0 20px; }
+.auth-brand-panel .auth-brand-description { color: white; font-size: clamp(30px, 3vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -.03em; margin: 32px 0 20px; }
 .auth-brand-panel .mendoza-brand { height: 126px; }
 .auth-brand-panel .institutional-stripe { width: 72px; margin-top: 32px; }
 .auth-brand-panel p { color: #e2e5ff; }
@@ -45,12 +45,12 @@
 .institutional-login.is-pwa { min-height: 100dvh; padding: 28px 20px; display: flex; justify-content: center; align-items: center; }
 .login-brand-lockup { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 20px; }
 .login-brand-lockup .mendoza-brand { height: 48px; }
-.login-brand-lockup .sitrep-wordmark { border-left: 1px solid #d2d3dc; padding-left: 24px; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; color: var(--brand-blue); }
+.login-brand-lockup .sitrep-wordmark { border-left: 1px solid #d2d3dc; padding-left: 24px; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; color: #1b5e3c; }
 .institutional-login input { min-height: 48px; font-size: 16px; background: white; }
 .institutional-login input:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px #0811a018; }
 .institutional-login button[type=submit] { min-height: 48px; }
 .institutional-registration { background: white; border: 1px solid #dedbd5; border-top: 3px solid var(--brand-sand); }
-.institutional-registration h3 { color: var(--brand-blue); }
+.institutional-registration h2 { color: var(--brand-blue); }
 .institutional-registration p { color: #565965; }
 .institutional-registration a { border-color: #e2e3ea; }
 .login-institutional-footer { margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }

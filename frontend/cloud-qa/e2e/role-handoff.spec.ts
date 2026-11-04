@@ -84,8 +84,8 @@ test('separate real users hand a manifest from generator to transport to operato
 
     const operator = await asRole('operador');
     await operator.goto(`${prefix(info)}/manifiestos/${id}`);
-    const operatorAdenda = process.env.MANIFEST_ADDENDA_ENABLED === 'true' ? await recordOrdinaryAddendum(operator) : undefined;
-    await mutate(operator, id, 'Confirmar Recepcion', 'confirmar-recepcion');
+    const operatorAdenda = process.env.MANIFEST_ADDENDA_ENABLED === 'true' ? await recordOrdinaryAddendum(operator, undefined, 'Informar hallazgo') : undefined;
+    await mutate(operator, id, 'Confirmar recepción', 'confirmar-recepcion');
     await operator.getByRole('button', { name: 'Registrar Pesaje', exact: true }).click();
     await operator.getByPlaceholder('Peso real').first().fill('34.5');
     await operator.getByPlaceholder('Peso real').last().fill('12');

@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import AuthLayout from '../../layouts/AuthLayout';
 import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 
 const requests = vi.hoisted(() => ({ getRequirements: vi.fn(), put: vi.fn(), post: vi.fn() }));
@@ -31,14 +32,15 @@ describe('Shared registration navigation keeps identity, steps and data stable',
   ] as const)('%s does not indent its title or move the viewport while typing', async (type, label, total, secondStep) => {
     await act(async () => {
       render(<MemoryRouter initialEntries={[`/inscripcion/${type}?modo=revision`]}><Routes>
-        <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
+        <Route element={<AuthLayout/>}><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /></Route>
       </Routes></MemoryRouter>);
     });
     const identity = screen.getByTestId('registration-identity');
-    expect(identity.firstElementChild).toBe(screen.getByRole('heading', { name: `Inscripción como ${label}` }));
-    expect(within(identity).getByRole('button', { name: 'Volver a la pantalla anterior' })).toHaveTextContent('Volver');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: `Inscripción como ${label}` })).toBeVisible();
+    expect(within(identity).getByRole('button', { name: 'Volver al acceso' })).toHaveTextContent('Acceso');
     expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'instant' });
-    expect(railScroll).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'center', behavior: 'instant' });
+    expect(railScroll).not.toHaveBeenCalled();
     const rail = screen.getByRole('navigation', { name: 'Etapas de la inscripción' });
     expect(within(rail).getAllByRole('button')).toHaveLength(total);
     for (const button of within(rail).getAllByRole('button')) expect(button.querySelector('span')).not.toHaveClass('hidden');
@@ -54,7 +56,7 @@ describe('Shared registration navigation keeps identity, steps and data stable',
     expect(active).toHaveAttribute('aria-current', 'step');
     expect(active.firstElementChild).toHaveTextContent('2');
     expect(active.firstElementChild).toHaveClass('bg-primary-700', 'text-white');
-    fireEvent.click(screen.getByRole('button', { name: 'Anterior' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Etapa de la inscripción' }), { target: { value: '1' } });
     expect(screen.getByPlaceholderText(type === 'transportista' ? 'Transporte S.A.' : type === 'operador' ? 'Operador S.A.' : 'Empresa S.A.')).toHaveValue('QA dato conservado al cambiar de paso');
     expect(requests.put).not.toHaveBeenCalled();
     expect(requests.post).not.toHaveBeenCalled();

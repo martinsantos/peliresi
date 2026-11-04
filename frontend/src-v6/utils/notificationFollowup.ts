@@ -1,5 +1,14 @@
 import type { Notificacion } from '../types/models';
 
+/** A reminder projected from current PSIP data is not the original detection. */
+export function isCurrentRequirementNotice(notice: Pick<Notificacion, 'datos'>): boolean {
+  try {
+    const data = JSON.parse(notice.datos || 'null');
+    return data?.familia === 'catalogo_verificable' && data.version === 1
+      && data.tipo === 'requerimiento_inspeccion' && data.estadoDetectado === 'ACTUALIZADO';
+  } catch { return false; }
+}
+
 /** Acknowledging a notice does not complete work. Use the current API state. */
 export function notificationFollowup(notice: Notificacion): string | null {
   let data: { tipo?: string; version?: number; estadoDetectado?: string; familia?: string };
@@ -8,6 +17,8 @@ export function notificationFollowup(notice: Notificacion): string | null {
   if (data?.familia === 'catalogo_verificable' && data.version === 1) {
     if (notice.seguimientoEstado === 'RESUELTA') return 'Caso resuelto · Consultar fuente e historial';
     if (notice.seguimientoEstado === 'DESCARTADA') return 'Caso descartado · Consultar fuente e historial';
+    // The current message and the single opening action already explain this state.
+    if (isCurrentRequirementNotice(notice)) return null;
     return data.tipo === 'requerimiento_inspeccion' ? 'Revisar requerimiento y respuesta · Abrir expediente' : 'Revisar vigencia y documentación · Abrir ficha';
   }
   if (!data || data.tipo !== 'seguimiento_cierre' || data.version !== 1) return null;

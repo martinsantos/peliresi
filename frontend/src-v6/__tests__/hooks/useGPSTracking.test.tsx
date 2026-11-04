@@ -1,14 +1,19 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { headingToCompass, useGPSTracking } from '../../hooks/useGPSTracking';
 import { EstadoManifiesto } from '../../types/models';
 import { manifiestoService } from '../../services/manifiesto.service';
+import api from '../../services/api';
+import { gpsQueueKey } from '../../services/gpsQueue';
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 vi.mock('../../services/manifiesto.service', () => ({
   manifiestoService: {
     actualizarUbicacion: vi.fn(),
   },
 }));
+
+vi.mock('../../services/api', () => ({ default: { get: vi.fn() } }));
 
 vi.mock('../../components/ui/Toast', () => ({
   toast: {
@@ -27,10 +32,14 @@ describe('headingToCompass', () => {
 });
 
 describe('useGPSTracking', () => {
+  let restoreLocks: () => void;
   beforeEach(() => {
+    restoreLocks = installMockGpsLocks();
     localStorage.clear();
     vi.clearAllMocks();
+    vi.mocked(api.get).mockRejectedValue(new Error('offline'));
   });
+  afterEach(() => restoreLocks());
 
   it('keeps tracking while Android has GPS enabled but no location fix yet', async () => {
     let errorCallback: PositionErrorCallback | null = null;
@@ -41,6 +50,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-2',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -86,6 +96,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-3',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -123,6 +134,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-5',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -150,6 +162,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-4',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -179,15 +192,30 @@ describe('useGPSTracking', () => {
     unmount();
   });
 
+  it('does not invent a capture time when the device omits it', async () => {
+    vi.mocked(navigator.geolocation.watchPosition).mockImplementation(() => 11);
+    vi.mocked(navigator.geolocation.getCurrentPosition).mockImplementation((success) => {
+      success({ coords: { latitude: -32.9, longitude: -68.8, accuracy: 12,
+        speed: null, heading: null, altitude: null, altitudeAccuracy: null }, timestamp: NaN } as GeolocationPosition);
+    });
+    const { result, unmount } = renderHook(() => useGPSTracking({ ownerId: 'carrier-a',
+      manifiestoId: 'trip-no-time', estado: EstadoManifiesto.EN_TRANSITO, viajeStatus: 'ACTIVO' }));
+    await waitFor(() => expect(result.current.status).toBe('active'));
+    expect(result.current.position).toEqual([-32.9, -68.8]);
+    expect(result.current.details.lastUpdate).toBeNull();
+    unmount();
+  });
+
   it('exposes restored pending GPS metadata before sync completes', async () => {
     vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('offline'));
     localStorage.setItem(
-      'gps_pending_trip-1',
-      JSON.stringify([{ lat: -32.92871, lng: -68.85352, speed: null, heading: 90 }]),
+      gpsQueueKey('carrier-a', 'trip-1'),
+      JSON.stringify([{ lat: -32.92871, lng: -68.85352, speed: null, heading: 90, observedAt: Date.now() }]),
     );
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-1',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',

@@ -11,6 +11,7 @@ import type {
   InspectionVerification,
   InspectionExchangeTimeline,
   InspectionExchangeType,
+  InspectionFollowUp,
 } from '../types/inspection';
 
 export interface PublicInspectionVerification {
@@ -49,6 +50,7 @@ export interface InspectionParticipationSummary {
   plazoRespuestaAt?: string | null;
   version: number;
   cantidadPresentaciones: number;
+  seguimiento?: InspectionFollowUp;
 }
 
 export const inspeccionService = {
@@ -76,8 +78,8 @@ export const inspeccionService = {
     return data.data;
   },
 
-  async list(params?: { estado?: InspectionState; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedInspections> {
-    const { data } = await api.get('/inspecciones', { params });
+  async list(params?: { estado?: InspectionState; estados?: InspectionState[]; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedInspections> {
+    const { data } = await api.get('/inspecciones', { params: params?.estados ? { ...params, estados: params.estados.join(',') } : params });
     return data.data;
   },
 
@@ -91,6 +93,7 @@ export const inspeccionService = {
     tipoActor?: InspectionActorType | null;
     actorId?: string | null;
     clienteId?: string;
+    antecedenteId?: string;
     inspectorId?: string;
     latitud?: number;
     longitud?: number;

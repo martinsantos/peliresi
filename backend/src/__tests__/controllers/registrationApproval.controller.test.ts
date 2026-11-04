@@ -31,6 +31,7 @@ beforeEach(() => {
   mock.create.mockResolvedValue({ id: 'new-actor' }); mock.update.mockImplementation(async ({ data }) => ({ ...draft(), ...data }));
   mock.transaction.mockImplementation(callback => callback({ $queryRaw: mock.lock,
     solicitudInscripcion: { findUnique: mock.find, update: mock.update },
+    documentoSolicitud: { findMany: vi.fn().mockResolvedValue([]) },
     generador: { create: mock.create }, operador: { create: mock.create }, transportista: { create: mock.create },
     usuario: { update: mock.activate }, notificacion: { create: mock.notify },
   }));
@@ -40,6 +41,8 @@ describe('approved registration preserves declarations, not invented fiscal auth
   it.each(['GENERADOR', 'OPERADOR'])('%s transfers activity, split addresses and actual contact, keeping explicit zero', async type => {
     mock.find.mockResolvedValue(draft(type));
     expect((await approve()).error).toBeUndefined();
+    expect(JSON.parse(mock.notify.mock.calls[0][0].data.datos)).toMatchObject({solicitudId:'draft',tipoActor:type});
+    expect(mock.notify.mock.calls[0][0].data.titulo).toContain(type==='GENERADOR'?'Generador':'Operador');
     const data = mock.create.mock.calls[0][0].data;
     expect(data).toMatchObject({ usuarioId: 'owner', cuit: identity.cuit, email: declared.emailContacto,
       domicilioLegalCalle: 'QA legal 1', domicilioRealCalle: 'QA planta 2', domicilioRealDepto: 'Capital',
@@ -54,6 +57,8 @@ describe('approved registration preserves declarations, not invented fiscal auth
   });
   it('retains coordinate zero from the transport form without losing longitude', async () => {
     mock.find.mockResolvedValue(draft('TRANSPORTISTA')); await approve();
+    expect(JSON.parse(mock.notify.mock.calls[0][0].data.datos)).toMatchObject({solicitudId:'draft',tipoActor:'TRANSPORTISTA'});
+    expect(mock.notify.mock.calls[0][0].data.titulo).toContain('Transportista');
     expect(mock.create.mock.calls[0][0].data).toMatchObject({ latitud: 0, longitud: -68.84, localidad: 'Capital' });
     expect(mock.create.mock.calls[0][0].data).not.toHaveProperty('tefInputs');
   });

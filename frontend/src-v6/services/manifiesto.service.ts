@@ -3,6 +3,7 @@
  */
 
 import api from './api';
+import { sendIdempotentGps } from './gpsQueue';
 import type {
   CreateManifiestoRequest, ManifiestoFilters, ManifiestoDashboard,
   FirmarManifiestoRequest, ConfirmarRetiroRequest, ConfirmarEntregaRequest,
@@ -30,9 +31,9 @@ export const manifiestoService = {
     return data.data?.manifiesto || data.data;
   },
 
-  async create(req: CreateManifiestoRequest): Promise<Manifiesto> {
+  async create(req: CreateManifiestoRequest): Promise<Manifiesto & { creationRecovered?: boolean }> {
     const { data } = await api.post('/manifiestos', req);
-    return data.data?.manifiesto || data.data;
+    return { ...(data.data?.manifiesto || data.data), creationRecovered: data.data?.replayed === true };
   },
 
   async update(id: string, req: Partial<CreateManifiestoRequest>): Promise<Manifiesto> {
@@ -54,7 +55,11 @@ export const manifiestoService = {
     return data.data;
   },
 
-  async actualizarUbicacion(id: string, latitud: number, longitud: number, velocidad?: number | null, direccion?: number | null): Promise<void> {
+  async actualizarUbicacion(id: string, latitud: number, longitud: number, velocidad?: number | null, direccion?: number | null, puntoId?: string): Promise<void> {
+    if (puntoId) {
+      await sendIdempotentGps(api, id, { lat: latitud, lng: longitud, speed: velocidad ?? null, heading: direccion ?? null, puntoId });
+      return;
+    }
     await api.post(`/manifiestos/${id}/ubicacion`, {
       latitud, longitud,
       ...(velocidad != null && { velocidad }),

@@ -25,6 +25,13 @@ const cases = [
 ] as const;
 
 describe('manifest action dialogs do not discard unconfirmed work', () => {
+  it('associates the weighing fields with accessible names', () => {
+    const input = defaults();
+    input.showPesajeModal = true;
+    render(<ActionModals {...input} />);
+    expect(screen.getByRole('spinbutton', { name: 'Peso recibido de residuo (kg)' })).toBeVisible();
+    expect(screen.getByLabelText('Observaciones')).toHaveAttribute('placeholder', 'Observaciones del pesaje...');
+  });
   for (const item of cases) {
     it.each(['unconfirmed', 'rejected'])(`${item.action} retains the form when %s`, async mode => {
       const input = defaults();

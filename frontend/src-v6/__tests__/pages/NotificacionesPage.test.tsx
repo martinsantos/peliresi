@@ -6,6 +6,8 @@ import NotificacionesPage from '../../pages/notificaciones/NotificacionesPage';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn(), marcarTodasLeidas: vi.fn(), eliminar: vi.fn() }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: service }));
+const auth = vi.hoisted(() => ({ user: { id: 'qa', training: true, rol: '' } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: auth.user }) }));
 const notice = { id: 'notice', titulo: 'Inspección asignada · GRP-2026-00001', mensaje: 'Visita programada', leida: false, tipo: 'INFO_GENERAL', prioridad: 'NORMAL', createdAt: '2026-10-01T12:00:00Z', datos: JSON.stringify({ inspeccionId: 'assigned' }) };
 const response = { items: [notice], total: 45, noLeidas: 31, page: 1, limit: 20, totalPages: 3 };
 function Location() {
@@ -19,9 +21,116 @@ function setup(path = '/notificaciones') {
   return client;
 }
 describe('notification inbox states and interaction', () => {
+  for (const base of ['', '/app']) it.each([
+    ['/inspecciones?vista=antecedentes', 'Ver antecedentes en Inspecciones →'],
+    ['/soporte/qa-ticket', 'Abrir consulta de soporte →'],
+    ['/mi-perfil', 'Abrir mi ficha y documentos →'],
+    ['/admin/usuarios', 'Revisar cuentas de usuarios →'],
+    ['/admin/renovaciones', 'Revisar renovación →'],
+    ['/alertas', 'Revisar alerta →'],
+    ['/otra-pantalla', 'Abrir detalle →'],
+  ])(`names the actual destination %s on ${base || 'web'}`, async (path, label) => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Novedad de mi trámite', datos: JSON.stringify({ url: path }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText(label)).toBeVisible();
+    expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Novedad de mi trámite', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + path);
+  });
+  it('names an approved application and opens its result on app without an admin route', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Solicitud aprobada', datos: '{"tipo":"solicitud_aprobada","solicitudId":"own-1"}' }] });
+    setup('/app/notificaciones');
+    expect(await screen.findByText('Abrir solicitud y ver su estado →')).toBeVisible();
+    expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Solicitud aprobada', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/mi-solicitud?solicitud=own-1');
+  });
+  it('names the PSIP expediente instead of a manifest and opens the actor route in app', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'psip-1', destino: 'participacion' }) }] });
+    setup('/app/notificaciones');
+    expect(await screen.findByText('Consultar requerimiento y estado →')).toBeVisible();
+    expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/requerimientos/psip-1');
+  });
   beforeEach(() => {
+    auth.user.rol = '';
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
+  });
+  it.each(['', '/app'])('shows the updated requirement as current information on %s', async base => {
+    auth.user.rol = 'GENERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Estado actualizado de requerimiento',
+      mensaje: 'QA-001 · Se registró una respuesta.', datos: JSON.stringify({ familia: 'catalogo_verificable', version: 1,
+        tipo: 'requerimiento_inspeccion', estadoDetectado: 'ACTUALIZADO', inspeccionId: 'psip-1', destino: 'participacion' }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('QA-001 · Se registró una respuesta.')).toBeVisible();
+    expect(screen.queryByText(/Situación registrada al evaluar:/)).toBeNull();
+    expect(screen.queryByText('Consultar requerimiento y respuesta')).toBeNull();
+    expect(screen.getByText('Consultar requerimiento y estado →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Estado actualizado de requerimiento', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/requerimientos/psip-1');
+  });
+  it.each(['', '/app'])('clarifies an older GPS notice without changing its saved text on %s', async base => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS',
+      mensaje: 'Velocidad anormalmente alta detectada: 250 km/h', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+    expect(screen.getByText('Velocidad anormalmente alta detectada: 250 km/h')).toBeVisible();
+    expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
+  });
+  it.each(['', '/app'])('offers the recorded decision rather than a new response on %s', async base => {
+    auth.user.rol = 'OPERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Cierre conforme', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'closed-1', destino: 'participacion', tipoActor: 'OPERADOR', evento: 'CIERRE_CONFORME' }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Consultar cierre conforme →')).toBeVisible();
+    expect(screen.queryByText(/Ver requerimiento y responder/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Cierre conforme', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/requerimientos/closed-1');
+  });
+  it.each(['', '/app'])('identifies the receiving activity before opening its requirement on %s', async base => {
+    auth.user.rol = 'GENERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-operator', destino: 'participacion', tipoActor: 'OPERADOR' }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Ver aviso para Operador →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
+  });
+  it.each(['', '/app'])('orients an operator to the generator fiscal notice on %s', async base => {
+    auth.user.rol = 'OPERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Recordatorio fiscal 2026', datos: JSON.stringify({
+      tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil',
+    }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Ver aviso para Generador →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Recordatorio fiscal 2026', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
+  });
+  it.each(['', '/app'])('names a fiscal company notice before its authorized company context on %s', async base => {
+    auth.user.rol = 'GENERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Recordatorio fiscal 2026', datos: JSON.stringify({
+      tipo:'recordatorio_fiscal', version:1, destino:'representante', generadorId:'g-1', fiscalYear:2026,
+      accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'Empresa QA'}],
+    }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Ver aviso fiscal →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Recordatorio fiscal 2026', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
+  });
+  it('keeps secondary controls behind explicit options without changing read state', async () => {
+    setup('/app/notificaciones');
+    await screen.findByText(notice.titulo);
+    expect(screen.queryByText('Tus avisos')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Marcar todas leídas', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: `Eliminar aviso: ${notice.titulo}`, exact: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones de avisos', exact: true }));
+    expect(screen.getByRole('button', { name: 'Opciones de avisos', exact: true })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Marcar todas leídas', exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: `Opciones del aviso: ${notice.titulo}`, exact: true }));
+    expect(screen.getByRole('button', { name: `Eliminar aviso: ${notice.titulo}`, exact: true })).toBeVisible();
+    expect(service.marcarLeida).not.toHaveBeenCalled();
+    expect(service.marcarTodasLeidas).not.toHaveBeenCalled();
+    expect(service.eliminar).not.toHaveBeenCalled();
   });
   it('does not reuse a supposedly fresh minute-old workflow state when reopening the inbox', async () => {
     const client = setup();
@@ -79,6 +188,7 @@ describe('notification inbox states and interaction', () => {
     setup();
     expect(await screen.findByText('Aviso general')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Abrir aviso: Aviso general', exact: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones del aviso: Aviso general', exact: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como leída: Aviso general', exact: true }));
     await waitFor(() => expect(service.marcarLeida).toHaveBeenCalledWith('notice'));
     expect(screen.getByTestId('location')).toHaveTextContent('/notificaciones');
@@ -89,7 +199,7 @@ describe('notification inbox states and interaction', () => {
     service.list.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     setup();
     expect(screen.getByRole('status')).toHaveTextContent('Cargando avisos');
-    expect(screen.queryByText('No hay notificaciones')).toBeNull();
+    expect(screen.queryByText('Todavía no recibiste avisos')).toBeNull();
     await act(async () => finish(response));
     expect(await screen.findByText(notice.titulo)).toBeVisible();
   });
@@ -98,7 +208,7 @@ describe('notification inbox states and interaction', () => {
     service.list.mockRejectedValue(new Error('offline'));
     setup();
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar los avisos');
-    expect(screen.queryByText('No hay notificaciones')).toBeNull();
+    expect(screen.queryByText('Todavía no recibiste avisos')).toBeNull();
     service.list.mockResolvedValue(response);
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar', exact: true }));
     expect(await screen.findByText(notice.titulo)).toBeVisible();
@@ -107,7 +217,7 @@ describe('notification inbox states and interaction', () => {
   it('shows the global unread count and navigates to older real pages', async () => {
     service.list.mockImplementation(async (filters: { page?: number }) => ({ ...response, page: filters.page ?? 1, items: [{ ...notice, titulo: filters.page === 2 ? 'Aviso anterior' : notice.titulo }] }));
     setup();
-    expect(await screen.findByRole('button', { name: 'No leídas (31)', exact: true })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Sin leer (31)', exact: true })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente página', exact: true }));
     expect(await screen.findByText('Aviso anterior')).toBeVisible();
     expect(service.list).toHaveBeenLastCalledWith({ page: 2, limit: 20, leida: undefined });
@@ -119,7 +229,7 @@ describe('notification inbox states and interaction', () => {
   it('resets pagination when switching to unread and preserves back navigation', async () => {
     setup('/notificaciones?pagina=2');
     await screen.findByText(notice.titulo);
-    fireEvent.click(screen.getByRole('button', { name: 'No leídas (31)', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sin leer (31)', exact: true }));
     await waitFor(() => expect(service.list).toHaveBeenLastCalledWith({ page: 1, limit: 20, leida: false }));
     expect(screen.getByTestId('location')).toHaveTextContent('avisos=sin-leer');
     expect(screen.getByTestId('location')).not.toHaveTextContent('pagina=2');
@@ -136,7 +246,8 @@ describe('notification inbox states and interaction', () => {
   it('reports mutation failure and keeps the notice available', async () => {
     service.marcarLeida.mockRejectedValue(new Error('offline'));
     setup();
-    fireEvent.click(await screen.findByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: `Opciones del aviso: ${notice.titulo}`, exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar el cambio');
     expect(screen.getByText(notice.titulo)).toBeVisible();
   });
@@ -144,7 +255,7 @@ describe('notification inbox states and interaction', () => {
   it('only shows empty after a successful response', async () => {
     service.list.mockResolvedValue({ ...response, items: [], total: 0, noLeidas: 0, totalPages: 0 });
     setup();
-    expect(await screen.findByText('No hay notificaciones')).toBeVisible();
+    expect(await screen.findByText('Todavía no recibiste avisos')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Marcar todas leídas', exact: true })).toBeNull();
   });
 
@@ -156,9 +267,10 @@ describe('notification inbox states and interaction', () => {
     }));
     service.marcarLeida.mockImplementation(async () => { read = true; });
     setup('/notificaciones?avisos=sin-leer&pagina=2');
-    fireEvent.click(await screen.findByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: `Opciones del aviso: ${notice.titulo}`, exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
     await waitFor(() => expect(service.list).toHaveBeenLastCalledWith({ page: 1, limit: 20, leida: false }));
-    expect(screen.queryByText('No hay notificaciones')).toBeNull();
+    expect(screen.queryByText('Todavía no recibiste avisos')).toBeNull();
     expect(screen.getByTestId('location')).not.toHaveTextContent('pagina=2');
   });
 });

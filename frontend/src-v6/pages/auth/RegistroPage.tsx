@@ -79,13 +79,13 @@ const RegistroPage: React.FC = () => {
         <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={32} className="text-green-600" />
         </div>
-        <h2 className="text-2xl font-bold text-neutral-900 mb-3">¡Revisá tu email!</h2>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-3">¡Revisá tu email!</h1>
         <p className="text-neutral-600 mb-6">
           Te enviamos un email de verificación. Hacé clic en el enlace para activar tu cuenta.
           Luego, el administrador deberá aprobar tu acceso.
         </p>
         <Link to="/login" className="inline-flex items-center gap-2 bg-[#1B5E3C] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#164D32] transition-colors">
-          Ir al login
+          Iniciar sesión
         </Link>
       </div>
     );
@@ -99,7 +99,7 @@ const RegistroPage: React.FC = () => {
 
       <div className="text-center mb-6">
         <SitrepMark size={56} className="mx-auto mb-3" />
-        <h2 className="text-2xl font-bold text-neutral-900">Crear cuenta en SITREP</h2>
+        <h1 className="text-2xl font-bold text-neutral-900">Crear cuenta en SITREP</h1>
         <p className="text-sm text-neutral-500 mt-1">Una vez registrado, verificá tu email y aguardá la aprobación</p>
       </div>
 

@@ -1,3 +1,7 @@
+import { actorEditReturn, useActorNavigation } from '../../hooks/useActorDetailNavigation';
+import { PageToolbar } from '../../components/ui/PageToolbar';
+import { actorListReturn } from '../../hooks/useActorListNavigation';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Nuevo / Editar Generador — Wizard 6 pasos
  * ======================================================
@@ -44,7 +48,7 @@ const STEPS = [
   { id: 1, label: 'Identificacion', icon: Factory },
   { id: 2, label: 'Domicilios', icon: MapPin },
   { id: 3, label: 'Residuos', icon: Biohazard },
-  { id: 4, label: 'Calculo TEF', icon: Calculator },
+  { id: 4, label: 'Datos TEF', icon: Calculator },
   { id: 5, label: 'Regulatorio', icon: ClipboardList },
   { id: 6, label: 'Adjuntos', icon: Upload },
 ];
@@ -95,6 +99,7 @@ function FieldError({ show, msg }: { show: boolean; msg: string }) {
 const NuevoGeneradorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const location = useLocation();
   const isEdit = Boolean(id);
 
@@ -103,6 +108,7 @@ const NuevoGeneradorPage: React.FC = () => {
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [formEdited, setFormEdited] = useState(false);
   const [selectedY, setSelectedY] = useState<Set<string>>(new Set());
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const validationRef = useRegistrationValidationFocus(attempted);
@@ -115,16 +121,17 @@ const NuevoGeneradorPage: React.FC = () => {
   const [tefInputs, setTefInputs] = useState<TEFInputs | null>(null);
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
   const draftData = { form, step, selectedY: [...selectedY], tefInputs, savedActorId, uploadedDocs, files: [...missingFiles, ...Object.values(adjuntos).map(file => file.name)] };
-  const draft = useActorRegistrationDraft('GENERADOR', id, draftData, data => {
-    setAdjuntos({}); setSubmitError(null);
+  const draft = useActorRegistrationDraft('GENERADOR', id, draftData, (data, restoredFiles = {}) => {
+    setAdjuntos(Object.fromEntries(Object.entries(restoredFiles).map(([kind, item]) => [kind, item.file]))); setSubmitError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
-    setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
+    setFormEdited(Boolean(data.form)); setAttempted(new Set());
+    setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.flatMap(code => typeof code === 'string' ? parseCorrientes(code) : []).filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
     setTefInputs(data.tefInputs ? tefDeclaredInputs({ tefInputs: data.tefInputs }).inputs : null);
     setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
     setUploadedDocs(data.uploadedDocs && typeof data.uploadedDocs === 'object' ? data.uploadedDocs as Record<string, string> : {});
     setStep(data.savedActorId ? TOTAL_STEPS : Math.min(TOTAL_STEPS, Math.max(1, Number(data.step) || 1)));
     setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
-  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId));
+  }, (isEdit ? formEdited : formEdited || JSON.stringify(form) !== JSON.stringify(INITIAL_FORM)) || Boolean(savedActorId), Object.fromEntries(Object.entries(adjuntos).map(([kind, file]) => [kind, { file }])));
 
   const { data: existing, isLoading: loadingExisting, refetch: reloadExisting } = useGenerador(id || '');
   const initializedActor = useRef<string | null>(null);
@@ -132,10 +139,14 @@ const NuevoGeneradorPage: React.FC = () => {
   const updateMutation = useUpdateGenerador();
   const uploadDocMutation = useUploadDocumento();
 
-  const backPath = '/admin/actores/generadores';
+  const listPath = mp('/admin/actores/generadores');
+  const listReturn = actorListReturn(location.state, listPath);
+  const backPath = id ? actorEditReturn(location.state, listPath, id) : listReturn;
+  const actorNavigation = useActorNavigation();
+  const goBack = () => id ? navigate(backPath, { state: actorNavigation?.returnState || { actorReturn: listReturn } }) : navigate(backPath);
 
   useEffect(() => {
-    initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());
+    initializedActor.current = null; setForm(INITIAL_FORM); setFormEdited(false); setAttempted(new Set()); setSubmitError(null); setStep(1); setSelectedY(new Set());
     setAdjuntos({}); setSavedActorId(null); setUploadedDocs({}); setTefInputs(null); setMissingFiles([]);
   }, [id, draft.owner]);
 
@@ -150,15 +161,15 @@ const NuevoGeneradorPage: React.FC = () => {
 
     setForm({
       razonSocial: g.razonSocial || '', cuit: g.cuit || '',
-      domicilio: g.domicilio || csv?.domicilio || '', telefono: g.telefono || csv?.telefono || '',
+      domicilio: g.domicilio ?? (csv?.domicilio || ''), telefono: g.telefono ?? (csv?.telefono || ''),
       email: g.email || g.usuario?.email || csv?.email || '', password: '',
-      nombre: g.usuario?.nombre || '', numeroInscripcion: g.numeroInscripcion || csv?.certificado || '',
-      categoria: g.categoria || '', actividad: g.actividad || csv?.actividad || '',
-      rubro: g.rubro || csv?.rubro || '',
-      corrientesControl: g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : ''),
-      domicilioLegalCalle: g.domicilioLegalCalle || parsedDom[0] || '',
-      domicilioLegalLocalidad: g.domicilioLegalLocalidad || parsedDom[1] || '',
-      domicilioLegalDepto: g.domicilioLegalDepto || parsedDom[2] || '',
+      nombre: g.usuario?.nombre || '', numeroInscripcion: g.numeroInscripcion ?? (csv?.certificado || ''),
+      categoria: g.categoria || '', actividad: g.actividad ?? (csv?.actividad || ''),
+      rubro: g.rubro ?? (csv?.rubro || ''),
+      corrientesControl: g.corrientesControl ?? (csv?.categoriasControl ? csv.categoriasControl.join(', ') : ''),
+      domicilioLegalCalle: g.domicilioLegalCalle ?? parsedDom[0] ?? '',
+      domicilioLegalLocalidad: g.domicilioLegalLocalidad ?? parsedDom[1] ?? '',
+      domicilioLegalDepto: g.domicilioLegalDepto ?? parsedDom[2] ?? '',
       domicilioRealCalle: g.domicilioRealCalle || '',
       domicilioRealLocalidad: g.domicilioRealLocalidad || '',
       domicilioRealDepto: g.domicilioRealDepto || '',
@@ -173,7 +184,7 @@ const NuevoGeneradorPage: React.FC = () => {
       coordenadas: g.latitud != null && g.longitud != null ? `${g.latitud}, ${g.longitud}` : '',
     });
 
-    const corrientesStr = g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : '');
+    const corrientesStr = g.corrientesControl ?? (csv?.categoriasControl ? csv.categoriasControl.join(', ') : '');
     if (corrientesStr) {
       setSelectedY(new Set(parseCorrientes(corrientesStr)));
     }
@@ -183,15 +194,16 @@ const NuevoGeneradorPage: React.FC = () => {
     }
   }, [existing, isEdit, id, draft.owner]);
 
-  const up = (field: string, value: string | boolean) => setForm(prev => ({ ...prev, [field]: value }));
+  const up = (field: string, value: string | boolean) => { setFormEdited(true); setForm(prev => ({ ...prev, [field]: value })); };
 
   const toggleY = (code: string) => {
+    setFormEdited(true);
     setSelectedY(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
   };
 
   const corrientesCodes = useMemo(() => Array.from(selectedY).sort(), [selectedY]);
 
-  useEffect(() => { up('corrientesControl', corrientesCodes.join(', ')); }, [corrientesCodes]);
+  useEffect(() => { setForm(prev => ({ ...prev, corrientesControl: corrientesCodes.join(', ') })); }, [corrientesCodes]);
 
   // Per-step validation — returns list of error messages
   const getStepErrors = (s: number): string[] => {
@@ -263,22 +275,22 @@ const NuevoGeneradorPage: React.FC = () => {
     }
 
     // Parse coordenadas "lat, long" back to separate fields for backend
-    const coordinates = parseActorCoordinates(form.coordenadas) || {};
+    const coordinates = parseActorCoordinates(form.coordenadas) || (isEdit ? { latitud: null, longitud: null } : {});
 
     const regulatory: Record<string, any> = {
-      expedienteInscripcion: form.expedienteInscripcion || undefined,
-      resolucionInscripcion: form.resolucionInscripcion || undefined,
-      certificacionISO: form.certificacionISO || undefined,
-      factorR: form.factorR ? Number(form.factorR) : undefined,
-      montoMxR: form.montoMxR ? Number(form.montoMxR) : undefined,
-      categoriaIndividual: form.categoriaIndividual || undefined,
+      expedienteInscripcion: form.expedienteInscripcion || (isEdit ? "" : undefined),
+      resolucionInscripcion: form.resolucionInscripcion || (isEdit ? "" : undefined),
+      certificacionISO: form.certificacionISO || (isEdit ? null : undefined),
+      factorR: form.factorR ? Number(form.factorR) : isEdit ? null : undefined,
+      montoMxR: form.montoMxR ? Number(form.montoMxR) : isEdit ? null : undefined,
+      categoriaIndividual: form.categoriaIndividual || (isEdit ? "" : undefined),
       libroOperatoria: form.libroOperatoria,
-      domicilioLegalCalle: form.domicilioLegalCalle || undefined,
-      domicilioLegalLocalidad: form.domicilioLegalLocalidad || undefined,
-      domicilioLegalDepto: form.domicilioLegalDepto || undefined,
-      domicilioRealCalle: form.domicilioRealIgual ? form.domicilioLegalCalle || undefined : form.domicilioRealCalle || undefined,
-      domicilioRealLocalidad: form.domicilioRealIgual ? form.domicilioLegalLocalidad || undefined : form.domicilioRealLocalidad || undefined,
-      domicilioRealDepto: form.domicilioRealIgual ? form.domicilioLegalDepto || undefined : form.domicilioRealDepto || undefined,
+      domicilioLegalCalle: form.domicilioLegalCalle || (isEdit ? "" : undefined),
+      domicilioLegalLocalidad: form.domicilioLegalLocalidad || (isEdit ? "" : undefined),
+      domicilioLegalDepto: form.domicilioLegalDepto || (isEdit ? "" : undefined),
+      domicilioRealCalle: form.domicilioRealIgual ? form.domicilioLegalCalle || (isEdit ? "" : undefined) : form.domicilioRealCalle || (isEdit ? "" : undefined),
+      domicilioRealLocalidad: form.domicilioRealIgual ? form.domicilioLegalLocalidad || (isEdit ? "" : undefined) : form.domicilioRealLocalidad || (isEdit ? "" : undefined),
+      domicilioRealDepto: form.domicilioRealIgual ? form.domicilioLegalDepto || (isEdit ? "" : undefined) : form.domicilioRealDepto || (isEdit ? "" : undefined),
     };
 
     submissionInFlight.current = true;
@@ -286,6 +298,7 @@ const NuevoGeneradorPage: React.FC = () => {
     setSubmitError(null);
     try {
       draft.assertSession();
+      if (!await draft.checkpoint()) return;
       let generadorId: string | undefined = savedActorId || undefined;
 
       if (!generadorId && isEdit && id) {
@@ -327,7 +340,7 @@ const NuevoGeneradorPage: React.FC = () => {
       if (!generadorId) throw new Error('El servidor no devolvió el identificador del generador.');
       draft.assertSession();
       setSavedActorId(generadorId);
-      draft.checkpoint({ ...draftData, savedActorId: generadorId });
+      if (!await draft.checkpoint({ ...draftData, savedActorId: generadorId })) return;
       // A retry keeps the saved actor and sends only unconfirmed files.
       const filesToUpload = Object.entries(adjuntos);
       const failed: string[] = [];
@@ -359,7 +372,7 @@ const NuevoGeneradorPage: React.FC = () => {
         setSubmitError(`Generador guardado. No se subieron: ${failed.join(', ')}. Reintentá los adjuntos pendientes; no se repetirá el alta.`);
         return;
       }
-      draft.clear(); navigate(backPath);
+      if (!await draft.clear()) return; goBack();
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
       console.error('Submit error:', err);
@@ -382,23 +395,16 @@ const NuevoGeneradorPage: React.FC = () => {
       </div>
     );
   }
-  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del generador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
+  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del generador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(listReturn)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
-      {/* Header */}
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Button variant="outline" size="sm" className="shrink-0" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="shrink-0 p-2 bg-purple-100 rounded-xl"><Factory size={22} className="text-purple-600" /></div>
-          <div className="min-w-0">
-            <h2 aria-label={isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'} className="text-xl sm:text-2xl font-bold text-neutral-900"><span className="sm:hidden">{isEdit ? 'Editar generador' : 'Alta de generador'}</span><span className="hidden sm:inline">{isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'}</span></h2>
-            <p className="text-xs leading-5 text-neutral-600 sm:text-sm">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
-          </div>
-        </div>
-      </div>
+    <div ref={validationRef} onChangeCapture={event => { if ((event.target as HTMLElement).getAttribute("aria-label") !== "Paso del registro") setFormEdited(true); }} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
+      <PageToolbar label="Acciones del formulario">
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : actorNavigation?.backLabel || 'Volver a Generadores'}</Button>
+        <h2 className="sr-only">{isEdit ? 'Editar generador' : 'Nuevo generador'}</h2>
+      </PageToolbar>
 
-      <ActorRegistrationDraftBar draft={draft} />
+      <ActorRegistrationDraftBar draft={draft} mode={isEdit ? "edit" : "create"} />
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos que estaban pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
 
       {/* Stepper */}
@@ -441,7 +447,7 @@ const NuevoGeneradorPage: React.FC = () => {
           <Card>
             <CardHeader><div className="flex items-center gap-2"><Factory size={20} className="text-purple-600" /><h3 className="text-lg font-bold text-neutral-900">Identificacion y Contacto</h3></div></CardHeader>
             <CardContent className="space-y-4">
-              <ActorContactFields form={form} up={up} administrative domicile={false} attempted={attempted.has(1)} placeholder="Empresa S.A." identitySlot={<div><Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" errorMessage={showError('cuit') ? 'El CUIT es obligatorio' : undefined} />{!isEdit && !savedActorId && <ActorRegistryLookup type="GENERADOR" cuit={form.cuit} />}</div>} />
+              <ActorContactFields form={form} up={up} administrative domicile={false} attempted={attempted.has(1)} placeholder="Empresa S.A." identitySlot={<div><Input label="CUIT *" readOnly={isEdit} helperText={isEdit ? "Identifica al actor; no se modifica desde esta edición." : undefined} value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" errorMessage={showError('cuit') ? 'El CUIT es obligatorio' : undefined} />{!isEdit && !savedActorId && <ActorRegistryLookup type="GENERADOR" cuit={form.cuit} />}</div>} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
                   label="Categoria"
@@ -503,18 +509,15 @@ const NuevoGeneradorPage: React.FC = () => {
         {/* ===== PASO 4: Calculo TEF + ISO date ===== */}
         {step === 4 && (
           <div className="space-y-6">
-            {/* ISO date input — here because it affects TEF */}
+            {/* Fecha de certificación declarada, sin multiplicador fiscal automático */}
             <Card>
               <CardHeader><div className="flex items-center gap-2"><ClipboardList size={20} className="text-green-600" /><h3 className="text-lg font-bold text-neutral-900">Norma ISO 14000</h3></div></CardHeader>
               <CardContent>
-                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificacion ISO 14000, ingrese la fecha. Esto duplica el factor ISO en el calculo TEF (x2 en vez de x1).</p>
+                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificación ISO 14000, ingresá la fecha declarada. Su efecto fiscal se verifica con la liquidación correspondiente.</p>
                 <div className="max-w-xs">
                   <Input label="Fecha Certificacion ISO 14000" type="date" value={form.certificacionISO} onChange={e => up('certificacionISO', e.target.value)} />
                 </div>
-                <div className={`mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${form.certificacionISO ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'}`}>
-                  Factor ISO: <span className="font-bold font-mono">{form.certificacionISO ? '2' : '1'}</span>
-                  <span className="text-xs">({form.certificacionISO ? 'Posee ISO — factor x2' : 'Sin ISO — factor x1'})</span>
-                </div>
+
               </CardContent>
             </Card>
 
@@ -523,7 +526,7 @@ const NuevoGeneradorPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Calculator size={20} className="text-primary-600" />
                   <div>
-                    <h3 className="text-lg font-bold text-neutral-900">Datos para el Calculo de la T.E.F.</h3>
+                    <h3 className="text-lg font-bold text-neutral-900">Datos para evaluación TEF</h3>
                     <p className="text-xs text-neutral-500">Decreto Reglamentario 2625/99 — Ley Provincial 5917</p>
                   </div>
                 </div>
@@ -695,7 +698,7 @@ const NuevoGeneradorPage: React.FC = () => {
 
       {/* Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-        <Button variant="outline" disabled={isPending} leftIcon={<ArrowLeft size={16} />} onClick={savedActorId || step === 1 ? () => navigate(backPath) : goPrev}>
+        <Button variant="outline" disabled={isPending} leftIcon={<ArrowLeft size={16} />} onClick={savedActorId || step === 1 ? () => goBack() : goPrev}>
           {savedActorId ? 'Salir sin adjuntos pendientes' : step === 1 ? 'Cancelar' : 'Volver'}
         </Button>
         <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 
 await assertCloudDatabase();
+assert.notEqual(process.env.MANIFEST_PROPOSALS_ENABLED, 'true', 'Legacy assignment checks require proposals disabled; use proposal-integration.ts for the operational approval contract');
 const output = process.env.QA_ARTIFACTS!;
 const fixture = JSON.parse(await readFile(path.join(output, 'fixture.json'), 'utf8'));
 assert.equal(fixture.database, 'sitrep_night_qa_20260926');

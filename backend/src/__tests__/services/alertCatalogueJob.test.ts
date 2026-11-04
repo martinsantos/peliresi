@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ rules: vi.fn(), currentRule: vi.fn(), requests: vi.fn(), request: vi.fn(), actors: vi.fn(), actor: vi.fn(), cases: vi.fn(), upsert: vi.fn(), reconcile: vi.fn(), notice: vi.fn(), admins: vi.fn(), transaction: vi.fn(), cron: vi.fn() }));
+const m = vi.hoisted(() => ({ rules: vi.fn(), currentRule: vi.fn(), requests: vi.fn(), request: vi.fn(), actors: vi.fn(), actor: vi.fn(), cases: vi.fn(), upsert: vi.fn(), reconcile: vi.fn(), notice: vi.fn(), admins: vi.fn(), transaction: vi.fn(), cron: vi.fn(), companyRows: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   reglaAlerta: { findMany: m.rules }, intercambioInspeccion: { findMany: m.requests, findUnique: m.request },
   transportista: { findMany: m.actors, findUnique: m.actor }, operador: { findMany: m.actors, findUnique: m.actor },
@@ -7,6 +7,7 @@ vi.mock('../../lib/prisma', () => ({ default: {
   alertaGenerada: { findMany: m.cases }, $transaction: m.transaction,
 } }));
 vi.mock('node-cron', () => ({ default: { schedule: m.cron } }));
+vi.mock('../../services/inspectionDeadlineCompanyNotice.service', () => ({ inspectionDeadlineCompanyNoticeRows: m.companyRows }));
 import { ejecutarCatalogo, simularCatalogo, iniciarAlertCatalogueJob } from '../../jobs/alertCatalogue.job';
 const now = new Date('2026-10-04T12:00:00Z');
 const rule = { id: 'rule', nombre: 'Requerimiento vencido', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"requerimiento_inspeccion"}', destinatarios: '["INSPECCIONADO","INSPECTOR_ASIGNADO","ADMIN_GENERADOR","ADMIN_OPERADOR"]' };
@@ -15,6 +16,7 @@ const request = { id: 'req', tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', destinat
     inspector: { id: 'inspector', rol: 'GENERADOR', esInspector: true, activo: true }, generador: { id: 'g1', activo: true, usuario: { id: 'owner', activo: true } } } };
 beforeEach(() => {
   vi.clearAllMocks(); m.rules.mockResolvedValue([rule]); m.requests.mockResolvedValue([{ id: 'req' }]); m.request.mockResolvedValue(request);
+  m.companyRows.mockResolvedValue([]);
   m.currentRule.mockImplementation(async () => ({ ...(await m.rules())[0], activa: true }));
   m.cases.mockResolvedValue([]); m.upsert.mockResolvedValue({ estado: 'PENDIENTE' }); m.admins.mockResolvedValue([{ id: 'sector' }]);
   m.actors.mockResolvedValue([{ id: 'obj' }]); m.actor.mockResolvedValue({ id: 'obj', activo: true, usuarioId: 'operator', usuario: { activo: true }, razonSocial: 'QA operador', vencimientoHabilitacion: new Date('2026-10-01T12:00:00Z') });
@@ -27,6 +29,16 @@ it('notifies only the linked actor, assigned inspector and selected matching adm
   expect(m.admins.mock.calls[0][0].where.rol.in).toEqual(['ADMIN_GENERADOR']);
   expect(JSON.parse(m.notice.mock.calls[0][0].create.datos)).toMatchObject({ destino: 'participacion', inspeccionId: 'inspection', entidadId: 'req' });
   expect(JSON.parse(m.notice.mock.calls[1][0].create.datos).destino).toBe('inspeccion');
+});
+it('adds a representative only for a rule that includes the inspected party, preserving read state on retry', async () => {
+  const row = { id: 'rep-notice', usuarioId: 'rep', tipo: 'INFO_GENERAL', prioridad: 'NORMAL', titulo: 'Aviso para tu empresa', mensaje: 'Consultá tus avisos.', datos: '{"tipo":"psip_vencimiento_empresa"}' };
+  m.companyRows.mockResolvedValue([row]);
+  expect(await ejecutarCatalogo(now)).toBe(4);
+  expect(m.companyRows).toHaveBeenCalledWith(expect.anything(), { id: 'inspection', tipoActor: 'GENERADOR', generadorId: 'g1' }, expect.any(String), ['owner', 'inspector', 'sector']);
+  const saved = m.notice.mock.calls[3][0]; expect(saved.create).toEqual(row); expect(saved.update).not.toHaveProperty('leida');
+  m.notice.mockClear(); m.companyRows.mockClear();
+  m.rules.mockResolvedValue([{ ...rule, destinatarios: '["INSPECTOR_ASIGNADO"]' }]);
+  expect(await ejecutarCatalogo(now)).toBe(1); expect(m.companyRows).not.toHaveBeenCalled();
 });
 it('simulation does not create rules, cases or notices', async () => {
   expect(await simularCatalogo(rule.condicion, now)).toMatchObject({ total: 1, escribeDatos: false });

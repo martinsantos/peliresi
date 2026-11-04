@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../services/api', () => ({ default: {} }));
 
 describe('evidence IndexedDB transaction acknowledgement', () => {
-  let transaction: { onabort?: () => void; oncomplete?: () => void; onerror?: () => void; error: DOMException | null; objectStore: () => { put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> } };
+  let read: { result?: unknown; onsuccess?: () => void };
+  let transaction: { onabort?: () => void; oncomplete?: () => void; onerror?: () => void; error: DOMException | null; abort: () => void; objectStore: () => { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> } };
   beforeEach(() => {
     vi.resetModules();
-    const store = { put: vi.fn(), delete: vi.fn() };
-    transaction = { error: null, objectStore: () => store };
+    read = {};
+    const store = { get: vi.fn(() => read), put: vi.fn(), delete: vi.fn() };
+    transaction = { error: null, abort: () => transaction.onabort?.(), objectStore: () => store };
     vi.stubGlobal('indexedDB', { open: vi.fn(() => {
       const request: { result: unknown; onsuccess?: () => void } = { result: { transaction: () => transaction } };
       queueMicrotask(() => request.onsuccess?.());
@@ -43,5 +45,36 @@ describe('evidence IndexedDB transaction acknowledgement', () => {
     expect(transaction.objectStore().delete).toHaveBeenCalledWith('original');
     transaction.onabort?.();
     await assertion;
+  });
+
+  it('does not acknowledge a command claim until its read/write transaction commits', async () => {
+    const { updateOffline } = await import('../../services/indexeddb');
+    let acknowledged = false;
+    const result = updateOffline<{ id: string }>('inspection_exchange_drafts', 'command', current => current || { id: 'command' }).then(value => { acknowledged = true; return value; });
+    await vi.waitFor(() => expect(read.onsuccess).toBeTypeOf('function'));
+    read.onsuccess?.();
+    expect(transaction.objectStore().get).toHaveBeenCalledWith('command');
+    expect(transaction.objectStore().put).toHaveBeenCalledWith({ id: 'command' });
+    await Promise.resolve(); expect(acknowledged).toBe(false);
+    transaction.oncomplete?.();
+    expect(await result).toEqual({ id: 'command' });
+  });
+
+  it('rejects an aborted command claim even when put has succeeded', async () => {
+    const { updateOffline } = await import('../../services/indexeddb');
+    const result = updateOffline('inspection_exchange_drafts', 'command', () => ({ id: 'command' }));
+    const assertion = expect(result).rejects.toThrow('No se confirmó la copia del envío');
+    await vi.waitFor(() => expect(read.onsuccess).toBeTypeOf('function'));
+    read.onsuccess?.(); transaction.onabort?.(); await assertion;
+  });
+
+  it('aborts without replacement if the command updater rejects another tab content', async () => {
+    const { updateOffline } = await import('../../services/indexeddb');
+    const result = updateOffline('inspection_exchange_drafts', 'command', () => { throw new Error('immutable conflict'); });
+    const assertion = expect(result).rejects.toThrow('immutable conflict');
+    await vi.waitFor(() => expect(read.onsuccess).toBeTypeOf('function'));
+    read.onsuccess?.(); await assertion;
+    expect(transaction.objectStore().put).not.toHaveBeenCalled();
+    expect(transaction.objectStore().delete).not.toHaveBeenCalled();
   });
 });

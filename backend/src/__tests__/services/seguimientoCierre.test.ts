@@ -1,15 +1,19 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ scan: vi.fn(), count: vi.fn(), current: vi.fn(), upsert: vi.fn(), transaction: vi.fn(), schedule: vi.fn(), rules: vi.fn(), rule: vi.fn(), adopt: vi.fn(), admin: vi.fn(), admins: vi.fn(), cases: vi.fn(), reconcile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ scan: vi.fn(), count: vi.fn(), current: vi.fn(), lock: vi.fn(), lockTimeout: vi.fn(), upsert: vi.fn(), transaction: vi.fn(), schedule: vi.fn(), rules: vi.fn(), rule: vi.fn(), adopt: vi.fn(), admin: vi.fn(), admins: vi.fn(), cases: vi.fn(), reconcile: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { manifiesto: { findMany: mocks.scan, count: mocks.count }, reglaAlerta: { findMany: mocks.rules, findUnique: mocks.rule, upsert: mocks.adopt }, usuario: { findFirst: mocks.admin }, alertaGenerada: { updateMany: mocks.reconcile }, $transaction: mocks.transaction } }));
 vi.mock('node-cron', () => ({ default: { schedule: mocks.schedule } }));
 import { ejecutarSeguimientoCierre, iniciarSeguimientoCierreJob, simularSeguimientoCierre } from '../../jobs/seguimientoCierre.job';
+import { inTrainingSession } from '../../lib/trainingScope';
 beforeEach(() => {
   vi.clearAllMocks(); mocks.scan.mockResolvedValue([{ id: 'qa' }]);
   mocks.rule.mockResolvedValue({ id: 'seguimiento_cierre_v1' });
   mocks.rules.mockResolvedValue([{ id: 'seguimiento_cierre_v1', nombre: 'Seguimiento de manifiesto', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":0}}', destinatarios: '["OPERADOR"]' }]);
   mocks.cases.mockResolvedValue({ estado: 'PENDIENTE' }); mocks.admins.mockResolvedValue([]);
+  mocks.lock.mockResolvedValue([{ id: 'qa' }]);
   mocks.current.mockResolvedValue({ id: 'qa', numero: 'QA', estado: 'RECIBIDO', fechaRecepcion: new Date('2026-10-01T12:00:00Z'), operador: { usuario: { id: 'operator', activo: true } } });
-  mocks.transaction.mockImplementation(fn => fn({ manifiesto: { findUnique: mocks.current }, notificacion: { upsert: mocks.upsert }, alertaGenerada: { upsert: mocks.cases }, usuario: { findMany: mocks.admins } }));
+  mocks.transaction.mockImplementation(fn => fn({ $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
+    strings.join('?').includes('set_config') ? mocks.lockTimeout(strings, ...values) : mocks.lock(strings, ...values),
+    manifiesto: { findUnique: mocks.current }, notificacion: { upsert: mocks.upsert }, alertaGenerada: { upsert: mocks.cases }, usuario: { findMany: mocks.admins } }));
 });
 it('links the operator notice and administrative case without resetting case state on retry', async () => {
   await ejecutarSeguimientoCierre();
@@ -34,6 +38,50 @@ it('preview counts source rows without adopting a rule or writing notices/cases'
   expect(await simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z'))).toMatchObject({ total: 125, escribeDatos: false, canal: 'interno' });
   expect(mocks.scan.mock.calls[0][0]).toMatchObject({ take: 20, where: { fechaRecepcion: { lte: new Date('2026-10-01T12:00:00Z') } } });
   expect(mocks.transaction).not.toHaveBeenCalled(); expect(mocks.adopt).not.toHaveBeenCalled(); expect(mocks.cases).not.toHaveBeenCalled();
+});
+it('excludes artificial manifests from operational preview, sweep and reconciliation', async () => {
+  mocks.count.mockResolvedValue(0);
+  await simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z'));
+  expect(mocks.count.mock.calls[0][0].where).toMatchObject({ isDemoData: false });
+  expect(mocks.scan.mock.calls[0][0].where).toMatchObject({ isDemoData: false });
+  mocks.scan.mockClear();
+  await ejecutarSeguimientoCierre();
+  expect(mocks.scan.mock.calls[0][0].where).toMatchObject({ isDemoData: false });
+  expect(mocks.reconcile.mock.calls[0][0].where.manifiesto).toMatchObject({ isDemoData: false });
+});
+it('rechecks demo status before writing when a selected manifest changes', async () => {
+  mocks.current.mockResolvedValue({ id: 'qa', numero: 'QA', estado: 'RECIBIDO', isDemoData: true,
+    fechaRecepcion: new Date('2026-10-01T12:00:00Z'), operador: { usuario: { id: 'operator', activo: true } } });
+  expect(await ejecutarSeguimientoCierre()).toBe(0);
+  expect(mocks.cases).not.toHaveBeenCalled(); expect(mocks.upsert).not.toHaveBeenCalled();
+});
+it('locks the selected manifest before rereading it and skips a row that disappeared', async () => {
+  await ejecutarSeguimientoCierre();
+  expect(mocks.lock).toHaveBeenCalledOnce();
+  expect(mocks.lock.mock.calls[0][0].join('?')).toContain('FOR UPDATE');
+  expect(mocks.lock.mock.calls[0][1]).toBe('qa');
+  expect(mocks.lock.mock.invocationCallOrder[0]).toBeLessThan(mocks.current.mock.invocationCallOrder[0]);
+  vi.clearAllMocks(); mocks.lock.mockResolvedValue([]);
+  await ejecutarSeguimientoCierre();
+  expect(mocks.current).not.toHaveBeenCalled(); expect(mocks.cases).not.toHaveBeenCalled(); expect(mocks.upsert).not.toHaveBeenCalled();
+});
+it('bounds row-lock waiting inside each transaction before selecting a manifest', async () => {
+  await ejecutarSeguimientoCierre();
+  expect(mocks.lockTimeout).toHaveBeenCalledOnce();
+  expect(mocks.lockTimeout.mock.calls[0][0].join('?')).toContain("SELECT set_config('lock_timeout', '1s', true)");
+  expect(mocks.lockTimeout.mock.invocationCallOrder[0]).toBeLessThan(mocks.lock.mock.invocationCallOrder[0]);
+});
+it('retains the isolated training scope when explicitly simulating there', async () => {
+  mocks.count.mockResolvedValue(0);
+  await inTrainingSession(() => simularSeguimientoCierre(3, new Date('2026-10-04T12:00:00Z')));
+  expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty('isDemoData');
+});
+it('keeps artificial manifests available inside an explicit isolated training scope', async () => {
+  mocks.current.mockResolvedValue({ id: 'qa', numero: 'QA', estado: 'RECIBIDO', isDemoData: true,
+    fechaRecepcion: new Date('2026-10-01T12:00:00Z'), operador: { usuario: { id: 'operator', activo: true } } });
+  expect(await inTrainingSession(() => ejecutarSeguimientoCierre())).toBe(1);
+  expect(mocks.scan.mock.calls[0][0].where).not.toHaveProperty('isDemoData');
+  expect(mocks.reconcile.mock.calls[0][0].where.manifiesto).not.toHaveProperty('isDemoData');
 });
 it('adopts the existing follow-up once using an active administrator, preserving default notice identity', async () => {
   mocks.rule.mockResolvedValue(null); mocks.admin.mockResolvedValue({ id: 'admin' });
@@ -71,7 +119,19 @@ it('a missing record after scanning is not a task', async () => {
 });
 it('storage failures propagate for the scheduler to report rather than reporting success', async () => {
   mocks.upsert.mockRejectedValueOnce(new Error('storage failure'));
-  await expect(ejecutarSeguimientoCierre()).rejects.toThrow('storage failure');
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+  try { await expect(ejecutarSeguimientoCierre()).rejects.toThrow('Seguimiento incompleto: 1'); }
+  finally { log.mockRestore(); }
+});
+it('continues after a locked or unavailable manifest and reports an incomplete sweep', async () => {
+  mocks.scan.mockResolvedValueOnce([{ id: 'first' }, { id: 'second' }]);
+  mocks.transaction.mockRejectedValueOnce(new Error('lock timeout'));
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+  try {
+    await expect(ejecutarSeguimientoCierre()).rejects.toThrow('Seguimiento incompleto: 1');
+    expect(mocks.transaction).toHaveBeenCalledTimes(2); expect(mocks.upsert).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('[SeguimientoCierre] No se pudo evaluar un manifiesto', 'first', expect.any(Error));
+  } finally { log.mockRestore(); }
 });
 it('a future reception time does not invent a negative elapsed time', async () => {
   await ejecutarSeguimientoCierre(new Date('2026-09-01T12:00:00Z'));

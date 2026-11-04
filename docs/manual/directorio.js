@@ -113,20 +113,25 @@ function updateProgress() {
   bar.style.width = pct + '%';
 }
 
-// v2026.4: accordion toggle for sidebar nav groups
-function toggleNavGroup(title) {
+// Mantener la visibilidad y el estado accesible sincronizados en cada apertura.
+function setNavGroupExpanded(title, expanded) {
   var items = title.nextElementSibling;
   if (!items || !items.classList.contains('nav-group-items')) return;
-  var collapsed = items.classList.toggle('collapsed');
-  title.classList.toggle('collapsed', collapsed);
+  items.hidden = !expanded;
+  title.classList.toggle('collapsed', !expanded);
+  title.setAttribute('aria-expanded', String(expanded));
+}
+function toggleNavGroup(title) {
+  setNavGroupExpanded(title, title.getAttribute('aria-expanded') !== 'true');
 }
 
 // Collapsible toggle (global, for FAQ etc.)
 function toggleCollapsible(el) {
-  el.classList.toggle('open');
+  var open = el.classList.toggle('open');
+  el.setAttribute('aria-expanded', String(open));
   var body = el.nextElementSibling;
   if (body && body.classList.contains('collapsible-body')) {
-    body.classList.toggle('open');
+    body.classList.toggle('open', open);
   }
 }
 
@@ -134,6 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var sections = document.querySelectorAll('section[id]');
   var navLinks = document.querySelectorAll('.nav-link');
   var searchInput = document.getElementById('searchInput');
+  var searchEmpty = document.getElementById('sidebarSearchEmpty');
   var roleTabs = document.querySelectorAll('.role-tab');
   var backToTop = document.getElementById('backToTop');
   var hamburger = document.getElementById('hamburgerBtn');
@@ -152,20 +158,58 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!Number.isFinite(offset)) offset = 122;
     window.scrollTo({ top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - offset), behavior: 'instant' });
   }
-  function settleHashTarget() {
-    alignHashTarget();
-    setTimeout(alignHashTarget, 180);
-    setTimeout(alignHashTarget, 750);
+  var hashAlignmentTimers = [];
+  var hashAlignmentFrame = 0;
+  var hashAlignmentInterrupted = false;
+
+  function cancelHashAlignment() {
+    hashAlignmentTimers.forEach(clearTimeout);
+    hashAlignmentTimers = [];
+    if (hashAlignmentFrame) {
+      cancelAnimationFrame(hashAlignmentFrame);
+      hashAlignmentFrame = 0;
+    }
   }
-  window.addEventListener('hashchange', settleHashTarget);
-  window.addEventListener('load', settleHashTarget, { once: true });
-  if (window.location.hash) requestAnimationFrame(settleHashTarget);
+  function interruptHashAlignment(event) {
+    if (event.type === 'keydown' && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar', 'Tab'].indexOf(event.key) < 0) return;
+    hashAlignmentInterrupted = true;
+    cancelHashAlignment();
+  }
+  ['wheel', 'touchstart', 'pointerdown'].forEach(function(type) {
+    window.addEventListener(type, interruptHashAlignment, { capture: true, passive: true });
+  });
+  window.addEventListener('keydown', interruptHashAlignment, { capture: true });
+
+  function settleHashTarget() {
+    cancelHashAlignment();
+    if (hashAlignmentInterrupted) return;
+    alignHashTarget();
+    hashAlignmentTimers.push(setTimeout(alignHashTarget, 180), setTimeout(alignHashTarget, 750));
+  }
+  window.addEventListener('hashchange', function() {
+    hashAlignmentInterrupted = false;
+    settleHashTarget();
+  });
+  window.addEventListener('load', function() {
+    if (!hashAlignmentInterrupted) settleHashTarget();
+  }, { once: true });
+  if (window.location.hash) hashAlignmentFrame = requestAnimationFrame(function() {
+    hashAlignmentFrame = 0;
+    if (!hashAlignmentInterrupted) settleHashTarget();
+  });
 
   // Abrir todos los collapsibles (FAQ) por defecto
-  document.querySelectorAll('.collapsible-header').forEach(function(h) {
+  document.querySelectorAll('.collapsible-header').forEach(function(h, index) {
     h.classList.add('open');
     var body = h.nextElementSibling;
     if (body && body.classList.contains('collapsible-body')) {
+      if (!body.id) {
+        var id = 'manual-accordion-' + (index + 1);
+        while (document.getElementById(id)) id += '-';
+        body.id = id;
+      }
+      h.setAttribute('aria-controls', body.id);
+      h.setAttribute('aria-expanded', 'true');
       body.classList.add('open');
     }
   });
@@ -200,15 +244,16 @@ document.addEventListener('DOMContentLoaded', function() {
     navLinks.forEach(function(link) {
       var isActive = link.getAttribute('href') === '#' + current;
       link.classList.toggle('active', isActive);
+      if (isActive) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
       if (isActive) {
-        link.scrollIntoView({ block: 'nearest' });
         // Auto-expandir grupo padre si esta colapsado
         var group = link.closest('.nav-group-items');
-        if (group && group.classList.contains('collapsed')) {
-          group.classList.remove('collapsed');
+        if (group && group.hidden) {
           var title = group.previousElementSibling;
-          if (title) title.classList.remove('collapsed');
+          if (title) setNavGroupExpanded(title, true);
         }
+        link.scrollIntoView({ block: 'nearest' });
         // Marcar section-title padre como active-parent
         var parentGroup = link.closest('.nav-group-items');
         if (parentGroup) {
@@ -228,11 +273,18 @@ document.addEventListener('DOMContentLoaded', function() {
   updateProgress();
 
   // Search — v2026.4: busca dentro de nav-group-items
-  searchInput.addEventListener('input', function() {
-    var q = this.value.toLowerCase();
+  function searchableText(value) {
+    return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  }
+  function filterNavigation() {
+    var q = searchableText(this.value);
+    var matches = 0;
     navLinks.forEach(function(link) {
-      var text = link.textContent.toLowerCase();
-      link.style.display = text.includes(q) || q === '' ? '' : 'none';
+      if (!link.closest('.nav-group-items')) return;
+      var text = searchableText(link.textContent);
+      var visible = text.includes(q) || q === '';
+      link.style.display = visible ? '' : 'none';
+      if (visible) matches++;
     });
     document.querySelectorAll('.nav-section-title').forEach(function(t) {
       var items = t.nextElementSibling;
@@ -243,13 +295,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // Auto-expand when searching
         if (q !== '' && hasVisible) {
-          items.classList.remove('collapsed');
-          t.classList.remove('collapsed');
+          setNavGroupExpanded(t, true);
         }
       }
       t.style.display = hasVisible || q === '' ? '' : 'none';
     });
-  });
+    searchEmpty.hidden = q === '' || matches > 0;
+  }
+  searchInput.addEventListener('input', filterNavigation);
 
   // Role filter tabs — v2026.4: SOLO filtra contenido, NUNCA oculta nav links
   roleTabs.forEach(function(tab) {
@@ -267,8 +320,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (visible && !firstVisible && r === currentRole) firstVisible = sec;
       });
 
-      // Restaurar TODOS los nav links (nunca ocultar sidebar)
-      navLinks.forEach(function(link) { link.style.display = ''; });
+      // Mantener coherente la búsqueda al cambiar el filtro de rol.
+      filterNavigation.call(searchInput);
 
       // Scroll a la primera seccion del rol seleccionado
       if (firstVisible && currentRole !== 'all') {
@@ -289,23 +342,45 @@ document.addEventListener('DOMContentLoaded', function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
+  function syncSidebar() {
+    var mobile = window.matchMedia('(max-width: 900px)').matches;
+    if (!mobile) {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+    }
+    hamburger.setAttribute('aria-label', sidebar.classList.contains('open') ? 'Cerrar índice del manual' : 'Abrir índice del manual');
+    sidebar.toggleAttribute('inert', mobile && !sidebar.classList.contains('open'));
+  }
+  function closeSidebar(restoreFocus) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    hamburger.setAttribute('aria-expanded', 'false');
+    syncSidebar();
+    if (restoreFocus) hamburger.focus({ preventScroll: true });
+  }
+
   // Hamburger (mobile)
   hamburger.addEventListener('click', function() {
     sidebar.classList.toggle('open');
     overlay.classList.toggle('open');
     hamburger.setAttribute('aria-expanded', sidebar.classList.contains('open') ? 'true' : 'false');
+    syncSidebar();
   });
   overlay.addEventListener('click', function() {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('open');
-    hamburger.setAttribute('aria-expanded', 'false');
+    closeSidebar(false);
   });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && window.matchMedia('(max-width: 900px)').matches && sidebar.classList.contains('open')) {
+      closeSidebar(true);
+    }
+  });
+  window.addEventListener('resize', syncSidebar);
+  syncSidebar();
   navLinks.forEach(function(link) {
     link.addEventListener('click', function() {
       if (window.innerWidth <= 900) {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('open');
-        hamburger.setAttribute('aria-expanded', 'false');
+        closeSidebar(false);
       }
     });
   });
@@ -356,20 +431,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ── v2026.6: Sticky section breadcrumb ──
   (function stickyBreadcrumb() {
-    var bar = document.createElement('div');
+    var bar = document.createElement('nav');
     bar.className = 'section-breadcrumb';
+    bar.setAttribute('aria-label', 'Ruta del directorio');
+    bar.setAttribute('aria-hidden', 'true');
 
-    var sbSection = document.createElement('span');
+    var sbSection = document.createElement('button');
+    sbSection.type = 'button';
+    sbSection.tabIndex = -1;
     sbSection.className = 'sb-section';
     var sbSep = document.createElement('span');
     sbSep.className = 'sb-sep';
+    sbSep.setAttribute('aria-hidden', 'true');
     sbSep.textContent = '\u203A'; // ›
-    var sbSub = document.createElement('span');
+    var sbSub = document.createElement('button');
+    sbSub.type = 'button';
+    sbSub.tabIndex = -1;
     sbSub.className = 'sb-sub';
     var sbSep2 = document.createElement('span');
     sbSep2.className = 'sb-sep';
+    sbSep2.setAttribute('aria-hidden', 'true');
     sbSep2.textContent = '\u203A';
-    var sbCU = document.createElement('span');
+    var sbCU = document.createElement('button');
+    sbCU.type = 'button';
+    sbCU.tabIndex = -1;
     sbCU.className = 'sb-cu';
 
     bar.appendChild(sbSection);
@@ -391,16 +476,39 @@ document.addEventListener('DOMContentLoaded', function() {
     var heroBottom = heroEl ? heroEl.offsetTop + heroEl.offsetHeight : 0;
     var headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 64;
     var breadcrumbHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--breadcrumb-height')) || 32;
+    var headingLabels = new WeakMap();
 
-    // Click handlers — scroll to the heading's section
+    function setBreadcrumbVisible(visible) {
+      bar.classList.toggle('visible', visible);
+      bar.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      [sbSection, sbSub, sbCU].forEach(function(button) { button.tabIndex = visible ? 0 : -1; });
+    }
+
+    function headingLabel(heading) {
+      if (headingLabels.has(heading)) return headingLabels.get(heading);
+      var copy = heading.cloneNode(true);
+      copy.querySelectorAll('.cu-section-badge, .cu-section-count').forEach(function(badge) { badge.remove(); });
+      var label = (copy.textContent || '').replace(/\s+/g, ' ').trim();
+      headingLabels.set(heading, label);
+      return label;
+    }
+
+    function scrollToHeading(heading) {
+      if (!heading) return;
+      var top = Math.max(0, window.scrollY + heading.getBoundingClientRect().top - headerHeight - breadcrumbHeight - 12);
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: top, behavior: reduced ? 'auto' : 'smooth' });
+    }
+
+    // Native buttons keep the route available to mouse, touch and keyboard.
     sbSection.addEventListener('click', function() {
-      if (currentH2El) currentH2El.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToHeading(currentH2El);
     });
     sbSub.addEventListener('click', function() {
-      if (currentH3El) currentH3El.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToHeading(currentH3El);
     });
     sbCU.addEventListener('click', function() {
-      if (currentCUEl) currentCUEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToHeading(currentCUEl);
     });
 
     var ticking = false;
@@ -413,13 +521,17 @@ document.addEventListener('DOMContentLoaded', function() {
         ticking = true;
       }
     });
+    // Do not hide a focused keyboard control while the reader scrolls away.
+    // Re-evaluate after focus actually leaves the breadcrumb.
+    bar.addEventListener('focusout', function() { requestAnimationFrame(updateBreadcrumb); });
 
     function updateBreadcrumb() {
       var scrollY = window.scrollY;
       var threshold = headerHeight + breadcrumbHeight + 20;
 
       if (scrollY < heroBottom - headerHeight) {
-        bar.classList.remove('visible');
+        if (bar.contains(document.activeElement)) return;
+        setBreadcrumbVisible(false);
         return;
       }
 
@@ -429,18 +541,33 @@ document.addEventListener('DOMContentLoaded', function() {
       var newH2El = null;
       var newH3El = null;
       var newCUEl = null;
+      var chapter = null;
+      var chapterIndex = -1;
 
       for (var i = 0; i < headings.length; i++) {
         var h = headings[i];
+        // A chapter heading can live in a role-filtered section. Keep its
+        // semantic place in the document even if that section is hidden.
+        if (h.tagName === 'H2') { chapter = h; chapterIndex = i; }
+        if (!h.getClientRects().length) continue;
         var top = h.getBoundingClientRect().top;
         if (top <= threshold) {
           if (h.tagName === 'H2') {
-            newH2 = h.textContent.trim();
+            newH2 = headingLabel(h);
             newH2El = h;
             newH3 = '';
             newH3El = null;
           } else {
-            newH3 = h.textContent.trim();
+            if (chapter) {
+              newH2 = headingLabel(chapter);
+              newH2El = chapter.getClientRects().length ? chapter : null;
+              if (!newH2El) {
+                for (var k = chapterIndex + 1; k <= i; k++) {
+                  if (headings[k].getClientRects().length) { newH2El = headings[k]; break; }
+                }
+              }
+            }
+            newH3 = headingLabel(h);
             newH3El = h;
           }
         }
@@ -452,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var sectionCollapsibles = currentSection.querySelectorAll('.collapsible-header');
         for (var j = 0; j < sectionCollapsibles.length; j++) {
           var c = sectionCollapsibles[j];
-          if (!c.classList.contains('open')) continue;
+          if (!c.classList.contains('open') || !c.getClientRects().length) continue;
           var cTop = c.getBoundingClientRect().top;
           if (cTop <= threshold) {
             newCU = c.textContent.trim();
@@ -462,11 +589,13 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       if (!newH2 && !newH3) {
-        bar.classList.remove('visible');
+        if (bar.contains(document.activeElement)) return;
+        setBreadcrumbVisible(false);
         return;
       }
 
-      if (newH2 !== currentH2 || newH3 !== currentH3 || newCU !== currentCU) {
+      if (newH2 !== currentH2 || newH3 !== currentH3 || newCU !== currentCU
+        || newH2El !== currentH2El || newH3El !== currentH3El || newCUEl !== currentCUEl) {
         currentH2 = newH2;
         currentH3 = newH3;
         currentCU = newCU;
@@ -474,23 +603,36 @@ document.addEventListener('DOMContentLoaded', function() {
         currentH3El = newH3El;
         currentCUEl = newCUEl;
         sbSection.textContent = currentH2;
+        sbSection.hidden = !currentH2;
+        sbSection.setAttribute('aria-label', 'Ir a ' + currentH2);
+        sbSection.title = currentH2;
         if (currentH3) {
-          sbSep.style.display = '';
+          sbSep.hidden = !currentH2;
+          sbSub.hidden = false;
           sbSub.textContent = currentH3;
+          sbSub.setAttribute('aria-label', 'Ir a ' + currentH3);
+          sbSub.title = currentH3;
         } else {
-          sbSep.style.display = 'none';
+          sbSep.hidden = true;
+          sbSub.hidden = true;
           sbSub.textContent = '';
         }
         if (currentCU) {
-          sbSep2.style.display = '';
+          sbSep2.hidden = false;
+          sbCU.hidden = false;
           sbCU.textContent = currentCU;
+          sbCU.setAttribute('aria-label', 'Ir a ' + currentCU);
+          sbCU.title = currentCU;
         } else {
-          sbSep2.style.display = 'none';
+          sbSep2.hidden = true;
+          sbCU.hidden = true;
           sbCU.textContent = '';
         }
+        [sbSection, sbSub, sbCU].forEach(function(button) { button.removeAttribute('aria-current'); });
+        (currentCU ? sbCU : currentH3 ? sbSub : sbSection).setAttribute('aria-current', 'location');
       }
 
-      bar.classList.add('visible');
+      setBreadcrumbVisible(true);
     }
   })();
 });

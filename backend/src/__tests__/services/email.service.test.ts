@@ -128,7 +128,10 @@ describe('mail safety regressions', () => {
     expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt;');
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('PRIVATE_BODY_NOT_FOR_DIGEST');
-    expect(html).toContain('Revisar alertas</a>');
+    expect(html).toContain('Consultar mis avisos</a>');
+    expect(html).toContain('data-mail-action="app"');
+    expect(html).toContain('/app/notificaciones');
+    expect(html).toContain('Abrir en la web</a>');
     expect(html).toContain('line-height:24px');
     expect(mocks.sendMail).not.toHaveBeenCalled();
     expect(mocks.queue.create).not.toHaveBeenCalled();

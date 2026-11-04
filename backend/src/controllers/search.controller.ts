@@ -1,7 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
-import { Prisma } from '@prisma/client';
+import { AppError } from '../middlewares/errorHandler';
+import { applyRoleFilter, directoryActorIdScope } from '../utils/roleFilter';
+import { EstadoManifiesto, Prisma } from '@prisma/client';
 
 export const globalSearch = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -13,9 +15,13 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const query = q.trim();
+    if (query.length > 200) throw new AppError('Usá hasta 200 caracteres para buscar', 400);
+    if (estado !== undefined && (typeof estado !== 'string' || !Object.values(EstadoManifiesto).includes(estado as EstadoManifiesto))) {
+      throw new AppError('Filtro de estado inválido', 400);
+    }
 
-    // Role-based filter for manifiestos (mirrors getManifiestos lines 152-158)
-    const manifiestoWhere: any = {
+    // Reuse the list policy, including company/site scope and missing actor denial.
+    const manifiestoWhere: Prisma.ManifiestoWhereInput = {
       OR: [
         { numero: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { generador: { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } } },
@@ -28,18 +34,13 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
     };
 
     if (estado && typeof estado === 'string') {
-      manifiestoWhere.estado = estado;
+      manifiestoWhere.estado = estado as EstadoManifiesto;
     }
 
-    if (req.user.rol === 'GENERADOR' && req.user.generador) {
-      manifiestoWhere.generadorId = req.user.generador.id;
-    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-      manifiestoWhere.transportistaId = req.user.transportista.id;
-    } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-      manifiestoWhere.operadorId = req.user.operador.id;
-    }
+    applyRoleFilter(manifiestoWhere, req.user);
 
     const generadorWhere = {
+      id: directoryActorIdScope(req.user, 'generador'),
       OR: [
         { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { cuit: { contains: query, mode: Prisma.QueryMode.insensitive } },
@@ -48,6 +49,7 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
     };
 
     const transportistaWhere = {
+      id: directoryActorIdScope(req.user, 'transportista'),
       OR: [
         { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { cuit: { contains: query, mode: Prisma.QueryMode.insensitive } },
@@ -56,6 +58,7 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
     };
 
     const operadorWhere = {
+      id: directoryActorIdScope(req.user, 'operador'),
       OR: [
         { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { cuit: { contains: query, mode: Prisma.QueryMode.insensitive } },
@@ -74,22 +77,25 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
           generador: { select: { razonSocial: true } },
         },
         take: 5,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
       prisma.generador.findMany({
         where: generadorWhere,
         select: { id: true, razonSocial: true, cuit: true, categoria: true },
         take: 3,
+        orderBy: [{ razonSocial: 'asc' }, { id: 'asc' }],
       }),
       prisma.transportista.findMany({
         where: transportistaWhere,
         select: { id: true, razonSocial: true, cuit: true },
         take: 3,
+        orderBy: [{ razonSocial: 'asc' }, { id: 'asc' }],
       }),
       prisma.operador.findMany({
         where: operadorWhere,
         select: { id: true, razonSocial: true, cuit: true, categoria: true },
         take: 3,
+        orderBy: [{ razonSocial: 'asc' }, { id: 'asc' }],
       }),
     ]);
 

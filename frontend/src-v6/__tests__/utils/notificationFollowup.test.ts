@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { notificationFollowup } from '../../utils/notificationFollowup';
+import { isCurrentRequirementNotice, notificationFollowup } from '../../utils/notificationFollowup';
 import { EstadoManifiesto, type Notificacion } from '../../types/models';
 const notice = (state?: EstadoManifiesto): Notificacion => ({ datos: JSON.stringify({ tipo: 'seguimiento_cierre', version: 1, estadoDetectado: 'RECIBIDO' }), leida: true, manifiesto: state ? { numero: 'QA', estado: state } : null } as Notificacion);
 it('reading does not resolve a pending workflow', () => expect(notificationFollowup(notice(EstadoManifiesto.RECIBIDO))).toContain('Revisar pesaje'));
@@ -8,3 +8,10 @@ it.each([EstadoManifiesto.TRATADO, EstadoManifiesto.CANCELADO])('does not call a
 it('missing live state is unknown, not completed or overdue', () => expect(notificationFollowup(notice())).toBe('Consultar el estado actual del manifiesto'));
 it('other current states do not invent a task', () => expect(notificationFollowup(notice(EstadoManifiesto.APROBADO))).toContain('Estado actualizado'));
 it.each([null, 'invalid', 'null', '{}', '{"tipo":"seguimiento_cierre","version":2}'])('ignores unrelated or malformed metadata: %s', datos => expect(notificationFollowup({ ...notice(), datos })).toBeNull());
+it('distinguishes the current requirement status from its earlier detection', () => {
+  const updated = { ...notice(), datos: JSON.stringify({ familia: 'catalogo_verificable', version: 1, tipo: 'requerimiento_inspeccion', estadoDetectado: 'ACTUALIZADO' }) };
+  expect(isCurrentRequirementNotice(updated)).toBe(true);
+  expect(notificationFollowup(updated)).toBeNull();
+  expect(isCurrentRequirementNotice(notice())).toBe(false);
+  expect(isCurrentRequirementNotice({ datos: 'invalid' })).toBe(false);
+});

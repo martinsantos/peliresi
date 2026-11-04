@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Transportista Hooks
  */
@@ -15,17 +16,20 @@ const KEYS = {
 };
 
 export function useTransportistas(filters?: ActorFilters) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.transportistas(filters),
+    queryKey: [...KEYS.transportistas(filters), owner],
     queryFn: () => actoresService.listTransportistas(filters),
+    enabled: Boolean(owner),
   });
 }
 
 export function useTransportista(id: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.transportista(id),
+    queryKey: [...KEYS.transportista(id), owner],
     queryFn: () => actoresService.getTransportista(id),
-    enabled: !!id,
+    enabled: Boolean(owner && id),
   });
 }
 
@@ -56,18 +60,20 @@ export function useDeleteTransportista() {
 
 // Vehiculos & Choferes
 export function useVehiculos(transportistaId: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.vehiculos(transportistaId),
+    queryKey: [...KEYS.vehiculos(transportistaId), owner],
     queryFn: () => actoresService.listVehiculos(transportistaId),
-    enabled: !!transportistaId,
+    enabled: Boolean(owner && transportistaId),
   });
 }
 
 export function useChoferes(transportistaId: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.choferes(transportistaId),
+    queryKey: [...KEYS.choferes(transportistaId), owner],
     queryFn: () => actoresService.listChoferes(transportistaId),
-    enabled: !!transportistaId,
+    enabled: Boolean(owner && transportistaId),
   });
 }
 

@@ -21,7 +21,9 @@ interface OwnershipAttempt {
  * Unsupported browsers fail closed: a localStorage lease cannot elect one writer
  * atomically, so it is intentionally not used as a fallback.
  */
-export function useInspectionDraftOwnership(key: string, enabled: boolean) {
+export function useInspectionDraftOwnership(key: string, enabled: boolean, onAcquire?: () => void) {
+  const acquireCallback = useRef(onAcquire);
+  acquireCallback.current = onAcquire;
   const [revision, setRevision] = useState(0);
   const request = useMemo(() => ({ key, enabled, revision }), [key, enabled, revision]);
   const [state, setState] = useState<{
@@ -59,6 +61,9 @@ export function useInspectionDraftOwnership(key: string, enabled: boolean) {
           }
 
           attempt.held = true;
+          // Refresh the local copy while the lock is already held, before the
+          // UI enables editing. Another tab may have saved after this mounted.
+          acquireCallback.current?.();
           setState({ request, status: 'owned' });
           await new Promise<void>((resolve) => { attempt.release = resolve; });
           attempt.held = false;

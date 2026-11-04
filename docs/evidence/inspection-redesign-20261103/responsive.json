@@ -1,0 +1,314 @@
+[
+  {
+    "width": 320,
+    "section": "Visita y lugar",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 292,
+      "top": 608.75,
+      "width": 264,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 304,
+      "top": 81,
+      "width": 288,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "section": "Constataciones",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 292,
+      "top": 608.75,
+      "width": 264,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 304,
+      "top": 81,
+      "width": 288,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "section": "Evidencias",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 292,
+      "top": 608.75,
+      "width": 264,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 304,
+      "top": 81,
+      "width": 288,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 320,
+    "section": "Revisar y firmar",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 292,
+      "top": 608.75,
+      "width": 264,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 304,
+      "top": 81,
+      "width": 288,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 320,
+    "viewport": 320
+  },
+  {
+    "width": 393,
+    "section": "Visita y lugar",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 365,
+      "top": 608.75,
+      "width": 337,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 377,
+      "top": 81,
+      "width": 361,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 393,
+    "viewport": 393
+  },
+  {
+    "width": 393,
+    "section": "Constataciones",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 365,
+      "top": 608.75,
+      "width": 337,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 377,
+      "top": 81,
+      "width": 361,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 393,
+    "viewport": 393
+  },
+  {
+    "width": 393,
+    "section": "Evidencias",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 365,
+      "top": 608.75,
+      "width": 337,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 377,
+      "top": 81,
+      "width": 361,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 393,
+    "viewport": 393
+  },
+  {
+    "width": 393,
+    "section": "Revisar y firmar",
+    "actions": {
+      "bottom": 676,
+      "height": 67.25,
+      "left": 28,
+      "right": 365,
+      "top": 608.75,
+      "width": 337,
+      "x": 28,
+      "y": 608.75
+    },
+    "main": {
+      "bottom": 599.75,
+      "height": 518.75,
+      "left": 16,
+      "right": 377,
+      "top": 81,
+      "width": 361,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 393,
+    "viewport": 393
+  },
+  {
+    "width": 768,
+    "section": "Visita y lugar",
+    "actions": {
+      "bottom": 676,
+      "height": 44,
+      "left": 40,
+      "right": 728,
+      "top": 632,
+      "width": 688,
+      "x": 40,
+      "y": 632
+    },
+    "main": {
+      "bottom": 623,
+      "height": 542,
+      "left": 16,
+      "right": 752,
+      "top": 81,
+      "width": 736,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "width": 768,
+    "section": "Constataciones",
+    "actions": {
+      "bottom": 676,
+      "height": 44,
+      "left": 40,
+      "right": 728,
+      "top": 632,
+      "width": 688,
+      "x": 40,
+      "y": 632
+    },
+    "main": {
+      "bottom": 623,
+      "height": 542,
+      "left": 16,
+      "right": 752,
+      "top": 81,
+      "width": 736,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "width": 768,
+    "section": "Evidencias",
+    "actions": {
+      "bottom": 676,
+      "height": 44,
+      "left": 40,
+      "right": 728,
+      "top": 632,
+      "width": 688,
+      "x": 40,
+      "y": 632
+    },
+    "main": {
+      "bottom": 623,
+      "height": 542,
+      "left": 16,
+      "right": 752,
+      "top": 81,
+      "width": 736,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "width": 768,
+    "section": "Revisar y firmar",
+    "actions": {
+      "bottom": 676,
+      "height": 44,
+      "left": 40,
+      "right": 728,
+      "top": 632,
+      "width": 688,
+      "x": 40,
+      "y": 632
+    },
+    "main": {
+      "bottom": 623,
+      "height": 542,
+      "left": 16,
+      "right": 752,
+      "top": 81,
+      "width": 736,
+      "x": 16,
+      "y": 81
+    },
+    "pageWidth": 768,
+    "viewport": 768
+  }
+]

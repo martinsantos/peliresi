@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { solicitudService } from '../services/solicitud.service';
 import type { SolicitudFilters, IniciarSolicitudRequest, UpdateSolicitudRequest } from '../types/api';
+import { useAdmissionContext } from './useAdmissionContext';
 
 const KEYS = {
   solicitudes: (filters?: SolicitudFilters) => ['solicitudes', filters] as const,
@@ -10,32 +11,40 @@ const KEYS = {
 };
 
 export function useSolicitudes(filters?: SolicitudFilters) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.solicitudes(filters),
+    queryKey: [...KEYS.solicitudes(filters), owner],
     queryFn: () => solicitudService.list(filters),
+    enabled: ready,
   });
 }
 
 export function useSolicitud(id: string) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.solicitud(id),
+    queryKey: [...KEYS.solicitud(id), owner],
     queryFn: () => solicitudService.getById(id),
-    enabled: !!id,
+    enabled: !!id && ready,
+    staleTime: 0,
   });
 }
 
 export function useMisSolicitudes() {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.misSolicitudes,
+    queryKey: [...KEYS.misSolicitudes, owner],
+    enabled: ready,
     queryFn: () => solicitudService.misSolicitudes(),
   });
 }
 
 export function useMensajesSolicitud(id: string) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.mensajes(id),
+    queryKey: [...KEYS.mensajes(id), owner],
     queryFn: () => solicitudService.getMensajes(id),
-    enabled: !!id,
+    enabled: !!id && ready,
+    staleTime: 0,
     refetchInterval: 30000,
   });
 }
@@ -58,8 +67,8 @@ export function useUpdateSolicitud() {
 export function useEnviarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => solicitudService.enviar(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    mutationFn: (request: string | { id: string; expectedUpdatedAt?: string }) => typeof request === 'string' ? solicitudService.enviar(request) : solicitudService.enviar(request.id, request.expectedUpdatedAt),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
@@ -84,8 +93,8 @@ export function useDeleteDocumento() {
 export function useEnviarMensaje() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ solicitudId, contenido }: { solicitudId: string; contenido: string }) =>
-      solicitudService.enviarMensaje(solicitudId, contenido),
+    mutationFn: ({ solicitudId, contenido, clientMessageId }: { solicitudId: string; contenido: string; clientMessageId?: string }) =>
+      solicitudService.enviarMensaje(solicitudId, contenido, clientMessageId),
     onSuccess: (_, { solicitudId }) => qc.invalidateQueries({ queryKey: KEYS.mensajes(solicitudId) }),
   });
 }
@@ -93,43 +102,43 @@ export function useEnviarMensaje() {
 export function useRevisarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => solicitudService.revisar(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    mutationFn: ({ id, expectedUpdatedAt }: { id: string; expectedUpdatedAt?: string }) => solicitudService.revisar(id, expectedUpdatedAt),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
 export function useObservarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, mensaje }: { id: string; mensaje: string }) =>
-      solicitudService.observar(id, mensaje),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    mutationFn: ({ id, mensaje, expectedUpdatedAt }: { id: string; mensaje: string; expectedUpdatedAt?: string }) =>
+      solicitudService.observar(id, mensaje, expectedUpdatedAt),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
 export function useAprobarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => solicitudService.aprobar(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    mutationFn: ({ id, expectedUpdatedAt }: { id: string; expectedUpdatedAt?: string }) => solicitudService.aprobar(id, expectedUpdatedAt),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
 export function useRechazarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, motivoRechazo }: { id: string; motivoRechazo: string }) =>
-      solicitudService.rechazar(id, motivoRechazo),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    mutationFn: ({ id, motivoRechazo, expectedUpdatedAt }: { id: string; motivoRechazo: string; expectedUpdatedAt?: string }) =>
+      solicitudService.rechazar(id, motivoRechazo, expectedUpdatedAt),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
 export function useRevisarDocumento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ solicitudId, docId, estado, observaciones }: {
-      solicitudId: string; docId: string; estado: 'APROBADO' | 'RECHAZADO'; observaciones?: string;
-    }) => solicitudService.revisarDocumento(solicitudId, docId, estado, observaciones),
+    mutationFn: ({ solicitudId, docId, estado, observaciones, expectedDocument }: {
+      solicitudId: string; docId: string; estado: 'APROBADO' | 'RECHAZADO'; observaciones?: string; expectedDocument?: { estado: string; sha256: string | null };
+    }) => solicitudService.revisarDocumento(solicitudId, docId, estado, observaciones, expectedDocument),
     onSuccess: (_, { solicitudId }) => qc.invalidateQueries({ queryKey: KEYS.solicitud(solicitudId) }),
   });
 }

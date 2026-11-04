@@ -34,3 +34,8 @@ describe('native support API client', () => {
     expect(supportError(new Error('private internal detail'))).not.toContain('private internal detail');
   });
 });
+
+it('reconciles with the original key and no rejected file upload', async () => {
+  calls.post.mockClear(); await supportService.recoverAction('ticket', 'original_key');
+  expect(calls.post).toHaveBeenCalledWith('/soporte/ticket/acciones/recuperar', {}, { headers: { 'Idempotency-Key': 'original_key' } });
+});

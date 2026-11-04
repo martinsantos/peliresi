@@ -38,6 +38,17 @@ export type ExchangeDigestInput = {
   adjuntos: ExchangeAttachmentDigest[];
 };
 
+export const PARTICIPANT_VISIBLE_STATES: EstadoInspeccion[] = [
+  'NOTIFICADA',
+  'EN_DESCARGO',
+  'REQUIERE_SUBSANACION',
+  'CERRADA_CONFORME',
+  'DERIVADA_LEGALES',
+  'EN_TRAMITE_LEGAL',
+  'DERIVADA_ATM',
+  'FINALIZADA',
+];
+
 const ACTOR_RESPONSE_TYPES = new Set<TipoIntercambioInspeccion>(['RESPUESTA', 'DESCARGO', 'SUBSANACION']);
 const AUTHORITY_MESSAGE_TYPES = new Set<TipoIntercambioInspeccion>(['REQUERIMIENTO', 'RESPUESTA', 'PRONUNCIAMIENTO']);
 const EXCHANGE_OPEN_STATES = new Set<EstadoInspeccion>(['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION']);
@@ -59,7 +70,7 @@ export function exchangePartyForUser(
   inspection: InspectionExchangeAccessTarget,
 ): ParteIntercambioInspeccion | null {
   const role = String(user?.rol || '');
-  if (role === 'ADMIN') return 'AUTORIDAD';
+  if (role === 'ADMIN' || user?.esJefeInspecciones) return 'AUTORIDAD';
   if (role === `ADMIN_${inspection.tipoActor}`) return 'AUTORIDAD';
   if (user?.esInspector && String(user?.id) === inspection.inspectorId) return 'AUTORIDAD';
   const expectedRole = inspection.tipoActor;
@@ -71,7 +82,7 @@ export function exchangePartyForUser(
 
 export function canDecideInspectionExchange(user: any, inspection: InspectionExchangeAccessTarget): boolean {
   const role = String(user?.rol || '');
-  return role === 'ADMIN' || role === `ADMIN_${inspection.tipoActor}`;
+  return Boolean(user?.esJefeInspecciones) || role === 'ADMIN' || role === `ADMIN_${inspection.tipoActor}`;
 }
 
 export function isInspectionExchangeOpen(estado: EstadoInspeccion): boolean {

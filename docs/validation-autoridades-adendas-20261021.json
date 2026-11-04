@@ -1,0 +1,228 @@
+{
+  "base": "ea8ae868f48cf3382140f0df0347894711264ecc",
+  "productBase": "db68b24e4b4a4e04ec5a1bae308d1bd1a41deab8",
+  "branch": "codex/sitrep-training-20261018",
+  "main": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "productionAccessed": false,
+  "pushed": false,
+  "workflowsTriggered": false,
+  "backend": {
+    "numTotalTests": 1451,
+    "numPassedTests": 1451,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "frontend": {
+    "numTotalTests": 1796,
+    "numPassedTests": 1796,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "directedBackend": {
+    "numTotalTests": 49,
+    "numPassedTests": 49,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "directedFrontend": {
+    "numTotalTests": 57,
+    "numPassedTests": 57,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "browser": {
+    "startTime": "2026-10-21T13:31:03.853Z",
+    "duration": 317861.19800000003,
+    "expected": 18,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "http": [
+    "normal accounts and linked roles only; draft/forged finding rejected",
+    "quantity and omitted Y conserved in finding; independent generator/operator intake",
+    "idempotent creation preserves exact notices and request identity",
+    "counterpart observation, no self/admin review; stale version blocked and replay deduplicated",
+    "independent decisions and historic PDF/finding retained; current annex includes finding/reviews",
+    "rectification appends, original rejected record retained; cross-manifest link denied",
+    "concurrent creation once; one version decision wins, loser must refresh",
+    "carrier difference stays distinct from destination operator finding; operator counterpart can observe",
+    "inactive recipient account or actor receives no new internal party notice",
+    "manifest status/declaration/events unchanged; review does not certify documentary closure"
+  ],
+  "authorityHttp": [
+    "all four undesignated admin roles can read but cannot review",
+    "four selected roles review independently, retain audit authors and replay without duplicate notices",
+    "two approvals notify exactly four active designated authorities; inactive/nonadmin excluded",
+    "existing tokens lose authority after deactivation or role change",
+    "eventual circuit remains closed; original declaration, physical stage and documentary closure unchanged"
+  ],
+  "noAuthority": [
+    "missing authority returns actionable 409; review/version/notices roll back atomically"
+  ],
+  "flagsOff": [
+    "flags off close reads and writes without reopening CAP"
+  ],
+  "audit": {
+    "checks": [
+      "actual runtime providers closed; four CAP aliases 403",
+      "all four phases render simulated mail; zero attempts/sends; legacy original unchanged"
+    ],
+    "simulated": 146,
+    "demoSourcesSuppressed": 146,
+    "phases": [
+      "CREADA",
+      "OBSERVADA",
+      "APROBADA",
+      "RECHAZADA"
+    ],
+    "attempts": 0,
+    "sent": 0,
+    "emailQueue": 0
+  },
+  "protectedTables": 415,
+  "sourceVerification": {
+    "backend-final-snapshot": 407,
+    "build-snapshot": 794,
+    "manual-final-snapshot": 255,
+    "qaSources": 247,
+    "unrelatedRemoteFilesPreserved": [
+      "frontend/cloud-qa/._live-easy-accounts.ts",
+      "frontend/cloud-qa/e2e/nonblocking-preview.spec.ts",
+      "frontend/cloud-qa/e2e/owned-four-phone-recovery.spec.ts",
+      "frontend/cloud-qa/manual-published.playwright.config.ts",
+      "frontend/cloud-qa/nonblocking-boundary.test.ts",
+      "frontend/cloud-qa/nonblocking-evidence.ts",
+      "frontend/cloud-qa/nonblocking-preview.ts",
+      "frontend/cloud-qa/nonblocking.playwright.config.ts",
+      "frontend/cloud-qa/owned-recovery.playwright.config.ts"
+    ]
+  },
+  "suiteSelection": {
+    "original": 6,
+    "authorities": 18,
+    "exactExecutedCases": true
+  },
+  "shutdown": {
+    "at": "2026-10-21T13:51:56.300Z",
+    "portsClosed": [
+      3037,
+      4177
+    ],
+    "postgresStopped": true,
+    "pgLog": "waiting for server to shut down.... done\nserver stopped\n",
+    "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+  },
+  "container": {
+    "name": "/sitrep-qa-training-20261018",
+    "status": "exited",
+    "running": false,
+    "pid": 0,
+    "oomKilled": false,
+    "finishedAt": "2026-10-21T13:51:57.478188379Z",
+    "exitCode": 143,
+    "cpu": 1000000000,
+    "memory": 2147483648,
+    "memorySwap": 2147483648,
+    "imagePreserved": "sha256:55d05c442dae3a6ae2af816720fbdcaa433acfe89a8f5b62c5bad75de13d80dd"
+  },
+  "screenshots": [
+    {
+      "path": "docs/evidence/autoridades-adendas-20261021/autoridad-generadores-web.png",
+      "sha256": "08460aacce973e909c69c4899a184a7e296f1914b6bb54f930ce1e410505ec9b",
+      "origin": "adenda-e2e-browser-fixed/adenda-authorities-ADMIN-G-67e98-nd-records-its-own-decision-web-desktop/authority-decision.png"
+    },
+    {
+      "path": "docs/evidence/autoridades-adendas-20261021/autoridad-operadores-app.png",
+      "sha256": "514d52e94e922b5abaf8d705bddae5c441401c35dea7e1a2196ea65e45554f4d",
+      "origin": "adenda-e2e-browser-fixed/adenda-authorities-ADMIN-O-2f640-nd-records-its-own-decision-app/authority-decision.png"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "backend-all.json",
+      "sha256": "9f7d166bd85b0d09b84b70140d4b51f85454f3ff474f2aff71f23f943cc4203d"
+    },
+    {
+      "path": "frontend-all.json",
+      "sha256": "db6ae00cc617b18bf494d2cfb1a5234a975e9c30791d6511a388494ed254997a"
+    },
+    {
+      "path": "adenda-backend.json",
+      "sha256": "cbaad88fad627b680a7ec447b41f20bed33b647e273147825878e8057ffcffc1"
+    },
+    {
+      "path": "adenda-ui-final.json",
+      "sha256": "7c5c16403fc9355ec22c3b534a9bc712fd0add27bda53676d9217e223b0e807b"
+    },
+    {
+      "path": "adenda-e2e-browser-fixed.json",
+      "sha256": "ad425ca279bdb1d74c39be0e5dfdf307f94dcaedef0c88435619798dab0f713b"
+    },
+    {
+      "path": "authority-http.json",
+      "sha256": "526818182a7b7afec071015447392a270e0ff0beded11528ef9cb7740a10d459"
+    },
+    {
+      "path": "adenda-http.json",
+      "sha256": "22f4b41f2ee77aadd20ae4132e41b90e350198d09cd4e8fa63e611dc001121cf"
+    },
+    {
+      "path": "adenda-noauthority.json",
+      "sha256": "ee4fbcafd6491ad0146666e44d97b74834e0afe24da4dc6266d393adf8b9bf0d"
+    },
+    {
+      "path": "adenda-off.json",
+      "sha256": "7acd79842c9358cb9c9153839fd158bfba43a0b744e8f57cefd88fc6facd8fc9"
+    },
+    {
+      "path": "adenda-audit.json",
+      "sha256": "7371a9de38e5efa083ab1e70ab768824c9976ba501fe48f0ef5898a14015928b"
+    },
+    {
+      "path": "source-verification.json",
+      "sha256": "2cf77433ed45c3b8d5ddcb924c0f01791cd08b675f6cd50c99c8f57fa7e557c1"
+    },
+    {
+      "path": "qa-source-final.json",
+      "sha256": "0b427791c3f8dfa59d2b81bc90b3ecc255978b4c754096c19fa17321642992a6"
+    },
+    {
+      "path": "suite-selection.json",
+      "sha256": "1f0889a42d983519787ea872fcdbf141a6aced4439db6579ef631a8d8b6b4019"
+    },
+    {
+      "path": "protected-schemas-before.json",
+      "sha256": "32dc4239912888cc2f8e385bd3837ac7f368d0858fc2342813f4becc1ca2a330"
+    },
+    {
+      "path": "audit-protected-result.json",
+      "sha256": "e5024a4abf3001a77e40c04b2eac6ec604cf96fc218047688a89bb45711646c6"
+    },
+    {
+      "path": "shutdown.json",
+      "sha256": "72339aaa9c20e7d1f3a7242d29b796f2612d7d331ea3693e5ed207965a16a446"
+    },
+    {
+      "path": "container-closed.json",
+      "sha256": "f4b2cc2d49771d0439e3aec5e8986f061ebbc63e45143ce91ee9489673cc1db7"
+    },
+    {
+      "path": "lint-final.json",
+      "sha256": "a320fb4869b73f3d3c80bc7636fbbd722ab03286fec18b4c3c451633f012c1a1"
+    }
+  ],
+  "pending": "Asignación de cuentas productivas diferida por el dueño el 21/10/2026. Funciones que autorizan incorporadas y probadas en f7b0ad60: Super Admin y administraciones de Generadores, Operadores y Transporte. No se requiere identificar personas en esta fase; no hay nueva publicación autorizada.",
+  "ownerClarification": {
+    "date": "2026-10-21",
+    "authorities": [
+      "ADMIN",
+      "ADMIN_GENERADOR",
+      "ADMIN_OPERADOR",
+      "ADMIN_TRANSPORTISTA"
+    ],
+    "accountAssignment": "deferred_by_owner",
+    "implementationCommit": "f7b0ad602037252429161e9517ac3e52b437a1a6",
+    "codeOrPermissionsChangedByClarification": false
+  }
+}

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { renovacionService } from '../services/renovacion.service';
 import type { RenovacionFilters, CreateRenovacionRequest } from '../types/api';
+import { useAdmissionContext } from './useAdmissionContext';
 
 const KEYS = {
   renovaciones: (filters?: RenovacionFilters) => ['renovaciones', filters] as const,
@@ -8,17 +9,21 @@ const KEYS = {
 };
 
 export function useRenovaciones(filters?: RenovacionFilters) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.renovaciones(filters),
+    queryKey: [...KEYS.renovaciones(filters), owner],
     queryFn: () => renovacionService.list(filters),
+    enabled: ready,
   });
 }
 
 export function useRenovacion(id: string) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.renovacion(id),
+    queryKey: [...KEYS.renovacion(id), owner],
     queryFn: () => renovacionService.getById(id),
-    enabled: !!id,
+    enabled: !!id && ready,
+    staleTime: 0,
   });
 }
 

@@ -11,6 +11,7 @@ import {
   enviarSolicitud,
   uploadDocumento,
   analizarDocumentoSolicitud,
+  confirmarIdentidadPago,
   downloadDocumentoSolicitud,
   deleteDocumento,
   getMensajes,
@@ -57,5 +58,6 @@ router.post('/:id/observar', isAuthenticated, requireAnyAdmin, observarSolicitud
 router.post('/:id/aprobar', isAuthenticated, requireAnyAdmin, aprobarSolicitud);
 router.post('/:id/rechazar', isAuthenticated, requireAnyAdmin, rechazarSolicitud);
 router.patch('/:id/documentos/:docId/revisar', isAuthenticated, requireAnyAdmin, revisarDocumento);
+router.post('/:id/documentos/:docId/identidad-pago', isAuthenticated, requireAnyAdmin, confirmarIdentidadPago);
 
 export default router;

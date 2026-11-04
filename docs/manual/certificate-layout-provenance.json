@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "productCommit": "ae24f304855ee9d73850041263e545ae315f3dc6",
+  "surface": "app in Chromium; Android device not tested",
+  "viewport": "320x800 CSS pixels",
+  "files": [
+    {
+      "file": "screenshots/mobile/certificate-list-20261030.png",
+      "sha256": "45e77bc641c707b7ff418d8ed79e068e9ecdadc6c6bfbfad99cfba65ebe2f8d7",
+      "source": ".qa-certificate-layout-20261030/browser/certificate-layout-operado-1b0ca--without-repeated-summaries-app/certifications.png"
+    },
+    {
+      "file": "screenshots/mobile/certificate-recovery-list-20261030.png",
+      "sha256": "f8d97b33d8bef1aa799ec9093415c6ace67114fb1f874fe8cc58111e48e8878a",
+      "source": ".qa-certificate-layout-20261030/browser-receipt/certificate-receipt-ux-a-l-0e121-es-repeated-receipt-details-app/certificate-compact.png"
+    }
+  ]
+}

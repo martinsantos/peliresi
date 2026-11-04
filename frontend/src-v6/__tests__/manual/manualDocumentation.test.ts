@@ -14,6 +14,33 @@ const data = context.window.SITREP_HELP!;
 const catalogue = data.guides.find(guide => guide.id === 'administrador-alertas-proactivas')!;
 
 describe('manual documentation stays usable and truthful', () => {
+  it('keeps all manual icons in the bundled font without relying on the external font service', () => {
+    const metadata = JSON.parse(readFileSync(manual + 'material-symbols-manual.json', 'utf8')) as { font_sha256: string; icons: string[] };
+    const css = readFileSync(manual + 'manual.css', 'utf8');
+    const encoded = css.match(/data:font\/woff2;base64,([A-Za-z0-9+/=]+)/)?.[1];
+    expect(encoded).toBeDefined();
+    if (!encoded) throw new Error('Manual icon font is missing');
+    const font = Buffer.from(encoded, 'base64');
+    expect(font.subarray(0, 4).toString('ascii')).toBe('wOF2');
+    expect(createHash('sha256').update(font).digest('hex')).toBe(metadata.font_sha256);
+    const localFont = readFileSync(manual + 'material-symbols-rounded-manual.woff2');
+    expect(createHash('sha256').update(localFont).digest('hex')).toBe(metadata.font_sha256);
+    const used = new Set<string>();
+    for (const file of ['index.html', 'search.html', 'tutorial.html', 'manual.js', 'help-data.js']) {
+      const source = readFileSync(manual + file, 'utf8');
+      for (const match of source.matchAll(/\bicon\s*:\s*['"]([a-z0-9_]+)['"]/g)) used.add(match[1]);
+      for (const match of source.matchAll(/class="material-symbols-rounded(?: [^"]*)?"[^>]*>\s*([a-z0-9_]+)\s*</g)) used.add(match[1]);
+      if (file.endsWith('.html')) expect(source).not.toContain('family=Material+Symbols+Rounded');
+    }
+    expect([...used].sort().filter(icon => !metadata.icons.includes(icon))).toEqual([]);
+  });
+  it('distinguishes individual approval, repeated receipts and certificate issuance', () => {
+    const guide = data.guides.find(item => item.id === 'correos-decisiones-documentos');
+    expect(guide).toBeDefined();
+    const content = JSON.stringify(guide);
+    for (const term of ['aprobación individual', 'no acredita un pago nuevo', 'emisión expresa del operador', 'permanecen apagados', 'históricos']) expect(content).toContain(term);
+    expect(guide?.steps).toHaveLength(3);
+  });
   it('keeps unique guides, recognized roles, useful steps and existing captures for every tutorial', () => {
     expect(new Set(data.guides.map(guide => guide.id)).size).toBe(data.guides.length);
     for (const guide of data.guides) {
@@ -22,8 +49,15 @@ describe('manual documentation stays usable and truthful', () => {
       for (const step of guide.steps) {
         expect(step.title.length && step.body.length && step.expected.length).toBeGreaterThan(0);
         if (step.image) {
-          expect(step.image).toMatch(/^screenshots\/(desktop|mobile)\/[^/]+\.png$/);
+          expect(step.image).toMatch(/^screenshots\/(desktop|mobile)\/[^/]+\.(png|jpg)$/);
           expect(existsSync(manual + step.image), step.image).toBe(true);
+          const bytes = readFileSync(manual + step.image);
+          expect(bytes.length, step.image).toBeGreaterThan(24);
+          // Some historical .png captures contain original JPEG bytes. Preserve the
+          // evidence; validate the actual supported encoding rather than its label.
+          const png = bytes.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+          const jpeg = bytes.subarray(0, 3).toString('hex') === 'ffd8ff';
+          expect(png || jpeg, step.image).toBe(true);
           expect(step.alt?.length).toBeGreaterThan(0);
         }
       }
@@ -32,7 +66,7 @@ describe('manual documentation stays usable and truthful', () => {
   it('distinguishes simulation, internal delivery, reading, legal decisions and unimplemented families', () => {
     const text = catalogue.steps.flatMap(step => step.body).join(' ');
     expect(catalogue.safety).toContain('datos sintéticos y no acreditan la configuración actual');
-    for (const phrase of ['No crea la regla, casos ni avisos', 'inactivas', 'no un vencimiento legal', 'no significa aceptación legal', 'hasta finalizar el 10 en Mendoza', 'nunca todo el padrón', 'No se envía correo ni push', 'no cierra un manifiesto', 'todavía no son reglas operativas']) {
+    for (const phrase of ['sin crear casos ni avisos', 'estado inicial depende de la familia elegida', 'no un vencimiento legal', 'no significa aceptación legal', 'hasta finalizar el 10 en Mendoza', 'nunca todo el padrón', 'No se envía correo ni push', 'no cierra un manifiesto', 'todavía no son reglas operativas']) {
       expect(text).toContain(phrase);
     }
   });
@@ -46,24 +80,94 @@ describe('manual documentation stays usable and truthful', () => {
       expect(createHash('sha256').update(bytes).digest('hex')).toBe(item.sha256);
       expect(bytes.readUInt32BE(16)).toBe(item.width); expect(bytes.readUInt32BE(20)).toBe(item.height);
     }
-    for (const step of catalogue.steps) {
+    const capturedSteps = catalogue.steps.filter(step => step.image);
+    expect(capturedSteps.length).toBeGreaterThan(0);
+    for (const step of capturedSteps) {
       expect(step.caption).toContain('Datos sintéticos');
       expect(step.caption).toContain('No acredita el estado actual de esta instalación');
       expect(receipt.files.some((item: { file: string }) => step.image === 'screenshots/' + item.file)).toBe(true);
     }
   });
+  it('preserves the current account-edit captures and explains the notice delivery boundary', () => {
+    const provenance = JSON.parse(readFileSync(manual + 'circuit-review-capture-provenance.json', 'utf8'));
+    expect(provenance).toMatchObject({ synthetic: true, productionCapture: false, edited: false });
+    expect(provenance.files).toHaveLength(4);
+    for (const image of provenance.files) {
+      const bytes = readFileSync(manual + 'screenshots/' + image.file);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(image.sha256);
+      expect(bytes.readUInt32BE(16)).toBe(image.width); expect(bytes.readUInt32BE(20)).toBe(image.height);
+    }
+    const psip = data.guides.find(guide => guide.id === 'psip-flujo-inspecciones')!;
+    const body = psip.steps.flatMap(step => step.body).join(' ');
+    expect(body).toContain('Quitar la fecha no cancela');
+    expect(body).toContain('históricos sólo-campana no se reenvían');
+    expect(body).toContain('correo y push siguen apagados');
+    const account = data.guides.find(guide => guide.id === 'administrador-editar-usuarios')!;
+    expect(account.steps.flatMap(step => step.body).join(' ')).toContain('Nombre y Apellido son campos separados');
+  });
+
   it('exposes the tutorial in all entry pages and escapes the explicit capture caption', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
-      // The published classroom guide advances all three cache keys together.
-      // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.20.1');
-      expect(html).toContain('manual.js?v=2026.20.1');
-      expect(html).toContain('manual.css?v=2026.20.1');
+      // Any changed asset must have a new URL, including content-only manual edits.
+      for (const asset of ['help-data.js', 'manual.js', 'manual.css']) {
+        const digest = createHash('sha256').update(readFileSync(manual + asset)).digest('hex').slice(0, 12);
+        expect(html, `Refresh ${asset} cache key in ${file}`).toContain(`${asset}?v=${digest}`);
+      }
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");
     expect(script).toContain('escapeHTML(step.caption ||');
     expect(readFileSync(manual + 'directorio.html', 'utf8')).toContain('id="alertas-catalogo"');
   });
+});
+
+it('documents explicit operational approvals separately from CAP without inventing historical decisions',()=>{
+ const guide=data.guides.find(g=>g.id==='manifiestos-tres-partes')!;
+ const text=guide.steps.flatMap(s=>s.body.concat(s.expected)).join(' ');
+ for(const value of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','Leer un aviso no aprueba','SITREP pide revisión y bloquea nuevas decisiones'])expect(text).toContain(value);
+ expect(guide.safety).toContain('CAP cerrado y correo/push apagados');
+ const creator = data.guides.find(g=>g.id==='generador-crear-manifiesto')!;
+ expect(creator.safety).toContain('no aprueba por ninguna parte');
+ expect(creator.safety).toContain('no se les inventan aprobaciones');
+ expect(JSON.stringify(creator.steps)).toContain('Pendiente aprobación');
+});
+
+it('explains eventual search, live updates and explicit conflict recovery', () => {
+ const guide = data.guides.find(item => item.id === 'eventuales-aprobaciones-avisos');
+ const content = JSON.stringify(guide);
+ for (const text of ['Buscar eventual', 'Etapa del eventual', 'Usar versión actual', 'no envía ni aprueba', 'se reutilizan la referencia y los datos originales', 'No edites ni descartes el envío pendiente']) expect(content).toContain(text);
+ expect(guide?.safety).toContain('La referencia BI- es interna');
+ expect(content).toContain('Correo y push permanecen apagados');
+ expect(content).not.toContain('en este ensayo');
+});
+
+it('explains the historical recovery link and a different restored draft without suggesting that records are linked', () => {
+ for (const id of ['manifiestos-tres-partes', 'generador-crear-manifiesto']) {
+  const guide = data.guides.find(item => item.id === id)!;
+  const content = guide.steps.flatMap(step => step.body).join(' ');
+  for (const text of ['Abrir nueva propuesta', 'no copia ni vincula automáticamente', 'puede corresponder a otra operación', 'propuesta duplicada', 'Revisar aprobaciones', 'No repitas una aprobación']) {
+   expect(content).toContain(text);
+  }
+ }
+});
+
+
+it('explains current transport identity, first GPS after handoff and the recent route window', () => {
+  const guide = data.guides.find(item => item.id === 'monitor-viaje-vigente');
+  expect(guide).toBeDefined();
+  const text = guide!.steps.flatMap(step => [...step.body, step.expected]).join(' ');
+  for (const phrase of ['tramo de relevo vigente', 'no la completa con otro móvil', 'no se usa como ubicación actual', 'últimos 500 puntos', 'puntos anteriores permanecen guardados']) {
+    expect(text).toContain(phrase);
+  }
+  const handoff = data.guides.find(item => item.id === 'transporte-relevo')!;
+  expect(handoff.steps.flatMap(step => step.body).join(' ')).toContain('no los de otro viaje de la misma empresa');
+});
+
+it('describes explicit retry after waiting without reloading or claiming the action was saved', () => {
+  const guide = data.guides.find(item => item.id === 'resolver-espera-reintento');
+  expect(guide).toBeDefined();
+  const text = guide!.steps.flatMap(step => [...step.body, step.expected]).join(' ');
+  for (const phrase of ['El sistema está ocupado', 'datos en pantalla', 'no hace falta recargar', 'no confirma', 'no se reenvían automáticamente', 'mismo registro', 'revisá el estado']) expect(text).toContain(phrase);
+  expect(text).not.toMatch(/CPU|Redis|rate.?limit|solicitudes por minuto/i);
 });

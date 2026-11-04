@@ -39,11 +39,8 @@ export const StepTEF = forwardRef<StepTEFHandle, StepTEFProps>(({
   // Expose snapshot method to parent via ref
   const snapshotTEF = useCallback((): Record<string, string> => {
     if (!tefRef.current) return {};
-    const r = tefRef.current.getResult();
     const inputs = tefRef.current.getInputs();
     return {
-      factorR: r.R.toFixed(4),
-      montoMxR: r.TEF.toFixed(2),
       tefInputs: JSON.stringify(inputs),
       tefPersonal: String(inputs.personal),
       tefSuperficie: String(inputs.superficieM2),
@@ -56,12 +53,12 @@ export const StepTEF = forwardRef<StepTEFHandle, StepTEFProps>(({
 
   return (
     <div className="space-y-4">
-      <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
+      <SectionTitle icon={Calculator} title="Datos para evaluación TEF" />
       <p className="text-sm text-neutral-500">
-        Calculadora completa segun Decreto 2625/99. Complete los coeficientes para obtener la tasa.
+        Revisá los datos declarados. El importe requiere la liquidación oficial.
         {tefCorrientesYList.length === 0 && (
           <span className="block mt-1 text-amber-600 font-medium">
-            Ingrese corrientes Y en el paso anterior para calcular el coeficiente C.
+            Revisá las corrientes Y de la actividad.
           </span>
         )}
       </p>

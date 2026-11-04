@@ -1,3 +1,5 @@
+import { lockTrainingDocuments, assertNoFinalTrainingCertificate, hasFinalTrainingCertificate } from '../services/trainingCertificate.service';
+import { manifestFeatureEnabled, manifestPracticeIdentity } from '../lib/manifestTraining';
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
@@ -5,15 +7,19 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { canAccessManifiesto } from '../utils/roleFilter';
-import { exceptionalCanReview } from './manifiesto-excepcional.controller';
+import { canReviewAsAddendumAuthority } from '../domain/addendumAuthority';
 import { canReviewAsCounterpart, ReviewParties } from '../domain/partyReview';
 import { addendumCreateSchema, addendumReviewSchema, addendumStageAllowed, canRecordAddendum, AddendumReview } from '../domain/manifiestoAdenda';
-import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domain/manifiestoAdendaDocument';
+import { addendumDocument, documentaryStatus, documentaryResolution } from '../domain/manifiestoAdendaDocument';
 import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
+import { notifyAddendumParties } from '../services/manifiestoAddendumNotice.service';
+import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
+import { findingAtDestination } from '../domain/inspectionIntake';
+import { buildOperatorFinding, recordFindingIntakes } from '../services/inspectionIntake.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
-  if (process.env.MANIFEST_ADDENDA_ENABLED !== 'true') return next(new AppError('Adendas no habilitadas', 404));
+  if (!manifestFeatureEnabled('MANIFEST_ADDENDA_ENABLED')) return next(new AppError('Adendas no habilitadas', 404));
   next();
 }
 async function accessibleManifest(req: AuthRequest) {
@@ -23,33 +29,44 @@ async function accessibleManifest(req: AuthRequest) {
   return manifest;
 }
 function canReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue }) {
-  return exceptionalCanReview(req, record) || (process.env.MANIFEST_PARTY_REVIEW_ENABLED === 'true'
-    && canReviewAsCounterpart(req.user, record, record.declaracion as ReviewParties));
+  return canReviewAsAddendumAuthority(req.user, record) || (manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')
+    && canReviewAsCounterpart(manifestPracticeIdentity(req.user), record, record.declaracion as ReviewParties));
 }
-function present(record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
+function present(record: { id: string; creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
   const reviews = record.revisiones as unknown as AddendumReview[];
   return { ...record, estadoRevision: reviews[reviews.length - 1]?.decision || 'PENDIENTE', puedeResolver: canReview(req, record) };
+}
+/** Names are presentation metadata; stored declarations/revisions and PDF hashes stay intact. */
+async function presentRecords(records: Parameters<typeof present>[0][], req: AuthRequest) {
+  const ids = [...new Set(records.flatMap(record => [record.creadoPorId, ...(record.revisiones as unknown as AddendumReview[]).map(review => review.autorId)]))];
+  const users = ids.length ? await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, apellido: true, rol: true } }) : [];
+  const authors = new Map(users.map(user => [user.id, { nombre: [user.nombre, user.apellido].filter(Boolean).join(' '), rol: user.rol }]));
+  return records.map(record => ({ ...present(record, req), autor: authors.get(record.creadoPorId) || null,
+    revisiones: (record.revisiones as unknown as AddendumReview[]).map(review => ({ ...review, autor: authors.get(review.autorId) || null })) }));
 }
 export async function listAddenda(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const manifest = await accessibleManifest(req);
     const page = Math.max(1, Math.min(100000, Math.floor(Number(req.query.page) || 1)));
-    const where = { manifiestoId: manifest.id };
-    const [items, counts] = await Promise.all([
-      prisma.adendaManifiesto.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
-      // Counts span all pages. Authorization was checked against the parent above.
-      prisma.$queryRaw<DocumentaryCounts[]>(Prisma.sql`
-        SELECT COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE jsonb_array_length(revisiones) = 0)::int AS pendientes,
-          COUNT(*) FILTER (WHERE revisiones->-1->>'decision' = 'OBSERVADA')::int AS observadas,
-          COUNT(*) FILTER (WHERE revisiones->-1->>'decision' = 'RECHAZADA')::int AS rechazadas
-        FROM adendas_manifiesto WHERE "manifiestoId" = ${manifest.id}`),
+    const selected = req.query.adenda;
+    if (selected !== undefined && (typeof selected !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(selected))) throw new AppError('Adenda inválida', 400);
+    const where = { manifiestoId: manifest.id, ...(selected ? { id: selected as string } : {}) };
+    const [items, all] = await Promise.all([
+      prisma.adendaManifiesto.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: selected ? 0 : (page - 1) * 20 }),
+      // Resolution spans all pages. Authorization was checked against the parent above.
+      prisma.adendaManifiesto.findMany({ where: { manifiestoId: manifest.id }, select: { id: true, rectificaId: true, revisiones: true } }),
     ]);
-    const summary = counts[0];
-    res.json({ success: true, data: { adendas: items.map(r => present(r, req)), total: summary.total,
+    const { counts: summary, resolvedObservations, invalidLineages } = documentaryResolution(all);
+    const finalLiberado = await hasFinalTrainingCertificate(prisma, manifest.id);
+    res.json({ success: true, data: { adendas: (await presentRecords(items, req)).map(r => {
+      const resolved = resolvedObservations.has(String(r.id));
+      return { ...r, observacionResueltaPorRectificacion: resolved, relacionRectificacionInvalida: invalidLineages.has(String(r.id)), ...(finalLiberado || resolved ? { puedeResolver: false } : {}) };
+    }), total: selected ? items.length : summary.total, finalLiberado,
       documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
-      manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado },
-      puedeRegistrar: canRecordAddendum(req.user, manifest) && addendumStageAllowed(manifest.estado) } });
+      manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado,
+        residuos: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })) },
+      puedeInformarHallazgo: findingAtDestination(req.user.rol, manifest.estado) && canRecordAddendum(req.user, manifest),
+      puedeRegistrar: !finalLiberado && canRecordAddendum(req.user, manifest) && addendumStageAllowed(manifest.estado) } });
   } catch (error) { next(error); }
 }
 export async function downloadAddendum(req: AuthRequest, res: Response, next: NextFunction) {
@@ -88,16 +105,29 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     };
     const existing = await prisma.adendaManifiesto.findUnique({ where: { id: command.id } });
     if (existing) {
-      verifyReplay(existing); res.status(201).json({ success: true, data: { adenda: present(existing, req) } }); return;
+      verifyReplay(existing); res.status(201).json({ success: true, data: { adenda: (await presentRecords([existing], req))[0] } }); return;
     }
     if (!addendumStageAllowed(manifest.estado)) throw new AppError('Las adendas corresponden a manifiestos aprobados o ejecutados', 409);
     if (command.rectificaId && !await prisma.adendaManifiesto.findFirst({ where: { id: command.rectificaId, manifiestoId: manifest.id } })) {
       throw new AppError('La rectificación debe referirse a una adenda de este manifiesto', 400);
     }
-    const record = await prisma.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
+    let pushIds: string[] = [];
+    const record = await prisma.$transaction(async tx => {
+      await lockTrainingDocuments(tx,manifest.id);
+      await assertNoFinalTrainingCertificate(tx,manifest.id);
+      const replay = await tx.adendaManifiesto.findUnique({ where: { id: command.id } });
+      if (replay) { verifyReplay(replay); return replay; }
+      const currentManifest = await tx.manifiesto.findUniqueOrThrow({ where: { id: manifest.id }, select: { estado: true } });
+      if (!addendumStageAllowed(currentManifest.estado)) throw new AppError('El manifiesto ya no admite esta adenda', 409);
+      const informeHallazgo = findingAtDestination(req.user.rol, currentManifest.estado) ? await buildOperatorFinding(tx, {
+        operadorId: manifest.operadorId, autorId: req.user.id, estado: currentManifest.estado, motivo: command.motivo,
+        declarado: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })), observado: command.residuos,
+      }) : null;
+      const created = await tx.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
       id: command.id, manifiestoId: manifest.id, creadoPorId: req.user.id,
       impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud: hash,
       motivo: command.motivo, rectificaId: command.rectificaId || null, residuos: command.residuos,
+      ...(informeHallazgo ? { informeHallazgo } : {}),
       // Declared quantities only, never replace them with received weights or add observed totals to them.
       declaracion: { numero: manifest.numero, estadoAlRegistrar: manifest.estado,
         fechaFirma: manifest.fechaFirma?.toISOString() || null,
@@ -105,45 +135,64 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
         residuos: manifest.residuos.map(r => ({ id: r.id, tipoResiduoId: r.tipoResiduoId,
           corriente: r.tipoResiduo.codigo, cantidad: r.cantidad, unidad: r.unidad, descripcion: r.descripcion })) },
       revisiones: [],
-    } }).catch(async (error: unknown) => {
+      } });
+      verifyReplay(created);
+      if (informeHallazgo) await recordFindingIntakes(tx, { adendaId: created.id, referencia: manifest.numero,
+        generadorId: manifest.generadorId, creadoPorId: req.user.id, informe: informeHallazgo });
+      pushIds = await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id,req.user.rol);
+      return created;
+    }).catch(async (error: unknown) => {
       // Prisma can race its client-side upsert on simultaneous first requests.
       // Only recover a primary-key conflict, then verify the original request below.
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
       return prisma.adendaManifiesto.findUniqueOrThrow({ where: { id: command.id } });
     });
     verifyReplay(record);
-    res.status(201).json({ success: true, data: { adenda: present(record, req) } });
+    scheduleCommittedManifestPush(pushIds);
+    res.status(201).json({ success: true, data: { adenda: (await presentRecords([record], req))[0] } });
   } catch (error) { next(error); }
 }
 export async function reviewAddendum(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await accessibleManifest(req);
+    const manifest = await accessibleManifest(req);
     const parsed = addendumReviewSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const command = parsed.data;
+    let pushIds: string[] = [];
     const record = await prisma.$transaction(async tx => {
+      await lockTrainingDocuments(tx,req.params.id);
+      await assertNoFinalTrainingCertificate(tx,req.params.id);
       const current = await tx.adendaManifiesto.findFirst({ where: { id: req.params.adendaId, manifiestoId: req.params.id } });
       if (!current) throw new AppError('Adenda no encontrada', 404);
       if (!canReview(req, current)) throw new AppError('Se requiere contraparte vinculada o revisor designado, sin autoaprobación ni impersonación', 403);
       const reviews = current.revisiones as unknown as AddendumReview[];
       const repeated = reviews.find(r => r.id === command.id);
       if (repeated) {
-        if (repeated.autorId !== req.user.id || repeated.version !== command.version || repeated.nota !== command.nota || repeated.decision !== command.decision) {
+        if (repeated.autorId !== req.user.id || repeated.impersonadoPorId !== req.user.impersonatedBy?.id || repeated.version !== command.version || repeated.nota !== command.nota || repeated.decision !== command.decision) {
           throw new AppError('La resolución ya tiene otro contenido', 409);
         }
         return current;
       }
       if (current.version !== command.version) throw new AppError('La revisión cambió; recargá antes de resolver', 409);
+      if (reviews.at(-1)?.decision === 'OBSERVADA') {
+        const history = await tx.adendaManifiesto.findMany({ where: { manifiestoId: manifest.id }, select: { id: true, rectificaId: true, revisiones: true } });
+        if (documentaryResolution(history).resolvedObservations.has(current.id)) {
+          throw new AppError('La observación quedó como antecedente de una rectificación aprobada. Revisá la rectificación.', 409);
+        }
+      }
       const updated = await tx.adendaManifiesto.updateMany({ where: { id: current.id, version: command.version }, data: {
-        version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
+        version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}), fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
       } });
       if (updated.count !== 1) throw new AppError('Otro revisor resolvió esta versión; recargá', 409);
       if (command.decision === 'APROBADA') {
         await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
-          '/manifiestos/' + current.manifiestoId + '/adendas', command.id);
+          '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id,
+          { id: current.id, version: command.version + 1, manifiestoId: manifest.id, numero: manifest.numero });
       }
+      pushIds = await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id,req.user.rol);
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });
-    res.json({ success: true, data: { adenda: present(record, req) } });
+    scheduleCommittedManifestPush(pushIds);
+    res.json({ success: true, data: { adenda: (await presentRecords([record], req))[0] } });
   } catch (error) { next(error); }
 }

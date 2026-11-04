@@ -24,6 +24,7 @@ import { toast } from '../../components/ui/Toast';
 import { Select } from '../../components/ui/Select';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 import api from '../../services/api';
+import { syntheticPreviewHeaders } from '../../services/syntheticPreviewHeaders';
 import { bulkUploadFailureMessage, summarizeBulkUpload, type BulkUploadRowError } from '../../utils/bulkUploadResult';
 
 // Type for upload results
@@ -139,6 +140,7 @@ const CargaMasivaPage: React.FC = () => {
         const token = localStorage.getItem('sitrep_access_token');
         const apiBase = import.meta.env.VITE_API_URL || '/api';
         xhr.open('POST', `${apiBase}/carga-masiva/${tipoSeleccionado}`);
+        for (const [name, value] of Object.entries(syntheticPreviewHeaders())) xhr.setRequestHeader(name, value);
         if (token) {
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }

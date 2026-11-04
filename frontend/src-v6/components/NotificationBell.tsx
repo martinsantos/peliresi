@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { inspectionWorkspaceOwner } from '../utils/inspectionWorkspace';
 import { useNavigate } from 'react-router-dom';
 import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X, MapPin, ClipboardCheck, LifeBuoy } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,7 +16,9 @@ import { getAccessToken } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Notificacion } from '../types/models';
 import { TipoNotificacion } from '../types/models';
-import { resolveNotificationPath } from '../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, needsPersonalManifestChoice } from '../utils/notificationNavigation';
+import { gpsNoticeContext, gpsNoticeTitle, isGpsNotice } from '../utils/gpsNoticeContext';
+import { notificationManifestReference } from '../utils/notificationManifestReference';
 
 // ========================================
 // HELPERS
@@ -47,7 +50,7 @@ function getTypeIcon(type: NotificationType, notice: Notificacion) {
   if (type === 'info' && resolveNotificationPath(notice).includes('/soporte/')) {
     return <LifeBuoy size={16} className="text-primary-700 shrink-0" />;
   }
-  if (type === 'info' && resolveNotificationPath(notice).includes('/inspecciones/')) {
+  if (type === 'info' && /\/(?:requerimientos|(?:mis-)?inspecciones)\//.test(resolveNotificationPath(notice))) {
     return <ClipboardCheck size={16} className="text-primary-700 shrink-0" />;
   }
   switch (type) {
@@ -92,6 +95,21 @@ function formatTimeAgo(dateStr: string): string {
   return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
+/** Only the known coordinate map shortcut is accepted from stored notices. */
+function noticeMapUrl(notif: Notificacion): string | null {
+  try {
+    const value = JSON.parse(notif.datos || '{}').mapsUrl;
+    if (typeof value !== 'string') return null;
+    const url = new URL(value), keys = [...url.searchParams.keys()];
+    if (url.origin !== 'https://maps.google.com' || url.username || url.password || url.pathname !== '/' || url.hash
+      || keys.length !== 1 || keys[0] !== 'q') return null;
+    const pieces = (url.searchParams.get('q') || '').split(',');
+    if (pieces.length !== 2 || pieces.some(piece => !piece.trim())) return null;
+    const [lat, lng] = pieces.map(Number);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? url.toString() : null;
+  } catch { return null; }
+}
+
 // ========================================
 // COMPONENT
 // ========================================
@@ -104,6 +122,7 @@ interface NotificationBellProps {
 
 export const NotificationBell: React.FC<NotificationBellProps> = React.memo(function NotificationBell({ basePath = '', inverse = false }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [panelTop, setPanelTop] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
@@ -114,7 +133,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
 
   // Fetch últimas 5 sin filtrar por leída; badge usa noLeidas del response
   const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['notificaciones', 'bell', currentUser?.id],
+    queryKey: ['notificaciones', 'bell', currentUser?.id, inspectionWorkspaceOwner(currentUser)],
     queryFn: () => notificacionService.list({ limit: 5 }),
     refetchInterval: hasToken ? 30_000 : false,
     staleTime: 15_000,
@@ -128,6 +147,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
+
+    const reposition = () => setPanelTop(buttonRef.current?.getBoundingClientRect().bottom ?? 0);
+    reposition();
+    window.addEventListener('resize', reposition);
+    document.addEventListener('scroll', reposition, true);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -149,24 +173,28 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', reposition);
+      document.removeEventListener('scroll', reposition, true);
     };
   }, [isOpen]);
 
   const handleBellClick = useCallback(() => {
+    setPanelTop(buttonRef.current?.getBoundingClientRect().bottom ?? 0);
     if (!isOpen) void refetch();
     setIsOpen((prev) => !prev);
   }, [isOpen, refetch]);
 
   const handleNotificationClick = useCallback(
     (notif: Notificacion) => {
+      refreshInspectionNotification(notif, queryClient);
       void notificacionService.marcarLeida(notif.id)
         .then(() => queryClient.invalidateQueries({ queryKey: ['notificaciones'] }))
         .catch(() => { /* Keep the notice unread if acknowledgement was not confirmed. */ });
       setIsOpen(false);
 
-      navigate(resolveNotificationPath(notif, basePath));
+      navigate(resolveNotificationPath(notif, basePath, currentUser?.rol, false, needsPersonalManifestChoice(currentUser)));
     },
-    [navigate, queryClient, basePath]
+    [navigate, queryClient, basePath, currentUser]
   );
 
   const handleViewAll = useCallback(() => {
@@ -181,7 +209,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       <button
         ref={buttonRef}
         onClick={handleBellClick}
-        className={'relative flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ' + (inverse ? 'text-white hover:bg-white/15 focus-visible:outline-white' : 'text-neutral-700 hover:bg-neutral-100')}
+        className={'relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors ' + (inverse ? 'text-white hover:bg-white/15 focus-visible:outline-white' : 'text-neutral-700 hover:bg-neutral-100')}
         aria-expanded={isOpen}
         aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
       >
@@ -197,12 +225,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden"
+          role="region" aria-label="Notificaciones recientes"
+          style={{ '--notification-panel-top': `${panelTop}px` } as React.CSSProperties}
+          className="fixed inset-x-[12px] top-[var(--notification-panel-top)] mt-[8px] flex max-h-[calc(100dvh-var(--notification-panel-top)-16px)] flex-col bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-96"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-neutral-900 text-sm">Notificaciones</h3>
+          <div className="flex shrink-0 flex-wrap items-start justify-between gap-[8px] px-[16px] py-[12px] border-b border-neutral-100">
+            <div className="flex min-w-[min(100%,9ch)] flex-1 flex-wrap items-center gap-[8px]">
+              <h3 className="min-w-0 font-semibold text-neutral-900 text-sm [overflow-wrap:anywhere]">Notificaciones</h3>
               {unreadCount > 0 && (
                 <span className="px-1.5 py-0.5 bg-error-100 text-error-700 text-xs font-semibold rounded-full">
                   {unreadCount}
@@ -211,7 +241,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 transition-colors"
+              className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 transition-colors"
               aria-label="Cerrar notificaciones"
             >
               <X size={16} />
@@ -219,7 +249,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-80 min-h-0 overflow-y-auto">
             {isError && <div role="alert" className="border-b border-neutral-200 px-4 py-3 text-sm text-error-800">No se pudieron actualizar los avisos.{items.length > 0 && ' Se muestran los últimos disponibles.'}<button type="button" onClick={() => void refetch()} className="mt-2 block min-h-11 rounded-lg border border-neutral-400 px-3 font-semibold text-neutral-900">Reintentar</button></div>}
             {isPending ? <p role="status" className="px-4 py-6 text-sm text-neutral-700">Cargando avisos…</p> : items.length === 0 && !isError ? (
               <div className="py-10 text-center">
@@ -231,10 +261,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                 {items.map((notif) => {
                   const type = getNotificationType(notif);
                   const isUnread = !notif.leida;
+                  const gpsContext = gpsNoticeContext(notif);
+                  const manifestReference = notificationManifestReference(notif);
+                  const mapsUrl = noticeMapUrl(notif);
 
                   return (
+                    <div key={notif.id}>
                     <button
-                      key={notif.id}
                       onClick={() => handleNotificationClick(notif)}
                       className={`
                         w-full text-left px-4 py-3 hover:bg-neutral-50 transition-colors
@@ -248,34 +281,28 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <p className={`text-sm leading-snug break-words ${isUnread ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-700'}`}>
-                              {notif.titulo}
+                              {gpsNoticeTitle(notif) || notif.titulo}
                             </p>
                             {isUnread && (
                               <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0 mt-1.5" />
                             )}
                           </div>
-                          <p className="text-sm text-neutral-700 mt-1 line-clamp-2">
+                          {manifestReference && <p className="mt-1 text-xs font-semibold text-neutral-700">{manifestReference}</p>}
+                          {gpsContext && <p className="mt-1 text-sm font-medium text-neutral-700">{gpsContext}</p>}
+                          <p className={`text-sm text-neutral-700 mt-1 ${isGpsNotice(notif) ? 'break-words' : 'line-clamp-2'}`}>
                             {notif.mensaje}
                           </p>
-                          {(() => {
-                            try {
-                              const d = notif.datos ? JSON.parse(notif.datos) : null;
-                              if (!d?.mapsUrl) return null;
-                              return (
-                                <a href={d.mapsUrl} target="_blank" rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] text-primary-600 mt-0.5 hover:underline"
-                                  onClick={(e) => e.stopPropagation()}>
-                                  <MapPin size={11} /> Ver ubicacion
-                                </a>
-                              );
-                            } catch { return null; }
-                          })()}
                           <p className="text-xs text-neutral-600 mt-1">
                             {formatTimeAgo(notif.createdAt)}
                           </p>
                         </div>
                       </div>
                     </button>
+                    {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+                      className="ml-14 inline-flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                      <MapPin size={15} aria-hidden="true" /> Ver ubicación del generador
+                    </a>}
+                    </div>
                   );
                 })}
               </div>
@@ -283,10 +310,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           </div>
 
           {/* Footer */}
-          <div className="border-t border-neutral-100 p-2">
+          <div className="shrink-0 border-t border-neutral-100 p-[8px]">
             <button
               onClick={handleViewAll}
-              className="min-h-11 w-full py-2 text-sm font-semibold text-primary-800 hover:bg-primary-50 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
+              className="min-h-[44px] w-full px-[8px] py-[8px] text-sm font-semibold text-primary-800 hover:bg-primary-50 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
             >
               Ver todas las notificaciones
             </button>

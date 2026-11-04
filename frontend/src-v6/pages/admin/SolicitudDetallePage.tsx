@@ -1,16 +1,23 @@
+import { documentReadingOutcome } from '../../utils/documentReadingOutcome';
 /**
  * SITREP v6 - Solicitud Detalle Page (Admin)
  * Review a specific inscription solicitud
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useAdmissionContext } from '../../hooks/useAdmissionContext';
+import { ACTOR_NAMES, APPLICATION_STATES, applicantName, applicationReturn, applicationDeclarationsReadable } from '../../utils/admissionReview';
+import { ApplicationDeclarationSummary } from '../../components/registration/ApplicationDeclarationSummary';
 import {
   ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle, Eye,
   Send, Download, MessageSquare, User, File, Clock,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
-import { FormSkeleton } from '../../components/ui/LoadingState';
+import { QueryContent } from '../../components/ui/QueryContent';
+import { useRecoverableForm } from '../../hooks/useRecoverableForm';
+import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
@@ -28,6 +35,7 @@ import {
 import type { EstadoSolicitud, DocumentoSolicitud, MensajeSolicitud } from '../../types/api';
 import { solicitudService } from '../../services/solicitud.service';
 import { DocumentAnalysis } from '../../components/DocumentAnalysis';
+import { PaymentIdentityReview } from '../../components/PaymentIdentityReview';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
@@ -43,7 +51,7 @@ const ESTADO_CONFIG: Record<EstadoSolicitud, {
 }> = {
   BORRADOR:    { label: 'Borrador',     color: 'neutral' },
   ENVIADA:     { label: 'Enviada',      color: 'info' },
-  EN_REVISION: { label: 'En Revision',  color: 'warning' },
+  EN_REVISION: { label: 'En revisión',  color: 'warning' },
   OBSERVADA:   { label: 'Observada',    color: 'warning' },
   APROBADA:    { label: 'Aprobada',     color: 'success' },
   RECHAZADA:   { label: 'Rechazada',    color: 'error' },
@@ -75,161 +83,176 @@ function parseDatosActor(json: string): Record<string, string> {
   return {};
 }
 
-function fieldLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/[_-]/g, ' ')
-    .replace(/^\w/, c => c.toUpperCase())
-    .trim();
-}
-
 // ── Component ──
 
 const SolicitudDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { owner } = useAdmissionContext();
+  return <SolicitudReview key={owner + ':' + id} />;
+};
 
-  const [messageText, setMessageText] = useState('');
+const validText = (v: unknown): v is string => typeof v === 'string' && v.length <= 5000;
+function ReviewDraftNotice({ draft }: { draft: Pick<ReturnType<typeof useRecoverableForm>, 'conflict' | 'conflictSaved' | 'conflictCount' | 'reload' | 'overwrite' | 'error' | 'saved'> }) {
+  return <div className="space-y-2 text-sm text-neutral-600">
+    {draft.conflict && <DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} />}
+    <p role="status">{draft.error ? 'No pudimos guardar en este dispositivo. Mantené esta pantalla abierta.' : draft.saved ? 'Borrador guardado en este dispositivo. Todavía no enviado.' : 'El texto se enviará sólo al confirmar.'}</p>
+  </div>;
+}
+
+function DocumentReviewDialog({ document, decision, scope, allowed, busy, changed, observed, feedback, onClose, onConfirm }: {
+  document: DocumentoSolicitud; decision: 'APROBADO' | 'RECHAZADO'; scope: string;
+  allowed: boolean; busy: boolean; changed: boolean; observed: boolean; feedback: React.ReactNode;
+  onClose: () => void; onConfirm: (note: string, clear: () => void) => void;
+}) {
+  const note = useRecoverableForm(`${scope}:document:${document.id}:${document.sha256 || 'original'}:${decision}`, document.observaciones || '', validText);
+  const approving = decision === 'APROBADO';
+  return <Modal isOpen onClose={onClose} isBusy={busy} title={approving ? 'Aprobar documento' : 'Rechazar documento'} size="sm">
+    <div className="space-y-4">
+      <p className="font-semibold text-neutral-900 [overflow-wrap:anywhere]">{document.nombre}</p>
+      <p className="text-sm text-neutral-700">{approving ? 'Esta decisión aprueba sólo el documento. La solicitud mantiene su estado hasta que la resuelvas.' : observed ? 'El solicitante ya debe corregir y reenviar el alta. Podés registrar tu revisión del documento; esta decisión no envía otro requerimiento.' : 'Registrá qué debe corregirse. Para pedir correcciones y avisar al solicitante, usá Observar en la solicitud.'}</p>
+      {feedback}
+      {changed ? <p role="alert" className="text-sm text-error-900">El documento cambió. Volvé a la ficha y revisá su estado antes de decidir. Tu texto se conserva.</p> : !allowed && <p role="status" className="text-sm text-neutral-700">Esperá a verificar la solicitud antes de confirmar.</p>}
+      <div>
+        <label htmlFor="document-review-note" className="mb-1 block text-sm font-medium text-neutral-800">Observaciones del documento (opcional)</label>
+        <textarea id="document-review-note" value={note.value} onChange={event => note.update(event.target.value)} maxLength={5000} disabled={busy}
+          rows={4} className="w-full rounded-xl border border-neutral-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary-700" />
+        <ReviewDraftNotice draft={note} />
+      </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" disabled={busy} onClick={onClose}>Volver sin decidir</Button>
+        <Button variant={approving ? 'primary' : 'danger'} disabled={!allowed || changed || busy || note.conflict} isLoading={busy} onClick={() => onConfirm(note.value.trim(), note.clear)}>
+          {approving ? 'Confirmar aprobación del documento' : 'Confirmar rechazo del documento'}
+        </Button>
+      </div>
+    </div>
+  </Modal>;
+}
+
+const SolicitudReview: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation(), mp = useMobilePrefix();
+  const { owner } = useAdmissionContext();
+  const backToList = () => navigate(applicationReturn(location.state, mp('/admin/solicitudes'), owner), { state: { admissionSectionReturn: location.state?.admissionSectionReturn } });
+  const { currentUser } = useAuth();
+  const scope = 'sitrep:application-review:v1:' + owner + ':' + id;
+  const message = useRecoverableForm(scope + ':message-v2', { text: '', requestId: crypto.randomUUID() }, (v): v is { text: string; requestId: string } => !!v && typeof v === 'object' && validText((v as { text?: unknown }).text) && typeof (v as { requestId?: unknown }).requestId === 'string');
+  const observation = useRecoverableForm(scope + ':observation', '', validText);
+  const rejection = useRecoverableForm(scope + ':rejection', '', validText);
+  const messageText = message.value.text, observarText = observation.value, rechazarText = rejection.value;
   const [observarModal, setObservarModal] = useState(false);
-  const [observarText, setObservarText] = useState('');
   const [rechazarModal, setRechazarModal] = useState(false);
-  const [rechazarText, setRechazarText] = useState('');
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
+  const [documentDecision, setDocumentDecision] = useState<{ document: DocumentoSolicitud; decision: 'APROBADO' | 'RECHAZADO' } | null>(null);
   const [readingReceipt, setReadingReceipt] = useState(false);
   const [editingData, setEditingData] = useState(false);
-  const readingInFlight = useRef(false);
-
-  const { data: solicitud, isLoading, refetch } = useSolicitud(id || '');
-  const { data: mensajes } = useMensajesSolicitud(id || '');
-
-  const enviarMensaje = useEnviarMensaje();
-  const revisarSolicitud = useRevisarSolicitud();
-  const observarSolicitud = useObservarSolicitud();
-  const aprobarSolicitud = useAprobarSolicitud();
-  const rechazarSolicitud = useRechazarSolicitud();
-  const revisarDocumento = useRevisarDocumento();
-
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  const [feedback, setFeedback] = useState<{ error: boolean; text: string; documentId?: string } | null>(null);
+  const feedbackRef = useRef<HTMLParagraphElement>(null);
+  const linkedDocumentRef = useRef<HTMLDivElement>(null);
+  const missingDocumentRef = useRef<HTMLParagraphElement>(null);
+  const locatedDocument = useRef<string | null>(null);
+  const linkedDocumentId = new URLSearchParams(location.search).get('documento');
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [mensajes]);
+    const target = feedbackRef.current;
+    if (!feedback || !target) return;
+    target.focus({ preventScroll: Boolean(feedback.documentId) });
+    if (feedback.documentId) target.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+  }, [feedback]);
 
-  // Auto-mark as EN_REVISION when admin opens an ENVIADA solicitud
+  const detail = useSolicitud(id || ''), messages = useMensajesSolicitud(id || '');
+  const { data: solicitud, refetch } = detail;
+  const mensajes = messages.data;
+  const enviarMensaje = useEnviarMensaje(), revisarSolicitud = useRevisarSolicitud();
+  const observarSolicitud = useObservarSolicitud(), aprobarSolicitud = useAprobarSolicitud();
+  const rechazarSolicitud = useRechazarSolicitud(), revisarDocumento = useRevisarDocumento();
+  const fresh = !!solicitud && !detail.isError && !detail.isPending && !detail.isFetching;
+  const linkedDocumentMissing = !!linkedDocumentId && fresh && Array.isArray(solicitud?.documentos)
+    && !solicitud.documentos.some(doc => doc.id === linkedDocumentId);
+  useEffect(() => { locatedDocument.current = null; }, [linkedDocumentId, id, location.key]);
   useEffect(() => {
-    if (solicitud?.estado === 'ENVIADA' && id && currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)) {
-      revisarSolicitud.mutate(id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [solicitud?.estado, solicitud?.tipoActor, currentUser?.rol, id]);
+    if (!linkedDocumentId || !fresh || !Array.isArray(solicitud?.documentos) || locatedDocument.current === linkedDocumentId
+      || documentDecision || observarModal || rechazarModal || confirmarAprobar) return;
+    const target = linkedDocumentMissing ? missingDocumentRef.current : linkedDocumentRef.current;
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+    locatedDocument.current = linkedDocumentId;
+  }, [linkedDocumentId, location.key, fresh, solicitud?.documentos, linkedDocumentMissing, documentDecision, observarModal, rechazarModal, confirmarAprobar]);
+  const reviewer = !!solicitud && !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol);
+  const canDecide = fresh && reviewer && solicitud?.estado === 'EN_REVISION' && !busy;
+  const canApprove = canDecide && applicationDeclarationsReadable(solicitud);
+  const canAct = fresh && reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud!.estado) && !busy;
+  const canMessage = fresh && reviewer && !messages.isError && !messages.isPending && !messages.isFetching && !busy;
 
-  // ── Handlers ──
-  const handleRetryReading = async (docId: string) => {
-    if (!id || !solicitud || !currentUser || !['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol) || readingInFlight.current) return;
-    readingInFlight.current = true; setReadingReceipt(true);
-    try { await solicitudService.analizarDocumento(id, docId); await refetch(); }
-    catch (error) { toast.error('Lectura del comprobante', getApiErrorMessage(error, 'No se pudo reintentar. El original sigue guardado.')); }
-    finally { readingInFlight.current = false; setReadingReceipt(false); }
+  const run = async <T,>(allowed: boolean, action: () => Promise<T>, confirmed: () => void, success: string | ((result: T) => string), documentId?: string) => {
+    if (!allowed || running.current) return;
+    running.current = true; setBusy(true); setFeedback(null);
+    try { const result = await action(); confirmed(); setFeedback({ error: false, text: typeof success === 'function' ? success(result) : success, documentId }); }
+    catch (error) { setFeedback({ error: true, documentId, text: getApiErrorMessage(error, 'No pudimos confirmar la acción. Tus textos se conservan; revisá el estado actualizado antes de reintentar.') }); }
+    finally { await refetch(); running.current = false; setBusy(false); }
+  };
+  const handleRetryReading = (docId: string) => run(canAct, async () => {
+    setReadingReceipt(true);
+    try { return await solicitudService.analizarDocumento(id!, docId); } finally { setReadingReceipt(false); }
+  }, () => {}, document => documentReadingOutcome(document?.analisis), docId);
+  const handleSendMessage = () => run(canMessage && !!messageText.trim() && !message.conflict,
+    () => enviarMensaje.mutateAsync({ solicitudId: id!, contenido: messageText.trim(), clientMessageId: message.value.requestId }),
+    () => { message.clear(); }, 'Mensaje enviado. Quedó registrado en la conversación.');
+  const handleObservar = () => run(canDecide && !!observarText.trim() && !observation.conflict,
+    () => observarSolicitud.mutateAsync({ id: id!, mensaje: observarText.trim(), expectedUpdatedAt: solicitud?.updatedAt }),
+    () => { observation.clear(); setObservarModal(false); }, 'Observaciones enviadas. El solicitante debe corregir y reenviar.');
+  const handleAprobar = () => run(canApprove,
+    () => aprobarSolicitud.mutateAsync({ id: id!, expectedUpdatedAt: solicitud?.updatedAt }),
+    () => { setConfirmarAprobar(false); observation.clear(); rejection.clear(); }, 'Solicitud aprobada. El alta quedó habilitada.');
+  const handleRechazar = () => run(canDecide && !!rechazarText.trim() && !rejection.conflict,
+    () => rechazarSolicitud.mutateAsync({ id: id!, motivoRechazo: rechazarText.trim(), expectedUpdatedAt: solicitud?.updatedAt }),
+    () => { rejection.clear(); observation.clear(); setRechazarModal(false); }, 'Solicitud rechazada. El motivo quedó registrado.');
+  const currentDocument = documentDecision && solicitud?.documentos?.find(doc => doc.id === documentDecision.document.id);
+  const documentChanged = !!documentDecision && (!currentDocument || currentDocument.estado !== documentDecision.document.estado || (currentDocument.sha256 || null) !== (documentDecision.document.sha256 || null));
+  const handleDocReview = (note: string, clear: () => void) => {
+    if (!documentDecision) return;
+    const { document, decision } = documentDecision;
+    return run(canAct && !documentChanged,
+      () => revisarDocumento.mutateAsync({ solicitudId: id!, docId: document.id, estado: decision, observaciones: note,
+        expectedDocument: { estado: document.estado, sha256: document.sha256 || null } }),
+      () => { clear(); setDocumentDecision(null); },
+      decision === 'APROBADO' ? 'Documento aprobado. La solicitud mantiene su estado.' : solicitud?.estado === 'OBSERVADA' ? 'Documento rechazado. La solicitud sigue esperando la corrección del solicitante.' : 'Documento rechazado. Para pedir correcciones al solicitante, observá la solicitud.', document.id);
   };
 
-  const sendingMessage = useRef(false);
-  const handleSendMessage = async () => {
-    if (!id || !messageText.trim() || sendingMessage.current) return;
-    sendingMessage.current = true;
-    try {
-      await enviarMensaje.mutateAsync({ solicitudId: id, contenido: messageText.trim() });
-      setMessageText('');
-    } catch {
-      toast.error('Error', 'No se pudo enviar el mensaje');
-    } finally {
-      sendingMessage.current = false;
-    }
-  };
-
-  const handleObservar = async () => {
-    if (!id || !observarText.trim()) return;
-    try {
-      await observarSolicitud.mutateAsync({ id, mensaje: observarText.trim() });
-      toast.success('Observada', 'La solicitud fue marcada con observaciones');
-      setObservarModal(false);
-      setObservarText('');
-    } catch {
-      toast.error('Error', 'No se pudo observar la solicitud');
-    }
-  };
-
-  const handleAprobar = async () => {
-    if (!id) return;
-    try {
-      await aprobarSolicitud.mutateAsync(id);
-      toast.success('Aprobada', 'La solicitud fue aprobada exitosamente');
-      setConfirmarAprobar(false);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo aprobar');
-    }
-  };
-
-  const handleRechazar = async () => {
-    if (!id || !rechazarText.trim()) return;
-    try {
-      await rechazarSolicitud.mutateAsync({ id, motivoRechazo: rechazarText.trim() });
-      toast.success('Rechazada', 'La solicitud fue rechazada');
-      setRechazarModal(false);
-      setRechazarText('');
-    } catch {
-      toast.error('Error', 'No se pudo rechazar la solicitud');
-    }
-  };
-
-  const handleDocReview = async (docId: string, estado: 'APROBADO' | 'RECHAZADO') => {
-    if (!id) return;
-    try {
-      await revisarDocumento.mutateAsync({ solicitudId: id, docId, estado });
-      toast.success('Documento actualizado', `Documento ${estado.toLowerCase()}`);
-    } catch {
-      toast.error('Error', 'No se pudo actualizar el documento');
-    }
-  };
-
-  // ── Loading ──
-
-  if (isLoading && !solicitud) {
-    return <FormSkeleton label="Cargando solicitud…" fields={8} />;
-  }
-
-  if (!solicitud) {
-    return (
-      <Card><div role="alert" className="space-y-3">
-        <p>No se pudo cargar la solicitud.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
-          <Button variant="ghost" onClick={() => navigate('/admin/solicitudes')}>Volver a solicitudes</Button>
-        </div>
-      </div></Card>
-    );
-  }
+  const feedbackPanel = feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={'rounded-lg border p-3 text-sm ' + (feedback.error ? 'border-error-200 bg-error-50 text-error-900' : 'border-primary-200 bg-primary-50 text-primary-900')}>{feedback.text}</p>;
+  // A failed fresh read must hide cached private data and decision controls.
+  if (detail.isPending || detail.isError || !solicitud) return <div className="space-y-4">
+    <Button variant="outline" onClick={backToList}>Volver a solicitudes</Button>
+    {feedbackPanel}
+    <QueryContent query={detail} loading="Cargando solicitud" error="No pudimos verificar la solicitud. Tus borradores se conservan; las decisiones esperan una consulta actualizada." retryLabel="Actualizar solicitud">
+      {!solicitud && <p role="alert">Solicitud no disponible.</p>}
+    </QueryContent>
+  </div>;
 
   const eCfg = ESTADO_CONFIG[solicitud.estado] || ESTADO_CONFIG.ENVIADA;
   const datosActor = parseDatosActor(solicitud.datosActor || '{}');
   const declaredDrivers = fleetRows(datosActor.choferesJson, EMPTY_DRIVER);
   const documentos = solicitud.documentos || [];
-  const canAct = !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)
-    && (solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA');
+  const statusText = APPLICATION_STATES[solicitud.estado]?.next || 'Estado por verificar';
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Back + Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/admin/solicitudes')}
-          className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+          type="button"
+          aria-label="Volver a solicitudes de inscripción"
+          onClick={backToList}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
         >
           <ArrowLeft size={20} className="text-neutral-500" />
         </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-neutral-900">
-              {solicitud.usuario?.nombre || 'Candidato'}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-semibold text-neutral-900 [overflow-wrap:anywhere]">
+              {applicantName(solicitud)}
             </h2>
             <Badge
               variant="default"
@@ -241,20 +264,36 @@ const SolicitudDetallePage: React.FC = () => {
               {eCfg.label}
             </Badge>
           </div>
-          <p className="text-sm text-neutral-500 mt-0.5">
-            {solicitud.usuario?.email} &middot; {solicitud.tipoActor} &middot; Creada{' '}
+          <p className="text-sm text-neutral-600 mt-0.5 [overflow-wrap:anywhere]">
+            {solicitud.usuario?.email} &middot; {ACTOR_NAMES[solicitud.tipoActor]} &middot; Creada{' '}
             {new Date(solicitud.createdAt).toLocaleDateString('es-AR')}
           </p>
         </div>
       </div>
 
+      {!observarModal && !rechazarModal && !confirmarAprobar && !documentDecision && (!feedback?.documentId || !documentos.some(doc => doc.id === feedback.documentId)) && feedbackPanel}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary-100 bg-primary-50 p-4">
+        <p className="min-w-0 flex-1 text-sm text-primary-900">{statusText}</p>
+        {solicitud.estado === 'ENVIADA' && reviewer && <Button disabled={!fresh || busy} onClick={() => void run(fresh && reviewer, () => revisarSolicitud.mutateAsync({ id: id!, expectedUpdatedAt: solicitud?.updatedAt }), () => {}, 'Revisión iniciada. Podés revisar documentos y resolver la solicitud.')}>Iniciar revisión</Button>}
+        {detail.isFetching && <span role="status" className="text-sm">Actualizando solicitud…</span>}
+      </div>
+
+      {solicitud.estado === 'RECHAZADA' && solicitud.motivoRechazo && <section aria-label="Motivo de rechazo" className="rounded-lg border border-error-200 bg-error-50 p-4">
+        <h3 className="text-sm font-semibold text-error-900">Motivo de rechazo</h3>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-error-900 [overflow-wrap:anywhere]">{solicitud.motivoRechazo}</p>
+      </section>}
+      {solicitud.estado === 'OBSERVADA' && solicitud.observaciones && <section aria-label="Correcciones solicitadas" className="rounded-lg border border-warning-200 bg-warning-50 p-4">
+        <h3 className="text-sm font-semibold text-warning-900">Correcciones solicitadas</h3>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-warning-900 [overflow-wrap:anywhere]">{solicitud.observaciones}</p>
+      </section>}
+
       <AdministrativeTEF actorType={solicitud.tipoActor} identity={solicitud.id}
         declaration={datosActor}
-        corrientesY={(datosActor.corrientesControl || datosActor.corrientesY || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
+        corrientesY={((solicitud.tipoActor === 'GENERADOR' ? datosActor.corrientesControl : solicitud.tipoActor === 'OPERADOR' ? datosActor.corrientesY : '') || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
         tieneISO={!!datosActor.certificacionISO} />
 
-      {/* 3-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Documents and correspondence retain one common workspace. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         {/* Column 1: Datos del Actor */}
         <Card padding="none">
           <div className="px-5 py-4 border-b border-neutral-200 flex flex-wrap items-center gap-2">
@@ -263,39 +302,20 @@ const SolicitudDetallePage: React.FC = () => {
             {canAct && solicitud.estado === 'EN_REVISION' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditingData(true)}>Corregir datos</Button>}
           </div>
           <div className="p-5 space-y-3">
-            {Object.keys(datosActor).length === 0 ? (
-              <p className="text-sm text-neutral-400">Sin datos cargados</p>
-            ) : (
-              Object.entries(datosActor).filter(([key]) => !['choferesJson', 'vehiculosJson'].includes(key)).map(([key, value]) => (
-                <div key={key}>
-                  <p className="text-xs text-neutral-500 mb-0.5">{fieldLabel(key)}</p>
-                  <p className="text-sm font-medium text-neutral-800 break-words">{value || '-'}</p>
-                </div>
-              ))
-            )}
+            <ApplicationDeclarationSummary raw={solicitud.datosActor} title="Datos del actor" grouped onRetry={() => void refetch()} retrying={!fresh || busy} />
 
             <RegistrationFleetSummary form={datosActor} />
             {/* Extra JSON sections */}
             {solicitud.datosResiduos && (
               <div className="pt-3 border-t border-neutral-100">
                 <p className="text-xs font-semibold text-neutral-600 mb-2">Datos de Residuos</p>
-                {Object.entries(parseDatosActor(solicitud.datosResiduos)).map(([k, v]) => (
-                  <div key={k} className="mb-2">
-                    <p className="text-xs text-neutral-500">{fieldLabel(k)}</p>
-                    <p className="text-sm text-neutral-800 break-words">{v || '-'}</p>
-                  </div>
-                ))}
+                <ApplicationDeclarationSummary raw={solicitud.datosResiduos} title="Datos de residuos" onRetry={() => void refetch()} retrying={!fresh || busy} />
               </div>
             )}
             {solicitud.datosRegulatorio && (
               <div className="pt-3 border-t border-neutral-100">
                 <p className="text-xs font-semibold text-neutral-600 mb-2">Datos Regulatorios</p>
-                {Object.entries(parseDatosActor(solicitud.datosRegulatorio)).map(([k, v]) => (
-                  <div key={k} className="mb-2">
-                    <p className="text-xs text-neutral-500">{fieldLabel(k)}</p>
-                    <p className="text-sm text-neutral-800 break-words">{v || '-'}</p>
-                  </div>
-                ))}
+                <ApplicationDeclarationSummary raw={solicitud.datosRegulatorio} title="Datos regulatorios" onRetry={() => void refetch()} retrying={!fresh || busy} />
               </div>
             )}
           </div>
@@ -309,13 +329,18 @@ const SolicitudDetallePage: React.FC = () => {
             <Badge variant="soft" color="neutral" size="sm">{documentos.length}</Badge>
           </div>
           <div className="p-4 space-y-3">
+            {linkedDocumentMissing && <p ref={missingDocumentRef} tabIndex={-1} role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-800">El documento indicado en el aviso no está disponible en esta solicitud.</p>}
             {documentos.length === 0 ? (
               <p className="text-sm text-neutral-400 text-center py-6">Sin documentos</p>
             ) : (
               documentos.map((doc: DocumentoSolicitud) => {
                 const dCfg = DOC_ESTADO_CONFIG[doc.estado] || DOC_ESTADO_CONFIG.PENDIENTE;
                 return (
-                  <div key={doc.id} className="border border-neutral-200 rounded-xl p-3 space-y-2">
+                  <div key={doc.id} role="group" aria-label={'Documento: ' + doc.nombre}
+                    ref={doc.id === linkedDocumentId ? linkedDocumentRef : undefined} tabIndex={doc.id === linkedDocumentId ? -1 : undefined}
+                    className={'border rounded-xl p-3 space-y-2 ' + (doc.id === linkedDocumentId ? 'border-primary-300 bg-primary-50 outline-none focus-visible:ring-2 focus-visible:ring-primary-700' : 'border-neutral-200')}>
+                    {doc.id === linkedDocumentId && <p className="text-sm font-semibold text-primary-800">Documento indicado en el aviso</p>}
+                    {doc.id === linkedDocumentId && <p className="text-sm text-neutral-700">Inscripción: {ACTOR_NAMES[solicitud.tipoActor] || solicitud.tipoActor}</p>}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-neutral-800 truncate" title={doc.nombre}>
@@ -333,14 +358,19 @@ const SolicitudDetallePage: React.FC = () => {
                       <Badge variant="soft" color={dCfg.color} size="sm">{dCfg.label}</Badge>
                     </div>
 
+                    {doc.tipo === 'FACTURA_ELECTRICA' && doc.estado === 'PENDIENTE' && solicitud.estado === 'APROBADA' && ['GENERADOR', 'OPERADOR'].includes(solicitud.tipoActor) && (
+                      <p className="text-sm text-neutral-700">El alta está aprobada; la revisión de esta factura sigue pendiente.</p>
+                    )}
                     {doc.observaciones && (
                       <p className="text-xs text-neutral-500 bg-neutral-50 px-2 py-1 rounded">
                         {doc.observaciones}
                       </p>
                     )}
-                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} retrying={readingReceipt} onRetry={canAct && (doc.tipo === 'COMPROBANTE_PAGO' || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
+                    {!documentDecision && feedback?.documentId === doc.id && feedbackPanel}
+                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
+                    {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         aria-label={`Descargar ${doc.nombre}`}
@@ -353,22 +383,22 @@ const SolicitudDetallePage: React.FC = () => {
                       {doc.estado === 'PENDIENTE' && canAct && (
                         <>
                           <button
-                            onClick={() => handleDocReview(doc.id, 'APROBADO')}
+                            onClick={() => { setFeedback(null); setDocumentDecision({ document: { ...doc }, decision: 'APROBADO' }); }}
                             aria-label={`Aprobar documento ${doc.nombre}`}
-                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-green-800 hover:bg-green-50 focus-visible:ring-2 focus-visible:ring-primary-700"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-green-800 hover:bg-green-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Aprobar documento"
                             disabled={revisarDocumento.isPending}
                           >
-                            <CheckCircle size={13} className="text-green-600" />
+                            <CheckCircle size={16} aria-hidden="true" /> Aprobar
                           </button>
                           <button
-                            onClick={() => handleDocReview(doc.id, 'RECHAZADO')}
+                            onClick={() => { setFeedback(null); setDocumentDecision({ document: { ...doc }, decision: 'RECHAZADO' }); }}
                             aria-label={`Rechazar documento ${doc.nombre}`}
-                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-red-800 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-primary-700"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-red-800 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Rechazar documento"
                             disabled={revisarDocumento.isPending}
                           >
-                            <XCircle size={13} className="text-red-600" />
+                            <XCircle size={16} aria-hidden="true" /> Rechazar
                           </button>
                         </>
                       )}
@@ -380,8 +410,8 @@ const SolicitudDetallePage: React.FC = () => {
           </div>
         </Card>
 
-        {/* Column 3: Mensajes */}
-        <Card padding="none" className="flex flex-col">
+        {/* Correspondence follows the document review at full width. */}
+        <Card padding="none" className="flex min-w-0 flex-col xl:col-span-2">
           <div className="px-5 py-4 border-b border-neutral-200 flex items-center gap-2">
             <MessageSquare size={16} className="text-neutral-500" />
             <h3 className="font-semibold text-neutral-800">Mensajes</h3>
@@ -391,11 +421,12 @@ const SolicitudDetallePage: React.FC = () => {
           </div>
 
           <div className="flex-1 max-h-96 overflow-y-auto p-4 space-y-3">
+            <QueryContent query={messages} loading="Cargando conversación" error="No pudimos consultar los mensajes. Tu borrador se conserva." retryLabel="Reintentar mensajes">
             {(!mensajes || mensajes.length === 0) ? (
               <p className="text-center text-sm text-neutral-400 py-6">No hay mensajes</p>
             ) : (
               mensajes.map((msg: MensajeSolicitud) => {
-                const isAdmin = msg.autorRol === 'ADMIN';
+                const isAdmin = msg.autorRol === 'ADMIN' || msg.autorRol.startsWith('ADMIN_');
                 return (
                   <div key={msg.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[85%] rounded-xl px-4 py-2.5 ${
@@ -407,7 +438,7 @@ const SolicitudDetallePage: React.FC = () => {
                         <span className={`text-[10px] font-semibold uppercase ${
                           isAdmin ? 'text-primary-600' : 'text-neutral-500'
                         }`}>
-                          {isAdmin ? 'Admin' : 'Candidato'}
+                          {isAdmin ? 'Administración' : 'Solicitante'}
                         </span>
                         <span className="text-[10px] text-neutral-400">
                           {new Date(msg.createdAt).toLocaleDateString('es-AR', {
@@ -415,86 +446,103 @@ const SolicitudDetallePage: React.FC = () => {
                           })}
                         </span>
                       </div>
-                      <p className="text-sm text-neutral-800">{msg.contenido}</p>
+                      <p className="whitespace-pre-wrap text-sm text-neutral-800 [overflow-wrap:anywhere]">{msg.contenido}</p>
                     </div>
                   </div>
                 );
               })
             )}
-            <div ref={messagesEndRef} />
+            </QueryContent>
           </div>
 
           {/* Compose */}
           <div className="px-4 py-3 border-t border-neutral-200 flex gap-2">
             <input
               type="text"
+              aria-label="Mensaje sobre la solicitud"
               value={messageText}
-              onChange={e => setMessageText(e.target.value)}
+              onChange={e => message.update({ text: e.target.value, requestId: crypto.randomUUID() })}
+              maxLength={5000}
+              disabled={!canMessage}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-              className="flex-1 h-9 px-3 rounded-lg border border-neutral-200 text-sm focus:border-primary-500 focus:outline-none"
+              className="min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-neutral-200 text-base focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-700"
               placeholder="Escribe un mensaje..."
             />
             <Button
               variant="primary"
               size="sm"
               onClick={handleSendMessage}
-              disabled={!messageText.trim() || enviarMensaje.isPending}
+              aria-label="Enviar mensaje sobre la solicitud"
+              className="min-w-11 shrink-0"
+              disabled={!canMessage || !messageText.trim() || message.conflict}
               isLoading={enviarMensaje.isPending}
             >
               <Send size={14} />
             </Button>
           </div>
+          {reviewer && <div className="px-4 pb-3"><ReviewDraftNotice draft={message} /></div>}
         </Card>
       </div>
 
       {/* Action Bar */}
-      {editingData && canAct && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor key={solicitud.id} application={solicitud} onClose={() => setEditingData(false)} onSaved={async () => { const current = await refetch(); if (current.isError) throw current.error; }} />}
-      {canAct && (
+      {editingData && reviewer && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor key={solicitud.id} application={solicitud} readOnly={!fresh || busy} onClose={() => setEditingData(false)} onConfirmed={() => setFeedback({ error: false, text: 'Corrección guardada. Los datos se actualizaron; la solicitud sigue en revisión.' })} onSaved={async () => { const current = await refetch(); if (current.isError) throw current.error; }} />}
+      {reviewer && solicitud.estado === 'EN_REVISION' && (
         <Card className="!bg-neutral-50 flex items-center justify-end gap-3 flex-wrap">
           <Button
             variant="primary"
             leftIcon={<CheckCircle size={16} />}
-            onClick={() => setConfirmarAprobar(true)}
-            disabled={aprobarSolicitud.isPending}
+            onClick={() => { setFeedback(null); setConfirmarAprobar(true); }}
+            disabled={!canApprove}
           >
             Aprobar
           </Button>
           <Button
             variant="outline"
             leftIcon={<AlertTriangle size={16} />}
-            onClick={() => setObservarModal(true)}
+            onClick={() => { setFeedback(null); setObservarModal(true); }}
+            disabled={!canDecide}
           >
             Observar
           </Button>
           <Button
             variant="danger"
             leftIcon={<XCircle size={16} />}
-            onClick={() => setRechazarModal(true)}
+            onClick={() => { setFeedback(null); setRechazarModal(true); }}
+            disabled={!canDecide}
           >
             Rechazar
           </Button>
         </Card>
       )}
 
+      {documentDecision && <DocumentReviewDialog key={`${documentDecision.document.id}:${documentDecision.document.sha256}:${documentDecision.decision}`}
+        document={documentDecision.document} decision={documentDecision.decision} scope={scope} allowed={canAct} busy={busy} changed={documentChanged} observed={solicitud.estado === 'OBSERVADA'}
+        feedback={feedback?.documentId === documentDecision.document.id ? feedbackPanel : null} onClose={() => setDocumentDecision(null)} onConfirm={handleDocReview} />}
+
       {/* Confirm Aprobar Modal */}
       {confirmarAprobar && (
-        <Modal isOpen onClose={() => setConfirmarAprobar(false)} title="Confirmar Aprobacion" size="sm">
+        <Modal isOpen onClose={() => setConfirmarAprobar(false)} isBusy={busy} title="Confirmar aprobación" size="sm">
           <div className="space-y-4">
+            {feedbackPanel}
+            {!canDecide && <p role="status" className="text-sm">Esperá a verificar el estado. Sólo se puede resolver una solicitud en revisión.</p>}
+            {canDecide && !canApprove && <p role="alert" className="text-sm text-error-900">No se puede aprobar sin una declaración legible. Actualizá los datos de la solicitud.</p>}
             <p className="text-sm text-neutral-600">
               Vas a aprobar la solicitud de <strong>{solicitud.usuario?.nombre}</strong> como{' '}
-              <strong>{solicitud.tipoActor}</strong>. Esto creara el actor y habilitara la cuenta.
+              <strong>{solicitud.tipoActor}</strong>. Esto habilitará el alta de esa actividad.
             </p>
+            {import.meta.env.VITE_ENTERPRISE_ENABLED === 'true' && <p className="text-sm text-neutral-700">La cuenta titular, con correo verificado, quedará vinculada al CUIT como responsable ante SITREP. Podrá autorizar a una segunda persona. Los demás roles conservan su revisión y no agregan cupos.</p>}
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirmarAprobar(false)}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => setConfirmarAprobar(false)}>
                 Cancelar
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleAprobar}
+                disabled={!canApprove}
                 isLoading={aprobarSolicitud.isPending}
               >
-                Confirmar Aprobacion
+                Confirmar aprobación
               </Button>
             </div>
           </div>
@@ -503,34 +551,39 @@ const SolicitudDetallePage: React.FC = () => {
 
       {/* Observar Modal */}
       {observarModal && (
-        <Modal isOpen onClose={() => setObservarModal(false)} isBusy={observarSolicitud.isPending} title="Observar Solicitud" size="sm">
+        <Modal isOpen onClose={() => setObservarModal(false)} isBusy={busy} title="Solicitar correcciones" size="sm">
           <div className="space-y-4">
+            {feedbackPanel}
+            {!canDecide && <p role="status" className="text-sm">Esperá a verificar el estado. Sólo se puede resolver una solicitud en revisión.</p>}
             <p className="text-sm text-neutral-600">
-              La solicitud volvera al candidato con tus observaciones para que corrija y re-envie.
+              El solicitante recibirá tus observaciones para corregir y reenviar.
             </p>
             <div>
               <label htmlFor="solicitud-observaciones" className="block text-sm font-medium text-neutral-700 mb-1">Observaciones *</label>
               <textarea
                 id="solicitud-observaciones"
                 value={observarText}
-                onChange={e => setObservarText(e.target.value)}
+                onChange={e => observation.update(e.target.value)}
+                maxLength={5000}
+                disabled={!canDecide}
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
                 rows={3}
-                placeholder="Describe las correcciones necesarias..."
+                placeholder="Describí las correcciones necesarias..."
               />
+              <ReviewDraftNotice draft={observation} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setObservarModal(false); setObservarText(''); }}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => { setObservarModal(false); }}>
                 Cancelar
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleObservar}
-                disabled={!observarText.trim() || observarSolicitud.isPending}
+                disabled={!canDecide || !observarText.trim() || observation.conflict}
                 isLoading={observarSolicitud.isPending}
               >
-                Enviar Observaciones
+                Enviar observaciones
               </Button>
             </div>
           </div>
@@ -539,34 +592,39 @@ const SolicitudDetallePage: React.FC = () => {
 
       {/* Rechazar Modal */}
       {rechazarModal && (
-        <Modal isOpen onClose={() => setRechazarModal(false)} isBusy={rechazarSolicitud.isPending} title="Rechazar Solicitud" size="sm">
+        <Modal isOpen onClose={() => setRechazarModal(false)} isBusy={busy} title="Rechazar Solicitud" size="sm">
           <div className="space-y-4">
+            {feedbackPanel}
+            {!canDecide && <p role="status" className="text-sm">Esperá a verificar el estado. Sólo se puede resolver una solicitud en revisión.</p>}
             <p className="text-sm text-neutral-600">
-              Rechazar la solicitud de <strong>{solicitud.usuario?.nombre}</strong>. Esta accion es definitiva.
+              Rechazar la solicitud de <strong>{solicitud.usuario?.nombre}</strong>. La decisión y su motivo quedarán registrados.
             </p>
             <div>
               <label htmlFor="solicitud-motivo-rechazo" className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
               <textarea
                 id="solicitud-motivo-rechazo"
                 value={rechazarText}
-                onChange={e => setRechazarText(e.target.value)}
+                onChange={e => rejection.update(e.target.value)}
+                maxLength={5000}
+                disabled={!canDecide}
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
                 rows={3}
-                placeholder="Indique el motivo del rechazo..."
+                placeholder="Indicá el motivo del rechazo..."
               />
+              <ReviewDraftNotice draft={rejection} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setRechazarModal(false); setRechazarText(''); }}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => { setRechazarModal(false); }}>
                 Cancelar
               </Button>
               <Button
                 variant="danger"
                 size="sm"
                 onClick={handleRechazar}
-                disabled={!rechazarText.trim() || rechazarSolicitud.isPending}
+                disabled={!canDecide || !rechazarText.trim() || rejection.conflict}
                 isLoading={rechazarSolicitud.isPending}
               >
-                Confirmar Rechazo
+                Confirmar rechazo
               </Button>
             </div>
           </div>

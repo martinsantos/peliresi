@@ -230,7 +230,7 @@ try {
   await logout(); await login('operador');
   await page.goto(origin + '/app/manifiestos/' + manifestId);
   const operatorAdenda = await recordOrdinaryAddendum(page, hideKeyboard);
-  await mutate('Confirmar Recepcion', 'confirmar-recepcion');
+  await mutate('Confirmar recepción', 'confirmar-recepcion');
   await page.getByRole('button', { name: 'Registrar Tratamiento', exact: true }).tap();
   await mutate('Confirmar Tratamiento', 'tratamiento');
   await mutate('Cerrar Manifiesto', 'cerrar');

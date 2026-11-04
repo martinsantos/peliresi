@@ -85,7 +85,7 @@ try{
    await dialog.getByRole('button',{name:'Usar firma',exact:true}).click();await postClick('/'+id+'/firmar',()=>dialog.getByRole('button',{name:'Confirmar y Firmar',exact:true}).click());await proof('manifest-signed');
    await asRole('Transportistas');await goto('/manifiestos/'+id);await postClick('/'+id+'/confirmar-retiro',()=>page.getByRole('button',{name:'Confirmar retiro',exact:true}).click());
    await page.getByRole('button',{name:'Confirmar entrega',exact:true}).click();await postClick('/'+id+'/confirmar-entrega',()=>page.getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click());
-   await asRole('Operadores');await goto('/manifiestos/'+id);await postClick('/'+id+'/confirmar-recepcion',()=>page.getByRole('button',{name:'Confirmar Recepcion',exact:true}).click());
+   await asRole('Operadores');await goto('/manifiestos/'+id);await postClick('/'+id+'/confirmar-recepcion',()=>page.getByRole('button',{name:'Confirmar recepción',exact:true}).click());
    await page.getByRole('button',{name:'Registrar Tratamiento',exact:true}).click();const treatment=page.getByRole('dialog',{name:'Registrar Tratamiento',exact:true});await treatment.getByPlaceholder('Observaciones del tratamiento...').fill('CAP 5 · Ensayo '+surface+' sin validez oficial');
    await postClick('/'+id+'/tratamiento',()=>treatment.getByRole('button',{name:'Confirmar Tratamiento',exact:true}).click());await postClick('/'+id+'/cerrar',()=>page.getByRole('button',{name:'Cerrar Manifiesto',exact:true}).click());await page.reload();
    await expect(page.getByRole('button',{name:'Descargar Certificado',exact:true})).toBeDisabled();await expect(page.getByText('Capacitación: no se emiten documentos oficiales.')).toBeVisible();await proof('manifest-closed');

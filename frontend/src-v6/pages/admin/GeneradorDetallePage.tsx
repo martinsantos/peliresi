@@ -1,3 +1,8 @@
+import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
+import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
+import { formatActorCalendarDate, formatActorEventDate } from '../../utils/actorCalendarDate';
+import { QueryContent } from '../../components/ui/QueryContent';
+import { LoadingIndicator } from '../../components/ui/LoadingState';
 /**
  * SITREP v6 - Generador Detail Page (5 tabs)
  * ============================================
@@ -7,8 +12,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { actorInspectionAccess } from '../../utils/actorReadAccess';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
   CheckCircle, AlertTriangle, Biohazard, Shield, FileText,
@@ -28,10 +33,11 @@ import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import DocumentUpload from '../../components/DocumentUpload';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
-import { generadorFiscalService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
+import { generadorFiscalService, documentoIdentityService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorSummary } from '../../components/ActorSummary';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 // ===== Inline CRUD Modal =====
@@ -140,9 +146,14 @@ const GeneradorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedFiscalYear = searchParams.get('ejercicio');
+  const fiscalYear = requestedFiscalYear && /^\d{4}$/.test(requestedFiscalYear)
+    && Number(requestedFiscalYear) >= 2000 && Number(requestedFiscalYear) <= 2100 ? Number(requestedFiscalYear) : null;
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   const canEdit = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_GENERADOR';
+  const detailTabs = useActorDetailNavigation(["info","residuos","fiscal","ddjj","historial"].concat(actorInspectionAccess(currentUser, 'GENERADOR', id) ? ['inspecciones'] : []));
   const showInspections = Boolean(actorInspectionAccess(currentUser, 'GENERADOR', id));
   // Removed isMobile — React Router handles basename
 
@@ -152,10 +163,13 @@ const GeneradorDetallePage: React.FC = () => {
   const { data: enrichmentData } = useGeneradoresEnrichment();
   const GENERADORES_DATA = enrichmentData?.generadores || {};
 
-  const { data: apiGenerador, isLoading } = useGenerador(id || '');
-  const { data: pagos = [] } = usePagosTEF(id || '');
-  const { data: ddjjList = [] } = useDDJJ(id || '');
-  const { data: documentos = [] } = useDocumentos(id || '');
+  const { data: apiGenerador, isLoading, refetch } = useGenerador(id || '');
+  const pagosQuery = usePagosTEF(id || '');
+  const ddjjQuery = useDDJJ(id || '');
+  const documentosQuery = useDocumentos(id || '');
+  const { data: pagos = [] } = pagosQuery;
+  const { data: ddjjList = [] } = ddjjQuery;
+  const { data: documentos = [], refetch: refetchDocumentos } = documentosQuery;
 
   const createPago = useCreatePago();
   const updatePago = useUpdatePago();
@@ -171,33 +185,37 @@ const GeneradorDetallePage: React.FC = () => {
     ...apiGenerador,
     estado: apiGenerador.activo !== false ? 'activo' : 'inactivo',
     inscripcionDGFA: apiGenerador.numeroInscripcion || '-',
-    fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
+    fechaAlta: formatActorEventDate(apiGenerador.createdAt),
   } : null;
 
-  const backPath = actorReturnPath(location.state, mp(canEdit ? '/admin/actores/generadores' : '/dashboard'));
+  const actorNavigation = useActorNavigation();
+  const backPath = actorNavigation?.backPath || mp('/dashboard');
+  const backLabel = actorNavigation?.backLabel || 'Volver a Inicio';
+  const goBack = () => {
+    const state = backLabel === 'Volver al aviso' && location.state && typeof location.state === 'object' && !Array.isArray(location.state)
+      ? { notificationInboxReturn: (location.state as { notificationInboxReturn?: unknown }).notificationInboxReturn } : undefined;
+    navigate(backPath, state ? { state } : undefined);
+  };
 
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={goBack}>{backLabel}</Button>
         </div>
         <Card className="py-12">
-          <div className="text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
-            <p className="text-neutral-500">Cargando generador...</p>
-          </div>
+          <LoadingIndicator label="Cargando generador…" />
         </Card>
       </div>
     );
   }
 
-  if (!generador) return null;
+  if (!generador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={goBack} backLabel={backLabel} />;
 
   const g = generador;
   const categoriaLabel = generador.categoria?.replaceAll('_', ' ') || 'Sin categoría';
   const enriched = generador.cuit ? (GENERADORES_DATA[generador.cuit] || GENERADORES_DATA[generador.cuit.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
-  const categorias = g.corrientesControl
+  const categorias = g.corrientesControl != null
     ? parseCorrientes(g.corrientesControl)
     : (enriched?.categoriasControl || []);
 
@@ -205,8 +223,7 @@ const GeneradorDetallePage: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const lastPago = pagos.find(p => p.anio === currentYear - 1) || pagos.find(p => p.anio === currentYear);
   const tefAlDia = lastPago?.fechaPago != null;
-  const ddjjRecent = ddjjList.filter(d => d.anio >= currentYear - 1 && d.presentada);
-  const habilitado = lastPago?.habilitado ?? false;
+  const habilitado = lastPago?.habilitado;
 
   // Pago handlers
   const handleSavePago = async (data: any) => {
@@ -297,14 +314,14 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const fmtMoney = (v: number | null) => v != null ? `$ ${v.toLocaleString('es-AR', { minimumFractionDigits: 0 })}` : '-';
-  const fmtDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-AR') : '-';
+  const fmtDate = formatActorCalendarDate;
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={goBack}>{backLabel}</Button>
           <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={() => {
             if (generador) downloadCsv([{
               RazonSocial: generador.razonSocial, CUIT: generador.cuit,
@@ -333,41 +350,25 @@ const GeneradorDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="min-w-0 p-4" aria-label="Categoría del generador">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Categoria</p>
-          <p className="text-base sm:text-lg font-bold text-neutral-900 mt-1 break-words">{categoriaLabel}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Corrientes Y</p>
-          <p className="text-2xl font-bold text-neutral-900 mt-1">{categorias.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">TEF</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className={`w-2.5 h-2.5 rounded-full ${tefAlDia ? 'bg-success-500' : 'bg-error-500'}`} />
-            <p className="text-lg font-bold text-neutral-900">{tefAlDia ? 'Al dia' : 'Pendiente'}</p>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Habilitacion</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className={`w-2.5 h-2.5 rounded-full ${habilitado ? 'bg-success-500' : 'bg-warning-500'}`} />
-            <p className="text-lg font-bold text-neutral-900">{habilitado ? 'Si' : 'No'}</p>
-          </div>
-        </Card>
-      </div>
+      {detailTabs.activeTab === 'info' && <section aria-label="Resumen del generador" className="space-y-3">
+        <QueryContent query={pagosQuery} loading="Cargando situación fiscal…" error="No pudimos consultar la situación fiscal." retryLabel="Reintentar situación fiscal">
+        <ActorSummary items={[
+          { key: 'corrientes', label: 'Corrientes Y', value: categorias.length },
+          { key: 'tef', label: <>TEF{lastPago && <span> · {lastPago.anio}</span>}</>, value: !lastPago ? 'Sin registro' : tefAlDia ? 'Al día' : 'Pendiente' },
+          { key: 'habilitacion', label: 'Habilitación', value: habilitado == null ? 'Sin registro' : habilitado ? 'Sí' : 'No' },
+        ]} />
+        </QueryContent>
+      </section>}
 
-      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`))}>Editar datos del padrón</Button>}
-      <ActorCertificates type="GENERADOR" actorId={id || ''} />
+      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
+      <div hidden={detailTabs.activeTab === 'fiscal'}><ActorCertificates type="GENERADOR" actorId={id || ''} /></div>
 
       {/* 5 Tabs */}
-      <Tabs defaultTab="info" variant="default">
+      <Tabs {...detailTabs} variant="default">
         <TabList>
-          <Tab id="info" icon={<Factory size={16} />}>Info General</Tab>
+          <Tab id="info" icon={<Factory size={16} />}>Información general</Tab>
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
-          <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
+          <Tab id="fiscal" icon={<DollarSign size={16} />}>Situación fiscal</Tab>
           <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
           {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
@@ -392,7 +393,7 @@ const GeneradorDetallePage: React.FC = () => {
                   {g.certificacionISO && (
                     <InfoRow icon={<Award size={16} />} label="Certificacion ISO" value={
                       <Badge variant="soft" color={new Date(g.certificacionISO) > new Date() ? 'success' : 'error'}>
-                        {new Date(g.certificacionISO).toLocaleDateString('es-AR')}
+                        {formatActorCalendarDate(g.certificacionISO)}
                       </Badge>
                     } />
                   )}
@@ -477,23 +478,28 @@ const GeneradorDetallePage: React.FC = () => {
 
         {/* ===== Tab 3: Situacion Fiscal (Pagos TEF) ===== */}
         <TabPanel id="fiscal">
+          <QueryContent query={pagosQuery} loading="Cargando pagos…" error="No pudimos consultar la situación fiscal." retryLabel="Reintentar pagos">
           <div className="space-y-6">
+            {fiscalYear && <div className="rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-neutral-800">
+              <p>Ejercicio consultado: <strong>{fiscalYear}</strong></p>
+              {!pagos.some(p => p.anio === fiscalYear) && <p className="mt-1">No hay pagos registrados para este ejercicio. Revisá las declaraciones y documentos o consultá a DGFA.</p>}
+            </div>}
             {/* KPI mini-cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Ultimo TEF</p>
+                <p className="text-xs text-neutral-500">Último TEF registrado</p>
                 <p className="text-lg font-bold text-neutral-900 mt-1">
-                  {pagos.length > 0 ? fmtMoney(pagos[0].montoTEF) : '-'}
+                  {pagos.length > 0 ? fmtMoney(pagos[0].montoTEF) : 'Sin registro'}
                 </p>
                 {pagos.length > 0 && <p className="text-xs text-neutral-400">{pagos[0].anio}</p>}
               </Card>
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Anos al dia</p>
-                <p className="text-2xl font-bold text-success-600 mt-1">{pagos.filter(p => p.fechaPago).length}</p>
+                <p className="text-xs text-neutral-500">Años con pago registrado</p>
+                <p className="text-2xl font-bold text-neutral-900 mt-1">{pagos.filter(p => p.fechaPago).length}</p>
               </Card>
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Pendientes</p>
-                <p className="text-2xl font-bold text-error-600 mt-1">{pagos.filter(p => !p.fechaPago).length}</p>
+                <p className="text-xs text-neutral-500">Pagos sin fecha</p>
+                <p className="text-2xl font-bold text-neutral-900 mt-1">{pagos.filter(p => !p.fechaPago).length}</p>
               </Card>
             </div>
 
@@ -504,48 +510,55 @@ const GeneradorDetallePage: React.FC = () => {
                 </Button> : undefined} />
               <CardContent>
                 {pagos.length > 0 ? (
+                  <>
+                  <p className="mb-2 text-xs text-neutral-600 md:hidden">Deslizá la tabla para ver todos los datos.</p>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[640px] text-sm">
                       <thead className="bg-neutral-50">
                         <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Ano</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Año</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">TEF</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Resolucion</th>
-                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notif.</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">F. Pago</th>
-                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Hab.</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Resolución</th>
+                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notificación</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Fecha de pago</th>
+                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Habilitación</th>
                           {canEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
                         {pagos.map(p => (
-                          <tr key={p.id} className="hover:bg-neutral-50">
-                            <td className="px-3 py-2.5 font-bold text-neutral-900">{p.anio}</td>
+                          <tr key={p.id} className={p.anio === fiscalYear ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-neutral-50'}>
+                            <td className="px-3 py-2.5 font-bold text-neutral-900">{p.anio}{p.anio === fiscalYear && <span className="block text-xs font-medium text-primary-800">Ejercicio consultado</span>}</td>
                             <td className="px-3 py-2.5 font-mono">{fmtMoney(p.montoTEF)}</td>
-                            <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{p.resolucion || '-'}</td>
+                            <td className="px-3 py-2.5 text-neutral-600">{p.resolucion || '-'}</td>
                             <td className="px-3 py-2.5 text-center">
-                              <div className={`w-2.5 h-2.5 rounded-full mx-auto ${p.notificado ? 'bg-success-500' : 'bg-neutral-200'}`} />
+                              <span className="inline-flex items-center justify-center gap-1.5">
+                                <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${p.notificado ? 'bg-success-500' : 'bg-neutral-300'}`} />
+                                <span>{p.notificado ? 'Notificada' : 'Sin notificación registrada'}</span>
+                              </span>
                             </td>
-                            <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{fmtDate(p.fechaPago)}</td>
+                            <td className="px-3 py-2.5 text-neutral-600">{fmtDate(p.fechaPago)}</td>
                             <td className="px-3 py-2.5 text-center">
                               {p.habilitado != null && (
                                 <Badge variant="soft" color={p.habilitado ? 'success' : 'error'} className="text-[10px] px-1.5">
-                                  {p.habilitado ? 'SI' : 'NO'}
+                                  {p.habilitado ? 'Sí' : 'No'}
                                 </Badge>
                               )}
+                              {p.habilitado == null && <span className="text-neutral-600">No informada</span>}
                             </td>
                             {canEdit && <td className="px-3 py-2.5 text-right">
-                              <button onClick={() => setPagoModal({ open: true, editing: p })} className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-primary-600"><Pencil size={14} /></button>
-                              <button onClick={() => handleDeletePago(p.id)} className="p-1 rounded hover:bg-error-50 text-neutral-400 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
+                              <button aria-label={`Editar pago de ${p.anio}`} onClick={() => setPagoModal({ open: true, editing: p })} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-neutral-100 text-neutral-600 hover:text-primary-600"><Pencil size={14} /></button>
+                              <button aria-label={`Eliminar pago de ${p.anio}`} onClick={() => handleDeletePago(p.id)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-error-50 text-neutral-600 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
                             </td>}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                  </>
+                ) : !fiscalYear ? (
                   <p className="text-sm text-neutral-400 text-center py-6">Sin pagos registrados</p>
-                )}
+                ) : null}
               </CardContent>
             </Card>
 
@@ -577,6 +590,7 @@ const GeneradorDetallePage: React.FC = () => {
               </Card>
             )}
           </div>
+          </QueryContent>
         </TabPanel>
 
         {/* ===== Tab 4: DDJJ y Documentos ===== */}
@@ -584,10 +598,11 @@ const GeneradorDetallePage: React.FC = () => {
           <div className="space-y-8">
             {/* DDJJ Table */}
             <Card>
-              <CardHeader className="flex-col sm:flex-row" title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit ? <Button leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
+              <CardHeader className="flex-col sm:flex-row" title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit && !ddjjQuery.isPending && !ddjjQuery.isError ? <Button leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
                   Registrar DDJJ
                 </Button> : undefined} />
               <CardContent>
+                <QueryContent query={ddjjQuery} loading="Cargando declaraciones juradas…" error="No pudimos consultar las declaraciones juradas." retryLabel="Reintentar declaraciones">
                 {ddjjList.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -625,6 +640,7 @@ const GeneradorDetallePage: React.FC = () => {
                 ) : (
                   <p className="text-sm text-neutral-400 text-center py-6">Sin DDJJ registradas</p>
                 )}
+                </QueryContent>
               </CardContent>
             </Card>
 
@@ -632,16 +648,20 @@ const GeneradorDetallePage: React.FC = () => {
             <Card>
               <CardHeader title="Documentos" icon={<FileText size={20} />} />
               <CardContent>
+                <QueryContent query={documentosQuery} loading="Cargando documentos…" error="No pudimos consultar los documentos." retryLabel="Reintentar documentos">
                 <DocumentUpload
                   documentos={documentos}
                   onUpload={handleUploadDoc}
                   onDownload={handleDownloadDoc}
                   onRevisar={handleRevisarDoc}
+                  cuit={generador.cuit}
+                  onConfirmPayment={async (docId, input) => { await documentoIdentityService.confirmarPago(docId, input); await refetchDocumentos(); }}
                   onDelete={handleDeleteDoc}
                   isAdmin={canEdit}
                   readOnly={!canEdit}
                   isPending={uploadDoc.isPending}
                 />
+                </QueryContent>
               </CardContent>
             </Card>
           </div>

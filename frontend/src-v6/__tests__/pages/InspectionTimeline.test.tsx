@@ -161,4 +161,10 @@ describe('InspectionTimeline', () => {
 
     expect(screen.queryByText(/Plazo del expediente/i)).not.toBeInTheDocument();
   });
+  it.each(['DERIVADA_LEGALES', 'EN_TRAMITE_LEGAL', 'DERIVADA_ATM', 'FINALIZADA'] as const)('keeps a past deadline historical after %s', state => {
+    render(<InspectionTimeline inspection={inspectionFixture({ estado: state, plazoRespuestaAt: '2020-01-01T12:00:00Z' })} canComment={false} busy={false} onAdd={vi.fn()} />);
+    expect(screen.getByText('Último plazo registrado · histórico:')).toBeInTheDocument();
+    expect(screen.queryByText(/· vencido|· vigente/)).not.toBeInTheDocument();
+  });
+
 });

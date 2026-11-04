@@ -1,0 +1,30 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "executor": "Preview 76.13.234.213; 1 CPU/2 GiB/swap0; 1 worker",
+  "sourceBase": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "frontendOverlaySha256": "174b0b6049e9b05ddecf77248416fe3c6556f4b6cfb7cea33b55eddaf0b470f1",
+  "backendOverlaySha256": "33c7860f736d2d605d1f7fc9f9a5c82f9c2bb79a054e03763804d77ff4497778",
+  "journey": "training-new-features.spec.ts / web-desktop",
+  "files": [
+    {
+      "file": "desktop/training-fleet-20261018.png",
+      "sha256": "f8915bc6c25ca492bc012484dd564d840eab6d9ccf6cd36c076f5bdfb2c872ff",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "desktop/training-eventual-20261018.png",
+      "sha256": "d7c22c2f4e707a480cba733d86ed065d235d3eda53517f9cadae7e94d36abe3d",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "desktop/training-addendum-20261018.png",
+      "sha256": "7be0ab2faa662a896f0ccac36794ad918abc0a03a59ae87633c3d8adfd76ed03",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}

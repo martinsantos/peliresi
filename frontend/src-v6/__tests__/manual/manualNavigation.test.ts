@@ -6,10 +6,16 @@ import path from 'node:path';
 const manual = path.resolve(process.cwd(), '../docs/manual');
 const script = readFileSync(path.join(manual, 'manual.js'), 'utf8');
 let targetTop = 600;
+let layoutChanged: () => void;
 let scroll: ReturnType<typeof vi.fn>;
 const listeners: Array<{target:Window|Document;type:string;listener:EventListenerOrEventListenerObject}>=[];
 beforeEach(() => {
-  vi.useFakeTimers(); localStorage.clear(); targetTop = 600;
+  vi.useFakeTimers(); localStorage.clear(); targetTop = 600; layoutChanged = () => {};
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { layoutChanged = callback; }
+    observe() {}
+    disconnect() {}
+  });
   const html = readFileSync(path.join(manual, 'tutorial.html'), 'utf8');
   document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*?)<\/body>/)![1];
   document.body.setAttribute('data-page', 'tutorial');
@@ -35,10 +41,10 @@ afterEach(() => {
   vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML='';
 });
 
-function mount(withImage = false) {
+function mount(withImage = false, titles = ['Paso 1', 'Paso 2', 'Paso 3']) {
   const help = {profiles:[{id:'qa',label:'QA',icon:'help'}],guides:[{
-    id:'qa',profile:'qa',title:'QA',summary:'QA',duration:'1 min',steps:[1,2,3].map(i=>({
-      title:'Paso '+i,body:['QA'],expected:'QA',...(withImage&&i===1?{image:'screenshots/qa.png',alt:'QA'}:{}),
+    id:'qa',profile:'qa',title:'QA',summary:'QA',duration:'1 min',steps:titles.map((title,index)=>({
+      title,body:['QA'],expected:'QA',...(withImage&&index===0?{image:'screenshots/qa.png',alt:'QA'}:{}),
     })),
   }]};
   const isolatedWindow = Object.create(window);
@@ -69,4 +75,170 @@ it('user scroll takes priority and later image loads do not pull them back',()=>
   const previous=scroll.mock.calls.length;
   document.querySelector('img.guide-image')!.dispatchEvent(new Event('load'));
   vi.advanceTimersByTime(100); expect(scroll).toHaveBeenCalledTimes(previous);
+});
+
+it('an explicit index destination survives intermediate smooth-scroll events until user input',()=>{
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount();
+  (document.querySelectorAll('#tutorialIndex a')[2] as HTMLElement).click();
+  window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(20);
+  expect(current()).toContain('Paso 3');
+  expect(window.location.hash).toBe('#paso-3-paso-3');
+  window.dispatchEvent(new Event('wheel')); targetTop=600;
+  window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(20);
+  expect(current()).toContain('Paso 2');
+});
+
+it.each(['index', 'next'])('late images preserve a newly selected %s step without an initial hash', control => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount(true);
+  if (control === 'index') (document.querySelectorAll('#tutorialIndex a')[2] as HTMLElement).click();
+  else {
+    (document.getElementById('nextStep') as HTMLElement).click();
+    (document.getElementById('nextStep') as HTMLElement).click();
+  }
+  vi.advanceTimersByTime(100);
+  targetTop = 600;
+  const previous = scroll.mock.calls.length;
+  document.querySelector('img.guide-image')!.dispatchEvent(new Event('load'));
+  vi.advanceTimersByTime(100);
+  expect(scroll.mock.calls.length).toBeGreaterThan(previous);
+  expect(targetTop).toBe(180);
+  expect(current()).toContain('Paso 3');
+});
+
+it.each(['ctrlKey', 'metaKey'])('index retains native open-in-new-tab behavior with %s', modifier => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount();
+  const event = new MouseEvent('click', { cancelable: true, bubbles: true, [modifier]: true });
+  expect(document.querySelectorAll('#tutorialIndex a')[2].dispatchEvent(event)).toBe(true);
+  expect(event.defaultPrevented).toBe(false);
+  expect(current()).toContain('Paso 1');
+});
+
+it('late layout changes keep the selected heading in view after images have loaded', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount();
+  (document.querySelectorAll('#tutorialIndex a')[2] as HTMLElement).click();
+  vi.advanceTimersByTime(100);
+  targetTop = -600;
+  layoutChanged();
+  vi.advanceTimersByTime(100);
+  expect(targetTop).toBe(180);
+  expect(current()).toContain('Paso 3');
+});
+it('a later layout change cannot override the reader scrolling away', () => {
+  mount(); vi.advanceTimersByTime(100);
+  window.dispatchEvent(new Event('wheel')); targetTop = 600;
+  const previous = scroll.mock.calls.length;
+  layoutChanged(); vi.advanceTimersByTime(100);
+  expect(scroll).toHaveBeenCalledTimes(previous);
+  expect(targetTop).toBe(600);
+});
+
+
+it.each(['null', '[]', '{"qa":null}', '{"qa":{"step":"wrong","updatedAt":1}}'])('invalid saved progress %s cannot prevent reading the guide', value => {
+  localStorage.setItem('sitrep_help_progress_v1', value);
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  expect(() => mount()).not.toThrow();
+  expect(current()).toContain('Paso 1');
+  (document.getElementById('nextStep') as HTMLElement).click();
+  expect(current()).toContain('Paso 2');
+});
+
+it.each(['getItem', 'setItem'] as const)('unavailable storage (%s) keeps previous/next usable and explains the limit', method => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  vi.spyOn(Storage.prototype, method).mockImplementation(() => { throw new Error('Storage unavailable'); });
+  expect(() => mount()).not.toThrow();
+  (document.getElementById('nextStep') as HTMLElement).click();
+  expect(current()).toContain('Paso 2');
+  expect(window.location.hash).toBe('#paso-2-paso-2');
+  expect(document.getElementById('progressStorageStatus')).toHaveTextContent('no puede guardar');
+  expect(document.getElementById('progressStorageStatus')).not.toHaveAttribute('hidden');
+  (document.getElementById('previousStep') as HTMLElement).click();
+  expect(current()).toContain('Paso 1');
+});
+
+it('reopening a guide scrolls to the recovered step instead of showing another step at the top', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:2,updatedAt:1}}));
+  mount(); vi.advanceTimersByTime(100);
+  expect(current()).toContain('Paso 3');
+  expect(targetTop).toBe(180);
+  expect(scroll.mock.contexts.some(target => (target as HTMLElement).id === 'paso-3-paso-3')).toBe(true);
+});
+
+it('an explicit link wins over a different saved step', () => {
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:1,updatedAt:1}}));
+  mount(); vi.advanceTimersByTime(100);
+  expect(current()).toContain('Paso 3');
+  expect(targetTop).toBe(180);
+});
+
+
+it('an old shared link follows its title after a step is inserted before it', () => {
+  mount(false, ['Nuevo paso', 'Paso 1', 'Paso 2', 'Paso 3']);
+  expect(current()).toContain('Paso 3');
+  expect(window.location.hash).toBe('#paso-4-paso-3');
+});
+it('saved progress follows step identity instead of the former array position', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:1,stepKey:'paso-2',updatedAt:1}}));
+  mount(false, ['Nuevo paso', 'Paso 1', 'Paso 2', 'Paso 3']);
+  expect(current()).toContain('Paso 2');
+});
+it('a removed saved step is explained instead of silently selecting its replacement', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:1,stepKey:'eliminado',updatedAt:1}}));
+  mount();
+  expect(current()).toContain('Paso 1');
+  expect(document.getElementById('stepRecoveryStatus')).not.toHaveAttribute('hidden');
+  expect(document.getElementById('stepRecoveryStatus')).toHaveTextContent('ya no está disponible');
+});
+it('an invalid explicit link never substitutes unrelated saved progress', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa#paso-8-eliminado');
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:2,updatedAt:1}}));
+  mount();
+  expect(current()).toContain('Paso 1');
+  expect(document.getElementById('stepRecoveryStatus')).not.toHaveAttribute('hidden');
+});
+it('a later hash navigation updates the indicated step and reading position', () => {
+  mount();
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa#paso-2-paso-2');
+  window.dispatchEvent(new Event('hashchange'));
+  expect(current()).toContain('Paso 2');
+  expect(scroll.mock.contexts.some(target => (target as HTMLElement).id === 'paso-2-paso-2')).toBe(true);
+});
+it('stores identity with progress so subsequent insertions cannot change its meaning', () => {
+  mount();
+  expect(JSON.parse(localStorage.getItem('sitrep_help_progress_v1')!).qa.stepKey).toBe('paso-3');
+});
+
+
+it('an ambiguous old title is not replaced by a guessed step', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa#paso-8-repetido');
+  mount(false, ['Inicio', 'Repetido', 'Repetido']);
+  expect(current()).toContain('Inicio');
+  expect(document.getElementById('stepRecoveryStatus')).not.toHaveAttribute('hidden');
+});
+it.each([false, true])('home resumes an identified step and explains a removed one (removed=%s)', removed => {
+  const html = readFileSync(path.join(manual, 'index.html'), 'utf8');
+  document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*?)<\/body>/)![1];
+  document.body.setAttribute('data-page', 'home');
+  window.history.replaceState(null, '', '/manual/');
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:1,stepKey:removed?'eliminado':'paso-2',updatedAt:1}}));
+  mount(false, ['Nuevo paso', 'Paso 1', 'Paso 2', 'Paso 3']);
+  expect(document.getElementById('continueLink')?.getAttribute('href')).toBe(removed?'tutorial.html?guide=qa':'tutorial.html?guide=qa#paso-3-paso-2');
+  expect(document.getElementById('continueDescription')).toHaveTextContent(removed?'Guía actualizada':'Paso 3 de 4');
+});
+
+
+it('the keyboard skip link remains a native content destination', () => {
+  mount();
+  const previous = scroll.mock.calls.length;
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa#tutorialMain');
+  window.dispatchEvent(new Event('hashchange'));
+  expect(window.location.hash).toBe('#tutorialMain');
+  expect(scroll).toHaveBeenCalledTimes(previous);
+  expect(document.getElementById('stepRecoveryStatus')).toHaveAttribute('hidden');
 });

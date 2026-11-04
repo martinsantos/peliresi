@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import PerfilPage from '../../pages/perfil/PerfilPage';
 
@@ -8,14 +8,17 @@ const m = vi.hoisted(() => ({ get: vi.fn(), user: { id: 'user', actorId: 'op-1',
 vi.mock('../../services/api', () => ({ default: { get: m.get }, api: { get: m.get } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: m.user, isGenerador: m.user.rol === 'GENERADOR', isOperador: m.user.rol === 'OPERADOR' }) }));
 const actor = (id: string) => ({ id, razonSocial: 'QA establecimiento ' + id, cuit: '99-00000001-0', domicilio: 'QA domicilio', numeroInscripcion: 'QA-G-1', numeroHabilitacion: 'QA-O-1', vencimientoHabilitacion: '2026-10-03T22:30:00Z' });
-function setup() {
+const LocationProbe=()=> <output data-testid="profile-location">{useLocation().pathname+useLocation().search}</output>;
+function setup(path='/mi-perfil') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = () => <QueryClientProvider client={client}><MemoryRouter><PerfilPage /></MemoryRouter></QueryClientProvider>;
+  const view = () => <QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><PerfilPage /><LocationProbe/></MemoryRouter></QueryClientProvider>;
   return { ...render(view()), view };
 }
 beforeEach(() => {
   m.user = { id: 'user', actorId: 'op-1', rol: 'OPERADOR', nombre: 'QA usuario', email: 'qa@example.invalid' };
   m.get.mockReset().mockImplementation(async (url: string) => {
+    if (url === '/solicitudes/mis-solicitudes') return { data: { success: true, data: { solicitudes: [] } } };
+    if (url === '/empresas') return { data: { success: true, data: { puedeValidar: false, pagination: { total: 0 } } } };
     if (url.endsWith('/documentos')) return { data: { success: true, data: { documentos: [] } } };
     const key = url.includes('/generadores/') ? 'generador' : 'operador';
     return { data: { success: true, data: { [key]: actor(url.split('/').at(-1)!) } } };
@@ -23,6 +26,8 @@ beforeEach(() => {
 });
 it('reads the actual nested operator response and calendar expiry, not empty or shifted fields', async () => {
   setup(); expect(await screen.findByText('QA establecimiento op-1')).toBeVisible();
+  // The layout owns the single page title, including for assistive technology.
+  expect(screen.queryByRole('heading', { name: /mi perfil/i })).not.toBeInTheDocument();
   expect(screen.getByText('99-00000001-0')).toBeVisible();
   expect(screen.getByText('03/10/2026')).toBeVisible();
   expect(screen.getByText('Vigencia hasta finalizar ese día en Mendoza.')).toBeVisible();
@@ -60,11 +65,55 @@ it('does not retain the former actor after an identity change', async () => {
 });
 it('does not request an actor for an unbound administrative identity', async () => {
   m.user = { ...m.user, actorId: '', rol: 'ADMIN' }; setup();
-  expect(screen.queryByText('Datos de mi Establecimiento')).toBeNull();
-  expect(m.get).not.toHaveBeenCalled();
+  expect(screen.queryByText('Mi establecimiento')).toBeNull();
+  expect(m.get.mock.calls.some(([url]) => url.startsWith('/actores/'))).toBe(false);
+});
+it('shows the company certificate only with authorization for every site', async () => {
+  m.user = { ...m.user, empresaContexto: { todasSedes: true, razonSocial: 'QA empresa', domicilioLegal: { calle: 'QA' } } } as typeof m.user;
+  setup('/mi-perfil?certificadoAmbiental=doc-1');
+  expect(await screen.findByText('El certificado del aviso ya no está disponible en esta ficha. Consultá a DGFA si necesitás ayuda.')).toBeVisible();
+  expect(m.get).toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
+it('explains restricted company access without requesting company-wide certificates', () => {
+  m.user = { ...m.user, empresaContexto: { todasSedes: false, razonSocial: 'QA empresa', domicilioLegal: { calle: 'QA' } } } as typeof m.user;
+  setup();
+  expect(screen.getByText(/necesitás autorización para todos sus establecimientos/i)).toBeVisible();
+  expect(m.get).not.toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
+it('opens only the receipt selected by a notice for the active actor', async () => {
+  const original=m.get.getMockImplementation()!;
+  m.get.mockImplementation(async (url:string)=>url.endsWith('/documentos')
+    ? {data:{success:true,data:{documentos:[{id:'doc-1',tipo:'COMPROBANTE_PAGO',nombre:'Pago QA.pdf',estado:'PENDIENTE',analisis:{duplicado:true}}]}}} : original(url));
+  setup('/mi-perfil?comprobante=doc-1#comprobante-aviso');
+  const panel=await screen.findByRole('region',{name:'Comprobante del aviso'});
+  await screen.findByText('Pago QA.pdf');expect(panel).toHaveTextContent('Actividad: Operador');
+});
+it('does not request the receipt in a site-restricted company context', () => {
+  m.user = { ...m.user, empresaContexto:{todasSedes:false,razonSocial:'QA empresa',domicilioLegal:{calle:'QA'}} } as typeof m.user;
+  setup('/mi-perfil?comprobante=doc-1#comprobante-aviso');
+  expect(screen.getByText(/Para consultar el comprobante necesitás autorización/)).toBeVisible();
+  expect(m.get).not.toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
+it('rejects a malformed receipt link without fetching a targeted document', () => {
+  setup('/mi-perfil?comprobante=..%2Fotro#comprobante-aviso');
+  expect(screen.getByRole('alert')).toHaveTextContent('El enlace del comprobante no es válido');
+  expect(screen.queryByRole('region',{name:'Comprobante del aviso'})).toBeNull();
+});
+it('explains a receipt link when the account no longer has a bound activity', () => {
+  m.user = { ...m.user, actorId: '', rol: 'ADMIN' };
+  setup('/mi-perfil?comprobante=doc-1#comprobante-aviso');
+  expect(screen.getByText(/No pudimos identificar una actividad autorizada para este comprobante/)).toBeVisible();
+  expect(screen.queryByRole('region',{name:'Comprobante del aviso'})).toBeNull();
 });
 it('identifies loading rather than showing placeholder establishment fields', async () => {
   m.get.mockImplementation(() => new Promise(() => {})); setup();
   expect(await screen.findByText('Cargando datos de tu establecimiento…')).toBeVisible();
   expect(screen.queryByText('Razon Social')).toBeNull();
+});
+
+it.each(['/mi-perfil','/mobile/mi-perfil'])('keeps profile actions in the same surface at %s',async path=>{
+ setup(path);await screen.findByText('QA establecimiento op-1');
+ expect(screen.queryByText('DGFA Mendoza')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Solicitar cambios'}));
+ expect(screen.getByTestId('profile-location')).toHaveTextContent(path+'/solicitar-cambios');
 });

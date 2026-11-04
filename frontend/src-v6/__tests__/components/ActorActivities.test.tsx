@@ -8,18 +8,18 @@ vi.mock('../../services/api', () => ({ api: { post: mocks.post, get: mocks.get }
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user', rol: 'GENERADOR' }, isRestricted: true }) }));
 import ActorActivities from '../../components/ActorActivities';
 function Location() { const location = useLocation(); return <output>{location.pathname + location.search}</output>; }
-function view() { return render(<MemoryRouter initialEntries={['/mi-solicitud']}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ActorActivities /><Location /></QueryClientProvider></MemoryRouter>); }
+function view(mode?: 'switch' | 'request') { return render(<MemoryRouter initialEntries={['/mi-solicitud']}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ActorActivities mode={mode} /><Location /></QueryClientProvider></MemoryRouter>); }
 beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true'); });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
 it('continues existing draft, views submitted application, and requests only a missing activity', async () => {
   mocks.list.mockResolvedValue([{ id: 'g', tipoActor: 'GENERADOR', estado: 'BORRADOR' }, { id: 'o', tipoActor: 'OPERADOR', estado: 'EN_REVISION' }]);
   view(); fireEvent.click(await screen.findByRole('button', { name: 'Continuar Generador' }));
-  expect(screen.getByText('/inscripcion/generador')).toBeVisible(); expect(mocks.post).not.toHaveBeenCalled();
+  expect(screen.getByText('/inscripcion/generador?solicitud=g')).toBeVisible(); expect(mocks.post).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Ver solicitud de Operador' }));
   expect(screen.getByText('/mi-solicitud?solicitud=o')).toBeVisible(); expect(mocks.post).not.toHaveBeenCalled();
   mocks.post.mockResolvedValue({ data: { data: { solicitud: { id: 't', usuarioId: 'qa-user', estado: 'BORRADOR' } } } });
   fireEvent.click(screen.getByRole('button', { name: 'Solicitar Transportista' }));
-  await screen.findByText('/inscripcion/transportista');
+  await screen.findByText('/inscripcion/transportista?solicitud=t');
   expect(mocks.post).toHaveBeenCalledWith('/solicitudes/actividad-adicional', { tipoActor: 'TRANSPORTISTA' });
 });
 it('failed lookup does not masquerade as no applications or permit duplicate requests', async () => {
@@ -30,3 +30,40 @@ it('failed lookup does not masquerade as no applications or permit duplicate req
   await waitFor(() => expect(screen.getByRole('button', { name: 'Continuar Operador' })).toBeEnabled());
 });
 it('flag off makes no request', () => { vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'false'); view(); expect(mocks.list).not.toHaveBeenCalled(); });
+it('application view offers only missing roles without duplicating the current draft action', async () => {
+  mocks.list.mockResolvedValue([{ id: 'g', tipoActor: 'GENERADOR', estado: 'BORRADOR' }, { id: 'o', tipoActor: 'OPERADOR', estado: 'EN_REVISION' }]);
+  view('request');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Solicitar Transportista' })).toBeEnabled());
+  expect(screen.queryByRole('button', { name: /Generador|Operador/ })).toBeNull();
+  expect(screen.getByRole('heading', { name: 'Sumar otra actividad' })).toBeVisible();
+  mocks.post.mockResolvedValue({ data: { data: { solicitud: { id: 't', usuarioId: 'qa-user', estado: 'BORRADOR' } } } });
+  fireEvent.click(screen.getByRole('button', { name: 'Solicitar Transportista' }));
+  await screen.findByText('/inscripcion/transportista?solicitud=t');
+  expect(mocks.post).toHaveBeenCalledTimes(1);
+});
+it('application view omits an empty add-role card when all activities are already requested', async () => {
+  mocks.list.mockResolvedValue(['GENERADOR','TRANSPORTISTA','OPERADOR'].map(tipoActor=>({id:tipoActor,tipoActor,estado:'ENVIADA'})));
+  view('request');
+  await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sumar otra actividad' })).toBeNull());
+  expect(mocks.post).not.toHaveBeenCalled();
+});
+it('application view blocks requests on a lookup failure and recovers without duplicating an existing role', async () => {
+  mocks.list.mockRejectedValue(new Error('offline')); view('request'); await screen.findByRole('alert');
+  expect(screen.getByRole('button', { name: 'Solicitar Generador' })).toBeDisabled();
+  mocks.list.mockResolvedValue([{id:'g',tipoActor:'GENERADOR',estado:'BORRADOR'}]);
+  fireEvent.click(screen.getByRole('button', { name:'Reintentar' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name:'Solicitar Generador' })).toBeNull());
+  expect(screen.getByRole('button', { name:'Solicitar Operador' })).toBeEnabled();
+  expect(mocks.post).not.toHaveBeenCalled();
+});
+
+it('identifies a new application after rejection without implying reopening the old file', async () => {
+  mocks.list.mockResolvedValue([{id:'closed',tipoActor:'GENERADOR',estado:'RECHAZADA'}]);
+  mocks.post.mockResolvedValue({data:{data:{solicitud:{id:'new-draft',usuarioId:'qa-user',estado:'BORRADOR'}}}});
+  view('request');
+  const button=await screen.findByRole('button',{name:'Nueva solicitud de Generador'});
+  expect(screen.getByRole('heading',{name:'Iniciar otra solicitud'})).toBeVisible();
+  await waitFor(()=>expect(button).toBeEnabled());fireEvent.click(button);
+  await screen.findByText('/inscripcion/generador?solicitud=new-draft');
+  expect(mocks.post).toHaveBeenCalledOnce();
+});

@@ -97,6 +97,10 @@ function createToken(payload: object): string {
 }
 
 describe('isAuthenticated middleware', () => {
+  it('never upgrades a transport GPS capability to a user session',async()=>{
+    mockFindUnique.mockClear();const {req,res,next}=createMocks('Bearer '+createToken({purpose:'transport-leg-gps',id:'forged-account'}));
+    await isAuthenticated(req,res,next);expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:401}));expect(mockFindUnique).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     mockFindUnique.mockReset();
   });

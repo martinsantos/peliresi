@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v116';
-const RUNTIME_CACHE = 'runtime-cache-v116';
+const CACHE_NAME = 'trazabilidad-rrpp-v181';
+const RUNTIME_CACHE = 'runtime-cache-v123';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -23,6 +23,20 @@ function isCacheableAsset(request, response) {
     if (/\.m?js$/i.test(pathname)) return /(?:java|ecma)script/i.test(contentType);
     if (/\.css$/i.test(pathname)) return /text\/css/i.test(contentType);
     return !pathname.startsWith('/assets/') || !/text\/html/i.test(contentType);
+}
+
+// A web tab that has not reloaded may still need the exact hashed asset from
+// its earlier release after another tab accepts a worker update.
+async function matchWebReleaseAsset(request) {
+    const runtime = await caches.open(RUNTIME_CACHE);
+    const own = await runtime.match(request) || await (await caches.open(CACHE_NAME)).match(request);
+    if (isCacheableAsset(request, own)) return own;
+    for (const name of await caches.keys()) {
+        if (!(name.startsWith('trazabilidad-rrpp-') || name.startsWith('runtime-cache-'))
+            || name === CACHE_NAME || name === RUNTIME_CACHE) continue;
+        const previous = await (await caches.open(name)).match(request);
+        if (isCacheableAsset(request, previous)) return previous;
+    }
 }
 
 const offlineResponse = () => new Response('<html><body><h1>Offline</h1><p>Sin conexion. Intente de nuevo.</p></body></html>', {
@@ -50,7 +64,16 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (event) => {
     console.log('[SW] Activando', CACHE_NAME);
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            const hasWebClient = clients.some((client) => {
+                try {
+                    const url = new URL(client.url);
+                    return url.origin === self.location.origin && !/^\/app(\/|$)/.test(url.pathname);
+                } catch { return true; }
+            });
+            if (hasWebClient) return [];
+            return caches.keys();
+        }).catch(() => []).then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
             return Promise.all(
                 cacheNames
@@ -102,6 +125,28 @@ self.addEventListener('fetch', (event) => {
                     if (offline) return offline;
                     return offlineResponse();
                 })
+        );
+        return;
+    }
+
+    // An open release must retain its exact, validated content-hashed assets.
+    // A deployment may remove that URL from the server while this tab still
+    // references it. Never substitute another hash, cache scope, or an API.
+    if (/^\/assets\/.*-[a-zA-Z0-9_-]{8}\./.test(url.pathname)) {
+        event.respondWith(
+            caches.open(RUNTIME_CACHE).then(async (cache) => {
+                const cached = await matchWebReleaseAsset(request);
+                if (isCacheableAsset(request, cached)) return cached;
+                try {
+                    const response = await fetch(request);
+                    if (isCacheableAsset(request, response)) {
+                        await cache.put(request, response.clone()).catch(() => {});
+                    }
+                    return response;
+                } catch {
+                    return new Response('', { status: 408, statusText: 'Offline' });
+                }
+            })
         );
         return;
     }
@@ -177,16 +222,27 @@ console.log('[SW] Service Worker cargado', CACHE_NAME);
 // ========================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ('focus' in client) {
-          client.navigate(url);
-          return client.focus();
-        }
-      }
-      return clients.openWindow(url);
-    })
-  );
+  const fallback = new URL('/', self.location.origin);
+  let target = fallback;
+  const requested = event.notification.data?.url;
+  if (typeof requested === 'string' && requested.trim()) {
+    try {
+      const candidate = new URL(requested, self.location.origin);
+      if (candidate.origin === self.location.origin && !candidate.username && !candidate.password) target = candidate;
+    } catch { /* An invalid destination returns to web home. */ }
+  }
+  event.waitUntil((async () => {
+    let clientList = [];
+    try { clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true }); } catch { /* Try a new window below. */ }
+    for (const client of clientList) {
+      let clientUrl;
+      try { clientUrl = new URL(client.url); } catch { continue; }
+      if (clientUrl.origin !== self.location.origin || /^\/app(\/|$)/.test(clientUrl.pathname) || typeof client.navigate !== 'function') continue;
+      let navigated;
+      try { navigated = await client.navigate(target.href); } catch { continue; }
+      if (!navigated) continue;
+      try { await navigated.focus(); return; } catch { break; }
+    }
+    return clients.openWindow(target.href);
+  })());
 });

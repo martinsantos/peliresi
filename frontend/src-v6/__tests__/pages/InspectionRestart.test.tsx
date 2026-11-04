@@ -1,3 +1,5 @@
+vi.mock('../../pages/inspecciones/InspectionLocationMap', () => ({ default: () => <div>Mapa de prueba</div> }));
+import { inspectionFieldDraftKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -13,7 +15,7 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'qa-inspector', rol: 'GENERADOR', esInspector: true, nombre: 'QA inspector' } }),
 }));
 vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: service }));
-vi.mock('../../services/indexeddb', () => ({ saveOffline: vi.fn().mockResolvedValue(undefined), getOffline: vi.fn() }));
+vi.mock('../../services/indexeddb', () => ({ saveOffline: vi.fn().mockResolvedValue(undefined), getOffline: vi.fn(), getAllOffline: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../services/inspectionOfflineEvidence', () => ({
   listPendingInspectionEvidence: vi.fn().mockResolvedValue([]),
   syncPendingInspectionEvidence: vi.fn().mockResolvedValue({ synchronized: 0, failed: 0 }),
@@ -43,7 +45,7 @@ function installLocks() {
   } });
 }
 
-const key = 'sitrep_inspection_draft_qa-inspector_qa-case';
+const key = inspectionFieldDraftKey('qa-inspector', inspectionWorkspaceOwner({ id: 'qa-inspector', rol: 'GENERADOR', esInspector: true }), 'qa-case');
 let server: Inspection;
 const clients: QueryClient[] = [];
 function fixture(): Inspection {
@@ -108,6 +110,40 @@ afterEach(async () => {
 });
 
 describe('inspection process restart with real asynchronous draft ownership', () => {
+  it('offers an explicit authorized review of old unscoped text without replacing the active draft', async () => {
+    const legacyKey = 'sitrep_inspection_draft_qa-inspector_qa-case';
+    const raw = JSON.stringify({ version: 1, observaciones: 'Trabajo anterior pendiente' });
+    localStorage.setItem(legacyKey, raw);
+    mount();
+    let input = await editor();
+    fireEvent.change(input, { target: { value: 'Trabajo de esta actividad' } });
+    // The dossier view mounts its own editor; the sheet's one is gone.
+    fireEvent.click(screen.getByRole('link', { name: 'Expediente completo' }));
+    input = await editor();
+    fireEvent.click(screen.getByRole('link', { name: 'Copias de versiones anteriores' }));
+    const search = screen.getByRole('button', { name: 'Buscar copias anteriores' });
+    await waitFor(() => expect(search).toBeEnabled());
+    fireEvent.click(search);
+    fireEvent.click(await screen.findByRole('button', { name: 'Revisar texto guardado' }));
+    expect(await screen.findByText('Dispositivo: Trabajo anterior pendiente')).toBeVisible();
+    expect(input).toHaveValue('Trabajo de esta actividad');
+    expect(service.saveDraft).not.toHaveBeenCalled();
+    expect(localStorage.getItem(legacyKey)).toBe(raw);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Trabajo anterior pendiente/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar selección (1)' }));
+    await waitFor(() => expect(input).toHaveValue('Trabajo anterior pendiente'));
+    expect(localStorage.getItem(legacyKey)).toBe(raw);
+    expect(service.saveDraft).not.toHaveBeenCalled();
+    const recovered = localStorage.getItem(key)!;
+    expect(JSON.parse(recovered).manualReview).toBe(true);
+    cleanup(); await act(async () => { await Promise.resolve(); });
+    checkpoint.read.mockImplementation(async (requestedKey: string) => requestedKey === key ? recovered : undefined);
+    mount();
+    expect(await editor()).toHaveValue('Trabajo anterior pendiente');
+    fireEvent(window, new Event('offline')); fireEvent(window, new Event('online'));
+    await act(async () => { await Promise.resolve(); });
+    expect(service.saveDraft).not.toHaveBeenCalled();
+  });
   it.each([false, true])('does not discard unproven legacy edits alongside a durable snapshot (edited=%s)', async edited => {
     const tree = mount(); await editor(); fireEvent(window, new Event('pagehide'));
     const journal = JSON.parse(localStorage.getItem(key)!);
@@ -176,23 +212,21 @@ describe('inspection process restart with real asynchronous draft ownership', ()
     fireEvent(window, new Event('pagehide'));
     const durableCopy = localStorage.getItem(key)!;
     expect(JSON.parse(durableCopy)).toMatchObject({ version: 1, observaciones: 'Descripción inicial QA' });
-    fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Iniciar visita', exact: true }));
     await waitFor(() => expect(server.estado).toBe('EN_CAMPO'));
     fireEvent.change(await editor(), { target: { value: 'Comentario confirmado después de iniciar' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios', exact: true }));
-    await waitFor(() => expect(toasts.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+    await waitFor(() => expect(server.observaciones).toBe('Comentario confirmado después de iniciar'), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByTestId('inspection-field-status')).toHaveTextContent(/^Guardado/));
     expect(server.version).toBe(4);
     expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ version: 4, observaciones: server.observaciones });
     await reopen(tree, durableCopy);
     await waitFor(() => expect(screen.queryByText('Hay un borrador anterior sin conciliar')).not.toBeInTheDocument());
     const reopened = await editor();
     expect(reopened).toHaveValue('Comentario confirmado después de iniciar');
-    expect(screen.getByRole('button', { name: 'Guardar cambios', exact: true })).toBeDisabled();
+    expect(screen.getByTestId('inspection-field-status')).toHaveTextContent(/^Guardado/);
     expect(service.saveDraft).toHaveBeenCalledTimes(2);
     fireEvent.change(reopened, { target: { value: 'Nueva observación después de reabrir' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios', exact: true }));
-    await waitFor(() => expect(server.version).toBe(5));
+    await waitFor(() => expect(server.version).toBe(5), { timeout: 4000 });
     expect(server.observaciones).toBe('Nueva observación después de reabrir');
   });
 

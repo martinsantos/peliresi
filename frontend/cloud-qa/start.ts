@@ -4,6 +4,7 @@ import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createServer } from 'node:net';
 import { assertCloudDatabase, root } from './safety.ts';
+import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 const output=process.env.QA_ARTIFACTS!;
@@ -15,7 +16,7 @@ for (const port of [3037, 4177]) {
     probe.listen(port,'127.0.0.1',()=>probe.close(error=>error?reject(error):resolve()));
   });
 }
-if (process.env.MANIFEST_EXCEPTIONAL_ENABLED === 'true') {
+if (process.env.MANIFEST_EXCEPTIONAL_ENABLED === 'true' && process.env.MANIFEST_REVIEW_AUTHORITY_BY_ROLE !== 'true') {
   const fixture = JSON.parse(await readFile(path.join(output, 'fixture.json'), 'utf8'));
   // Authority assignment exists only in this isolated QA process environment.
   process.env.MANIFEST_EXCEPTIONAL_REVIEWERS = fixture.users.admin;
@@ -41,7 +42,7 @@ for(const endpoint of ['http://127.0.0.1:3037/api/health','http://127.0.0.1:4177
   }
 }
 await writeFile(path.join(output,'runtime-proof.json'),JSON.stringify({
-  source:process.env.GITHUB_SHA,executor:process.env.SITREP_QA_EXECUTOR || 'github-actions',backend:path.join(root,'backend/dist/index.js'),
+  source:process.env.GITHUB_SHA,executor:process.env.SITREP_QA_EXECUTOR || 'github-actions',backend:qaBackendEntry(),
   database:'sitrep_night_qa_20260926',emails:false,push:false,blockchain:false,
   processes,runner:execFileSync('uname',['-a'],{encoding:'utf8'}).trim(),
 },null,2));

@@ -1,5 +1,6 @@
 import type { InspectionExchangeType } from '../types/inspection';
-import { getOffline, removeOffline, saveOffline } from './indexeddb';
+import { getOffline, removeOffline, saveOffline, updateOffline } from './indexeddb';
+import { inspectionContextKey } from '../utils/inspectionWorkspace';
 
 export interface OfflineExchangeDraftData {
   tipo: InspectionExchangeType;
@@ -17,8 +18,10 @@ type StoredExchangeFile = {
 };
 
 type StoredExchangeDraft = {
+  revision?: string;
   id: string;
   userId: string;
+  owner: string;
   inspectionId: string;
   savedAt: string;
   draft: OfflineExchangeDraftData;
@@ -26,23 +29,28 @@ type StoredExchangeDraft = {
 };
 
 export type RestoredExchangeDraft = {
+  revision?: string;
   draft: OfflineExchangeDraftData;
   files: File[];
   savedAt: string;
 };
 
-const key = (userId: string, inspectionId: string) => `${userId}:${inspectionId}`;
+const pendingWrites = new Map<string, Promise<void>>();
 
 export async function saveOfflineExchangeDraft(
   userId: string,
   inspectionId: string,
+  owner: string,
   draft: OfflineExchangeDraftData,
   files: File[],
 ): Promise<void> {
-  if (!userId || !inspectionId) throw new Error('El borrador offline requiere usuario y expediente');
-  await saveOffline('inspection_exchange_drafts', {
-    id: key(userId, inspectionId),
+  if (!userId || !inspectionId || !owner) throw new Error('El borrador offline requiere usuario, actividad y expediente');
+  const id = inspectionContextKey(userId, owner, inspectionId);
+  const record = {
+    revision: crypto.randomUUID(),
+    id,
     userId,
+    owner,
     inspectionId,
     savedAt: new Date().toISOString(),
     draft,
@@ -52,19 +60,57 @@ export async function saveOfflineExchangeDraft(
       lastModified: file.lastModified,
       blob: file.slice(0, file.size, file.type),
     })),
-  } satisfies StoredExchangeDraft);
+  } satisfies StoredExchangeDraft;
+  const write = (pendingWrites.get(id) || Promise.resolve()).catch(() => undefined)
+    .then(() => saveOffline('inspection_exchange_drafts', record));
+  pendingWrites.set(id, write);
+  try { await write; } finally { if (pendingWrites.get(id) === write) pendingWrites.delete(id); }
 }
 
-export async function loadOfflineExchangeDraft(userId: string, inspectionId: string): Promise<RestoredExchangeDraft | null> {
-  const stored = await getOffline<StoredExchangeDraft>('inspection_exchange_drafts', key(userId, inspectionId));
-  if (!stored || stored.userId !== userId || stored.inspectionId !== inspectionId) return null;
+export async function loadOfflineExchangeDraft(userId: string, inspectionId: string, owner: string): Promise<RestoredExchangeDraft | null> {
+  const id = inspectionContextKey(userId, owner, inspectionId);
+  if (!id) return null;
+  // Returning immediately to a role must wait for its departing editor's flush.
+  await pendingWrites.get(id);
+  const stored = await getOffline<StoredExchangeDraft>('inspection_exchange_drafts', id);
+  if (!stored || stored.id !== id || stored.userId !== userId || stored.owner !== owner || stored.inspectionId !== inspectionId) return null;
   return {
+    revision: stored.revision,
     draft: stored.draft,
     savedAt: stored.savedAt,
     files: stored.files.map((file) => new File([file.blob], file.name, { type: file.type, lastModified: file.lastModified })),
   };
 }
 
-export async function removeOfflineExchangeDraft(userId: string, inspectionId: string): Promise<void> {
-  await removeOffline('inspection_exchange_drafts', key(userId, inspectionId));
+/** Explicit recovery may replace only the revision the user just inspected.
+ * Another tab's newer draft must remain untouched, including its attachments. */
+export async function replaceOfflineExchangeDraft(userId: string, inspectionId: string, owner: string, draft: OfflineExchangeDraftData, files: File[], expectedRevision?: string): Promise<void> {
+  if (!userId || !inspectionId || !owner) throw new Error('No se identificó el contexto del borrador.');
+  const id = inspectionContextKey(userId, owner, inspectionId);
+  const replacement: StoredExchangeDraft = { id, userId, owner, inspectionId, revision: crypto.randomUUID(), savedAt: new Date().toISOString(), draft,
+    files: files.map(file => ({ name: file.name, type: file.type, lastModified: file.lastModified, blob: file.slice(0, file.size, file.type) })) };
+  const write = (pendingWrites.get(id) || Promise.resolve()).catch(() => undefined).then(async () => {
+    await updateOffline<StoredExchangeDraft>('inspection_exchange_drafts', id, current => {
+      if (current ? !expectedRevision || current.revision !== expectedRevision || current.userId !== userId || current.owner !== owner || current.inspectionId !== inspectionId : Boolean(expectedRevision)) {
+        throw new Error('Otra pestaña cambió el borrador. Se conservaron las versiones; revisalas antes de recuperar.');
+      }
+      return replacement;
+    });
+  });
+  pendingWrites.set(id, write);
+  try { await write; } finally { if (pendingWrites.get(id) === write) pendingWrites.delete(id); }
+}
+
+/** Acknowledge only the exact revision we inspected, never another tab's write. */
+export async function removeOfflineExchangeDraftRevision(userId: string, inspectionId: string, owner: string, revision: string | undefined): Promise<void> {
+  if (!revision) return; // Preserve legacy records whose identity cannot be proven.
+  const id = inspectionContextKey(userId, owner, inspectionId);
+  await pendingWrites.get(id);
+  await updateOffline<StoredExchangeDraft>('inspection_exchange_drafts', id, current =>
+    current?.revision === revision && current.userId === userId && current.owner === owner && current.inspectionId === inspectionId ? null : current);
+}
+
+export async function removeOfflineExchangeDraft(userId: string, inspectionId: string, owner: string): Promise<void> {
+  const id = inspectionContextKey(userId, owner, inspectionId);
+  if (id) { await pendingWrites.get(id); await removeOffline('inspection_exchange_drafts', id); }
 }

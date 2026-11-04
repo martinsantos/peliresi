@@ -13,10 +13,10 @@ function input(estado: EstadoManifiesto, userRol: string, isInSitu = false): Act
 const workflows = [
   [EstadoManifiesto.BORRADOR, 'GENERADOR', 'Firmar Manifiesto', 'onOpenFirmaModal', false],
   [EstadoManifiesto.APROBADO, 'TRANSPORTISTA', 'Confirmar Retiro', 'onConfirmarRetiro', false],
-  [EstadoManifiesto.APROBADO, 'OPERADOR', 'Confirmar Recepcion In Situ', 'onConfirmarRecepcionInSitu', true],
+  [EstadoManifiesto.APROBADO, 'OPERADOR', 'Confirmar recepción en origen', 'onConfirmarRecepcionInSitu', true],
   [EstadoManifiesto.EN_TRANSITO, 'TRANSPORTISTA', 'Confirmar Entrega', 'onConfirmarEntrega', false],
   [EstadoManifiesto.EN_TRANSITO, 'TRANSPORTISTA', 'Registrar Incidente', 'onOpenIncidenteModal', false],
-  [EstadoManifiesto.ENTREGADO, 'OPERADOR', 'Confirmar Recepcion', 'onConfirmarRecepcion', false],
+  [EstadoManifiesto.ENTREGADO, 'OPERADOR', 'Confirmar recepción', 'onConfirmarRecepcion', false],
   [EstadoManifiesto.ENTREGADO, 'OPERADOR', 'Rechazar Carga', 'onOpenRechazarModal', false],
   [EstadoManifiesto.RECIBIDO, 'OPERADOR', 'Registrar Pesaje', 'onOpenPesajeModal', false],
   [EstadoManifiesto.RECIBIDO, 'OPERADOR', 'Registrar Tratamiento', 'onOpenTratamientoModal', false],
@@ -24,13 +24,21 @@ const workflows = [
   [EstadoManifiesto.TRATADO, 'OPERADOR', 'Descargar Certificado', 'onDescargarCertificado', false],
 ] as const;
 describe('manifest workflow actions', () => {
-  it('explains disabled official downloads in training without removing normal workflow actions', () => {
+  it('keeps in-situ reception blocked until the approved parties start coordination', () => {
+    const props = input(EstadoManifiesto.APROBADO, 'OPERADOR', true);
+    const view = render(<ActionButtons {...props} pickupBlocked />);
+    const receipt = screen.getByRole('button', { name: 'Confirmar recepción en origen' });
+    expect(receipt).toBeDisabled(); fireEvent.click(receipt);
+    expect(props.onConfirmarRecepcionInSitu).not.toHaveBeenCalled();
+    view.rerender(<ActionButtons {...props} pickupBlocked={false} />);
+    expect(receipt).toBeEnabled();
+  });
+  it('directs training to its actual certifications without dead official download controls', () => {
     const props = input(EstadoManifiesto.TRATADO, 'OPERADOR');
     render(<ActionButtons {...props} training />);
-    expect(screen.getByRole('button', { name: 'Descargar Certificado' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeDisabled();
-    expect(screen.getByText('Capacitación: no se emiten documentos oficiales.')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Descargar Certificado' }));
+    expect(screen.queryByRole('button', { name: 'Descargar Certificado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Descargar PDF' })).not.toBeInTheDocument();
+    expect(screen.getByText('Las certificaciones se emiten y descargan más abajo, en Certificaciones.')).toBeVisible();
     expect(props.onDescargarCertificado).not.toHaveBeenCalled();
   });
   it.each(workflows)('%s / %s exposes and wires %s', (estado, role, name, handler, inSitu) => {

@@ -5,6 +5,7 @@
  * duplication and ensure consistency. Each controller can spread and override
  * fields as needed.
  */
+import type { Prisma } from '@prisma/client';
 
 /** Lightweight include for list views (ManifiestosPage, reportes, dashboards). */
 export const MANIFIESTO_LIST_INCLUDE = {
@@ -42,7 +43,7 @@ export const MANIFIESTO_DETAIL_INCLUDE = {
     },
   },
   tracking: {
-    orderBy: { timestamp: 'desc' as const },
+    orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
     take: 100,
   },
-} as const;
+} satisfies Prisma.ManifiestoInclude;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ find: vi.fn(), create: vi.fn(), list: vi.fn(), emit: vi.fn(), current: vi.fn(), transaction: vi.fn() }));
+const mocks = vi.hoisted(() => ({ find: vi.fn(), create: vi.fn(), list: vi.fn(), emit: vi.fn(), current: vi.fn(), transaction: vi.fn(),leg:vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   manifiesto: { findUnique: mocks.find }, trackingGPS: { create: mocks.create, findMany: mocks.list },
   $transaction: mocks.transaction,
@@ -11,7 +11,7 @@ import { actualizarUbicacion, getViajeActual, invalidateGpsCache } from '../../c
 
 const trip = {
   id: 'gps-qa-trip', estado: 'EN_TRANSITO', numero: 'QA-50', transportistaId: 'carrier-1',
-  generadorId: 'generator-1', operadorId: 'operator-1', fechaRetiro: null,
+  generadorId: 'generator-1', operadorId: 'operator-1', fechaRetiro: null, isDemoData: false,
   generador: null, operador: null,
 };
 const point = { latitud: -32.88, longitud: -68.84, velocidad: 15, direccion: 180 };
@@ -29,7 +29,8 @@ describe('GPS concurrency and recovery guards', () => {
     mocks.create.mockResolvedValue({ id: 'point-1', ...point });
     mocks.list.mockResolvedValue([]);
     mocks.current.mockResolvedValue([trip]);
-    mocks.transaction.mockImplementation(async callback => callback({ $queryRaw: mocks.current, trackingGPS: { create: mocks.create } }));
+    mocks.leg.mockResolvedValue(null);
+    mocks.transaction.mockImplementation(async callback => callback({ $queryRaw: mocks.current, trackingGPS: { create: mocks.create },tramoTransporte:{findFirst:mocks.leg} }));
   });
   afterEach(() => { vi.restoreAllMocks(); invalidateGpsCache(trip.id); });
 
@@ -40,7 +41,39 @@ describe('GPS concurrency and recovery guards', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mocks.find).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledTimes(2);
-    expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point } });
+    expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point,isDemoData:false,emisor:'usuario:user-carrier-1' } });
+  });
+
+  it.each([true, false])('keeps the parent manifest practice marker on an original GPS point: %s', async isDemoData => {
+    mocks.current.mockResolvedValue([{ ...trip, isDemoData }]);
+    const next = vi.fn();
+    await actualizarUbicacion(request(), response(), next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isDemoData }) }));
+  });
+
+  it('describes a corridor observation as received points without claiming a current or sustained route', async () => {
+    mocks.find.mockResolvedValue({ ...trip,
+      generador: { latitud: -32.89, longitud: -68.84 }, operador: { latitud: -34.62, longitud: -68.33 } });
+    mocks.list.mockResolvedValue([
+      { latitud: -31.4, longitud: -66.0 },
+      { latitud: -31.5, longitud: -66.1 },
+      { latitud: -31.6, longitud: -66.2 },
+    ]);
+    const next = vi.fn();
+    await actualizarUbicacion(request(), response(), next);
+    expect(next).not.toHaveBeenCalled();
+    const event = mocks.emit.mock.calls.map(([value]) => value).find(value => value.tipoAnomalia === 'FUERA_CORREDOR_GEOGRAFICO');
+    expect(event).toBeDefined();
+    expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({
+      where: { manifiestoId: trip.id, tramoId: null },
+    }));
+    expect(event.descripcion).toMatch(/posiciones recibidas/i);
+    expect(event.descripcion).toMatch(/transporte original/i);
+    expect(event.descripcion).toMatch(/hora de captura no disponible/i);
+    expect(event.descripcion).toMatch(/verific[aá].*transporte/i);
+    expect(event.descripcion).toMatch(/no se compara una ruta vial autorizada/i);
+    expect(event.descripcion).not.toMatch(/se mantuvieron|est[aá] fuera/i);
   });
 
   it.each([true, false])('rejects a foreign carrier with warm cache = %s', async (warm) => {
@@ -122,5 +155,22 @@ describe('GPS concurrency and recovery guards', () => {
     await getViajeActual(request(point, 'carrier-2'), response(), next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
     expect(mocks.list).not.toHaveBeenCalled();
+  });
+  it('loads the company site when authorizing the GPS history', async () => {
+    const site = { empresaId: 'qa-company', establecimientoId: 'qa-site' };
+    mocks.find.mockResolvedValue({ ...trip, contextoEmpresa: site });
+    const own = request(); own.user.empresaContexto = { ...site, todasSedes: false };
+    const next = vi.fn(), res = response(); await getViajeActual(own, res, next);
+    expect(next).not.toHaveBeenCalled(); expect(res.json).toHaveBeenCalled();
+    expect(mocks.find.mock.calls[0][0].select.contextoEmpresa).toBe(true);
+    const other = request(); other.user.empresaContexto = { ...site, establecimientoId: 'other-site', todasSedes: false };
+    mocks.list.mockClear(); const denied = vi.fn(); await getViajeActual(other, response(), denied);
+    expect(denied).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 })); expect(mocks.list).not.toHaveBeenCalled();
+  });
+  it('stops the original phone after a handoff even with a warm owner cache',async()=>{
+    await actualizarUbicacion(request(),response(),vi.fn());mocks.create.mockClear();
+    mocks.leg.mockResolvedValue({id:'replacement',tipo:'EXTERNO'});
+    const next=vi.fn();await actualizarUbicacion(request(),response(),next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));expect(mocks.create).not.toHaveBeenCalled();
   });
 });

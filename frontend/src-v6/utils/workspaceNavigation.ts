@@ -1,0 +1,102 @@
+import {
+  Home, FileText, Truck, ClipboardCheck, Command, Radio, Users, Factory,
+  FlaskConical, Building2, FileCheck, BarChart3, AlertTriangle, Bell, Shield,
+  ShieldCheck, Upload, ScanLine, HelpCircle, LifeBuoy, Settings, type LucideIcon,
+} from 'lucide-react';
+import type { User } from '../contexts/AuthContext';
+import { canAccessMobilePath } from './mobileAccess';
+import { canUseCompanySection } from '../services/companyContext';
+import { actorWorkspaceNavigation, actorWorkspaceRoute } from './actorWorkspace';
+
+export type WorkspaceItem = { path: string; label: string; icon: LucideIcon; section: 'main' | 'admin' | 'tools' };
+/** Keep help in the header throughout actor lists, details and forms. */
+export const isActorWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?(?:admin\/)?actores(?:\/|$)/.test(pathname)
+  || /^\/(?:(?:app|mobile)\/)?admin\/(?:generadores|operadores)(?:\/|$)/.test(pathname);
+export const isNoticeWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?notificaciones(?:\/|$)/.test(pathname);
+export const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
+export const isInspectionStaff = (user: Pick<User, 'rol' | 'esInspector' | 'esJefeInspecciones'> | null | undefined) =>
+  Boolean(user && (user.esJefeInspecciones || user.esInspector || ADMIN_ROLES.includes(user.rol)));
+const catalog: WorkspaceItem[] = [
+  {path:'/dashboard', label:'Inicio', icon:Home, section:'main'},
+  {path:'/transporte/perfil', label:'Viajes', icon:Truck, section:'main'},
+  {path:'/manifiestos', label:'Manifiestos', icon:FileText, section:'main'},
+  {path:'/inspecciones', label:'Inspecciones', icon:ClipboardCheck, section:'main'},
+  {path:'/centro-control', label:'Centro de control', icon:Command, section:'main'},
+  {path:'/monitor', label:'Monitor', icon:Radio, section:'main'},
+  {path:'/reportes', label:'Reportes', icon:BarChart3, section:'main'},
+  {path:'/notificaciones', label:'Avisos', icon:Bell, section:'main'},
+  {path:'/alertas', label:'Alertas operativas', icon:AlertTriangle, section:'main'},
+  {path:'/actores', label:'Consultar actores', icon:Building2, section:'main'},
+  {path:'/admin/actores', label:'Actores', icon:Building2, section:'admin'},
+  {path:'/admin/actores/generadores', label:'Generadores', icon:Factory, section:'admin'},
+  {path:'/admin/actores/transportistas', label:'Transportistas', icon:Truck, section:'admin'},
+  {path:'/admin/actores/operadores', label:'Operadores', icon:FlaskConical, section:'admin'},
+  {path:'/admin/solicitudes', label:'Solicitudes', icon:FileCheck, section:'admin'},
+  {path:'/admin/usuarios', label:'Usuarios', icon:Users, section:'admin'},
+  {path:'/admin/vehiculos', label:'Vehículos', icon:Truck, section:'admin'},
+  {path:'/admin/residuos', label:'Catálogo de residuos', icon:FlaskConical, section:'admin'},
+  {path:'/admin/tratamientos', label:'Tratamientos', icon:BarChart3, section:'admin'},
+  {path:'/admin/blockchain', label:'Certificación blockchain', icon:ShieldCheck, section:'admin'},
+  {path:'/admin/auditoria', label:'Auditoría', icon:Shield, section:'admin'},
+  {path:'/admin/carga-masiva', label:'Carga masiva', icon:Upload, section:'admin'},
+  {path:'/escaner-qr', label:'Escanear QR', icon:ScanLine, section:'tools'},
+  {path:'/configuracion', label:'Configuración', icon:Settings, section:'tools'},
+  {path:'/ayuda', label:'Ayuda', icon:HelpCircle, section:'tools'},
+  {path:'/soporte', label:'Soporte', icon:LifeBuoy, section:'tools'},
+];
+export function workspaceNavigation(user: User | null | undefined): WorkspaceItem[] {
+  if (!user) return [];
+  return catalog.filter(item =>
+    canAccessMobilePath(user, item.path) && canUseCompanySection(user.empresaContexto, item.path)
+    && (item.path !== '/actores' || Boolean(user.esInspector && !ADMIN_ROLES.includes(user.rol)))
+    && (item.path !== '/transporte/perfil' || user.rol === 'TRANSPORTISTA')
+  );
+}
+export function workspaceTitle(pathname: string): string {
+  const actor = actorWorkspaceRoute(pathname);
+  if (actor) return actor.stage === 'list' ? actor.plural : actor.stage === 'detail' ? `Ficha del ${actor.label}`
+    : `${actor.stage === 'create' ? 'Nuevo' : actor.stage === 'renew' ? 'Renovar' : 'Editar'} ${actor.label}`;
+  const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
+  const details: Array<[RegExp, string]> = [
+    [/^\/notificaciones\//, 'Aviso recibido'],
+    [/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/, 'Requerimiento'],
+    [/^\/inspecciones\//, 'Inspección'],
+    [/^\/manifiestos\/nuevo/, 'Nuevo manifiesto'],
+    [/^\/manifiestos\/[^/]+\/adendas/, 'Adendas del manifiesto'],
+    [/^\/manifiestos\/baja-intensidad/, 'Eventuales'],
+    [/^\/transporte\/cargas/, 'GPS de mis viajes'],
+    [/^\/transporte\/viaje\//, 'Viaje'],
+    [/^\/mi-perfil/, 'Mi perfil'],
+    [/^\/mi-solicitud(?:\/|$)/, 'Mi solicitud'],
+    [/^\/empresas/, 'Empresas y establecimientos'],
+    [/^\/tracking/, 'Seguimiento GPS'],
+    [/^\/estadisticas/, 'Estadísticas'],
+    [/^\/admin\/renovaciones/, 'Renovaciones'],
+    [/^\/admin\/solicitudes/, 'Solicitudes de inscripción'],
+    [/^\/switch-user/, 'Cuenta'],
+  ];
+  return details.find(([rule]) => rule.test(path))?.[1]
+    || [...catalog].sort((a,b) => b.path.length-a.path.length)
+      .find(item => path === item.path || path.startsWith(item.path+'/'))?.label
+    || 'SITREP';
+}
+
+/** Associate detail screens with the section that owns the work. */
+export function workspaceSectionPath(pathname: string, user?: User | null, state?: unknown): string {
+  if (user) {
+    const actor = actorWorkspaceNavigation(pathname, user, state);
+    if (actor) return actor.sectionPath;
+  }
+  const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
+  if (/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/.test(path)) return '/notificaciones';
+  if (isNoticeWorkspace(path)) return '/notificaciones';
+  if (/^\/admin\/(?:solicitudes|renovaciones)(?:\/|$)/.test(path)) return '/admin/solicitudes';
+  if (/^\/transporte\/(?:viaje|cargas)(?:\/|$)/.test(path)) return '/transporte/perfil';
+  if (/^\/(?:empresas|mi-solicitud)(?:\/|$)/.test(path)) return '/mi-perfil';
+  return path;
+}
+
+export function workspaceRoleLabel(role: string): string {
+  return ({ADMIN:'Administrador',GENERADOR:'Generador',TRANSPORTISTA:'Transportista',OPERADOR:'Operador',
+    AUDITOR:'Auditor',ADMIN_GENERADOR:'Adm. Generadores',ADMIN_TRANSPORTISTA:'Adm. Transportistas',ADMIN_OPERADOR:'Adm. Operadores'} as Record<string,string>)[role] || role;
+}

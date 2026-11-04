@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 
-export const SWUpdateBanner: React.FC = () => {
+export const SWUpdateBanner: React.FC<{ localBlockReason?: string; className?: string }> = ({ localBlockReason, className = '' }) => {
   const [showUpdate, setShowUpdate] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [blockedReason, setBlockedReason] = useState('');
@@ -33,9 +33,14 @@ export const SWUpdateBanner: React.FC = () => {
     };
 
     const handleUpdateFound = () => {
-      installingWorker = registration?.installing ?? null;
-      if (!installingWorker) return;
-      installingWorker.addEventListener('statechange', handleStateChange);
+      const next = registration?.installing ?? null;
+      if (next !== installingWorker) {
+        installingWorker?.removeEventListener('statechange', handleStateChange);
+        installingWorker = next;
+        installingWorker?.addEventListener('statechange', handleStateChange);
+      }
+      // updatefound may have fired before this component mounted.
+      handleStateChange();
     };
 
     // Detect when a new SW takes control
@@ -45,10 +50,11 @@ export const SWUpdateBanner: React.FC = () => {
     navigator.serviceWorker.ready.then((reg) => {
       if (!mounted) return;
       registration = reg;
+      reg.addEventListener('updatefound', handleUpdateFound);
+      handleUpdateFound();
       if (reg.waiting) {
         setShowUpdate(true);
       }
-      reg.addEventListener('updatefound', handleUpdateFound);
     });
 
     return () => {
@@ -60,6 +66,10 @@ export const SWUpdateBanner: React.FC = () => {
   }, []);
 
   const handleUpdate = async () => {
+    if (localBlockReason) {
+      setBlockedReason(localBlockReason);
+      return;
+    }
     const beforeUpdate = new CustomEvent<{ reason?: string }>('sitrep:before-app-update', { cancelable: true, detail: {} });
     window.dispatchEvent(beforeUpdate);
     if (beforeUpdate.defaultPrevented) {
@@ -89,11 +99,11 @@ export const SWUpdateBanner: React.FC = () => {
   if (!showUpdate) return null;
 
   return (
-    <div className="relative z-30 border-b border-primary-800 bg-primary-700 px-3 py-2" role="status" aria-live="polite">
+    <div className={`relative z-30 border-b border-primary-800 bg-primary-700 px-3 py-2 ${className}`} role="status" aria-live="polite">
       <button
         onClick={() => void handleUpdate()}
         disabled={updating}
-        className="mx-auto flex min-h-10 w-full max-w-xl items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700"
+        className="mx-auto flex min-h-11 w-full max-w-xl items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700"
       >
         <RefreshCw size={16} />
         {updating ? 'Preparando actualización…' : 'Nueva versión disponible — Actualizar cuando termines'}

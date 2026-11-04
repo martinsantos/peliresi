@@ -53,6 +53,24 @@ export function normalizeAlertCondition(raw: unknown): string {
   return JSON.stringify(parseAlertCondition(raw));
 }
 
+/** Every matching branch must include an explicitly configured lower bound. */
+export function hasConfiguredTransitThreshold(raw: unknown): boolean {
+  const requiresThreshold = (node: Condition): boolean => {
+    const threshold = node.horasTransito;
+    if (threshold && !Array.isArray(threshold) && typeof threshold === 'object') {
+      const [operator, value] = Object.entries(threshold as Record<string, unknown>)[0] ?? [];
+      const numeric = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+      if ((operator === 'gt' || operator === 'gte') && Number.isFinite(numeric) && numeric >= 0) return true;
+    }
+    const all = node.all;
+    if (Array.isArray(all) && all.some(child => requiresThreshold(child as Condition))) return true;
+    const any = node.any;
+    if (Array.isArray(any) && any.length > 0 && any.every(child => requiresThreshold(child as Condition))) return true;
+    return false;
+  };
+  return requiresThreshold(parseAlertCondition(raw));
+}
+
 export function matchesAlertCondition(raw: unknown, data: Record<string, unknown>): boolean {
   const condition = parseAlertCondition(raw);
   const evaluate = (node: Condition): boolean => Object.entries(node).every(([field, expected]) => {

@@ -1,379 +1,113 @@
-/**
- * SITREP v6 - Admin Renovaciones Page
- * Lista y gestiona renovaciones anuales de Generadores y Operadores
- */
-
-import React, { useState } from 'react';
-import {
-  RefreshCw, CheckCircle, XCircle, Clock, Filter,
-  Eye, ThumbsUp, ThumbsDown, Loader2,
-} from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
-import { Button } from '../../components/ui/ButtonV2';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { Badge } from '../../components/ui/BadgeV2';
+import { Button } from '../../components/ui/ButtonV2';
 import { Modal } from '../../components/ui/Modal';
-import { Select } from '../../components/ui/Select';
-import { Table, Pagination } from '../../components/ui/Table';
-import { toast } from '../../components/ui/Toast';
-import {
-  useRenovaciones,
-  useAprobarRenovacion,
-  useRechazarRenovacion,
-} from '../../hooks/useRenovaciones';
+import { NativeSelect } from '../../components/ui/NativeSelect';
+import { QueryContent } from '../../components/ui/QueryContent';
+import { ReviewPagination } from '../../components/registration/ReviewPagination';
+import { AdmissionTabs } from '../../components/registration/AdmissionTabs';
+import { DraftConflictNotice } from '../../components/DraftConflictNotice';
+import { useRenovaciones, useRenovacion, useAprobarRenovacion, useRechazarRenovacion } from '../../hooks/useRenovaciones';
+import { useAdmissionContext } from '../../hooks/useAdmissionContext';
+import { useScopedSearchParams } from '../../hooks/useScopedSearchParams';
+import { useRecoverableForm } from '../../hooks/useRecoverableForm';
+import { ACTOR_NAMES, RENEWAL_STATES, renewalActor, renewalChanges } from '../../utils/admissionReview';
+import { getApiErrorMessage } from '../../utils/api-error';
 import type { Renovacion } from '../../types/api';
 
-const ESTADO_CONFIG: Record<string, { color: string; icon: typeof Clock; label: string }> = {
-  PENDIENTE: { color: 'warning', icon: Clock, label: 'Pendiente' },
-  APROBADA: { color: 'success', icon: CheckCircle, label: 'Aprobada' },
-  RECHAZADA: { color: 'error', icon: XCircle, label: 'Rechazada' },
-};
-
-const AdminRenovacionesPage: React.FC = () => {
-  const currentYear = new Date().getFullYear();
-  const [anio, setAnio] = useState<number>(currentYear);
-  const [tipoActor, setTipoActor] = useState<string>('');
-  const [estado, setEstado] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const [selectedRenov, setSelectedRenov] = useState<Renovacion | null>(null);
-  const [rejectModal, setRejectModal] = useState<Renovacion | null>(null);
-  const [motivoRechazo, setMotivoRechazo] = useState('');
-
-  const { data, isLoading } = useRenovaciones({
-    anio: anio || undefined,
-    tipoActor: tipoActor || undefined,
-    estado: estado || undefined,
-    page,
-    limit: 20,
-  });
-
-  const aprobarMutation = useAprobarRenovacion();
-  const rechazarMutation = useRechazarRenovacion();
-
-  const renovaciones = data?.items || [];
-  const totalPages = data?.totalPages || 1;
-
-  const stats = {
-    pendientesGen: renovaciones.filter(r => r.estado === 'PENDIENTE' && r.tipoActor === 'GENERADOR').length,
-    pendientesOp: renovaciones.filter(r => r.estado === 'PENDIENTE' && r.tipoActor === 'OPERADOR').length,
-    aprobadas: renovaciones.filter(r => r.estado === 'APROBADA').length,
-    rechazadas: renovaciones.filter(r => r.estado === 'RECHAZADA').length,
-  };
-
-  const handleAprobar = async (renov: Renovacion) => {
-    try {
-      await aprobarMutation.mutateAsync({ id: renov.id });
-      toast.success('Aprobada', `Renovacion ${renov.anio} aprobada`);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo aprobar');
-    }
-  };
-
-  const handleRechazar = async () => {
-    if (!rejectModal || !motivoRechazo.trim()) return;
-    try {
-      await rechazarMutation.mutateAsync({ id: rejectModal.id, motivoRechazo });
-      toast.success('Rechazada', 'Renovacion rechazada');
-      setRejectModal(null);
-      setMotivoRechazo('');
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo rechazar');
-    }
-  };
-
-  const actorName = (r: Renovacion) => r.generador?.razonSocial || r.operador?.razonSocial || '-';
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary-100 rounded-xl">
-          <RefreshCw size={22} className="text-primary-600" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Renovaciones Anuales</h2>
-          <p className="text-sm text-neutral-500">Gestion de renovaciones de habilitacion</p>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="!p-4 text-center">
-          <p className="text-2xl font-bold text-amber-600">{stats.pendientesGen}</p>
-          <p className="text-xs text-neutral-500">Pend. Generadores</p>
-        </Card>
-        <Card className="!p-4 text-center">
-          <p className="text-2xl font-bold text-amber-600">{stats.pendientesOp}</p>
-          <p className="text-xs text-neutral-500">Pend. Operadores</p>
-        </Card>
-        <Card className="!p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">{stats.aprobadas}</p>
-          <p className="text-xs text-neutral-500">Aprobadas</p>
-        </Card>
-        <Card className="!p-4 text-center">
-          <p className="text-2xl font-bold text-red-600">{stats.rechazadas}</p>
-          <p className="text-xs text-neutral-500">Rechazadas</p>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <Filter size={16} className="text-neutral-400 hidden sm:block" />
-        <div className="w-full sm:w-36">
-          <Select
-            value={String(anio)}
-            onChange={(val) => { setAnio(Number(val)); setPage(1); }}
-            options={[currentYear, currentYear - 1, currentYear - 2].map(y => ({ value: String(y), label: String(y) }))}
-            size="sm"
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            value={tipoActor}
-            onChange={(val) => { setTipoActor(val); setPage(1); }}
-            options={[
-              { value: '', label: 'Todos los actores' },
-              { value: 'GENERADOR', label: 'Generadores' },
-              { value: 'OPERADOR', label: 'Operadores' },
-            ]}
-            size="sm"
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            value={estado}
-            onChange={(val) => { setEstado(val); setPage(1); }}
-            options={[
-              { value: '', label: 'Todos los estados' },
-              { value: 'PENDIENTE', label: 'Pendientes' },
-              { value: 'APROBADA', label: 'Aprobadas' },
-              { value: 'RECHAZADA', label: 'Rechazadas' },
-            ]}
-            size="sm"
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      {isLoading ? (
-        <div className="text-center py-12">
-          <Loader2 size={32} className="animate-spin text-primary-500 mx-auto" />
-        </div>
-      ) : renovaciones.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <RefreshCw size={40} className="text-neutral-300 mx-auto mb-3" />
-            <p className="text-neutral-500">No hay renovaciones para los filtros seleccionados</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-        {/* Mobile Card View */}
-        <div className="md:hidden space-y-2">
-          {renovaciones.map(r => {
-            const cfg = ESTADO_CONFIG[r.estado] || ESTADO_CONFIG.PENDIENTE;
-            return (
-              <Card
-                key={r.id}
-                className="active:scale-[0.98] transition-transform cursor-pointer"
-                onClick={() => setSelectedRenov(r)}
-              >
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
-                        <RefreshCw size={16} className="text-primary-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-neutral-900 truncate">{actorName(r)}</p>
-                        <span className="text-xs text-neutral-400">{r.anio}</span>
-                      </div>
-                    </div>
-                    <Badge variant="soft" color={cfg.color}>{cfg.label}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between mt-2 pl-10">
-                    <Badge variant="soft" color={r.tipoActor === 'GENERADOR' ? 'purple' : 'blue'}>
-                      {r.tipoActor}
-                    </Badge>
-                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setSelectedRenov(r)} className="p-1.5 rounded-lg hover:bg-neutral-100" title="Ver detalle">
-                        <Eye size={14} className="text-neutral-500" />
-                      </button>
-                      {r.estado === 'PENDIENTE' && (
-                        <>
-                          <button onClick={() => handleAprobar(r)} className="p-1.5 rounded-lg hover:bg-green-50" title="Aprobar"
-                            disabled={aprobarMutation.isPending}>
-                            <ThumbsUp size={14} className="text-green-600" />
-                          </button>
-                          <button onClick={() => setRejectModal(r)} className="p-1.5 rounded-lg hover:bg-red-50" title="Rechazar">
-                            <ThumbsDown size={14} className="text-red-600" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Desktop Table */}
-        <Card className="hidden md:block">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50">
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Actor</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Tipo</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Ano</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Modalidad</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Estado</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Campos</th>
-                  <th className="text-right py-3 px-4 font-medium text-neutral-600">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {renovaciones.map(r => {
-                  const cfg = ESTADO_CONFIG[r.estado] || ESTADO_CONFIG.PENDIENTE;
-                  const campos = r.camposModificados ? JSON.parse(r.camposModificados) : [];
-                  return (
-                    <tr key={r.id} className="border-b border-neutral-100 hover:bg-neutral-50">
-                      <td className="py-3 px-4 font-medium">{actorName(r)}</td>
-                      <td className="py-3 px-4">
-                        <Badge variant="soft" color={r.tipoActor === 'GENERADOR' ? 'purple' : 'blue'}>
-                          {r.tipoActor}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">{r.anio}</td>
-                      <td className="py-3 px-4">
-                        <Badge variant="soft" color={r.modalidad === 'SIN_CAMBIOS' ? 'success' : 'warning'}>
-                          {r.modalidad === 'SIN_CAMBIOS' ? 'Sin Cambios' : `Con Cambios (${campos.length})`}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge variant="soft" color={cfg.color}>{cfg.label}</Badge>
-                      </td>
-                      <td className="py-3 px-4 text-xs text-neutral-500">
-                        {campos.length > 0 ? campos.slice(0, 3).join(', ') + (campos.length > 3 ? '...' : '') : '-'}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setSelectedRenov(r)} className="p-1.5 rounded-lg hover:bg-neutral-100" title="Ver detalle">
-                            <Eye size={14} className="text-neutral-500" />
-                          </button>
-                          {r.estado === 'PENDIENTE' && (
-                            <>
-                              <button onClick={() => handleAprobar(r)} className="p-1.5 rounded-lg hover:bg-green-50" title="Aprobar"
-                                disabled={aprobarMutation.isPending}>
-                                <ThumbsUp size={14} className="text-green-600" />
-                              </button>
-                              <button onClick={() => setRejectModal(r)} className="p-1.5 rounded-lg hover:bg-red-50" title="Rechazar">
-                                <ThumbsDown size={14} className="text-red-600" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 p-4 border-t border-neutral-200">
-              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-50">Anterior</button>
-              <span className="text-xs text-neutral-500">Pagina {page} de {totalPages}</span>
-              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-50">Siguiente</button>
-            </div>
-          )}
-        </Card>
-        </>
-      )}
-
-      {/* Detail Modal */}
-      {selectedRenov && (
-        <Modal isOpen onClose={() => setSelectedRenov(null)} title={`Renovacion ${selectedRenov.anio} — ${actorName(selectedRenov)}`} size="lg">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <p className="text-xs text-neutral-500">Tipo Actor</p>
-                <p className="font-medium">{selectedRenov.tipoActor}</p>
-              </div>
-              <div>
-                <p className="text-xs text-neutral-500">Modalidad</p>
-                <Badge variant="soft" color={selectedRenov.modalidad === 'SIN_CAMBIOS' ? 'success' : 'warning'}>
-                  {selectedRenov.modalidad === 'SIN_CAMBIOS' ? 'Sin Cambios' : 'Con Cambios'}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-xs text-neutral-500">Estado</p>
-                <Badge variant="soft" color={ESTADO_CONFIG[selectedRenov.estado]?.color || 'warning'}>
-                  {ESTADO_CONFIG[selectedRenov.estado]?.label || selectedRenov.estado}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-xs text-neutral-500">Fecha</p>
-                <p className="text-sm">{new Date(selectedRenov.createdAt).toLocaleDateString('es-AR')}</p>
-              </div>
-            </div>
-            {selectedRenov.tefAnterior !== undefined && selectedRenov.tefNuevo !== undefined && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <p className="text-xs font-medium text-amber-700 mb-1">Impacto TEF</p>
-                <p className="text-sm">Anterior: <span className="font-mono font-bold">${selectedRenov.tefAnterior?.toLocaleString()}</span> → Nuevo: <span className="font-mono font-bold">${selectedRenov.tefNuevo?.toLocaleString()}</span></p>
-              </div>
-            )}
-            {selectedRenov.camposModificados && (
-              <div>
-                <p className="text-xs text-neutral-500 mb-1">Campos modificados</p>
-                <div className="flex flex-wrap gap-1">
-                  {JSON.parse(selectedRenov.camposModificados).map((c: string) => (
-                    <Badge key={c} variant="soft" color="warning">{c}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedRenov.observaciones && (
-              <div>
-                <p className="text-xs text-neutral-500 mb-1">Observaciones</p>
-                <p className="text-sm">{selectedRenov.observaciones}</p>
-              </div>
-            )}
-            {selectedRenov.motivoRechazo && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <p className="text-xs font-medium text-red-700 mb-1">Motivo de rechazo</p>
-                <p className="text-sm">{selectedRenov.motivoRechazo}</p>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {/* Reject Modal */}
-      {rejectModal && (
-        <Modal isOpen onClose={() => { setRejectModal(null); setMotivoRechazo(''); }} title="Rechazar Renovacion" size="sm">
-          <div className="space-y-4">
-            <p className="text-sm text-neutral-600">Rechazar renovacion de <strong>{actorName(rejectModal)}</strong> ({rejectModal.anio})</p>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
-              <textarea value={motivoRechazo} onChange={e => setMotivoRechazo(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
-                rows={3} placeholder="Indique el motivo del rechazo..." />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setRejectModal(null); setMotivoRechazo(''); }}>Cancelar</Button>
-              <Button variant="primary" size="sm" onClick={handleRechazar}
-                disabled={!motivoRechazo.trim() || rechazarMutation.isPending}>
-                {rechazarMutation.isPending ? 'Rechazando...' : 'Confirmar Rechazo'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+export default function AdminRenovacionesPage() {
+  const context = useAdmissionContext();
+  return <RenewalList key={context.owner} {...context} />;
+}
+function RenewalList({ owner, actorType, role }: { owner: string; actorType: string; role: string }) {
+  const [params, setParams] = useScopedSearchParams('admin-renewals', ['anio', 'tipoActor', 'estado', 'page', 'revision'], owner);
+  const anio = params.get('anio') ?? String(new Date().getFullYear()), tipoActor = actorType || params.get('tipoActor') || '', estado = params.get('estado') || '';
+  const page = Math.max(1, Math.floor(Number(params.get('page'))) || 1), selected = params.get('revision') || '';
+  const query = useRenovaciones({ anio: anio ? Number(anio) : undefined, tipoActor: tipoActor || undefined, estado: estado || undefined, page, limit: 20 });
+  const change = (key: string, value: string) => setParams(next => { value || key === 'anio' ? next.set(key, value) : next.delete(key); if (key !== 'page' && key !== 'revision') next.delete('page'); return next; });
+  const years = Array.from(new Set([new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2, ...(anio ? [Number(anio)] : [])])).sort((a,b) => b-a);
+  return <div className="space-y-4">
+    <AdmissionTabs active="renovaciones" />
+    <div className="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-3">
+      <NativeSelect label="Año" value={anio} onChange={v => change('anio', v)}><option value="">Todos los años</option>{years.map(y => <option key={y} value={y}>{y}</option>)}</NativeSelect>
+      {!actorType ? <NativeSelect label="Actividad" value={tipoActor} onChange={v => change('tipoActor', v)}><option value="">Todas las actividades</option><option value="GENERADOR">Generador</option><option value="OPERADOR">Operador</option></NativeSelect> : <p className="self-end py-3 text-sm text-neutral-600">{ACTOR_NAMES[actorType]} · tu área de revisión</p>}
+      <NativeSelect label="Estado" value={estado} onChange={v => change('estado', v)}><option value="">Todos los estados</option>{Object.entries(RENEWAL_STATES).map(([key, s]) => <option key={key} value={key}>{s.label}</option>)}</NativeSelect>
     </div>
-  );
-};
-
-export default AdminRenovacionesPage;
+    <QueryContent query={query} loading="Cargando renovaciones" error="No pudimos consultar las renovaciones. Tus filtros se conservan." retryLabel="Reintentar renovaciones">
+      {!query.data?.items.length && <p className="rounded-xl border border-neutral-200 bg-white p-4">No hay renovaciones con estos filtros.</p>}
+      {!!query.data?.items.length && <div className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">{query.data.items.map(r => {
+        const status = RENEWAL_STATES[r.estado];
+        return <button key={r.id} onClick={() => change('revision', r.id)} aria-label={`Revisar ${renewalActor(r)}, ${r.anio}`} className="grid min-h-11 w-full gap-2 p-4 text-left hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-700 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] md:items-center">
+          <span className="min-w-0"><span className="block font-semibold text-neutral-900 [overflow-wrap:anywhere]">{renewalActor(r)}</span><span className="block text-sm text-neutral-600">{ACTOR_NAMES[r.tipoActor]} · {r.anio} · {r.modalidad === 'SIN_CAMBIOS' ? 'Sin cambios' : r.modalidad === 'CON_CAMBIOS' ? 'Con cambios' : 'Modalidad sin identificar'}</span></span>
+          <span className="space-y-1"><Badge variant="soft" color={status?.color || 'neutral'}>{status?.label || 'Estado no disponible'}</Badge><span className="block text-sm text-neutral-600">{status?.next || 'Consultar el detalle'}</span></span>
+          <span className="flex items-center justify-end gap-2 text-sm text-primary-800">Revisar<ArrowRight size={18} aria-hidden="true" /></span>
+        </button>;
+      })}</div>}
+      <ReviewPagination page={page} pages={query.data?.totalPages || 1} total={query.data?.total || 0} onPage={p => change('page', String(p))} />
+    </QueryContent>
+    {selected && <RenewalReview key={owner + selected} id={selected} owner={owner} role={role} close={() => change('revision', '')} />}
+  </div>;
+}
+export function RenewalReview({ id, owner, role, close }: { id: string; owner: string; role: string; close: () => void }) {
+  const query = useRenovacion(id), approve = useAprobarRenovacion(), reject = useRechazarRenovacion();
+  const running = useRef(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState('');
+  const feedback = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (error || success) feedback.current?.focus(); }, [error, success]);
+  const act = async (decision: 'approve' | 'reject', reason: string, confirmed: () => void) => {
+    const r = query.data;
+    if (running.current || query.isFetching || query.isError || !r || r.estado !== 'PENDIENTE' || !(role === 'ADMIN' || role === 'ADMIN_' + r.tipoActor)) return;
+    if (decision === 'approve' && !renewalChanges(r).valid) return;
+    if (decision === 'reject' && reason.trim().length < 3) return;
+    running.current = true; setBusy(true); setError(''); setSuccess('');
+    try {
+      if (decision === 'approve') await approve.mutateAsync({ id }); else await reject.mutateAsync({ id, motivoRechazo: reason.trim() });
+      confirmed();
+      setSuccess(decision === 'approve' ? 'Renovación aprobada. La decisión quedó registrada.' : 'Renovación rechazada. El motivo quedó registrado.');
+    } catch (e) { setError(getApiErrorMessage(e, 'No pudimos confirmar la decisión. Consultá el estado actualizado antes de reintentar.')); }
+    finally { await query.refetch(); running.current = false; setBusy(false); }
+  };
+  return <Modal isOpen onClose={close} isBusy={busy} title="Revisar renovación" size="lg">
+    <div className="space-y-4">
+      {error && <p ref={feedback} tabIndex={-1} role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900">{error}</p>}
+      {success && <p ref={feedback} tabIndex={-1} role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900">{success}</p>}
+      <QueryContent query={query} loading="Consultando la renovación" error="No pudimos verificar la renovación. La decisión está bloqueada hasta actualizarla." retryLabel="Actualizar renovación">
+        {query.data && <RenewalDecision key={owner + id} renewal={query.data} owner={owner} role={role} busy={busy || query.isFetching} act={act} />}
+      </QueryContent>
+    </div>
+  </Modal>;
+}
+function RenewalDecision({ renewal: r, owner, role, busy, act }: { renewal: Renovacion; owner: string; role: string; busy: boolean; act: (decision: 'approve' | 'reject', reason: string, confirmed: () => void) => Promise<void> }) {
+  const draft = useRecoverableForm('sitrep:renewal-review:v1:' + owner + ':' + r.id, '', (v): v is string => typeof v === 'string' && v.length <= 2000);
+  const [decision, setDecision] = useState<'approve' | 'reject' | null>(draft.value ? 'reject' : null);
+  const actionPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (decision) actionPanel.current?.querySelector<HTMLElement>(decision === 'reject' ? 'textarea' : 'button')?.focus();
+  }, [decision]);
+  const status = RENEWAL_STATES[r.estado], changes = renewalChanges(r);
+  const canDecide = r.estado === 'PENDIENTE' && (role === 'ADMIN' || role === 'ADMIN_' + r.tipoActor);
+  return <div className="space-y-4">
+    <div><h2 className="font-semibold text-lg [overflow-wrap:anywhere]">{renewalActor(r)}</h2><p className="text-sm text-neutral-600">{ACTOR_NAMES[r.tipoActor]} · {r.anio} · CUIT {r.generador?.cuit || r.operador?.cuit || 'no disponible'}</p><Badge variant="soft" color={status?.color || 'neutral'}>{status?.label || 'Estado no disponible'}</Badge></div>
+    <section aria-label="Cambios propuestos" className="space-y-3">
+      <h3 className="font-semibold">Datos de la renovación</h3>
+      {r.modalidad === 'SIN_CAMBIOS' && <p className="text-sm">El actor declara que sus datos no cambiaron.</p>}
+      {!changes.valid && <p role="alert" className="rounded-lg bg-warning-50 p-3 text-sm text-warning-900">No podemos interpretar los cambios de esta solicitud. No se puede aprobar hasta revisar sus datos.</p>}
+      {changes.rows.length > 0 && <><p className="text-sm text-neutral-600">Comparación con los datos al presentar la renovación.</p><dl className="divide-y divide-neutral-200 rounded-lg border border-neutral-200">{changes.rows.map(row => <div key={row.key} className="space-y-2 p-3"><dt className="font-medium">{row.label}</dt><dd className="grid gap-3 sm:grid-cols-2"><div className="min-w-0 text-sm [overflow-wrap:anywhere]"><span className="block text-neutral-600">Al presentar</span>{row.before}</div><div className="min-w-0 rounded-lg bg-primary-50 p-2 text-sm text-primary-900 [overflow-wrap:anywhere]"><span className="block font-medium">Propuesto</span>{row.after}</div></dd></div>)}</dl></>}
+    </section>
+    {(r.tefAnterior != null || r.tefNuevo != null) && <p className="text-sm">TEF declarada: anterior {r.tefAnterior ?? 'sin declarar'} · nueva {r.tefNuevo ?? 'sin declarar'}</p>}
+    {r.observaciones && <div><h3 className="font-medium">Observaciones</h3><p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{r.observaciones}</p></div>}
+    {r.motivoRechazo && <div className="rounded-lg bg-error-50 p-3"><h3 className="font-medium text-error-900">Motivo del rechazo</h3><p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{r.motivoRechazo}</p></div>}
+    {canDecide && <section ref={actionPanel} className="space-y-3 border-t border-neutral-200 pt-4" aria-label="Decisión de administración">
+      <p className="text-sm text-neutral-600">Te corresponde revisar y decidir esta renovación.</p>
+      {draft.conflict && <DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} />}
+      {!decision && <div className="flex flex-wrap gap-2"><Button disabled={busy || !changes.valid || draft.conflict} onClick={() => setDecision('approve')}>Aprobar renovación</Button><Button variant="outline" disabled={busy} onClick={() => setDecision('reject')}>Rechazar con motivo</Button></div>}
+      {decision === 'approve' && <div className="space-y-3 rounded-lg border border-primary-200 bg-primary-50 p-3"><p className="text-sm">Al confirmar, se aprobará la renovación de {renewalActor(r)} para {r.anio}{r.modalidad === 'CON_CAMBIOS' ? ' y se aplicarán los cambios propuestos' : ''}.</p><div className="flex flex-wrap gap-2"><Button disabled={busy || !changes.valid || draft.conflict} onClick={() => void act('approve', '', () => { draft.clear(); setDecision(null); })}>Confirmar aprobación</Button><Button variant="outline" disabled={busy} onClick={() => setDecision(null)}>Volver a revisar</Button></div></div>}
+      {decision === 'reject' && <form className="space-y-3" onSubmit={e => { e.preventDefault(); if (!draft.conflict) void act('reject', draft.value, () => { draft.clear(); setDecision(null); }); }}>
+        <div><label htmlFor="renewal-reason" className="block text-sm font-medium">Motivo del rechazo</label><textarea id="renewal-reason" required minLength={3} maxLength={2000} disabled={busy} rows={4} value={draft.value} onChange={e => draft.update(e.target.value)} aria-describedby="renewal-reason-help" className="mt-1 w-full rounded-lg border border-neutral-300 p-3" /><p id="renewal-reason-help" className="text-sm text-neutral-600">Indicá qué debe corregir el actor. Mínimo 3 caracteres.</p></div>
+        <p role="status" className="text-sm text-neutral-600">{draft.error ? 'No pudimos guardar el motivo en este dispositivo. Mantené la pantalla abierta.' : draft.saved ? 'Borrador guardado en este dispositivo. Todavía no enviado.' : 'El motivo se enviará al confirmar.'}</p>
+        <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy || draft.value.trim().length < 3 || draft.conflict}>Confirmar rechazo</Button><Button variant="outline" disabled={busy} onClick={() => setDecision(null)}>Volver a revisar</Button></div>
+      </form>}
+    </section>}
+  </div>;
+}

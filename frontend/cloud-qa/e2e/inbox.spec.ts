@@ -13,13 +13,15 @@ test('operator opens a persisted proactive follow-up in the existing inbox witho
   await page.goto(prefix(info) + '/notificaciones');
   const row = page.getByRole('list', { name: 'Avisos', exact: true }).locator(':scope > li').filter({ hasText: fixture.followup.numero });
   await expect(page.getByRole('list', { name: 'Avisos', exact: true })).toBeVisible();
-  for (let i = 0; i < 10 && await row.count() === 0; i++) {
+  while (await row.count() === 0) {
     const next = page.getByRole('button', { name: 'Siguiente página', exact: true });
     if (await next.isDisabled()) break;
-    const loaded = page.waitForResponse(r => r.url().includes('/api/notificaciones?') && r.request().method() === 'GET');
+    const currentPage = Number(new URL(page.url()).searchParams.get('pagina') || 1);
+    const loaded = page.waitForResponse(r => new URL(r.url()).pathname === '/api/notificaciones' && new URL(r.url()).searchParams.get('offset') === String(currentPage * 20) && r.request().method() === 'GET');
     await next.click();
-    expect((await loaded).status()).toBe(200);
-    await expect(page.getByRole('list', { name: 'Avisos', exact: true })).toBeVisible();
+    const response = await loaded; expect(response.status()).toBe(200);
+    const data = (await response.json()).data; expect(data.pagina).toBe(currentPage + 1);
+    await expect(page.getByRole('list', { name: 'Avisos', exact: true })).toContainText(data.notificaciones[0].mensaje);
   }
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('Revisar pesaje y tratamiento · Abrir manifiesto');
@@ -51,14 +53,16 @@ test('real assignment -> bell -> paginated inbox -> keyboard -> exact dossier ->
   await page.getByRole('button', { name: 'Crear expediente', exact: true }).click();
   const saved = await save; expect(saved.status()).toBe(201);
   const inspection = (await saved.json()).data;
+  let actualNoticeId: string;
   const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
   try {
     const target = await db.$queryRawUnsafe('SELECT current_database() AS name, inet_server_port() AS port, host(inet_server_addr()) AS address');
     expect(target).toEqual([{ name: 'sitrep_night_qa_20260926', port: 55440, address: '127.0.0.1' }]);
     const recipient = await db.usuario.findUniqueOrThrow({ where: { email: 'inspector@night-qa.invalid' } });
     expect(inspection.inspectorId).toBe(recipient.id);
-    const actualNotice = await db.notificacion.findFirstOrThrow({ where: { usuarioId: recipient.id, titulo: 'Inspección asignada · ' + inspection.numero } });
+    const actualNotice = await db.notificacion.findFirstOrThrow({ where: { usuarioId: recipient.id, titulo: 'PSIP · Inspección programada', mensaje: { startsWith: inspection.numero + ' ·' } } });
     expect(JSON.parse(actualNotice.datos).inspeccionId).toBe(inspection.id);
+    actualNoticeId = actualNotice.id;
     // Older notifications are explicit synthetic pagination fixtures, not a
     // replacement for the actual domain-created assignment above.
     await db.notificacion.createMany({ data: Array.from({ length: 45 }, (_, i) => ({
@@ -85,13 +89,13 @@ test('real assignment -> bell -> paginated inbox -> keyboard -> exact dossier ->
       return (await response.json()).data;
     };
     await inspector.getByRole('banner').getByRole('button', { name: /^Notificaciones/ }).click();
-    await expect(inspector.getByText('Inspección asignada · ' + inspection.numero, { exact: true })).toBeVisible();
+    await expect(inspector.getByRole('region', { name: 'Notificaciones recientes' }).getByRole('button').filter({ hasText: inspection.numero })).toContainText('PSIP · Inspección programada');
     const all = inspector.getByRole('button', { name: 'Ver todas las notificaciones', exact: true });
     expect((await all.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await all.click();
     await expect(inspector).toHaveURL(new RegExp(prefix(info) + '/notificaciones$'));
     const inbox = inspector.getByTestId('notification-inbox');
-    await expect(inbox.getByRole('heading', { name: 'Notificaciones', exact: true })).toBeVisible();
+    await expect(inbox.getByRole('heading', { name: 'Tus avisos', exact: true })).toBeVisible();
     if (info.project.name === 'app') {
       const activeNotice = inspector.getByRole('link', { name: /Avisos/ });
       await expect(activeNotice).toHaveAttribute('aria-current', 'page');
@@ -101,7 +105,7 @@ test('real assignment -> bell -> paginated inbox -> keyboard -> exact dossier ->
     const counts = await notices('limit=20');
     await expect(inbox.getByRole('button', { name: 'No leídas (' + counts.noLeidas + ')', exact: true })).toBeVisible();
     await expect(inbox.getByRole('list', { name: 'Avisos', exact: true }).locator(':scope > li')).toHaveCount(20);
-    const primary = inbox.getByRole('button', { name: 'Abrir aviso: Inspección asignada · ' + inspection.numero, exact: true });
+    const primary = inbox.getByRole('button', { name: 'Abrir aviso: PSIP · Inspección programada', exact: true }).filter({ hasText: inspection.numero });
     await expect(primary.locator('svg.lucide-clipboard-check')).toHaveCount(1);
     if (info.project.name === 'web-desktop') {
       const before = await primary.boundingBox();
@@ -128,9 +132,9 @@ test('real assignment -> bell -> paginated inbox -> keyboard -> exact dossier ->
     await inspector.keyboard.press('Enter');
     await expect(inspector).toHaveURL(new RegExp(prefix(info) + '/inspecciones/' + inspection.id + '$'));
     await expect(inspector.locator('main')).toContainText(inspection.numero);
-    await expect.poll(async () => (await notices('limit=20')).notificaciones.find((n: { titulo: string }) => n.titulo === 'Inspección asignada · ' + inspection.numero)?.leida).toBe(true);
+    await expect.poll(async () => (await notices('limit=20')).notificaciones.find((n: { id: string }) => n.id === actualNoticeId)?.leida).toBe(true);
     await inspector.goto(prefix(info) + '/notificaciones');
-    await expect(inbox.getByRole('button', { name: 'Abrir aviso: Inspección asignada · ' + inspection.numero, exact: true })).toBeVisible();
+    await expect(inbox.getByRole('button', { name: 'Abrir aviso: PSIP · Inspección programada', exact: true }).filter({ hasText: inspection.numero })).toBeVisible();
     const changed = await notices('limit=1');
     await expect(inspector.getByRole('banner').getByRole('button', { name: 'Notificaciones (' + changed.noLeidas + ' sin leer)', exact: true })).toBeVisible();
     await expect(inspector).toHaveTitle(/SITREP/);

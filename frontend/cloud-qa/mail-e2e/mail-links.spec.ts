@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { prefix } from '../e2e/helpers';
+import { prefix, isolatedMapTiles } from '../e2e/helpers';
 const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'mail-fixture.json'), 'utf8'));
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, info) => {
+  await isolatedMapTiles(page, info);
   expect(fixture.database).toBe('sitrep_night_qa_20260926');
   expect(fixture.externalDelivery).toBe(false);
   await page.context().addCookies([{ name: 'sitrep_qa_client', value: `127.11.${Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`, url: 'http://127.0.0.1:4177' }]);
@@ -29,7 +30,7 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
   expect(new URL(href!).origin).toBe('http://127.0.0.1:4177');
   // Email actions are canonical web URLs. App proves the equivalent /app route,
   // not automatic Android app-link association or an installed email client.
-  if (info.project.name === 'app') await page.goto('/app' + new URL(href!).pathname);
+  if (info.project.name === 'app') await page.goto('/app' + new URL(href!).pathname + new URL(href!).search + new URL(href!).hash);
   else await action.click();
   await signInAtDestination(page, item.user);
   await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + item.expected);
@@ -87,8 +88,8 @@ test('forwarded support link does not reveal another actor ticket', async ({ pag
   await page.screenshot({ path: info.outputPath('denied-ticket.png'), animations: 'disabled' });
 });
 test('all templates and operational variants fit with institutional brand and readable actions', async ({ page }, info) => {
-  test.setTimeout(120_000);
-  expect(fixture.templates).toHaveLength(58);
+  test.setTimeout(240_000);
+  expect(fixture.templates).toHaveLength(107);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -150,8 +151,8 @@ test('all templates and operational variants fit with institutional brand and re
 });
 
 test('all templates retain identity and actions when email images are blocked', async ({ page }, info) => {
-  test.setTimeout(120_000);
-  expect(fixture.templates).toHaveLength(58);
+  test.setTimeout(240_000);
+  expect(fixture.templates).toHaveLength(107);
   for (const item of fixture.templates) {
     // Reproduce the received Gmail DOM: image elements remain, but src is stripped.
     // This is graceful degradation, not a claim that Gmail delivery is repaired.

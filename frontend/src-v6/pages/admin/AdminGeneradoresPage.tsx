@@ -1,3 +1,4 @@
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Admin Generadores Page
  * ==================================
@@ -9,7 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useActorListNavigation } from '../../hooks/useActorListNavigation';
 import {
   Factory,
   CheckCircle,
@@ -23,6 +24,7 @@ import {
   ShieldX,
   RefreshCw,
   BellRing,
+  ChevronDown,
   CheckSquare,
   ListChecks,
 } from 'lucide-react';
@@ -91,7 +93,9 @@ function fallbackFiscalSituation(generador: Generador, fiscalYear: number): Situ
 }
 
 const AdminGeneradoresPage: React.FC = () => {
-  const navigate = useNavigate();
+  const list = useActorListNavigation();
+  const navigate = list.open;
+  const mp = useMobilePrefix();
   const { isAdmin, isAdminGenerador } = useAuth();
   const { impersonateUser } = useImpersonation();
   const { data: enrichmentData } = useGeneradoresEnrichment();
@@ -99,15 +103,17 @@ const AdminGeneradoresPage: React.FC = () => {
   const topRubros = useMemo(() => enrichmentData?.topRubros || [], [enrichmentData]);
 
   // ── State ──
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState('');
-  const [filtroRubro, setFiltroRubro] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [filtroFiscal, setFiltroFiscal] = useState<'todos' | FiscalStatusFilter>('todos');
-  const [fiscalYear, setFiscalYear] = useState(CURRENT_YEAR);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>('razonSocial');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const busqueda = list.text('q'), setBusqueda = (value: string) => list.set('q', value);
+  const filtroCategoria = list.text('categoria'), setFiltroCategoria = (value: string) => list.set('categoria', value);
+  const filtroRubro = list.text('rubro'), setFiltroRubro = (value: string) => list.set('rubro', value);
+  const filtroEstado = list.text('estado', 'todos'), setFiltroEstado = (value: string) => list.set('estado', value);
+  const filtroFiscal = list.text('fiscal', 'todos') as 'todos' | FiscalStatusFilter;
+  const setFiltroFiscal = (value: 'todos' | FiscalStatusFilter) => list.set('fiscal', value);
+  const fiscalYear = list.number('year', CURRENT_YEAR), setFiscalYear = (value: number) => list.set('year', value);
+  const currentPage = list.number('page', 1), setCurrentPage = (value: number) => list.set('page', value);
+  const sortBy = list.text('sortBy', 'razonSocial'), setSortBy = (value: string) => list.set('sortBy', value);
+  const sortOrder = list.text('sortOrder', 'asc') === 'desc' ? 'desc' : 'asc';
+  const setSortOrder = (value: 'asc' | 'desc') => list.set('sortOrder', value);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectingSegment, setSelectingSegment] = useState(false);
@@ -205,6 +211,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const filters: CRUDFilter[] = [
     {
       key: 'rubro',
+      label: 'Rubro',
       value: filtroRubro,
       onChange: (v) => { setFiltroRubro(v); setCurrentPage(1); },
       placeholder: 'Todos los rubros',
@@ -218,6 +225,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'categoria',
+      label: 'Categoría',
       value: filtroCategoria,
       onChange: (v) => { setFiltroCategoria(v); setCurrentPage(1); },
       placeholder: 'Todas las categorias',
@@ -230,6 +238,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'estado',
+      label: 'Estado',
       value: filtroEstado,
       onChange: (v) => { setFiltroEstado(v); setCurrentPage(1); },
       placeholder: 'Todos los estados',
@@ -241,6 +250,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'fiscalYear',
+      label: 'Ejercicio fiscal',
       value: String(fiscalYear),
       onChange: (v) => { setFiscalYear(Number(v)); setCurrentPage(1); },
       placeholder: 'Ejercicio fiscal',
@@ -250,6 +260,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'fiscalStatus',
+      label: 'Situación fiscal',
       value: filtroFiscal,
       onChange: (v) => { setFiltroFiscal(v as 'todos' | FiscalStatusFilter); setCurrentPage(1); },
       placeholder: 'Situacion fiscal',
@@ -266,6 +277,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'orden',
+      label: 'Orden',
       value: `${sortBy}:${sortOrder}`,
       onChange: (value) => {
         const [field, direction] = value.split(':');
@@ -473,21 +485,21 @@ const AdminGeneradoresPage: React.FC = () => {
           )}
           <button
             className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/generadores/${row.id}`)); }}
             title="Ver"
           >
             <Eye size={14} />
           </button>
           <button
             className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 hover:text-info-700 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}/editar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/generadores/${row.id}/editar`)); }}
             title="Editar"
           >
             <Edit size={14} />
           </button>
           <button
             className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}/renovar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/generadores/${row.id}/renovar`)); }}
             title="Renovar"
           >
             <RefreshCw size={14} />
@@ -552,7 +564,7 @@ const AdminGeneradoresPage: React.FC = () => {
     setSendingReminders(true);
     try {
       const result = await actoresService.createGeneradorReminders({ ids: selectedIds, fiscalYear, motivo: reminderText.trim() });
-      toast.success('Recordatorios creados', `${result.delivered} avisos entregados${result.skipped ? `; ${result.skipped} omitidos por cuenta inactiva o inexistente` : ''}.`);
+      toast.success('Recordatorios creados', `${result.delivered} avisos creados${result.skipped ? `; ${result.skipped} generadores sin destinatarios disponibles` : ''}.`);
       setReminderOpen(false);
       setSelectedIds([]);
     } catch (reminderError: any) {
@@ -623,10 +635,7 @@ const AdminGeneradoresPage: React.FC = () => {
     <>
     <GenericCRUDPage<Row>
       // Page metadata
-      title="Admin Generadores"
-      subtitle="Panel de gestion de generadores de residuos"
-      icon={<Factory size={24} className="text-purple-600" />}
-      iconBg="bg-purple-100"
+      title="Generadores"
       // Data
       data={tableData}
       isLoading={isLoading}
@@ -637,7 +646,8 @@ const AdminGeneradoresPage: React.FC = () => {
       columns={columns}
       tableClassName="[&_table]:min-w-[40rem]"
       getRowKey={(row) => row.id}
-      onRowClick={(row) => navigate(`/admin/actores/generadores/${row.id}`)}
+      getRowLabel={(row) => row.razonSocial}
+      onRowClick={(row) => navigate(mp(`/admin/actores/generadores/${row.id}`))}
       emptyMessage="No se encontraron generadores"
       // Search
       searchValue={busqueda}
@@ -660,9 +670,8 @@ const AdminGeneradoresPage: React.FC = () => {
         onPageChange: setCurrentPage,
       }}
       // Actions
-      onNew={() => navigate('/admin/actores/generadores/nuevo')}
-      newLabel="Nuevo Generador"
-      mobileNewLabel="Nuevo"
+      onNew={() => navigate(mp('/admin/actores/generadores/nuevo'))}
+      newLabel="Nuevo generador"
       // CSV export
       csvExport={{
         onExport: handleCsvExport,
@@ -695,12 +704,14 @@ const AdminGeneradoresPage: React.FC = () => {
         title: 'Eliminar Generador',
       }}
       renderAfterFilters={() => (
-        <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-4" aria-live="polite">
+        <details className="group rounded-xl border border-neutral-200 bg-white p-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-neutral-700 [&::-webkit-details-marker]:hidden"><BellRing size={16} aria-hidden="true" /><span>Recordatorios a generadores{selectedIds.length > 0 ? ` · ${selectedIds.length} seleccionados` : ''}</span><ChevronDown size={16} aria-hidden="true" className="ml-auto shrink-0 transition-transform group-open:rotate-180" /></summary>
+          <div className="mt-3 border-t border-neutral-100 pt-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-white p-2 text-primary-700 shadow-sm"><ListChecks size={20} /></div>
               <div>
-                <p className="text-sm font-bold text-neutral-900">Gestionar el segmento visible</p>
+                <p className="text-sm font-bold text-neutral-900">Seleccionar destinatarios</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{selectedIds.length > 0 ? `${selectedIds.length} generadores seleccionados. La audiencia exacta se revisa antes de crear avisos.` : 'Seleccione filas, la pagina actual o todos los resultados de los filtros vigentes.'}</p>
               </div>
             </div>
@@ -709,13 +720,14 @@ const AdminGeneradoresPage: React.FC = () => {
                 const pageIds = tableData.map((row) => row.id);
                 const everyPageRowSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
                 setSelectedIds(everyPageRowSelected ? selectedIds.filter((id) => !pageIds.includes(id)) : Array.from(new Set([...selectedIds, ...pageIds])));
-              }} disabled={tableData.length === 0}>{tableData.every((row) => selectedIds.includes(row.id)) && tableData.length > 0 ? 'Quitar pagina' : 'Seleccionar pagina'}</Button>
-              <Button variant="outline" size="sm" leftIcon={<ListChecks size={15} />} onClick={() => void selectCompleteSegment()} isLoading={selectingSegment} disabled={total === 0}>Todo el segmento ({total})</Button>
+              }} disabled={tableData.length === 0}>{tableData.every((row) => selectedIds.includes(row.id)) && tableData.length > 0 ? 'Quitar página' : 'Seleccionar página'}</Button>
+              <Button variant="outline" size="sm" leftIcon={<ListChecks size={15} />} onClick={() => void selectCompleteSegment()} isLoading={selectingSegment} disabled={total === 0}>Todos los resultados ({total})</Button>
               {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Limpiar</Button>}
               <Button size="sm" leftIcon={<BellRing size={15} />} onClick={openReminderReview} disabled={selectedIds.length === 0 || (!isAdmin && !isAdminGenerador)}>Preparar recordatorio</Button>
             </div>
           </div>
-        </div>
+          </div>
+        </details>
       )}
       renderMobileCard={(row) => (
         <Card className="p-4 pr-14">
@@ -772,7 +784,7 @@ const AdminGeneradoresPage: React.FC = () => {
           <div className="rounded-xl bg-neutral-50 p-3"><p className="text-xs font-medium text-neutral-500">Destinatarios</p><p className="mt-1 text-xl font-bold text-neutral-900">{selectedIds.length}</p></div>
           <div className="rounded-xl bg-neutral-50 p-3"><p className="text-xs font-medium text-neutral-500">Ejercicio</p><p className="mt-1 text-xl font-bold text-neutral-900">{fiscalYear}</p></div>
         </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">Solo reciben el aviso las cuentas activas asociadas a la seleccion confirmada. Si una cuenta fue desactivada desde la seleccion, se omitira y quedara informada en el resultado.</div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">Reciben el aviso las cuentas principales activas y, si está habilitada la representación de empresas, las personas con cuenta activa, correo verificado y autorización para toda la actividad del generador. Las autorizaciones se verifican de nuevo al abrirlo; el resultado informa los generadores sin destinatarios disponibles.</div>
         <label className="block text-sm font-semibold text-neutral-800">Mensaje del recordatorio
           <textarea value={reminderText} maxLength={500} onChange={(event) => setReminderText(event.target.value)} rows={5} className="mt-2 w-full resize-y rounded-xl border border-neutral-300 px-3 py-2.5 font-normal leading-relaxed outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100" />
         </label>

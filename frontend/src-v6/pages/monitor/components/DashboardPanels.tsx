@@ -1,9 +1,11 @@
+import { MonitorPosition } from './MonitorPosition';
 /**
  * DashboardPanels — Left sidebar with Widget System
  * Layout: top zone (scrollable widgets) + drag divider + bottom zone (EventFeed).
  * Each widget: collapsible header + closeable. Closed → tray.
  */
 
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ClipboardCheck, Factory, FlaskConical, Package, Beaker, Droplets,
@@ -37,12 +39,12 @@ function PendingManifest({ id, numero, canViewDetail, className, children }: {
 
 const ESTADO_COLORS: Record<string, { base: string; dark: string }> = {
   BORRADOR:       { base: '#94a3b8', dark: '#64748b' },
-  APROBADO:       { base: '#22c55e', dark: '#16a34a' },
+  APROBADO:       { base: '#22c55e', dark: '#15803d' },
   EN_TRANSITO:    { base: '#3b82f6', dark: '#2563eb' },
-  ENTREGADO:      { base: '#f97316', dark: '#ea580c' },
+  ENTREGADO:      { base: '#f97316', dark: '#c2410c' },
   RECIBIDO:       { base: '#8b5cf6', dark: '#7c3aed' },
   EN_TRATAMIENTO: { base: '#a855f7', dark: '#9333ea' },
-  TRATADO:        { base: '#eab308', dark: '#ca8a04' },
+  TRATADO:        { base: '#eab308', dark: '#a16207' },
   CANCELADO:      { base: '#737373', dark: '#525252' },
   RECHAZADO:      { base: '#ef4444', dark: '#b91c1c' },
 };
@@ -163,9 +165,9 @@ const ManifiestoCard: React.FC<{
           className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
           style={{ backgroundColor: color + '20' }}
         >
-          {tipo || 'EVENTO'}
+          {manifestEventLabel(tipo)}
         </span>
-        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono tabular-nums">
+        <div className="flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[10px] text-neutral-600 font-mono tabular-nums">
           <span>{formatTimeShort(event.timestamp)}</span>
           {totalEvents > 0 && <span className="text-neutral-600">{eventIndex + 1}/{totalEvents}</span>}
         </div>
@@ -196,7 +198,7 @@ const ManifiestoCard: React.FC<{
       )}
 
       {/* Description */}
-      <p className="text-[10px] text-neutral-400 truncate">{event.descripcion}</p>
+      <p className="break-words text-xs leading-relaxed text-neutral-700">{manifestEventDescription(tipo, event.descripcion)}</p>
     </div>
   );
 };
@@ -204,11 +206,14 @@ const ManifiestoCard: React.FC<{
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
+  now?: number;
   inspections?: InspectionOperation[];
   inspectionTotal?: number;
   inspectionError?: boolean;
   inspectionLoading?: boolean;
   mode: MonitorMode;
+  dataState?: 'ready' | 'stale' | 'loading' | 'error' | 'offline';
+  errorDetail?: string;
   liveData: MonitorLiveResponse | null;
   forecastData: ForecastResponse | null;
   timelineData: TimelineResponse | null;
@@ -237,8 +242,8 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const DashboardPanels: React.FC<Props> = ({
-  inspections, inspectionTotal, inspectionError, inspectionLoading,
-  mode, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
+  now, inspections, inspectionTotal, inspectionError, inspectionLoading,
+  mode, dataState = 'ready', errorDetail, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
   currentEventId, enTransito = [], currentEvent, currentEventIndex = 0,
   totalEventCount = 0, onTripClick, onEventOpen, onViajeOpen,
 }) => {
@@ -258,7 +263,10 @@ export const DashboardPanels: React.FC<Props> = ({
   const minimize = (id: WId) => setWs(p => ({ ...p, [id]: p[id] === 'minimized' ? 'visible' : 'minimized' }));
   const close    = (id: WId) => setWs(p => ({ ...p, [id]: 'closed' }));
   const restore  = (id: WId) => setWs(p => ({ ...p, [id]: 'visible' }));
-  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed' && (w.id !== 'inspecciones' || inspections !== undefined));
+  const dataAvailable = dataState === 'ready' || dataState === 'stale';
+  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed'
+    && (w.id !== 'inspecciones' || inspections !== undefined)
+    && (dataAvailable || w.id === 'inspecciones'));
 
   // ── Drag divider ──
   const containerRef = useRef<HTMLDivElement>(null);
@@ -274,7 +282,7 @@ export const DashboardPanels: React.FC<Props> = ({
     : (liveData?.estadisticas?.porEstado || {});
   const maxEstado = Math.max(...Object.values(porEstado), 1);
   const stages = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
-  const eventos = playbackEvents || liveData?.eventosRecientes || [];
+  const eventos = mode === 'PLAYBACK' ? (playbackEvents || []) : (liveData?.eventosRecientes || []);
 
   // In PLAYBACK: derive Residuos/Tratamiento/Actores from timelineData events
   // (gives stats relevant to the selected day, not the live snapshot)
@@ -318,10 +326,10 @@ export const DashboardPanels: React.FC<Props> = ({
     };
   }, [mode, timelineData]);
 
-  const topGeneradores = timelineActores?.generadores || liveData?.topGeneradores || [];
-  const topOperadores = timelineActores?.operadores || liveData?.topOperadores || [];
-  const topResiduos = timelineResidues || liveData?.topResiduos || [];
-  const tratamientosActivos = timelineTratamientos || liveData?.tratamientosActivos || [];
+  const topGeneradores = mode === 'PLAYBACK' ? (timelineActores?.generadores || []) : (liveData?.topGeneradores || []);
+  const topOperadores = mode === 'PLAYBACK' ? (timelineActores?.operadores || []) : (liveData?.topOperadores || []);
+  const topResiduos = mode === 'PLAYBACK' ? (timelineResidues || []) : (liveData?.topResiduos || []);
+  const tratamientosActivos = mode === 'PLAYBACK' ? (timelineTratamientos || []) : (liveData?.tratamientosActivos || []);
 
   return (
     <div ref={containerRef} className={`wr-dashboard flex flex-col h-full overflow-hidden p-3 gap-0 ${mode === 'FORECAST' ? 'wr-dashboard-pending' : ''}`}>
@@ -329,11 +337,17 @@ export const DashboardPanels: React.FC<Props> = ({
       {/* ── ZONA STATS — altura controlada por divider ── */}
       <div
         className="flex flex-col gap-2 overflow-y-auto flex-shrink-0 pb-2"
-        style={{ height: mode === 'FORECAST' ? '100%' : `calc(${dividerPct}% - 28px)` }}
+        style={{ height: mode === 'FORECAST' || !dataAvailable ? '100%' : `calc(${dividerPct}% - 28px)` }}
       >
+        {dataState !== 'ready' && <p role="status" className="wr-panel p-3 text-sm text-neutral-700">
+          {dataState === 'loading' ? 'Cargando los datos del Monitor…'
+            : dataState === 'offline' ? 'Sin conexión. Conectate para consultar los datos del Monitor.'
+            : dataState === 'error' ? errorDetail || 'No pudimos cargar los datos del Monitor. Usá Actualizar para reintentar.'
+            : `Consulta sin actualizar. Los datos mostrados pueden haber cambiado.${errorDetail ? ' ' + errorDetail : ''}`}
+        </p>}
         {mode !== 'FORECAST' && <>
         {/* Widget: Pipeline */}
-        {ws.pipeline !== 'closed' && (
+        {dataAvailable && ws.pipeline !== 'closed' && (
           <WidgetShell title="Estados del manifiesto" icon={GitBranch}
             state={ws.pipeline} onMin={() => minimize('pipeline')} onClose={() => close('pipeline')}>
             <div className="flex flex-col gap-1">
@@ -377,13 +391,16 @@ export const DashboardPanels: React.FC<Props> = ({
           {!!inspectionTotal && inspectionTotal > inspections.length && <Link className="text-xs text-primary-700" to="/inspecciones">Ver agenda completa ({inspectionTotal})</Link>}
         </WidgetShell>}
         {/* Widget: Viajes */}
-        {ws.viajes !== 'closed' && (
+        {dataAvailable && ws.viajes !== 'closed' && (
           <WidgetShell title="Viajes" icon={Truck}
             state={ws.viajes} onMin={() => minimize('viajes')} onClose={() => close('viajes')}>
             {enTransito.length === 0 ? (
-              <p className="text-[11px] text-neutral-400 text-center py-2">Sin viajes activos</p>
+              <p className="text-xs text-neutral-600 text-center py-2">{dataState === 'stale'
+                ? 'La última consulta no tenía viajes. No se pudo actualizar.'
+                : mode === 'PLAYBACK' ? 'Sin viajes en este momento del historial' : 'Sin viajes activos'}</p>
             ) : (
               <div className="space-y-1">
+                {mode === 'LIVE' && enTransito.some(v => v.ruta.length > 1) && <p className="text-xs text-neutral-600">Las líneas unen posiciones por orden de recepción; no confirman el recorrido.</p>}
                 {enTransito.map(v => (
                   <button key={v.manifiestoId} type="button" aria-label={`Abrir viaje ${v.numero}`}
                     className="w-full text-left min-h-11 flex items-start gap-2 py-2 px-1 rounded hover:bg-orange-50 cursor-pointer transition-colors"
@@ -396,12 +413,8 @@ export const DashboardPanels: React.FC<Props> = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
                         <p className="text-[11px] font-black font-mono text-neutral-800 truncate">{v.numero}</p>
-                        {v.ultimaPosicion?.velocidad != null && v.ultimaPosicion.velocidad > 0 && (
-                          <span className="text-[9px] font-mono text-orange-500 shrink-0">
-                            {v.ultimaPosicion.velocidad.toFixed(0)}km/h
-                          </span>
-                        )}
                       </div>
+                      {mode === 'LIVE' && <MonitorPosition position={v.ultimaPosicion} now={now} compact />}
                       {v.transportista && (
                         <p className="text-[10px] text-neutral-500 truncate">{v.transportista}</p>
                       )}
@@ -419,7 +432,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Manifiesto (compact card, no dark background) */}
-        {ws.manifiesto !== 'closed' && (
+        {dataAvailable && ws.manifiesto !== 'closed' && (
           <WidgetShell title="Manifiesto" icon={FileText}
             state={ws.manifiesto} onMin={() => minimize('manifiesto')} onClose={() => close('manifiesto')}>
             <ManifiestoCard
@@ -431,7 +444,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Top Actores */}
-        {ws.actores !== 'closed' && (topGeneradores.length > 0 || topOperadores.length > 0) && (
+        {dataAvailable && ws.actores !== 'closed' && (topGeneradores.length > 0 || topOperadores.length > 0) && (
           <WidgetShell title="Actores" icon={Users}
             state={ws.actores} onMin={() => minimize('actores')} onClose={() => close('actores')}>
             <h4 className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Top Generadores</h4>
@@ -474,7 +487,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Residuos */}
-        {ws.residuos !== 'closed' && (
+        {dataAvailable && ws.residuos !== 'closed' && (
           <WidgetShell title="Residuos" icon={Droplets}
             state={ws.residuos} onMin={() => minimize('residuos')} onClose={() => close('residuos')}>
             {(() => {
@@ -494,7 +507,7 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Widget: Tratamiento */}
-        {ws.tratamiento !== 'closed' && tratamientosActivos.length > 0 && (
+        {dataAvailable && ws.tratamiento !== 'closed' && tratamientosActivos.length > 0 && (
           <WidgetShell title="Tratamiento" icon={Beaker}
             state={ws.tratamiento} onMin={() => minimize('tratamiento')} onClose={() => close('tratamiento')}>
             {(() => {
@@ -521,7 +534,7 @@ export const DashboardPanels: React.FC<Props> = ({
 
         </>}
         {/* Actual pending work, not a prediction or cached live snapshot. */}
-        {mode === 'FORECAST' && forecastData && (
+        {mode === 'FORECAST' && dataAvailable && forecastData && (
           <>
             <div className="wr-panel p-3">
               <h3 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -599,12 +612,12 @@ export const DashboardPanels: React.FC<Props> = ({
       </div>
 
       {/* ── DRAG DIVIDER ── */}
-      {mode !== 'FORECAST' && <label className="wr-panel-divider flex items-center gap-2 min-h-7 px-1 text-xs text-neutral-600">
+      {mode !== 'FORECAST' && dataAvailable && <label className="wr-panel-divider flex items-center gap-2 min-h-7 px-1 text-xs text-neutral-600">
         <span>Paneles</span><input type="range" min={25} max={75} value={dividerPct} aria-label="Espacio para paneles del Monitor" className="flex-1 min-w-0 accent-[#1B5E3C]" onChange={event=>setDividerPct(Number(event.target.value))}/><span>Eventos</span>
       </label>}
 
       {/* ── ZONA EVENTOS — takes remaining height ── */}
-      {mode !== 'FORECAST' && <WidgetShell
+      {mode !== 'FORECAST' && dataAvailable && <WidgetShell
         title="Eventos"
         icon={Radio}
         state={ws.eventos}
@@ -612,12 +625,15 @@ export const DashboardPanels: React.FC<Props> = ({
         className="flex-1 min-h-0 overflow-hidden"
       >
         <div className="h-full overflow-y-auto -mr-1 pr-1">
+          {dataState === 'stale' && eventos.length === 0
+            ? <p className="text-sm text-neutral-600 text-center py-4">La última consulta no tenía eventos. No se pudo actualizar.</p>
+            :
           <EventFeed
             eventos={eventos}
             mode={mode}
             currentEventId={currentEventId}
             onEventClick={onEventOpen}
-          />
+          />}
         </div>
       </WidgetShell>}
     </div>

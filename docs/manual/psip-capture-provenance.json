@@ -1,0 +1,48 @@
+{
+  "capturedOn": "2026-10-20",
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "browserTestsPassed": 18,
+  "captureTestsPassed": 1,
+  "incrementalAcceptance": true,
+  "viewportCSS": {
+    "web-desktop": {
+      "width": 1440,
+      "height": 900
+    },
+    "app": {
+      "width": 360,
+      "height": 800
+    }
+  },
+  "sourceBaseCommit": "5b08aeefd7152536edadeea2ebdc1c32f8f3b487",
+  "sourceProductSha256": "bdfdd31b2e84ec35eded86429252bd116d293fdde2d501e1f8c144d7166f4ecf",
+  "limits": "Playwright en preview aislado; no teléfono Android físico ni aviso externo certificado",
+  "files": [
+    {
+      "file": "desktop/psip-etapas-20261020.png",
+      "sha256": "b223c3c8087cd5fb5102fa48f5ed616080b76c3f95e2ae64bf6b7e32f2ea1ea9",
+      "width": 1440,
+      "height": 900,
+      "project": "web-desktop",
+      "scenario": "Filtros PSIP por etapa"
+    },
+    {
+      "file": "mobile/psip-responder-20261020.png",
+      "sha256": "b110a06cf12bec06eff6049488ace4a1a009663f9b1f58dea574e4cd7ec136bc",
+      "width": 945,
+      "height": 2100,
+      "project": "app",
+      "scenario": "Requerimiento pendiente, después de desplazar la vista hasta Responder"
+    },
+    {
+      "file": "desktop/psip-cierre-20261020.png",
+      "sha256": "991d2d4b56bc57a51b49427fad7731ef6765669b3d1beafda2718e34ba735905",
+      "width": 1440,
+      "height": 900,
+      "project": "web-desktop",
+      "scenario": "Decisión de cierre y registro conservado"
+    }
+  ]
+}

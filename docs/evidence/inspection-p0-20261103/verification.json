@@ -1,0 +1,34 @@
+{
+  "commitProbado": "28bf6967f995227bd2c9df767b9d8b0d0874b97a",
+  "rama": "codex/inspection-field-model-20261103",
+  "padre": "173494004f863b9d277953e42f8164af135832c9",
+  "entorno": "preview aislado: API 3048, PostgreSQL efímero 55441, esquema inspection_field_20261103; contenedor 1 CPU / 2 GiB / sin swap",
+  "tipos": { "backend": "aprobado", "frontend": "aprobado" },
+  "pruebas": {
+    "backend": { "archivos": 15, "pruebas": 358, "nuevas": "inspectionActMail.service.test.ts (18) y 4 en inspectionActShare.controller.test.ts; incluye notification-mail y email.service como regresión" },
+    "frontend": { "archivos": 11, "pruebas": 102, "nuevas": "SharedInspectionActDraft.test.tsx (9) e InspectionActReplyDraft.test.tsx (7)" },
+    "nota": "Las repeticiones de suites durante la tanda no suman cobertura."
+  },
+  "compilaciones": { "backend": "aprobada", "web": "aprobada", "app": "aprobada", "picoMemoriaBytes": 1865408512, "nota": "API aislada detenida durante el build para respetar la guarda de 1,95 GB; heap Vite 950 MB" },
+  "circuitoApi": { "archivo": "flow-p0.json", "comprobaciones": 32, "nota": "33 en la primera corrida (incluyó la creación de la cuenta artificial de jefatura)" },
+  "navegador": [
+    "app 320/393: escribir presentación, cerrar y reabrir → recuperada con aviso y acceso superior",
+    "app 320: envío sin conexión (fetch POST simulado en la pestaña) → texto e id conservados, error junto al botón; reapertura → recuperado",
+    "app 320: registro confirmado → borrador eliminado",
+    "app 320: enlace revocado → 403, borrador de ese enlace eliminado, borrador de otro enlace conservado; sin 'Reintentar' comprobado en el build final",
+    "web 1365: respuesta del inspector sin publicar → recuperada tras salir/volver y tras cerrar sesión, ingresar como generador y volver como inspector",
+    "web 1365 / 768 / app 393 (build final, capturas panel-*.jpg): panel con pendientes primero, enlaces y respondidas plegados, respuesta recuperada visible, registro de avisos legible, sin desborde horizontal",
+    "generador: sin Inspecciones ni Mis inspecciones en el menú; expediente → 'Acceso no disponible'",
+    "correos renderizados a 320/375 px: 8 variantes del circuito revisadas"
+  ],
+  "noValidado": [
+    "Android físico, PWA instalada, red real intermitente",
+    "conflicto entre pestañas en navegador real (sólo pruebas automatizadas)",
+    "sesión vencida por tiempo (se probó cierre voluntario de sesión)",
+    "vencimiento real de un enlace (sólo pruebas automatizadas)",
+    "entrega SMTP, clientes de correo reales, push",
+    "comprensión con inspectores y validación institucional"
+  ],
+  "guardas": { "DISABLE_EMAILS": "true", "PUSH_MANIFEST_NOTICES_ENABLED": "false", "EMAIL_EXTERNAL_ALERTS_ENABLED": "false", "SITREP_PAUSE_BACKGROUND_JOBS": "true", "INSPECTION_ACT_MAIL_ENABLED": "ausente", "filasEnviadas": 0 },
+  "produccion": false, "main": false, "workflows": false, "push": false
+}

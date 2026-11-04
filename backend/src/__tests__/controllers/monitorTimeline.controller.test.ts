@@ -37,6 +37,28 @@ it.each([
   }
   for(const [query] of db.manifests.mock.calls)expect(query.select).toMatchObject({generadorId:true,transportistaId:true,operadorId:true});
 });
+
+it.each([
+  [{ razonSocial: 'QA Transportista asignada' }, 'QA Transportista asignada'],
+  [null, 'Sin asignar'],
+])('forecast keeps its pending-assignment contract without requiring live GPS legs: %j', async (carrier, label) => {
+  db.manifests.mockResolvedValueOnce([{
+    id: 'qa-forecast', numero: 'QA-PENDIENTE', estado: 'APROBADO', generadorId: 'gen', transportistaId: carrier ? 'carrier' : null, operadorId: 'op',
+    createdAt: new Date(), fechaEstimadaRetiro: null,
+    generador: { razonSocial: 'QA Generador', latitud: null, longitud: null },
+    operador: { razonSocial: 'QA Operador', latitud: null, longitud: null }, transportista: carrier,
+  }]).mockResolvedValueOnce([]);
+  const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
+  await getForecast({ query: {}, user: { rol: 'ADMIN' } } as never, res as never);
+  expect(res.status).not.toHaveBeenCalled();
+  const body = res.json.mock.calls[0][0];
+  expect(body.success).toBe(true);
+  expect(body.data.pendienteRetiro).toHaveLength(1);
+  expect(body.data.pendienteRetiro[0]).toMatchObject({ manifiestoId: 'qa-forecast', transportista: label, canViewDetail: true });
+  expect(body.data.pendienteRetiro[0]).not.toHaveProperty('tramoActual');
+  expect(body.data.pendienteRetiro[0]).not.toHaveProperty('transportistaOriginal');
+  expect(body.data.pendienteTratamiento).toEqual([]);
+});
 const run = async (query: object) => {
   const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
   await getTimeline({ query } as any, res as any); return res;

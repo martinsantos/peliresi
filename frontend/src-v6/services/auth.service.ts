@@ -7,7 +7,7 @@ import api, { setTokensDurably, clearTokensDurably, getAccessToken } from './api
 import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../types/api';
 import type { Usuario } from '../types/models';
 import { readCompanyContext,saveCompanyContext } from './companyContext';
-import { activityOwner } from './actorActivity';
+import { activityOwner, readActorActivity, clearActorActivity } from './actorActivity';
 import { releasePushSubscription } from './pushRelease';
 
 export const authService = {
@@ -46,6 +46,12 @@ export const authService = {
         if(owner)saveCompanyContext(owner,null);
         const {data}=await api.get<{data:{user:Usuario}}>('/auth/profile');
         return {...data.data.user,empresaContextoError:selection?'Tu autorización cambió. Elegí nuevamente la empresa.':undefined};
+      }
+      if(axios.isAxiosError(error)&&error.response?.status===403&&readActorActivity(getAccessToken())) {
+        const owner=activityOwner(getAccessToken());
+        if(owner)clearActorActivity(owner);
+        const {data}=await api.get<{data:{user:Usuario}}>('/auth/profile');
+        return {...data.data.user,actividadContextoError:'Esta actividad ya no está disponible. Elegí otra actividad aprobada desde Mi perfil.'};
       }
       throw error;
     }

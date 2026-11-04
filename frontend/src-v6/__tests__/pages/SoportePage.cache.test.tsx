@@ -3,8 +3,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
-const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn() }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }) }));
+const records = vi.hoisted(() => new Map<string, unknown>());
+const identity = vi.hoisted(() => ({ current: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }));
+vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
+vi.mock('../../services/supportCommandStore', () => ({ readSupportCommandRecord: async (key: string) => records.get(key) || null, updateSupportCommandRecord: async (key: string, update: (value: unknown) => unknown) => { const next = update(records.get(key) || null); if (next) records.set(key, next); else records.delete(key); return next; } }));
+const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn(), recoverAction: vi.fn() }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: identity.current }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
 vi.mock('../../services/support.service', () => ({ supportService: calls, supportError: () => 'Error de prueba' }));
 import SoportePage from '../../pages/soporte/SoportePage';
@@ -16,8 +20,10 @@ const ticket = { id: 'new-ticket', referencia: 'SOP-000001', asunto: subject, ca
   contexto: { ruta: '/soporte', ancho: 360, alto: 800 }, puedeGestionar: false, puedeAtender: false, esAutor: true,
   mensajes: [{ id: 'message', cuerpo: 'Descripción original del reporte', interno: false, autor: { id: 'owner', nombre: 'QA' }, createdAt: '2026-10-06T01:00:00Z',
     adjuntos: [{ id: 'file', nombre: filename, mime: 'image/png', bytes: 1200, sha256: 'unit-fixture' }] }], eventos: [] };
+const storedCommands = () => [...records.values()].filter(value => value && typeof value === 'object' && 'status' in value);
 beforeEach(() => {
-  localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
+  identity.current = { id: 'owner', nombre: 'QA', rol: 'OPERADOR' };
+  records.clear(); localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
   vi.clearAllMocks(); calls.access.mockResolvedValue({ puedeGestionar: false, puedeConfigurar: false });
   calls.list.mockResolvedValue({ items: [], total: 0, page: 1, totalPages: 0 }); calls.get.mockResolvedValue(ticket);
   calls.create.mockImplementation(async () => {
@@ -45,6 +51,35 @@ it('refreshes the real owned list after a confirmed create even when its cache w
   await waitFor(() => expect(calls.list.mock.calls.length).toBeGreaterThan(1));
   expect(calls.create).toHaveBeenCalledOnce();
 });
+it('does not reuse a support ticket cached under another activity of the same account', async () => {
+  const query = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 300000 } } });
+  const tree = () => <QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>;
+  const view = render(tree());
+  await screen.findByRole('heading', { name: subject });
+  let release!: (value: unknown) => void;
+  calls.get.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  identity.current = { id: 'owner', nombre: 'QA', rol: 'GENERADOR' };
+  view.rerender(tree());
+  await waitFor(() => expect(calls.get).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument();
+  release({ ...ticket, asunto: 'Reporte de la otra actividad' });
+  expect(await screen.findByRole('heading', { name: 'Reporte de la otra actividad' })).toBeVisible();
+});
+it('does not show an old activity response that finishes after switching roles', async () => {
+  const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = () => <QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>;
+  let release!: (value: unknown) => void;
+  calls.get.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const view = render(tree());
+  await waitFor(() => expect(calls.get).toHaveBeenCalledTimes(1));
+  calls.get.mockResolvedValueOnce({ ...ticket, asunto: 'Ticket de la actividad actual' });
+  identity.current = { id: 'owner', nombre: 'QA', rol: 'GENERADOR' };
+  view.rerender(tree());
+  expect(await screen.findByRole('heading', { name: 'Ticket de la actividad actual' })).toBeVisible();
+  release(ticket);
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Ticket de la actividad actual' })).toBeVisible());
+  expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument();
+});
 it('distinguishes homonymous support agents and submits the selected account, not its display name', async () => {
   const agents = [{ id: 'first-agent', nombre: 'María Pérez', email: 'primera@qa.invalid' }, { id: 'second-agent', nombre: 'María Pérez', email: 'segunda@qa.invalid' }];
   calls.team.mockResolvedValue(agents); calls.act.mockResolvedValue({ id: ticket.id, version: 2, replay: false });
@@ -66,7 +101,8 @@ function openDetail(overrides = {}) {
   calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, ...overrides });
   calls.act.mockResolvedValue({ id: ticket.id, version: 2, replay: false });
   const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>);
+  query.setQueryData(['attention', 'current', 'support'], 6);
+  return { query, ...render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>) };
 }
 it('classifies area, type and priority with an internal reason rather than closing the ticket', async () => {
   openDetail();
@@ -141,6 +177,223 @@ it('offers assignment and direct routing for unassigned staff without opening re
   expect(await screen.findByRole('button', { name: 'Asignarme', exact: true })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Derivar', exact: true })).toBeVisible();
   for (const label of ['Responder', 'Nota interna', 'Pedir respuesta']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Asignarme', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Asignarme', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, { accion: 'TOMAR', cuerpo: '', version: 1 }, [], expect.any(String)));
+});
+
+it('keeps private notes and attachments separate from a public response while switching actions', async () => {
+  openDetail();
+  calls.act.mockImplementation(async () => { calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, version: 2 }); return { id: ticket.id, version: 2, replay: false }; });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Respuesta pública pendiente' } });
+  const publicFile = new File(['public'], 'publico.png', { type: 'image/png' });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [publicFile] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('');
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Diagnóstico privado pendiente' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['private'], 'privado.png', { type: 'image/png' })] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Responder', exact: true }));
+  expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Respuesta pública pendiente');
+  expect(screen.getByText('publico.png', { exact: true })).toBeVisible();
+  expect(screen.queryByText('privado.png', { exact: true })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'RESPONDER', cuerpo: 'Respuesta pública pendiente' }), [publicFile], expect.any(String)));
+  const continueButton = await screen.findByRole('button', { name: 'Continuar', exact: true });
+  await waitFor(() => expect(continueButton).toBeEnabled()); fireEvent.click(continueButton);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Nota interna', exact: true })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('Diagnóstico privado pendiente');
+  expect(screen.getByText('privado.png', { exact: true })).toBeVisible();
+  expect(screen.getAllByRole('button', { name: 'Grabar audio', exact: true })).toHaveLength(1);
+});
+it.each(['Derivar', 'Pedir respuesta', 'Cerrar', 'Clasificar'])('does not carry note text into %s or erase the note on return', async label => {
+  openDetail(); fireEvent.click(await screen.findByRole('button', { name: 'Nota interna', exact: true }));
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Sólo soporte: borrador reservado' } });
+  fireEvent.click(screen.getByRole('button', { name: label, exact: true }));
+  expect(screen.getByRole('textbox', { name: label === 'Derivar' || label === 'Clasificar' ? 'Nota interna / motivo' : 'Mensaje o resolución' })).toHaveValue('');
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('Sólo soporte: borrador reservado');
+  expect(calls.act).not.toHaveBeenCalled();
+});
+it('keeps a prepared public reply when a separate private note is confirmed', async () => {
+  openDetail(); fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Próxima respuesta pública' } });
+  calls.act.mockImplementation(async () => { calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, version: 2 }); return { id: ticket.id, version: 2, replay: false }; });
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Nota privada confirmada' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
+  const continueButton = await screen.findByRole('button', { name: 'Continuar', exact: true });
+  await waitFor(() => expect(continueButton).toBeEnabled()); fireEvent.click(continueButton);
+  await waitFor(() => expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Próxima respuesta pública'));
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('');
+});
+it('keeps previously chosen files after rejecting an oversized replacement and supports explicit removal', async () => {
+  openDetail(); const input = await screen.findByLabelText('Adjuntar captura o documento');
+  fireEvent.change(input, { target: { files: [new File(['public'], 'conservado.png', { type: 'image/png' })] } });
+  const large = new File(['invalid'], 'grande.png', { type: 'image/png' }); Object.defineProperty(large, 'size', { value: 6 * 1024 * 1024 });
+  fireEvent.change(input, { target: { files: [large] } });
+  expect(screen.getByRole('alert')).toHaveTextContent('Hasta 3 archivos de 5 MB cada uno.');
+  expect(screen.getByText('conservado.png', { exact: true })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar conservado.png', exact: true }));
+  expect(screen.queryByText('conservado.png', { exact: true })).toBeNull(); expect(calls.act).not.toHaveBeenCalled();
+});
+
+it.each(['RESPONDER', 'NOTA'])('recovers an uncertain %s in the real ticket composer after reopening', async action => {
+  const first = openDetail();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  if (action === 'NOTA') fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  const label = action === 'NOTA' ? 'Nota interna / motivo' : 'Mensaje o resolución';
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'Texto original pendiente de confirmar' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['file'], 'reabrir.pdf', { type: 'application/pdf' })] } });
+  calls.act.mockRejectedValueOnce(new Error('Lost response'));
+  fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Reintentar mismo envío', exact: true })).toBeEnabled());
+  first.unmount(); openDetail();
+  await screen.findByRole('button', { name: 'Reintentar mismo envío', exact: true });
+  expect(screen.getByLabelText(label)).toHaveValue('Texto original pendiente de confirmar');
+  expect(screen.getByLabelText(label)).toBeDisabled(); expect(screen.getByText('reabrir.pdf', { exact: true })).toBeVisible();
+  expect(calls.act).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar mismo envío', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  expect(calls.act.mock.calls[1]).toEqual(calls.act.mock.calls[0]);
+});
+
+it.each(['RESPONDER', 'NOTA'])('restores a rejected %s and lets its attachment be removed before a new action', async action => {
+  openDetail(); await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  if (action === 'NOTA') fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  const label = action === 'NOTA' ? 'Nota interna / motivo' : 'Mensaje o resolución';
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'Texto conservado tras rechazo del archivo' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['invalid'], 'rechazado.pdf', { type: 'application/pdf' })] } });
+  calls.act.mockRejectedValueOnce({ response: { status: 400, data: { message: 'Archivo inválido' } } });
+  calls.recoverAction.mockResolvedValueOnce({ id: ticket.id, version: 1, status: 'rejected', replay: false });
+  fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar y corregir envío' })).toBeEnabled());
+  expect(screen.getByLabelText(label)).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobar y corregir envío' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actualizar ticket y recuperar contenido' }));
+  await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+  expect(screen.getByLabelText(label)).toHaveValue('Texto conservado tras rechazo del archivo');
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar rechazado.pdf' }));
+  expect(screen.queryByText('rechazado.pdf', { exact: true })).toBeNull(); expect(calls.act).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  expect(calls.act.mock.calls[1][2]).toEqual([]); expect(calls.act.mock.calls[1][3]).not.toEqual(calls.act.mock.calls[0][3]);
+});
+
+it.each(['RESPONDER', 'NOTA'])('restores an unsent %s draft with its files after closing the composer', async action => {
+  const first = openDetail(); await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  if (action === 'NOTA') fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  const label = action === 'NOTA' ? 'Nota interna / motivo' : 'Mensaje o resolución';
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'Borrador sin enviar que debe recuperarse' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['draft'], 'borrador.pdf', { type: 'application/pdf', lastModified: 321 })] } });
+  // Allow an automatic local transaction to settle, without submitting a ticket action.
+  await waitFor(() => expect(screen.getByLabelText(label)).toHaveValue('Borrador sin enviar que debe recuperarse'));
+  await screen.findByText('Borrador guardado en este dispositivo. Todavía no se envió.');
+  first.unmount(); openDetail();
+  await waitFor(() => expect(screen.getByLabelText(label)).toHaveValue('Borrador sin enviar que debe recuperarse'));
+  expect(screen.getByText('borrador.pdf', { exact: true })).toBeVisible(); expect(calls.act).not.toHaveBeenCalled();
+});
+
+it('requires reviewing a changed ticket before sending a recovered draft', async () => {
+  const first = openDetail(); fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Revisar antes de responder' } });
+  await screen.findByText('Borrador guardado en este dispositivo. Todavía no se envió.'); first.unmount();
+  openDetail({ version: 2 });
+  await screen.findByText('El ticket cambió desde que preparaste este borrador. Revisá la conversación y el estado antes de confirmar.');
+  expect(screen.getByRole('button', { name: 'Enviar respuesta', exact: true })).toBeDisabled();
+  expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Revisar antes de responder');
+  fireEvent.click(screen.getByRole('button', { name: 'Revisé la conversación' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ cuerpo: 'Revisar antes de responder', version: 2 }), [], expect.any(String)));
+});
+
+it('a confirmed support decision invalidates the pending count', async () => {
+ const { query } = openDetail();
+ fireEvent.click(await screen.findByRole('button', { name: 'Nota interna', exact: true }));
+ fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'QA decisión registrada.' } });
+ fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
+ await waitFor(() => expect(query.getQueryState(['attention', 'current', 'support'])?.isInvalidated).toBe(true));
+});
+
+it('refreshes the assigned person and ticket state after a confirmed handoff without releasing the receipt', async () => {
+  const current = { ...ticket, autorId: 'customer', responsableId: 'owner', responsable: { id: 'owner', nombre: 'QA' }, puedeGestionar: true, puedeAtender: true, esAutor: false };
+  const updated = { ...current, responsableId: 'second-agent', responsable: { id: 'second-agent', nombre: 'Técnica QA' }, estado: 'EN_CURSO', version: 2 };
+  openDetail(current);
+  calls.act.mockImplementation(async () => { calls.get.mockResolvedValue(updated); return { id: ticket.id, version: 2, replay: false }; });
+  fireEvent.click(await screen.findByRole('button', { name: 'Derivar', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Nuevo responsable', exact: true }));
+  fireEvent.click(await screen.findByRole('option', { name: 'Técnica QA · tecnica@qa.invalid', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar derivación', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  await waitFor(() => expect(screen.getByText('Técnica QA', { exact: true, selector: 'dd' })).toBeVisible());
+  expect(screen.getByText('En atención', { exact: true })).toBeVisible();
+  expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed', receipt: expect.objectContaining({ version: 2 }) })]);
+  expect(calls.act).toHaveBeenCalledOnce();
+});
+
+it('keeps a confirmed receipt when refreshing fails and clears it only after a successful read', async () => {
+  const current = { ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false };
+  const updated = { ...current, estado: 'CERRADO', version: 2 };
+  openDetail(current);
+  calls.act.mockImplementation(async () => { calls.get.mockRejectedValue(new Error('Sin conexión')); return { id: ticket.id, version: 2, replay: false }; });
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar', exact: true }));
+  fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resuelto en la prueba.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  await waitFor(() => expect(screen.getAllByText(/No pudimos actualizar el ticket/).length).toBeGreaterThan(0));
+  expect(screen.getByText(/Pendiente de actualización/, { selector: 'span' })).toBeVisible();
+  const result = screen.getByRole('region', { name: 'Resultado de la acción', exact: true });
+  expect(result).toHaveFocus();
+  expect(within(result).getByRole('alert')).toHaveTextContent('No pudimos actualizar el ticket');
+  const continueButton = within(result).getByRole('button', { name: 'Reintentar actualización', exact: true });
+  const initialReads = calls.get.mock.calls.length;
+  fireEvent.click(continueButton);
+  await waitFor(() => expect(calls.get.mock.calls.length).toBeGreaterThan(initialReads));
+  await waitFor(() => expect(continueButton).toBeEnabled());
+  await waitFor(() => expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed' })]));
+  expect(calls.act).toHaveBeenCalledOnce();
+  calls.get.mockResolvedValue(updated);
+  fireEvent.click(continueButton);
+  await waitFor(() => expect(storedCommands()).toHaveLength(0));
+  expect(await screen.findByText('Cerrado', { exact: true })).toBeVisible();
+  expect(calls.act).toHaveBeenCalledOnce();
+});
+
+it('does not clear a confirmed receipt when the server returns a version older than that receipt', async () => {
+  const current = { ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false };
+  openDetail(current);
+  calls.act.mockResolvedValue({ id: ticket.id, version: 2, replay: false });
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar', exact: true }));
+  fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resolución de prueba.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  await waitFor(() => expect(screen.getAllByText(/No pudimos actualizar el ticket/).length).toBeGreaterThan(0));
+  const continueButton = within(screen.getByRole('region', { name: 'Resultado de la acción', exact: true })).getByRole('button', { name: 'Reintentar actualización', exact: true });
+  const initialReads = calls.get.mock.calls.length;
+  fireEvent.click(continueButton);
+  await waitFor(() => expect(calls.get.mock.calls.length).toBeGreaterThan(initialReads));
+  await waitFor(() => expect(continueButton).toBeEnabled());
+  await waitFor(() => expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed' })]));
+  expect(calls.act).toHaveBeenCalledOnce();
+  calls.get.mockResolvedValue({ ...current, estado: 'CERRADO', version: 2 });
+  fireEvent.click(continueButton);
+  await waitFor(() => expect(storedCommands()).toHaveLength(0));
+  expect(await screen.findByText('Cerrado', { exact: true })).toBeVisible();
+});
+
+it('hides a previously visible ticket when access is denied during confirmation refresh', async () => {
+  openDetail({ autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false });
+  calls.act.mockImplementation(async () => {
+    calls.get.mockRejectedValue({ response: { status: 403 } });
+    return { id: ticket.id, version: 2, replay: false };
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar', exact: true }));
+  fireEvent.change(screen.getByLabelText('Mensaje o resolución'), { target: { value: 'Resolución antes de perder acceso.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar con resolución', exact: true }));
+  await waitFor(() => expect(screen.queryByRole('heading', { name: subject })).not.toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Reintentar ticket', exact: true })).toBeVisible();
+  expect(storedCommands()).toEqual([expect.objectContaining({ status: 'confirmed' })]);
+  expect(calls.act).toHaveBeenCalledOnce();
 });

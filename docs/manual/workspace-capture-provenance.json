@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-24",
+  "environment": "preview aislado · proposal_operations_20261021",
+  "source": "51e4271a + refactor de claridad de recorridos",
+  "capture": "Navegador real mediante CUA, viewport 393 × 852, datos sintéticos",
+  "androidPhysical": false,
+  "files": [
+    {
+      "path": "screenshots/mobile/workspace-home-20261024.png",
+      "role": "OPERADOR",
+      "url": "http://127.0.0.1:4177/app/dashboard"
+    },
+    {
+      "path": "screenshots/mobile/workspace-list-20261024.png",
+      "role": "TRANSPORTISTA",
+      "url": "http://127.0.0.1:4177/app/manifiestos?q=2026-000138"
+    }
+  ],
+  "scope": "Navegación, jerarquía y continuidad; no acredita funcionamiento físico de GPS, Android ni producción."
+}

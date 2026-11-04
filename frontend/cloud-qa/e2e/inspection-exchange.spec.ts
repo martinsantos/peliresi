@@ -1,4 +1,5 @@
 import { devices, expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
 import { login, prefix } from './helpers';
 
 // All preconditions, logins and mutations are driven through the real UI/API.
@@ -10,7 +11,7 @@ async function recordScreenshot(page: Page, info: TestInfo, name: string) {
 
 for (const outcome of ['CERRADA_CONFORME', 'DERIVADA_LEGALES'] as const) {
   test(`real inspector, sector head and actor complete ${outcome} through the UI`, async ({ page, browser }, info) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     page.setDefaultTimeout(15_000);
     const contexts: BrowserContext[] = [];
     const errors: string[] = [];
@@ -120,19 +121,27 @@ for (const outcome of ['CERRADA_CONFORME', 'DERIVADA_LEGALES'] as const) {
       await head.getByRole('button', { name: 'Nuevo requerimiento', exact: true }).click();
       await head.getByRole('textbox', { name: 'Asunto', exact: true }).fill(`QA documentación ${record.numero}`);
       await head.getByRole('textbox', { name: 'Contenido', exact: true }).fill('QA presentar constancia sintética; no corresponde a un expediente real.');
+      await head.getByLabel('Plazo de respuesta', { exact: true }).fill('2030-01-02T12:00');
       const requirementResponse = head.waitForResponse(r => r.url().endsWith(`/inspecciones/${record.id}/intercambios`) && r.request().method() === 'POST');
       await head.getByRole('button', { name: 'Presentar en expediente', exact: true }).click();
       const requirement = await requirementResponse;
       expect(requirement.status()).toBe(201);
       const requirementId = (await requirement.json()).data.id;
       await expect(head.getByTestId('inspection-exchange-row')).toHaveCount(1);
+      await head.getByRole('button', { name: 'Continuar en el expediente', exact: true }).click();
       await head.context().close();
 
       const actor = await asUser('generador2');
-      await actor.goto(`${prefix(info)}/mis-inspecciones`);
-      await actor.getByRole('button', { name: new RegExp(`^${record.numero} `) }).click();
-      await expect(actor.getByRole('heading', { name: 'Presentaciones y respuestas', exact: true })).toBeVisible();
-      await actor.getByRole('button', { name: 'Responder esta actuación', exact: true }).click();
+      const openNotice = async (target: Page, title: string, sequence: number) => {
+        await target.goto(`${prefix(info)}/notificaciones`);
+        const item = target.getByRole('list', { name: 'Avisos', exact: true }).getByRole('listitem')
+          .filter({ hasText: record.numero }).filter({ hasText: `Actuación #${sequence}.` });
+        await item.getByRole('button', { name: `Abrir aviso: PSIP · ${title}`, exact: true }).click();
+        await expect(target).toHaveURL(new RegExp(`/requerimientos/${record.id}(?:[?#].*)?$`));
+      };
+      await openNotice(actor, 'Nuevo requerimiento', 1);
+      await expect(actor.getByRole('link', { name: 'Mis inspecciones', exact: true })).toHaveCount(0);
+      await actor.getByRole('button', { name: /^Responder requerimiento #/ }).click();
       await expect(actor.getByRole('combobox', { name: 'Tipo de actuación', exact: true })).toHaveValue('DESCARGO');
       const answer = `QA descargo de ${record.numero}: documentación sintética presentada por el actor correcto.`;
       await actor.getByRole('textbox', { name: 'Contenido', exact: true }).fill(answer);
@@ -151,6 +160,7 @@ for (const outcome of ['CERRADA_CONFORME', 'DERIVADA_LEGALES'] as const) {
       const submitted = await answerResponse;
       expect(submitted.status()).toBe(201);
       expect((await submitted.json()).data).toMatchObject({ respondeAId: requirementId, tipo: 'DESCARGO' });
+      await actor.getByRole('button', { name: 'Continuar en el expediente', exact: true }).click();
       await expect(actor.getByTestId('inspection-exchange-row')).toHaveCount(2);
       await expect(actor.getByText('En descargo', { exact: true })).toBeVisible();
       await expect(actor.getByRole('button', { name: 'Cerrar conforme', exact: true })).toHaveCount(0);
@@ -166,6 +176,7 @@ for (const outcome of ['CERRADA_CONFORME', 'DERIVADA_LEGALES'] as const) {
       const decisionResponse = reviewer.waitForResponse(r => r.url().endsWith(`/inspecciones/${record.id}/intercambios/decision`) && r.request().method() === 'POST');
       await confirmation.click();
       expect((await decisionResponse).status()).toBe(200);
+      await reviewer.getByRole('button', { name: 'Continuar en el expediente', exact: true }).click();
       await reviewer.reload();
       await expect(reviewer.getByTestId('inspection-exchange-row')).toHaveCount(3);
       await expect(reviewer.getByText(outcome === 'CERRADA_CONFORME' ? 'Cerrada conforme' : 'Derivada a legales', { exact: true }).first()).toBeVisible();
@@ -175,12 +186,13 @@ for (const outcome of ['CERRADA_CONFORME', 'DERIVADA_LEGALES'] as const) {
       await reviewer.context().close();
 
       const recipient = await asUser('generador2');
-      await recipient.goto(`${prefix(info)}/mis-inspecciones/${record.id}`);
+      await openNotice(recipient, outcome === 'CERRADA_CONFORME' ? 'Cierre conforme' : 'Derivación a Legales', 3);
       await expect(recipient.getByTestId('inspection-exchange-row')).toHaveCount(3);
       await expect(recipient.getByRole('button', { name: 'Responder esta actuación', exact: true })).toHaveCount(0);
       await recipient.getByTestId('inspection-exchange-row').last().scrollIntoViewIfNeeded();
       await recordScreenshot(recipient, info, `actor-${outcome}`);
       expect(errors).toEqual([]);
+      writeFileSync(info.outputPath('inspection-full-proof.json'), JSON.stringify({ synthetic: true, production: false, inspectionId: record.id, outcome, surface: info.project.name, requirementId, openedFromNotice: true }));
     } finally {
       for (const context of contexts) await context.close();
     }

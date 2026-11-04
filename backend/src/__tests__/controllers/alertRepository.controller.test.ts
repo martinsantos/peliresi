@@ -1,11 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ update: vi.fn(), create: vi.fn(), simulate: vi.fn(), evaluate: vi.fn(), list: vi.fn(), count: vi.fn(), notices: vi.fn(), noticeCount: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { alertaGenerada: { update: mocks.update, findMany: mocks.list, count: mocks.count }, reglaAlerta: { create: mocks.create }, notificacion: { findMany: mocks.notices, count: mocks.noticeCount } } }));
+const mocks = vi.hoisted(() => ({ update: vi.fn(), create: vi.fn(), ruleUpdate: vi.fn(), ruleFind: vi.fn(), rules: vi.fn(), simulate: vi.fn(), evaluate: vi.fn(), list: vi.fn(), count: vi.fn(), notices: vi.fn(), noticeCount: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { alertaGenerada: { update: mocks.update, findMany: mocks.list, count: mocks.count }, reglaAlerta: { create: mocks.create, update: mocks.ruleUpdate, findUnique: mocks.ruleFind, findMany: mocks.rules }, notificacion: { findMany: mocks.notices, count: mocks.noticeCount } } }));
 vi.mock('../../services/domainEvent.service', () => ({ domainEvents: {} }));
 vi.mock('../../services/notification-dispatcher.service', () => ({ notificationService: {} }));
 vi.mock('../../jobs/seguimientoCierre.job', () => ({ simularSeguimientoCierre: mocks.simulate, ejecutarSeguimientoCierre: mocks.evaluate }));
-import { resolverAlerta, crearReglaAlerta, getAlertasGeneradas, getNotificaciones } from '../../controllers/notification.controller';
-const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis() });
+import { resolverAlerta, crearReglaAlerta, actualizarReglaAlerta, getReglasAlerta, getAlertasGeneradas, getNotificaciones } from '../../controllers/notification.controller';
+const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis(), setHeader: vi.fn() });
 beforeEach(() => vi.clearAllMocks());
 it('rejects the old read-only request instead of silently timestamping a pending case as resolved', async () => {
   const next = vi.fn();
@@ -21,6 +21,26 @@ it('honors an inactive new rule instead of enabling it silently', async () => {
   const next = vi.fn();
   await crearReglaAlerta({ body: { nombre: 'QA', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":3}}', destinatarios: '["OPERADOR"]', activa: false }, user: { id: 'admin' } } as never, response() as never, next);
   expect(next).not.toHaveBeenCalled(); expect(mocks.create.mock.calls[0][0].data.activa).toBe(false);
+});
+it('requires an explicit transit threshold to activate a duration rule while allowing a draft', async () => {
+  const body = { nombre: 'QA duración', evento: 'TIEMPO_EXCESIVO', condicion: '{}', destinatarios: '["ADMIN"]' };
+  const next = vi.fn();
+  await crearReglaAlerta({ body, user: { id: 'admin' } } as never, response() as never, next);
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: expect.stringContaining('umbral') }));
+  expect(mocks.create).not.toHaveBeenCalled();
+  mocks.create.mockResolvedValue({ id: 'draft' });
+  const draftNext = vi.fn();
+  await crearReglaAlerta({ body: { ...body, activa: false }, user: { id: 'admin' } } as never, response() as never, draftNext);
+  expect(draftNext).not.toHaveBeenCalled(); expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ activa: false }) }));
+});
+it('shows historical duration rules that need a threshold and permits deactivating them', async () => {
+  const historical = { id: 'legacy', evento: 'TIEMPO_EXCESIVO', condicion: '{}', destinatarios: '["ADMIN"]', activa: true };
+  mocks.rules.mockResolvedValue([historical, { ...historical, id: 'followup', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":7}}' }]);
+  const res = response(); await getReglasAlerta({} as never, res as never, vi.fn());
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ requiereUmbralTransito: true }), expect.objectContaining({ requiereUmbralTransito: false })] }));
+  mocks.ruleFind.mockResolvedValue(historical); mocks.ruleUpdate.mockResolvedValue({ ...historical, activa: false });
+  const next = vi.fn(); await actualizarReglaAlerta({ params: { id: 'legacy' }, body: { activa: false } } as never, response() as never, next);
+  expect(next).not.toHaveBeenCalled(); expect(mocks.ruleUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ activa: false }) }));
 });
 it('paginates and filters in the database, not an invisible fifty-row browser subset', async () => {
   mocks.list.mockResolvedValue([]); mocks.count.mockResolvedValue(110); const res = response(); const next = vi.fn();

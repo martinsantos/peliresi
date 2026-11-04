@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
@@ -21,7 +22,7 @@ export default function SeguimientoExterno() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false), [exportError, setExportError] = useState('');
   const exportingRef = useRef(false);
-  const query = useQuery({ queryKey: ['seguimiento-externo', currentUser?.id, currentUser?.rol, filters],
+  const query = useQuery({ queryKey: ['seguimiento-externo', currentUser?.id, inspectionWorkspaceOwner(currentUser), filters],
     queryFn: async () => (await api.get('/manifiestos/baja-intensidad/seguimiento', { params: filters })).data.data as Result,
     retry: false });
   const data = query.data;

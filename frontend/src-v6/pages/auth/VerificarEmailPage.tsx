@@ -34,7 +34,8 @@ const VerificarEmailPage: React.FC = () => {
       {status === 'loading' && (
         <>
           <Loader2 size={40} className="text-[#1B5E3C] animate-spin mx-auto mb-4" />
-          <p className="text-neutral-600">Verificando tu email...</p>
+          <h1 className="text-xl font-bold text-neutral-900 mb-2">Verificar email</h1>
+          <p role="status" className="text-neutral-600">Verificando tu email…</p>
         </>
       )}
       {status === 'ok' && (
@@ -42,7 +43,7 @@ const VerificarEmailPage: React.FC = () => {
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 size={32} className="text-green-600" />
           </div>
-          <h2 className="text-xl font-bold text-neutral-900 mb-2">Email verificado</h2>
+          <h1 className="text-xl font-bold text-neutral-900 mb-2">Email verificado</h1>
           <p className="text-neutral-600 mb-6">{message}</p>
           {differentAccount && <p role="status" className="mb-4 text-neutral-700">La sesión abierta pertenece a otra cuenta. No la cambiamos. Para retomar esta inscripción, ingresá luego con la cuenta correspondiente.</p>}
           <Link to={differentAccount ? '/dashboard' : owner && owner === verified.verifiedUserId ? nextPath : '/login'} state={differentAccount ? undefined : { from: nextPath }} className="inline-flex items-center gap-2 bg-[#1B5E3C] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#164D32] transition-colors">
@@ -56,7 +57,7 @@ const VerificarEmailPage: React.FC = () => {
           <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <XCircle size={32} className="text-red-500" />
           </div>
-          <h2 className="text-xl font-bold text-neutral-900 mb-2">Error de verificación</h2>
+          <h1 className="text-xl font-bold text-neutral-900 mb-2">Error de verificación</h1>
           <p className="text-neutral-600 mb-6">{message} Tu borrador no fue eliminado.</p>
           <Link to="/login" state={{ from: '/mi-solicitud' }} className="inline-flex items-center gap-2 bg-[#1B5E3C] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#164D32] transition-colors">
             Ingresar a mi cuenta

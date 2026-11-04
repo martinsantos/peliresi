@@ -24,7 +24,7 @@ describe('Recovery controls work with touch, labels and a single submission', ()
     expect(email).toHaveAttribute('aria-pressed', 'true');
     expect(cuit).toHaveAttribute('aria-pressed', 'false');
     for (const button of [email, cuit]) expect(button).toHaveClass('min-h-11', 'focus-visible:outline-2');
-    expect(screen.getByRole('link', { name: 'Volver al login' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('link', { name: 'Volver a iniciar sesión' })).toHaveClass('min-h-11');
     fireEvent.click(cuit);
     expect(cuit).toHaveAttribute('aria-pressed', 'true');
     expect(email).toHaveAttribute('aria-pressed', 'false');

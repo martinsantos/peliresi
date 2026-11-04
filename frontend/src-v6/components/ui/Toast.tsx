@@ -4,8 +4,8 @@
  * Sistema de notificaciones tipo toast
  */
 
-import React, { useEffect, useState } from 'react';
-import { CheckCircle, AlertCircle, Info, X, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { CheckCircle, AlertCircle, Info, X, AlertTriangle, ArrowRight } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -27,10 +27,13 @@ interface Toast {
   actionLabel?: string;
   onAction?: () => void;
   compact?: boolean;
+  /** Linked inbox notices retain the full message in the inbox. */
+  messagePreview?: boolean;
 }
 
 interface ToastItemProps extends Toast {
   onRemove: (id: string) => void;
+  constrained?: boolean;
 }
 
 // ========================================
@@ -38,13 +41,77 @@ interface ToastItemProps extends Toast {
 // ========================================
 let toastListeners: ((toasts: Toast[]) => void)[] = [];
 let toasts: Toast[] = [];
-const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let visibleToasts: Toast[] = [];
+let layoutHolds = 0;
+let pendingNoticeChange = false;
+let signatureNoticeReservations = 0;
+const reservationListeners = new Set<(reserved: boolean) => void>();
+type Expiry = { remaining: number; deadline?: number; handle?: ReturnType<typeof setTimeout> };
+const expiryTimers = new Map<string, Expiry>();
 
 const notifyListeners = () => {
-  toastListeners.forEach((listener) => listener([...toasts]));
+  if (layoutHolds > 0) { pendingNoticeChange = true; return; }
+  pendingNoticeChange = false;
+  visibleToasts = [...toasts];
+  toastListeners.forEach((listener) => listener([...visibleToasts]));
 };
 
+function clearExpiry(id: string) {
+  const expiry = expiryTimers.get(id);
+  if (expiry?.handle !== undefined) clearTimeout(expiry.handle);
+  expiryTimers.delete(id);
+}
+
+function armExpiry(id: string, expiry: Expiry) {
+  expiry.deadline = Date.now() + expiry.remaining;
+  expiry.handle = setTimeout(() => toast.remove(id), expiry.remaining);
+}
+
+/** Keep in-flow notices from moving a canvas while a handwritten stroke is active. */
+export function holdNoticeLayout(): () => void {
+  if (layoutHolds++ === 0) {
+    for (const expiry of expiryTimers.values()) {
+      if (expiry.handle !== undefined) clearTimeout(expiry.handle);
+      expiry.handle = undefined;
+      expiry.remaining = Math.max(0, (expiry.deadline ?? Date.now()) - Date.now());
+      expiry.deadline = undefined;
+    }
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    layoutHolds -= 1;
+    if (layoutHolds !== 0) return;
+    if (pendingNoticeChange) notifyListeners();
+    for (const [id, expiry] of expiryTimers) armExpiry(id, expiry);
+  };
+}
+
+/** Reserve a stable, scrollable notice area while a signature pad is open. */
+export function reserveSignatureNoticeLayout(): () => void {
+  signatureNoticeReservations += 1;
+  reservationListeners.forEach(listener => listener(true));
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    signatureNoticeReservations -= 1;
+    reservationListeners.forEach(listener => listener(signatureNoticeReservations > 0));
+  };
+}
+
 export const toast = {
+  /** Ephemeral UI only: never marks, removes or mutates the durable inbox. */
+  clear: () => {
+    for (const id of expiryTimers.keys()) clearExpiry(id);
+    toasts = [];
+    visibleToasts = [];
+    pendingNoticeChange = false;
+    // A session boundary must take effect immediately, even during a canvas
+    // layout hold. Keep hold counters intact so their cleanup remains balanced.
+    toastListeners.forEach(listener => listener([]));
+  },
   add: (t: Omit<Toast, 'id'>) => {
     // Success confirmations are a current-state signal, not an accumulating
     // timeline. Never supersede errors, warnings or duration-zero notices.
@@ -52,8 +119,7 @@ export const toast = {
       toasts = toasts.filter(item => {
         const superseded = item.type === 'success' && (item.duration ?? 5000) > 0;
         if (superseded) {
-          clearTimeout(expiryTimers.get(item.id));
-          expiryTimers.delete(item.id);
+          clearExpiry(item.id);
         }
         return !superseded;
       });
@@ -63,18 +129,20 @@ export const toast = {
     if (existing) toasts = toasts.map(item => item.id === id ? { ...t, id } : item);
     else toasts = [...toasts, { ...t, id }];
     notifyListeners();
-    clearTimeout(expiryTimers.get(id));
-    expiryTimers.delete(id);
+    clearExpiry(id);
     // An explicit zero keeps an actionable notice until the user dismisses it.
     const duration = t.duration ?? 5000;
-    if (duration > 0) expiryTimers.set(id, setTimeout(() => toast.remove(id), duration));
+    if (duration > 0) {
+      const expiry: Expiry = { remaining: duration };
+      expiryTimers.set(id, expiry);
+      if (layoutHolds === 0) armExpiry(id, expiry);
+    }
 
     return id;
   },
   
   remove: (id: string) => {
-    clearTimeout(expiryTimers.get(id));
-    expiryTimers.delete(id);
+    clearExpiry(id);
     toasts = toasts.filter((t) => t.id !== id);
     notifyListeners();
   },
@@ -97,7 +165,7 @@ export const toast = {
   
   subscribe: (listener: (toasts: Toast[]) => void) => {
     toastListeners.push(listener);
-    listener([...toasts]);
+    listener([...visibleToasts]);
     return () => {
       toastListeners = toastListeners.filter((l) => l !== listener);
     };
@@ -133,6 +201,8 @@ const ToastItem: React.FC<ToastItemProps> = ({
   actionLabel,
   onAction,
   compact,
+  messagePreview,
+  constrained,
 }) => {
   // Only the unread summary uses the compact row. Full warnings/errors keep
   // their explanation and actions; never truncate critical information.
@@ -145,10 +215,29 @@ const ToastItem: React.FC<ToastItemProps> = ({
     <button type="button" aria-label="Cerrar notificación" onClick={() => onRemove(id)}
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline-primary-700"><X size={16} /></button>
   </div>;
+  // Inbox notices already retain their full content. Make the entire summary
+  // the action so concurrent notices do not each need a second 44px row.
+  // Local errors keep their complete, non-truncated explanation below.
+  if (messagePreview && onAction && type !== 'error') return <div
+    role={type === 'warning' ? 'alert' : 'status'} aria-atomic="true" data-linked-notice="true"
+    className={cn('flex w-full items-start gap-2 rounded-xl border px-2 py-1', toastStyles[type])}>
+    <span className="mt-3 shrink-0" aria-hidden="true">{toastIcons[type]}</span>
+    <button type="button" aria-label={[title,message,actionLabel || 'Abrir'].filter(Boolean).join(' ')}
+      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
+      onClick={() => { onAction(); onRemove(id); }}>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 text-sm font-semibold text-primary-800 underline decoration-primary-300 underline-offset-2">{title}</span>
+        {message && <span className="line-clamp-2 mt-1 break-words text-sm leading-snug text-neutral-700">{message}</span>}
+      </span>
+      <ArrowRight size={18} className="shrink-0 text-primary-700" aria-hidden="true" />
+    </button>
+    <button type="button" aria-label="Cerrar notificación" onClick={() => onRemove(id)}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><X size={16}/></button>
+  </div>;
   return (
     <div
       className={cn(
-        'w-full rounded-xl border p-3 shadow-3',
+        'w-full rounded-xl border shadow-3', constrained ? 'p-1' : 'p-3',
         toastStyles[type]
       )}
       role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
@@ -180,8 +269,20 @@ const ToastItem: React.FC<ToastItemProps> = ({
 // ========================================
 // TOAST CONTAINER
 // ========================================
-export const ToastContainer: React.FC = () => {
+function duplicatesPendingDelivery(item: Toast, syncNoticeMessage?: string): boolean {
+  return Boolean(syncNoticeMessage && item.type === 'info' && item.title === 'Entrega pendiente'
+    && item.message === syncNoticeMessage && !item.onAction && (item.duration ?? 5000) > 0);
+}
+
+export const ToastContainer: React.FC<{ syncNoticeMessage?: string }> = ({ syncNoticeMessage }) => {
   const [activeToasts, setActiveToasts] = useState<Toast[]>([]);
+  const [signatureReserved, setSignatureReserved] = useState(() => signatureNoticeReservations > 0);
+
+  useLayoutEffect(() => {
+    reservationListeners.add(setSignatureReserved);
+    setSignatureReserved(signatureNoticeReservations > 0);
+    return () => { reservationListeners.delete(setSignatureReserved); };
+  }, []);
 
   useEffect(() => {
     return toast.subscribe((newToasts) => {
@@ -189,15 +290,26 @@ export const ToastContainer: React.FC = () => {
     });
   }, []);
 
-  if (activeToasts.length === 0) return null;
+  useEffect(() => {
+    // Remove the duplicate as well as hiding it, so it cannot reappear after
+    // synchronization succeeds or the person switches activity.
+    activeToasts.filter(item => duplicatesPendingDelivery(item, syncNoticeMessage)).forEach(item => toast.remove(item.id));
+  }, [activeToasts, syncNoticeMessage]);
+
+  const visible = activeToasts.filter(item => !duplicatesPendingDelivery(item, syncNoticeMessage));
+  if (visible.length === 0 && !signatureReserved) return null;
 
   // Layouts provide an outlet outside the scrollable form. Notices occupy real
   // space instead of covering case identity, tabs, maps or fixed field actions.
   return (
-    <div aria-label="Avisos del sistema" role="region" className="relative flex max-h-[30dvh] shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 py-2 sm:px-4">
-      {activeToasts.map((t) => (
-        <div key={t.id} className="pointer-events-auto">
-          <ToastItem {...t} onRemove={toast.remove} />
+    <div aria-label="Avisos del sistema" role="region" tabIndex={signatureReserved && visible.length ? 0 : undefined}
+      data-signature-notice-reserved={signatureReserved || undefined}
+      className={cn('relative flex shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 sm:px-4',
+        signatureReserved ? 'h-14 py-0' : 'max-h-[30dvh] py-2')}>
+      {visible.length === 0 && <p className="my-auto text-sm text-neutral-600">Los avisos siguen disponibles en la campana.</p>}
+      {visible.map((t) => (
+        <div key={t.id} className="pointer-events-auto shrink-0">
+          <ToastItem {...t} onRemove={toast.remove} constrained={signatureReserved} />
         </div>
       ))}
     </div>

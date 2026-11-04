@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ControlFilters } from '../../pages/centro-control/components/ControlFilters';
@@ -7,27 +7,29 @@ import DashboardPage from '../../pages/dashboard/DashboardPage';
 import ManifiestosPage from '../../pages/manifiestos/ManifiestosPage';
 
 const mocks = vi.hoisted(() => {
-  const trip = (estado: string, numero: string) => ({ data: { items: [{ id: 'qa-trip', numero, estado, createdAt: '2026-10-05T12:00:00Z', generador: { razonSocial: 'QA Generador' }, operador: { razonSocial: 'QA Operador' }, residuos: [] }], total: 1, totalPages: 1 }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
+  const trip = (estado: string, numero: string) => ({ data: { items: [{ id: 'qa-trip', numero, estado, inicio: null, partes: ['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({rol,aprobada:true})), createdAt: '2026-10-05T12:00:00Z', generador: { razonSocial: 'QA Generador' }, operador: { razonSocial: 'QA Operador' }, residuos: [] }], total: 1, totalPages: 1 }, isLoading: false, isFetching: false, isFetchedAfterMount: true, isError: false, refetch: vi.fn() });
   return { verify: vi.fn(), query: vi.fn(), active: trip('EN_TRANSITO', 'QA-ACTIVE-001'), pending: trip('APROBADO', 'QA-PENDING-001') };
 });
 vi.mock('@tanstack/react-query', () => ({
   useQuery: mocks.query,
+  useQueryClient: () => ({ getQueryState: () => undefined }),
   useMutation: () => ({ mutate: mocks.verify, isPending: false }),
 }));
 vi.mock('../../services/api', () => ({ default: { get: vi.fn(() => { throw new Error('No external API in unit tests'); }) } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
-  isAdmin: false, isTransportista: true, currentUser: { nombre: 'QA Transporte', sector: 'Empresa QA' },
+  isAdmin: false, isTransportista: true, currentUser: { id: 'transport-qa', rol: 'TRANSPORTISTA', nombre: 'QA Transporte', sector: 'Empresa QA' },
 }) }));
+vi.mock('../../hooks/useConnectivity', () => ({ useConnectivity: () => ({ isOnline: true, isApiReachable: true }) }));
 vi.mock('../../hooks/useDashboard', () => ({ useDashboardStats: () => ({ data: { estadisticas: { entregados: 0, enTransito: 1, aprobados: 1, recibidos: 0 }, enTransitoList: [] } }) }));
 vi.mock('../../hooks/useInspectionOperations', () => ({ useInspectionOperations: () => ({ data: { total: 0 } }) }));
-vi.mock('../../hooks/useManifiestos', () => ({ useManifiestos: (filter: { estado?: string }) => filter.estado === 'EN_TRANSITO' ? mocks.active : mocks.pending }));
+vi.mock('../../hooks/useManifiestos', () => ({ useManifiestos: (filter?: { estado?: string }) => filter?.estado === 'EN_TRANSITO' ? mocks.active : mocks.pending }));
 vi.mock('../../hooks/useMobilePrefix', () => ({ useMobilePrefix: () => ((route: string) => route) }));
 vi.mock('../../hooks/useGeneradores', () => ({ useGeneradores: () => ({ data: { items: [] } }) }));
 vi.mock('../../hooks/useOperadores', () => ({ useOperadores: () => ({ data: { items: [] } }) }));
 vi.mock('../../utils/exportPdf', () => ({ exportReportePDF: vi.fn() }));
 vi.mock('../../pages/reportes/tabs/shared', () => ({ downloadCsv: vi.fn() }));
 beforeEach(() => { vi.clearAllMocks(); mocks.query.mockReturnValue({ data: { manifiestos: [], total: 0 }, isLoading: false }); });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
 
 it('keeps live status readable on its tinted background and refresh operational', () => {
   const refresh = vi.fn();
@@ -37,9 +39,9 @@ it('keeps live status readable on its tinted background and refresh operational'
   expect(refresh).toHaveBeenCalledOnce();
 });
 
-it('keeps PDF export text readable on the error-tinted button', () => {
+it('uses the shared readable secondary action for PDF export', () => {
   render(<MemoryRouter><ManifiestosPage /></MemoryRouter>);
-  expect(screen.getByRole('button', { name: 'PDF', exact: true })).toHaveClass('text-error-700');
+  expect(screen.getByRole('button', { name: 'PDF', exact: true })).toHaveClass('bg-white', 'text-neutral-700', 'min-h-11');
 });
 
 it('uses readable, touch-sized certification controls with a semantic selected filter', () => {
@@ -56,9 +58,18 @@ it('uses readable, touch-sized certification controls with a semantic selected f
 });
 
 it('keeps active and assigned trip references readable without changing their meaning', () => {
+  // In proposal mode, the mobile home replaces the old paired trip cards with
+  // the shared agenda. Verify the same records remain distinguishable there.
+  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
+  mocks.query.mockReturnValue({ data: { items: [
+    { ...mocks.active.data.items[0], id: 'active-qa', numero: 'QA-ACTIVE-001' },
+    { ...mocks.pending.data.items[0], id: 'assigned-qa', numero: 'QA-PENDING-001' },
+  ], total: 2, page: 1, limit: 6, counts: { all: 2 } }, isLoading: false, isPending: false, isFetching: false, isError: false });
   render(<MemoryRouter><DashboardPage /></MemoryRouter>);
-  expect(screen.getByText('#QA-ACTIVE-001')).toHaveClass('text-success-700');
-  expect(screen.getByText('Pendientes de retiro')).toHaveClass('text-warning-700');
-  expect(screen.getByRole('button', { name: 'Ir al Viaje' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: /#QA-PENDING-001/ })).toBeEnabled();
+  const active = screen.getByRole('link', { name: /QA-ACTIVE-001/ });
+  const assigned = screen.getByRole('link', { name: /QA-PENDING-001/ });
+  expect(active).toHaveAttribute('href', '/manifiestos/active-qa');
+  expect(within(active).getByText('En viaje · GPS')).toBeVisible();
+  expect(assigned).toHaveAttribute('href', '/manifiestos/assigned-qa');
+  expect(within(assigned).getByText('Listo para iniciar')).toBeVisible();
 });

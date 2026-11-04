@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Alertas Hooks
  */
@@ -14,11 +15,12 @@ const KEYS = {
 };
 
 export function useReglasAlerta(enabled = true) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.reglas,
+    queryKey: [...KEYS.reglas, owner],
     queryFn: () => alertaService.listReglas(),
     staleTime: 60_000,
-    enabled,
+    enabled: enabled && Boolean(owner),
   });
 }
 
@@ -31,11 +33,12 @@ export function useCreateReglaAlerta() {
 }
 
 export function useAlertas(filters?: AlertaFilters, enabled = true) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.alertas(filters),
+    queryKey: [...KEYS.alertas(filters), owner],
     queryFn: () => alertaService.listAlertas(filters),
     staleTime: 30_000,
-    enabled,
+    enabled: enabled && Boolean(owner),
   });
 }
 
@@ -73,9 +76,11 @@ export function useDeleteReglaAlerta() {
 }
 
 export function useAnomalias(manifiestoId?: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.anomalias(manifiestoId),
+    queryKey: [...KEYS.anomalias(manifiestoId), owner],
     queryFn: () => alertaService.listAnomalias(manifiestoId),
+    enabled: Boolean(owner),
     staleTime: 60_000,
   });
 }

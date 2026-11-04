@@ -1,0 +1,68 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {limitedLegReceipt,limitedLegRequest,relayCapabilityVersion} from '../../services/limited-transport-gps';
+
+const point={latitud:-33,longitud:-69,precision:8};
+const reference='1949916e-22df-4dc1-9d1e-98f98a3eab26';
+afterEach(()=>vi.unstubAllGlobals());
+
+it('reconciles a relay receipt after float round trip but rejects a changed position',async()=>{
+  const sent={...point,latitud:-12.357009851458013};
+  const tracking={latitud:-12.35700985145801,longitud:sent.longitud,precision:sent.precision,velocidad:null,direccion:null};
+  const data={idempotencia:{version:1,puntoId:reference,confirmado:true},tracking};
+  const fetchMock=vi.fn()
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data})})
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data:{...data,tracking:{...tracking,latitud:tracking.latitud+.000001}}})});
+  vi.stubGlobal('fetch',fetchMock);
+  expect(await limitedLegReceipt('leg','private-token',sent,reference)).toBe(true);
+  await expect(limitedLegReceipt('leg','private-token',sent,reference)).rejects.toMatchObject({status:409});
+});
+
+it('requires the server to confirm the exact retry reference without sending cookies',async()=>{
+  const fetchMock=vi.fn().mockResolvedValue({ok:true,status:200,json:async()=>({success:true,data:{tracking:{timestamp:'2026-10-29T00:00:00Z'},idempotencia:{version:1,puntoId:reference,repetido:true}}})});
+  vi.stubGlobal('fetch',fetchMock);
+  await expect(limitedLegRequest('leg','token',point,reference)).resolves.toMatchObject({idempotencia:{puntoId:reference,repetido:true}});
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(fetchMock.mock.calls[0][0]).toContain('/seguimiento-relevo/leg/ubicacion-idempotente');
+  expect(fetchMock.mock.calls[0][1]).toMatchObject({credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({...point,puntoId:reference});
+});
+
+it('does not treat an old or mismatched response as confirmation or fall back to the legacy endpoint',async()=>{
+  const fetchMock=vi.fn()
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data:{tracking:{id:'old'}}})})
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data:{idempotencia:{version:1,puntoId:'another'}}})})
+    .mockResolvedValueOnce({ok:false,status:404,json:async()=>({message:'No encontrado'})});
+  vi.stubGlobal('fetch',fetchMock);
+  await expect(limitedLegRequest('leg','token',point,reference)).rejects.toThrow('no confirmó');
+  await expect(limitedLegRequest('leg','token',point,reference)).rejects.toThrow('no confirmó');
+  await expect(limitedLegRequest('leg','token',point,reference)).rejects.toMatchObject({status:503});
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(fetchMock.mock.calls.every(([url])=>String(url).endsWith('/ubicacion-idempotente'))).toBe(true);
+});
+it('extracts only a non-secret UUID capability version',()=>{
+  const token=`header.${btoa(JSON.stringify({jti:reference}))}.signature`;
+  expect(relayCapabilityVersion(token)).toBe(reference);
+  expect(()=>relayCapabilityVersion('not-a-token')).toThrow(/autorización/i);
+  expect(()=>relayCapabilityVersion(`header.${btoa(JSON.stringify({jti:'not-a-uuid'}))}.signature`)).toThrow(/autorización/i);
+});
+it('only accepts an exact authenticated relay receipt without cookies or a token in the URL',async()=>{
+  const data={idempotencia:{version:1,puntoId:reference,confirmado:true},tracking:{latitud:-33,longitud:-69,precision:8,velocidad:null,direccion:null}};
+  const fetchMock=vi.fn().mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data})})
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data:{...data,tracking:{...data.tracking,precision:9}}})})
+    .mockResolvedValueOnce({ok:true,status:200,json:async()=>({success:true,data:{idempotencia:{version:1,puntoId:reference,confirmado:false},tracking:null}})});
+  vi.stubGlobal('fetch',fetchMock);
+  expect(await limitedLegReceipt('leg','private-token',point,reference)).toBe(true);
+  await expect(limitedLegReceipt('leg','private-token',point,reference)).rejects.toMatchObject({status:409});
+  expect(await limitedLegReceipt('leg','private-token',point,reference)).toBe(false);
+  expect(fetchMock.mock.calls[0][0]).not.toContain('private-token');
+  expect(fetchMock.mock.calls[0][1]).toMatchObject({credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',headers:{Authorization:'Bearer private-token'}});
+});
+it('uses the current capability to check an exact earlier version without a bearer token in the URL',async()=>{
+  const fetchMock=vi.fn().mockResolvedValue({ok:true,status:200,json:async()=>({success:true,data:{idempotencia:{version:1,puntoId:reference,confirmado:false},tracking:null}})});
+  vi.stubGlobal('fetch',fetchMock);
+  expect(await limitedLegReceipt('leg','private-token',point,reference,reference)).toBe(false);
+  expect(fetchMock.mock.calls[0][0]).toContain('?version='+reference);
+  expect(fetchMock.mock.calls[0][0]).not.toContain('private-token');
+  await expect(limitedLegReceipt('leg','private-token',point,reference,'invalid')).rejects.toThrow(/autorización anterior/i);
+  expect(fetchMock).toHaveBeenCalledOnce();
+});

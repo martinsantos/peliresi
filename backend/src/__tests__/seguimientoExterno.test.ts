@@ -12,21 +12,20 @@ it('validates bounded filters without normalizing or joining doubtful identities
 it('accepts the external operator as a tracked role', () => {
   expect(externalTrackingQuery.parse({ rol: 'operador' }).rol).toBe('operador');
 });
-// Spec v2 §5 (B): creator and registered parties read tracking of their own records only.
-it('the designated authority sees everything; everyone else is filtered to their own records', () => {
+it('the designated authority sees everything; actors are scoped to the active activity', () => {
   vi.stubEnv('MANIFEST_EXCEPTIONAL_REVIEWERS', 'authority');
   expect(externalTrackingAccess({ rol: 'ADMIN', id: 'authority' } as never)).toEqual({ reviewer: true, filter: null });
   const cases: Array<[Record<string, unknown>, string, string[]]> = [
-    [{ id: 'u1', rol: 'OPERADOR', operador: { id: 'own' } }, '"operadorId"', ['u1', 'own']],
-    [{ id: 'u2', rol: 'GENERADOR', generador: { id: 'gen' } }, "'generador'", ['u2', 'gen']],
-    [{ id: 'u3', rol: 'TRANSPORTISTA', transportista: { id: 'tr' } }, "'transportista'", ['u3', 'tr']],
+    [{ id: 'u1', rol: 'OPERADOR', operador: { id: 'own' } }, '"operadorId"', ['own']],
+    [{ id: 'u2', rol: 'GENERADOR', generador: { id: 'gen' } }, "'generador'", ['gen']],
+    [{ id: 'u3', rol: 'TRANSPORTISTA', transportista: { id: 'tr' } }, "'transportista'", ['tr']],
     [{ id: 'other', rol: 'ADMIN' }, '"creadoPorId"', ['other']],
     [{ id: 'authority', rol: 'ADMIN', impersonatedBy: { id: 'other' } }, '"creadoPorId"', ['authority']],
   ];
   for (const [user, column, values] of cases) {
     const access = externalTrackingAccess(user as never);
     expect(access.reviewer).toBe(false);
-    expect(access.filter!.sql).toContain('"creadoPorId"');
+    if (user.rol !== 'ADMIN') expect(access.filter!.sql).not.toContain('"creadoPorId"');
     expect(access.filter!.sql).toContain(column);
     expect(access.filter!.values).toEqual(values);
   }

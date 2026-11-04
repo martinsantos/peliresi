@@ -6,6 +6,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { approvedOperatorModeChange } from '../domain/operatorModalities';
 import { notifyRenovacion } from '../services/renovacion-notification.service';
 import {
+    ownRenovacionQuerySchema,
     canReviewRenovacion,
     canSubmitRenovacion,
     createRenovacionSchema,
@@ -74,6 +75,24 @@ export const getRenovacionById = async (req: AuthRequest, res: Response, next: N
     }
 };
 
+/** Actor receipt recovery is read-only and derives ownership from the verified session. */
+export const getOwnRenovacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const parsedRole = tipoActorRenovacionSchema.safeParse(req.user.rol);
+        if (!parsedRole.success) throw new AppError('Esta consulta es sólo para la actividad operativa actual', 403);
+        const role = parsedRole.data;
+        const actorId = role === 'GENERADOR' ? req.user.generador?.id : role === 'OPERADOR' ? req.user.operador?.id : null;
+        if (!actorId) throw new AppError('Esta consulta requiere una actividad de generador u operador vinculada a tu cuenta', 403);
+        const query = ownRenovacionQuerySchema.safeParse(req.query);
+        if (!query.success) throw new AppError('Indicá un período válido para consultar tu solicitud', 400);
+        const renovacion = await prisma.renovacion.findFirst({
+            where: { anio: query.data.anio, tipoActor: role, ...(role === 'GENERADOR' ? { generadorId: actorId } : { operadorId: actorId }) },
+            select: { id: true, anio: true, tipoActor: true, modalidad: true, estado: true, datosNuevos: true, camposModificados: true, fechaRevision: true, motivoRechazo: true, createdAt: true },
+        });
+        res.json({ success: true, data: { renovacion } });
+    } catch (error) { next(error); }
+};
+
 export const createRenovacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const parsed = createRenovacionSchema.safeParse(req.body);
@@ -103,7 +122,9 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
             throw new AppError('generadorId o operadorId requerido segun tipoActor', 400);
         }
 
-        const renovacion = await prisma.$transaction(async tx => {
+        let renovacion;
+        try {
+        renovacion = await prisma.$transaction(async tx => {
           const saved = await tx.renovacion.create({
             data: {
                 anio: Number(anio),
@@ -124,6 +145,29 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
           return saved;
         });
 
+        } catch (error: any) {
+          if (error.code !== 'P2002') throw error;
+          const existing = await prisma.renovacion.findFirst({ where: {
+            anio, tipoActor, ...(tipoActor === 'GENERADOR' ? { generadorId: actorId } : { operadorId: actorId }),
+          } });
+          // The existing actor/year constraint is the retry boundary. Only an exact
+          // proposal recovers its receipt; a different request must not overwrite it.
+          const canonical = (value: Record<string, unknown>) => JSON.stringify(Object.keys(value).sort().map(key => [key, value[key]]));
+          let sameChanges = false;
+          try {
+            const previous: unknown = JSON.parse(existing?.datosNuevos || '{}');
+            sameChanges = !!previous && typeof previous === 'object' && !Array.isArray(previous)
+              && canonical(previous as Record<string, unknown>) === canonical(sanitizedChanges);
+          } catch { /* Unreadable historical proposals require review. */ }
+          const sameNumber = (left: unknown, right: unknown) => left == null && right == null || left != null && right != null && Number(left) === Number(right);
+          if (existing && sameChanges && existing.modalidad === modalidad
+            && sameNumber(existing.tefAnterior, tefAnterior) && sameNumber(existing.tefNuevo, tefNuevo)
+            && (existing.observaciones ?? null) === (observaciones ?? null)) {
+            res.status(200).json({ success: true, data: { renovacion: existing } });
+            return;
+          }
+          throw new AppError('Ya existe una renovacion para este actor en ese ano. La propuesta guardada es diferente; consultá su resultado antes de presentar otros cambios.', 400);
+        }
         res.status(201).json({ success: true, data: { renovacion } });
     } catch (error: any) {
         if (error.code === 'P2002') {
@@ -167,7 +211,7 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
                 where: { id, estado: 'PENDIENTE' },
                 data: {
                     estado: 'APROBADA', revisadoPor: req.user.id, fechaRevision: new Date(),
-                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : null,
+                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : undefined,
                 },
             });
             if (status.count !== 1) throw new AppError('La renovacion ya fue procesada por otro usuario', 409);
@@ -200,7 +244,7 @@ export const rechazarRenovacion = async (req: AuthRequest, res: Response, next: 
                 data: {
                     estado: 'RECHAZADA', revisadoPor: req.user.id, fechaRevision: new Date(),
                     motivoRechazo: motivoRechazo.trim().slice(0, 2_000),
-                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : null,
+                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : undefined,
                 },
             });
             if (status.count !== 1) throw new AppError('La renovacion ya fue procesada por otro usuario', 409);

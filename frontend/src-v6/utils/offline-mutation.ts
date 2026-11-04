@@ -11,6 +11,7 @@ interface QueueConfig {
   endpoint: string;
   data?: unknown;
   userId: string | number;
+  contextOwner: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export async function offlineSafeMutation<T>(
         endpoint: queueConfig.endpoint,
         data: queueConfig.data,
         userId: queueConfig.userId,
+        contextOwner: queueConfig.contextOwner,
       });
       return 'QUEUED';
     }

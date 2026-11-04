@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Modal } from '../../components/ui/Modal';
+import { Modal, ConfirmModal } from '../../components/ui/Modal';
 
 class VisibleViewport extends EventTarget {
   width = 360;
@@ -21,6 +21,103 @@ describe('modal remains usable above the mobile keyboard', () => {
   const content = <input aria-label="Ubicación prevista" defaultValue="" />;
   const footer = <button type="button">Crear expediente</button>;
   const dialog = (isOpen = true) => <Modal isOpen={isOpen} title="Nueva inspección" onClose={vi.fn()} footer={footer}>{content}</Modal>;
+
+  it('keeps a rejected confirmation readable inside the active dialog and preserves the retry', () => {
+    const confirm = vi.fn(), close = vi.fn();
+    const renderDialog = (error = '') => <ConfirmModal isOpen title="Eliminar Usuario" onClose={close} onConfirm={confirm} error={error} confirmText="Si, eliminar" />;
+    const { rerender } = render(renderDialog());
+    fireEvent.click(screen.getByRole('button', { name: 'Si, eliminar' }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    rerender(renderDialog('No se puede eliminar: tiene manifiestos.'));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('tiene manifiestos');
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Si, eliminar' }));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    rerender(renderDialog());
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not steal focus from a field selected before deferred autofocus runs', () => {
+    let focusFrame: FrameRequestCallback | undefined;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { focusFrame = callback; return 1; });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    render(dialog());
+    const input = screen.getByLabelText('Ubicación prevista');
+    input.focus();
+    expect(input).toHaveFocus();
+    act(() => focusFrame!(0));
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: 'Dato elegido por la persona' } });
+    expect(input).toHaveValue('Dato elegido por la persona');
+  });
+
+  it('scrolls the focused field and its label into the available dialog body', async () => {
+    render(<Modal isOpen title="Nueva inspección" onClose={vi.fn()}>
+      <label htmlFor="field-reference">Ubicación prevista</label><input id="field-reference" />
+    </Modal>);
+    const modal = screen.getByRole('dialog');
+    const input = within(modal).getByLabelText('Ubicación prevista');
+    const label = within(modal).getByText('Ubicación prevista');
+    const body = label.closest('.overflow-y-auto') as HTMLDivElement;
+    const box = (top: number, height: number) => ({ x: 0, y: top, top, bottom: top + height, left: 0, right: 320, width: 320, height, toJSON: () => ({}) }) as DOMRect;
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(box(0, 160));
+    vi.spyOn(body, 'getClientRects').mockReturnValue([box(0, 160)] as unknown as DOMRectList);
+    vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(box(70, 30));
+    vi.spyOn(label, 'getClientRects').mockReturnValue([box(70, 30)] as unknown as DOMRectList);
+    vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(box(110, 90));
+    input.focus();
+    await waitFor(() => expect(body.scrollTop).toBe(48));
+    expect(input).toHaveFocus();
+  });
+
+  it.each([true, false])('reveals the focused field again after content shifts (visual viewport: %s)', async (hasViewport) => {
+    vi.stubGlobal('visualViewport', hasViewport ? new VisibleViewport() : undefined);
+    const view = (expanded: boolean) => <Modal isOpen title="Nueva inspección" onClose={vi.fn()}>
+      {expanded && <p>El borrador se guardó en este dispositivo.</p>}
+      <label htmlFor="field-reflow">Ubicación prevista</label><input id="field-reflow" />
+    </Modal>;
+    const { rerender } = render(view(false));
+    const modal = screen.getByRole('dialog'), input = within(modal).getByLabelText('Ubicación prevista');
+    const label = within(modal).getByText('Ubicación prevista');
+    const body = label.closest('.overflow-y-auto') as HTMLDivElement;
+    const box = (top: number, height: number) => ({ x: 0, y: top, top, bottom: top + height, left: 0, right: 320, width: 320, height, toJSON: () => ({}) }) as DOMRect;
+    let shift = 0;
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(box(0, 160));
+    vi.spyOn(body, 'getClientRects').mockReturnValue([box(0, 160)] as unknown as DOMRectList);
+    vi.spyOn(label, 'getBoundingClientRect').mockImplementation(() => box(8 + shift - body.scrollTop, 20));
+    vi.spyOn(label, 'getClientRects').mockImplementation(() => [box(8 + shift - body.scrollTop, 20)] as unknown as DOMRectList);
+    vi.spyOn(input, 'getBoundingClientRect').mockImplementation(() => box(40 + shift - body.scrollTop, 60));
+    input.focus();
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); });
+    expect(body.scrollTop).toBe(0);
+    shift = 100;
+    rerender(view(true));
+    await waitFor(() => expect(body.scrollTop).toBe(48));
+    expect(input).toHaveFocus();
+  });
+
+  it('keeps the focused field and label visible when the visual viewport shrinks', async () => {
+    const viewport = new VisibleViewport();
+    vi.stubGlobal('visualViewport', viewport);
+    render(<Modal isOpen title="Nueva inspección" onClose={vi.fn()}>
+      <label htmlFor="field-resize">Ubicación prevista</label><input id="field-resize" />
+    </Modal>);
+    const modal = screen.getByRole('dialog'), input = within(modal).getByLabelText('Ubicación prevista');
+    const label = within(modal).getByText('Ubicación prevista');
+    const body = label.closest('.overflow-y-auto') as HTMLDivElement;
+    const box = (top: number, height: number) => ({ x: 0, y: top, top, bottom: top + height, left: 0, right: 320, width: 320, height, toJSON: () => ({}) }) as DOMRect;
+    let bodyHeight = 300;
+    vi.spyOn(body, 'getBoundingClientRect').mockImplementation(() => box(0, bodyHeight));
+    vi.spyOn(body, 'getClientRects').mockImplementation(() => [box(0, bodyHeight)] as unknown as DOMRectList);
+    vi.spyOn(label, 'getBoundingClientRect').mockImplementation(() => box(70 - body.scrollTop, 30));
+    vi.spyOn(label, 'getClientRects').mockImplementation(() => [box(70 - body.scrollTop, 30)] as unknown as DOMRectList);
+    vi.spyOn(input, 'getBoundingClientRect').mockImplementation(() => box(110 - body.scrollTop, 90));
+    input.focus();
+    act(() => { bodyHeight = 160; viewport.resize(420); });
+    await waitFor(() => expect(body.scrollTop).toBe(48));
+    expect(input).toHaveFocus();
+  });
 
   it('fits the visible viewport as the keyboard opens, keeping typed text and focus', async () => {
     const viewport = new VisibleViewport();

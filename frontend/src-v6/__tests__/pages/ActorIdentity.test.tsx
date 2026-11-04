@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,18 +7,40 @@ import TransportistaDetallePage from '../../pages/actores/TransportistaDetallePa
 import OperadorDetallePage from '../../pages/actores/OperadorDetallePage';
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isAdmin: false, currentUser: { rol: 'GENERADOR', esInspector: true } }) }));
-vi.mock('../../hooks/useEnrichment', () => ({ useOperadoresEnrichment: () => ({ data: { operadores: {} } }) }));
+vi.mock('../../hooks/useEnrichment', () => ({ useOperadoresEnrichment: () => ({ data: { operadores: { QA: { telefono: 'Teléfono histórico', mail: 'historico@night-qa.invalid', corrientes: ['Y8'] } } } }) }));
 vi.mock('../../pages/inspecciones/ActorInspectionsPanel', () => ({ ActorInspectionsPanel: () => null }));
 vi.mock('../../components/TrazabilidadTimeline', () => ({ default: () => null }));
 vi.mock('../../services/api', () => ({ default: { get: vi.fn().mockResolvedValue({ data: { data: { documentos: [] } } }) } }));
 vi.mock('../../hooks/useActores', () => ({
   useTransportista: () => ({ data: { id: 'qa', razonSocial: 'QA Transporte', cuit: 'QA', activo: true, vehiculos: [], choferes: [] }, isLoading: false }),
-  useOperador: () => ({ data: { id: 'qa', razonSocial: 'QA Operador', cuit: 'QA', activo: true, tratamientos: [] }, isLoading: false }),
+  useOperador: () => ({ data: { id: 'qa', razonSocial: 'QA Operador', cuit: 'QA', activo: true, tratamientos: [], telefono: 'Teléfono guardado', email: 'guardado@night-qa.invalid', corrientesY: '', vencimientoHabilitacion: '2030-01-01T00:00:00.000Z' }, isLoading: false }),
   useCreateVehiculo: () => ({}), useCreateChofer: () => ({}), useUpdateVehiculo: () => ({}), useDeleteVehiculo: () => ({}),
   useUpdateChofer: () => ({}), useDeleteChofer: () => ({}),
 }));
 
 describe('Actor fichas use the same identity as operational maps', () => {
+  it.each([
+    ['operador', OperadorDetallePage], ['transportista', TransportistaDetallePage],
+  ] as const)('%s summary belongs to the overview and does not displace documents', (actor, Component) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/actors/qa']}><Routes><Route path="/actors/:id" element={<Component />} /></Routes></MemoryRouter></QueryClientProvider>);
+    expect(screen.getByRole('region', { name: 'Resumen del ' + actor })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: 'Documentos', exact: true }));
+    expect(screen.queryByRole('region', { name: 'Resumen del ' + actor })).toBeNull();
+    expect(screen.getByRole('tabpanel', { name: 'Documentos', exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: 'Información General', exact: true }));
+    expect(screen.getByRole('region', { name: 'Resumen del ' + actor })).toBeVisible();
+  });
+  it('shows saved operator contact data instead of the historical import', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/actors/qa']}><Routes><Route path="/actors/:id" element={<OperadorDetallePage />} /></Routes></MemoryRouter></QueryClientProvider>);
+    expect(screen.getByText('Teléfono guardado')).toBeVisible();
+    expect(screen.getByText('guardado@night-qa.invalid')).toBeVisible();
+    expect(screen.queryByText('Teléfono histórico')).toBeNull();
+    expect(screen.queryByText('historico@night-qa.invalid')).toBeNull();
+    expect(screen.getByText('01/01/2030')).toBeVisible();
+    expect(screen.queryByText('2030-01-01T00:00:00.000Z')).toBeNull();
+  });
   it.each([
     ['transportista', 'QA Transporte', 'truck', '#ea580c', TransportistaDetallePage],
     ['operador', 'QA Operador', 'flask-conical', '#2563eb', OperadorDetallePage],

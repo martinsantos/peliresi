@@ -1,5 +1,7 @@
+import { rateLimitMessage } from './rateLimitMessage';
+
 interface ApiErrorShape {
-  response?: { data?: { message?: unknown } };
+  response?: { status?: number; headers?: Record<string, unknown>; data?: { message?: unknown } };
   message?: unknown;
   isAxiosError?: unknown;
 }
@@ -8,6 +10,12 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (!error || typeof error !== 'object') return fallback;
   const shape = error as ApiErrorShape;
   const apiMessage = shape.response?.data?.message;
+  if (shape.response?.status === 429) {
+    const wait = rateLimitMessage(shape.response.headers);
+    // Preserve the distinction between account/network/login rejection.
+    return typeof apiMessage === 'string' && apiMessage.trim()
+      ? `${apiMessage.trim().replace(/[.!?]$/, '')}. ${wait}` : wait;
+  }
   if (typeof apiMessage === 'string' && apiMessage.trim()) return apiMessage;
   // Axios' own text ("Network Error", "timeout of 30000ms exceeded", "Request failed…")
   // is English transport detail; the caller's fallback says what to do in Spanish.

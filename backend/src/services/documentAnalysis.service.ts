@@ -9,6 +9,8 @@ import type { Prisma } from '@prisma/client';
 import { AppError } from '../middlewares/errorHandler';
 import { licenseFields } from '../domain/licenseReading';
 import { adaptiveLicensePixels, confidentLicenseText, mergeLicenseText } from '../domain/licenseOcr';
+import type { PaymentIdentity, PaymentProposal } from '../domain/paymentIdentity';
+import { electricityReading, type ElectricityReading } from '../domain/electricityReading';
 
 export type ReceiptAnalysis = {
   version: 1;
@@ -18,6 +20,10 @@ export type ReceiptAnalysis = {
   texto: string;
   alcance: string;
   aviso: string | null;
+  documentKind?: 'LICENCIA' | 'FACTURA_ELECTRICA';
+  electricidad?: ElectricityReading;
+  pago?: { propuesta?: PaymentProposal; revision: 'PENDIENTE' | 'CONFIRMADO'; coincidencia: boolean;
+    registroId?: string; identidad?: PaymentIdentity; sha256?: string };
 };
 
 /** Retrying extraction must not lose a successful read or a duplicate warning. */
@@ -27,11 +33,40 @@ export function mergeReceiptRead(previous: unknown, next: ReceiptAnalysis): Rece
   if (old.version !== 1) return next;
   const duplicado = next.duplicado || old.duplicado === true;
   if (old.lectura === 'LEIDO' && typeof old.texto === 'string' && old.texto.trim()) {
-    return { version: 1, duplicado, lectura: 'LEIDO', texto: old.texto,
+    return { ...old, version: 1, duplicado, lectura: 'LEIDO', texto: old.texto,
       motor: old.motor === 'PDF_TEXT' || old.motor === 'TESSERACT' ? old.motor : null,
       alcance: typeof old.alcance === 'string' ? old.alcance : next.alcance, aviso: null };
   }
-  return { ...next, duplicado };
+  return { ...next, duplicado, ...(old.pago?.revision === 'CONFIRMADO' ? { pago: old.pago } : {}) };
+}
+
+/* Re-read the same original while preserving earlier evidence and conflicts.
+ * The caller verifies the hash inside its transaction. Payment logic is separate.
+ */
+export function mergeElectricityRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis {
+  const candidate = previous && typeof previous === 'object' && !Array.isArray(previous)
+    ? previous as Partial<ReceiptAnalysis> : undefined;
+  const old = candidate?.version === 1 && candidate.lectura === 'LEIDO'
+    && typeof candidate.texto === 'string' && candidate.texto.trim() ? candidate : undefined;
+  let reading = next;
+  if (old) {
+    const keepPrevious = (aviso: string): ReceiptAnalysis => ({
+      version: 1, duplicado: old.duplicado === true || next.duplicado, lectura: 'LEIDO',
+      texto: old.texto!, motor: old.motor === 'PDF_TEXT' || old.motor === 'TESSERACT' ? old.motor : null,
+      alcance: typeof old.alcance === 'string' ? old.alcance : next.alcance, aviso,
+    });
+    if (next.lectura !== 'LEIDO' || !next.texto.trim()) {
+      reading = keepPrevious(next.aviso || 'No se obtuvieron nuevos datos. Se conserva la lectura anterior; revisá el original o reintentá.');
+    } else {
+      const text = [...new Set([old.texto!, next.texto].flatMap(value => value.split(/\r?\n/)).map(line => line.trim()).filter(Boolean))].join('\n');
+      // Never omit a competing value to make a reading look complete.
+      reading = text.length > 96_000
+        ? keepPrevious('La nueva lectura supera el límite de revisión. Se conserva la lectura anterior; revisá el original manualmente.')
+        : { ...next, duplicado: old.duplicado === true || next.duplicado, texto: text,
+          alcance: old.texto === next.texto ? next.alcance : 'Lecturas conservadas del mismo original. Los valores contradictorios requieren revisión.' };
+    }
+  }
+  return { ...reading, documentKind: 'FACTURA_ELECTRICA', electricidad: electricityReading(reading.texto) };
 }
 
 /** The original file is never normalized, rewritten, or treated as proof of payment. */
@@ -49,18 +84,59 @@ const MAX_TEXT_BYTES = 96 * 1024;
 const MAX_ANALYSIS_MS = 15_000;
 let receiptInFlight = false;
 
+/** Open the existing shared inode without O_CREAT, which Linux can reject for
+ * another owner in a sticky directory even when the file is readable. */
+function openReceiptLock(): number {
+  const lockPath = path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock');
+  // A FIFO at this path must not block the event loop before fstat rejects it.
+  const readFlags = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
+  let fd: number;
+  try {
+    fd = fs.openSync(lockPath, readFlags);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    try {
+      fd = fs.openSync(lockPath, readFlags | fs.constants.O_CREAT | fs.constants.O_EXCL, 0o644);
+    } catch (createError) {
+      if ((createError as NodeJS.ErrnoException).code !== 'EEXIST') throw createError;
+      return openExistingReceiptLock(lockPath, readFlags);
+    }
+    try { fs.fchmodSync(fd, 0o644); }
+    catch (permissionError) { fs.closeSync(fd); throw permissionError; }
+  }
+  return validateReceiptLock(fd);
+}
+
+function validateReceiptLock(fd: number): number {
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new Error('OCR_LOCK_INVALID');
+    return fd;
+  } catch (error) { fs.closeSync(fd); throw error; }
+}
+
+function openExistingReceiptLock(lockPath: string, flags: number): number {
+  return validateReceiptLock(fs.openSync(lockPath, flags));
+}
+
 function runLocked(command: string, args: string[], deadline: number): Promise<string> {
-  const remaining = deadline - Date.now();
-  if (remaining <= 0) return Promise.reject(new Error('OCR_DEADLINE'));
-  // flock shares ONE native analysis slot across the two PM2 workers. No shell,
-  // user-defined command, network provider, or unbounded wait is involved.
+  if (deadline <= Date.now()) return Promise.reject(new Error('OCR_DEADLINE'));
+  // Keep the descriptor open until the engine exits: flock opens this same
+  // inode through procfs, so old and new workers still share ONE native slot.
+  // No shell, user-defined command, network provider or unbounded wait.
   return new Promise((resolve, reject) => {
-    execFile('flock', ['-F', '-n', '-E', '75', path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock'), command, ...args], {
-      timeout: remaining, maxBuffer: MAX_TEXT_BYTES, encoding: 'utf8',
-      // --no-fork keeps the engine on the tracked PID, so a timeout kills it
-      // rather than leaving a detached OCR process consuming resources.
-      env: { PATH: process.env.PATH, LANG: process.env.LANG, OMP_THREAD_LIMIT: '1' },
-    }, (error, stdout) => error ? reject(error) : resolve(stdout));
+    let fd: number | undefined;
+    const release = () => { if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* already closed */ } fd = undefined; } };
+    try {
+      fd = openReceiptLock();
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error('OCR_DEADLINE');
+      execFile('flock', ['-F', '-n', '-E', '75', `/proc/${process.pid}/fd/${fd}`, command, ...args], {
+        timeout: remaining, maxBuffer: MAX_TEXT_BYTES, encoding: 'utf8',
+        // --no-fork keeps the engine on the tracked PID, so a timeout kills it
+        // rather than leaving a detached OCR process consuming resources.
+        env: { PATH: process.env.PATH, LANG: process.env.LANG, OMP_THREAD_LIMIT: '1' },
+      }, (error, stdout) => { release(); error ? reject(error) : resolve(stdout); });
+    } catch (error) { release(); reject(error); }
   });
 }
 
@@ -69,18 +145,21 @@ function readable(text: string): string {
 }
 
 /** Bounded, free server-side extraction. Scanned PDFs explicitly cover page 1. */
-export async function readReceipt(file: { path: string; mimeType: string }, profile?: 'LICENCIA'): Promise<ReceiptAnalysis> {
+export async function readReceipt(file: { path: string; mimeType: string }, profile?: 'LICENCIA' | 'FACTURA_ELECTRICA'): Promise<ReceiptAnalysis> {
   const result: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'SIN_TEXTO', motor: null,
     texto: '', alcance: file.mimeType === 'application/pdf' ? 'Hasta las primeras 3 páginas con texto; página 1 si es escaneado.' : 'Imagen adjunta.', aviso: null };
   if (receiptInFlight) return { ...result, lectura: 'NO_DISPONIBLE', aviso: 'La lectura automática está ocupada. El archivo se conserva para revisión manual.' };
   receiptInFlight = true;
   const deadline = Date.now() + MAX_ANALYSIS_MS;
   let temporary: string | undefined;
+  let partialPdfText = '';
   try {
     if (file.mimeType === 'application/pdf') {
       const text = readable(await runLocked('pdftotext', ['-f', '1', '-l', '3', '-layout', file.path, '-'], deadline));
       const proposed = profile === 'LICENCIA' ? mergeLicenseText([text]) : text;
-      if (/[\p{L}\p{N}]/u.test(proposed)) return { ...result, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: proposed };
+      const electricFields = profile === 'FACTURA_ELECTRICA' ? electricityReading(proposed).campos : undefined;
+      if (/[\p{L}\p{N}]/u.test(proposed) && (!electricFields || electricFields.categoriaTarifaria && (electricFields.consumoKwh || electricFields.suministro))) return { ...result, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: proposed };
+      if (profile === 'FACTURA_ELECTRICA') partialPdfText = proposed;
       temporary = await mkdtemp(path.join(os.tmpdir(), 'sitrep-receipt-'));
       const output = path.join(temporary, 'page');
       await runLocked('pdftoppm', ['-f', '1', '-l', '1', '-scale-to', '1800', '-png', '-singlefile', file.path, output], deadline);
@@ -140,11 +219,14 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
       return { ...result, lectura: text ? 'LEIDO' : 'SIN_TEXTO', motor: 'TESSERACT', texto: text,
         alcance: 'Sólo campos identificados de la licencia. Requiere revisión; no acredita identidad ni vigencia.', aviso: warning };
     }
-    const text = readable(await runLocked('tesseract', [image, 'stdout', '-l', 'spa', '--psm', '3'], deadline));
-    return { ...result, lectura: /[\p{L}\p{N}]/u.test(text) ? 'LEIDO' : 'SIN_TEXTO', motor: 'TESSERACT', texto: text };
+    const text = readable([partialPdfText, await runLocked('tesseract', [image, 'stdout', '-l', 'spa', '--psm', '3'], deadline)].filter(Boolean).join('\n'));
+    return { ...result, lectura: /[\p{L}\p{N}]/u.test(text) ? 'LEIDO' : 'SIN_TEXTO', motor: 'TESSERACT', texto: text,
+      ...(partialPdfText ? { alcance: 'Texto del PDF y OCR de su primera página. Los valores contradictorios requieren revisión.' } : {}) };
   } catch (error) {
     // A busy/missing/failed OCR never means success and never discards the file.
     const busy = (error as { code?: number })?.code === 75;
+    if (partialPdfText) return { ...result, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: partialPdfText,
+      aviso: 'Lectura parcial del PDF. El OCR complementario no estuvo disponible; podés reintentar sin reemplazar el original.' };
     return { ...result, lectura: 'NO_DISPONIBLE', aviso: busy
       ? 'La lectura automática está ocupada. El archivo se conserva para revisión manual.'
       : 'No se pudo leer automáticamente. El archivo se conserva para revisión manual.' };

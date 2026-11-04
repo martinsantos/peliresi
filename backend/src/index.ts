@@ -1,15 +1,21 @@
+import { iniciarRecordatorioFirmaJob } from './jobs/manifestSignatureReminder.job';
+import { iniciarDuracionTransitoJob } from './jobs/transitDuration.job';
 import express, { Request, Response } from 'express';
+import { existsSync, readFileSync } from 'node:fs';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
+import { resolveListenHost } from './config/listenHost';
+import { createScheduledTaskGate } from './config/scheduledTaskGate';
+import { assertSyntheticPreviewDatabase, assertSyntheticPreviewRuntime, syntheticPreviewEnabled, syntheticPreviewRequestAllowed } from './config/syntheticPreview';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { isAuthenticated } from './middlewares/auth.middleware';
 import authRoutes from './routes/auth.routes';
 import manifiestoRoutes from './routes/manifiesto.routes';
+import transportHandoffRoutes from './routes/transport-handoff.routes';
 import catalogoRoutes from './routes/catalogo.routes';
 import pdfRoutes from './routes/pdf.routes';
 import reporteRoutes from './routes/reporte.routes';
@@ -37,8 +43,23 @@ import inspeccionRoutes from './routes/inspeccion.routes';
 import supportRoutes from './routes/support.routes';
 import { startEmailFlushTimer } from './services/email.service';
 import { createAuthenticationLimiters } from './middlewares/authRateLimit';
+import { createApiAdmission } from './middlewares/apiAdmission';
+import { PostgresAdmissionStore } from './services/apiAdmission.service';
 import { trainingSession } from './middlewares/trainingSession';
 import empresaRoutes from './routes/empresa.routes';
+
+// The opt-in must pass runtime and connected database checks before traffic.
+const syntheticPreview = syntheticPreviewEnabled();
+if (syntheticPreview) assertSyntheticPreviewRuntime({ platform: process.platform, container: existsSync('/.dockerenv'),
+  cpu: readFileSync('/sys/fs/cgroup/cpu.max', 'utf8'), memory: readFileSync('/sys/fs/cgroup/memory.max', 'utf8'),
+  swap: readFileSync('/sys/fs/cgroup/memory.swap.max', 'utf8'), swapDevices: readFileSync('/proc/swaps', 'utf8'), ipv4Routes: readFileSync('/proc/net/route', 'utf8'),
+  ipv6Routes: existsSync('/proc/net/ipv6_route') ? readFileSync('/proc/net/ipv6_route', 'utf8') : '' });
+const verifySyntheticPreviewDatabase = async () => {
+  const rows = await prisma.$queryRaw<Array<{ name: string; port: number; address: string; schema: string; directory: string }>>`
+    SELECT current_database() AS name, inet_server_port() AS port, host(inet_server_addr()) AS address,
+      current_schema() AS schema, current_setting('data_directory') AS directory`;
+  assertSyntheticPreviewDatabase(rows);
+};
 
 // Inicializar la aplicación Express
 const app = express();
@@ -63,20 +84,20 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use('/api/', (req, res, next) => {
+  if (!syntheticPreviewRequestAllowed(syntheticPreview, req.method, req.path, req.get('X-SITREP-Synthetic-Preview'))) {
+    res.status(403).json({ success: false, message: 'No se pudo verificar la versión del entorno. Recargá la pantalla.' });
+    return;
+  }
+  next();
+});
 app.use(trainingSession);
 
-// Rate limiting - General API (600 req/min to support 50+ phones behind shared NAT/CGNAT)
-const generalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 600, // 600 requests per minute per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Demasiadas solicitudes, intente de nuevo en un momento' },
-});
-app.use('/api/', generalLimiter);
-
-// Shared Wi-Fi logins retain separate failure quotas for network and identity.
-const authLimiters = createAuthenticationLimiters();
+// Shared counters across workers. Valid sessions have independent work quotas;
+// anonymous requests retain IP protection and login keeps its failure limits.
+const admissionStore = new PostgresAdmissionStore();
+app.use('/api/', createApiAdmission(admissionStore));
+const authLimiters = createAuthenticationLimiters(admissionStore);
 app.use('/api/auth/login', ...authLimiters.login);
 app.use('/api/auth/register', authLimiters.registration);
 
@@ -109,6 +130,16 @@ app.get('/api/docs.json', (req, res, next) => {
     }
     return res.json(swaggerSpec);
   });
+});
+
+if (syntheticPreview) app.get('/api/preview/identity', async (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await verifySyntheticPreviewDatabase();
+    res.json({ mode: 'synthetic-preview-v1' });
+  } catch {
+    res.status(503).json({ error: 'No se pudo confirmar el entorno de práctica.' });
+  }
 });
 
 // Rutas
@@ -227,6 +258,7 @@ app.get('/api/health/ready', async (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/empresas',empresaRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
+app.use('/api/seguimiento-relevo', transportHandoffRoutes);
 app.use('/api/catalogos', catalogoRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/reportes', reporteRoutes);
@@ -252,20 +284,40 @@ app.use(errorHandler);
 domainEvents.subscribe(eventoManifiestoSubscriber);
 domainEvents.subscribe(alertaSubscriber);
 
-// Iniciar jobs cron
-iniciarVencimientoJob();
-iniciarBlockchainJob();
-iniciarRecordatorioJob();
-iniciarSeguimientoCierreJob();
-iniciarAlertCatalogueJob();
+// This startup-only gate does not prevent writes made by requests or other
+// workers. A controlled validation window must pause every worker separately.
+const scheduledTasks = createScheduledTaskGate(process.env.SITREP_PAUSE_BACKGROUND_JOBS, () => {
+  logger.warn({ scope: 'cron-and-email-queue', resumeRequiresRestart: true },
+    'Scheduled jobs and email queue timer paused at startup');
+});
+scheduledTasks.run(() => {
+  iniciarVencimientoJob();
+  iniciarBlockchainJob();
+  iniciarRecordatorioJob();
+  iniciarSeguimientoCierreJob();
+  iniciarRecordatorioFirmaJob();
+  iniciarAlertCatalogueJob();
+  iniciarDuracionTransitoJob();
+});
 
 // Iniciar el servidor
 const PORT = config.PORT;
-app.listen(PORT, () => {
+const HOST = resolveListenHost(process.env.HOST, config.NODE_ENV);
+const onListening = () => {
   logger.info({ port: PORT }, `Server running on port ${PORT}`);
   logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
-  startEmailFlushTimer();
-});
+  scheduledTasks.run(() => startEmailFlushTimer());
+};
+const listen = () => {
+  if (HOST) app.listen(PORT, HOST, onListening);
+  else app.listen(PORT, onListening);
+};
+if (syntheticPreview) {
+  void verifySyntheticPreviewDatabase().then(listen).catch(() => {
+    logger.fatal('Synthetic preview database identity could not be verified');
+    process.exit(1);
+  });
+} else listen();
 
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {

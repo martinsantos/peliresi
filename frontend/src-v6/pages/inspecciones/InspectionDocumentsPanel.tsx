@@ -9,6 +9,8 @@ interface Props {
   reportEditable: boolean;
   reportFirst?: boolean;
   section?: 'acta' | 'informe';
+  /** The field sheet asks the closing statements (daños, testigos, firma, copia, libro, comunicación) as its own questions. */
+  omitClosing?: boolean;
   actorType?: InspectionActorType | null;
   onActDataChange: (value: InspectionActData) => void;
   onReportChange: (value: InspectionTechnicalReport) => void;
@@ -20,7 +22,7 @@ const groupClass = 'group/act border-t border-neutral-200';
 const summaryClass = 'flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-neutral-900 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 [&::-webkit-details-marker]:hidden';
 const groupTitle = (title: string) => <summary className={summaryClass}>{title}<ChevronDown aria-hidden size={18} className="shrink-0 text-neutral-600 group-open/act:rotate-180" /></summary>;
 
-export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, actEditable, reportEditable, reportFirst = false, section, actorType, onActDataChange, onReportChange }) => {
+export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, actEditable, reportEditable, reportFirst = false, section, actorType, omitClosing = false, onActDataChange, onReportChange }) => {
   const fieldPrefix = useId();
   const update = (key: keyof InspectionActData, value: string | number | undefined) => onActDataChange({ ...actData, [key]: value });
   const text = (key: keyof InspectionActData, label: string, multiline = false) => <div key={key} className={'text-sm font-medium text-neutral-700' + (multiline ? ' sm:col-span-2' : '')}><label htmlFor={fieldPrefix + key}>{label}</label>{multiline
@@ -35,15 +37,14 @@ export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, act
     {text('detalleInfraestructura', 'Instalaciones y condiciones observadas', true)}
   </>;
   const act = <div data-testid={'inspection-form-' + (actorType || 'HALLAZGO')}>
-    <div className="pb-5">{text('requerimientos', 'Medidas o requerimientos indicados', true)}</div>
+    {(!actData.modeloCampo || actData.requerimientos) && <details className={groupClass}>{groupTitle('Requerimientos anteriores (texto libre)')}<div className="pb-5">{text('requerimientos', 'Medidas o requerimientos ya registrados', true)}</div></details>}
     <details className={groupClass}>{groupTitle(operationalTitle)}<div className={gridClass + ' pb-5'}>{text('motivoInspeccion', 'Motivo de la visita')}{text('generacion', operationalLabel, true)}</div></details>
     <details className={groupClass}>{groupTitle('Personas y lugar')}<div className={gridClass + ' pb-5'}>
-      {text('atendidoPor', actorType ? 'Persona que atendió' : 'Persona presente o denunciante')}
-      {text('cargoAtendido', 'Carácter o cargo')}{text('dniAtendido', 'Documento de identidad')}{text('area', 'Área interviniente')}
+      {!actData.modeloCampo && <>{text('atendidoPor', actorType ? 'Persona que atendió' : 'Persona presente o denunciante')}{text('cargoAtendido', 'Carácter o cargo')}{text('dniAtendido', 'Documento de identidad')}</>}{text('area', 'Área interviniente')}
       {text('departamento', 'Departamento')}{text('calle', 'Calle')}{text('numeroDomicilio', 'Número')}{text('lugarAfectacion', 'Lugar afectado', true)}
     </div></details>
     {(actorType === 'GENERADOR' || actorType === 'OPERADOR') && <details className={groupClass}>{groupTitle(actorType === 'OPERADOR' ? 'Planta y tratamiento' : 'Establecimiento y almacenamiento')}<div className={gridClass + ' pb-5'}>{infrastructure}</div></details>}
-    <details className={groupClass}>{groupTitle('Constancias de la visita')}<div className={gridClass + ' pb-5'}>
+    {!omitClosing && <details className={groupClass}>{groupTitle('Constancias de la visita')}<div className={gridClass + ' pb-5'}>
       {select('danosEstado', 'Daños a personas o bienes', [['NO_VERIFICADO', 'Pendiente de constatar'], ['NO_OBSERVADOS', 'No se observaron'], ['OBSERVADOS', 'Se observaron']])}
       {text('danosDetalle', 'Detalle de daños', true)}
       {select('tercerosTestigosEstado', 'Terceros y testigos', [['NO_VERIFICADO', 'Pendiente de constatar'], ['NO_IDENTIFICADOS', 'No se identificaron'], ['IDENTIFICADOS', 'Se identificaron']])}
@@ -52,14 +53,14 @@ export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, act
       {text('firmaIntervinienteDetalle', 'Constancia de firma, negativa o imposibilidad', true)}
       {select('copiaActaEstado', 'Entrega de copia', [['PENDIENTE', 'Pendiente'], ['ENTREGADA', 'Copia entregada'], ['NEGATIVA_RECEPCION', 'Negativa a recibir copia'], ['NO_ENTREGADA', 'No entregada']], 'PENDIENTE')}
       {text('copiaActaDetalle', 'Constancia de entrega', true)}
-    </div></details>
+    </div></details>}
     <details className={groupClass}>{groupTitle('Documentación y comunicación')}<div className={gridClass + ' pb-5'}>
-      {select('libroOperacionesEstado', 'Libro de Registro de Operaciones', [['NO_VERIFICADO', 'Pendiente de verificar'], ['EXHIBIDO', 'Exhibido y verificado'], ['NO_EXHIBIDO', 'No exhibido'], ['NO_DISPONIBLE', 'No disponible'], ['SECUESTRADO', 'Secuestrado por disposición competente'], ['NO_APLICA', 'No aplica']])}
-      {text('libroOperacionesDetalle', 'Constancia del libro', true)}
+      {!omitClosing && select('libroOperacionesEstado', 'Libro de Registro de Operaciones', [['NO_VERIFICADO', 'Pendiente de verificar'], ['EXHIBIDO', 'Exhibido y verificado'], ['NO_EXHIBIDO', 'No exhibido'], ['NO_DISPONIBLE', 'No disponible'], ['SECUESTRADO', 'Secuestrado por disposición competente'], ['NO_APLICA', 'No aplica']])}
+      {!omitClosing && text('libroOperacionesDetalle', 'Constancia del libro', true)}
       {text('actaAnterior', 'Acta antecedente')}{text('domicilioLegal', 'Domicilio legal constituido')}
       <label className="text-sm font-medium text-neutral-700">Plazo de descargo (días hábiles)<input type="number" min={0} max={365} disabled={!actEditable} value={actData.plazoDescargoDias ?? ''} onChange={(event) => update('plazoDescargoDias', event.target.value === '' ? undefined : Number(event.target.value))} className={inputClass} /></label>
-      {select('notificacionEstado', 'Comunicación de lo actuado', [['PENDIENTE', 'Pendiente'], ['COMUNICADA_EN_ACTA', 'Informada en campo/acta'], ['CONSTANCIA_FORMAL', 'Constancia formal incorporada'], ['NO_REALIZADA', 'No realizada']], 'PENDIENTE')}
-      {text('notificacionDetalle', 'Constancia de comunicación y derechos', true)}
+      {!omitClosing && select('notificacionEstado', 'Comunicación de lo actuado', [['PENDIENTE', 'Pendiente'], ['COMUNICADA_EN_ACTA', 'Informada en campo/acta'], ['CONSTANCIA_FORMAL', 'Constancia formal incorporada'], ['NO_REALIZADA', 'No realizada']], 'PENDIENTE')}
+      {!omitClosing && text('notificacionDetalle', 'Constancia de comunicación y derechos', true)}
     </div></details>
     {!['GENERADOR', 'OPERADOR'].includes(actorType || '') && (actData.infraestructura || actData.detalleInfraestructura || actData.estadoInfraestructura) && <details className={groupClass}>{groupTitle('Otros datos ya registrados')}<div className={gridClass}>{infrastructure}</div></details>}
   </div>;

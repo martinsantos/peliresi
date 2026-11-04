@@ -28,6 +28,15 @@ const cases = [
   { name: 'operadores', render: () => <OperadoresTab periodoLabel="Todo" />, text: 'QA Operador', header: 'Razon Social', path: '/admin/actores/operadores/op' },
 ];
 describe('report table interaction contract', () => {
+  it.each(cases.slice(0,3))('$name does not duplicate the toolbar PDF action', item => {
+    render(<MemoryRouter>{item.render()}</MemoryRouter>);
+    expect(screen.queryByRole('button',{name:'Exportar PDF',exact:true})).toBeNull();
+  });
+  it('shows the shared status label instead of API codes', () => {
+    render(<MemoryRouter><ManifiestosTab {...props} data={{manifiestos:[{numero:'QA-PENDING',estado:'PENDIENTE_APROBACION'}]}}/></MemoryRouter>);
+    expect(within(screen.getByRole('table')).getByText('Pendiente Aprobación')).toBeVisible();
+    expect(screen.queryByText('PENDIENTE APROBACION')).toBeNull();
+  });
   it.each(['manifiestos','tratados'])('%s charts never add incompatible units or use lossy API aggregates',tipo=>{
     const row={id:'m',numero:'QA-MIX',residuos:[{tipo:'Y1',codigo:'Y1',cantidad:2,unidad:'L'},{tipo:'Y1',codigo:'Y1',cantidad:5,unidad:'kg'}]};
     const data={porTipoResiduo:{Y1:{cantidad:999,unidad:'kg'}},totalPorTipo:{Y1:999},manifiestos:[row],detalle:[row]};

@@ -1,3 +1,5 @@
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
 /**
  * SITREP v6 - Perfil Page
  * =======================
@@ -5,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User,
   Mail,
@@ -29,11 +31,22 @@ import { getApiErrorMessage } from '../../utils/api-error';
 import { useGenerador, useOperador } from '../../hooks/useActores';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorReceiptNotice } from '../../components/ActorReceiptNotice';
 import ActorActivities from '../../components/ActorActivities';
+import { CompanyAccessLink } from '../../components/CompanyAccessLink';
 
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const certificateId = searchParams.get('certificadoAmbiental');
+  const highlightedCertificate = certificateId && /^[a-zA-Z0-9_-]{1,100}$/.test(certificateId) ? certificateId : undefined;
+  const receiptId = searchParams.get('comprobante');
+  const highlightedReceipt = receiptId && /^[a-zA-Z0-9_-]{1,100}$/.test(receiptId) ? receiptId : undefined;
+  const noticeId = searchParams.get('aviso');
+  const receiptReturn = noticeId && /^[a-zA-Z0-9_-]{1,100}$/.test(noticeId) ? '/notificaciones/' + encodeURIComponent(noticeId) : '/notificaciones';
+  const mp = useMobilePrefix();
   const { currentUser, isGenerador:personalGenerador, isOperador:personalOperador } = useAuth();
   const isGenerador=personalGenerador&&!currentUser?.empresaContexto;
   const isOperador=personalOperador&&!currentUser?.empresaContexto;
@@ -62,7 +75,7 @@ const PerfilPage: React.FC = () => {
         nombre,
         email: currentUser.email || '',
         telefono: currentUser.telefono || '',
-        sector: currentUser.sector || 'DGFA Mendoza',
+        sector: currentUser.sector || '',
         rol: currentUser.rol || 'USUARIO',
         avatar: nombre.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
       });
@@ -86,14 +99,16 @@ const PerfilPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <h2 className="sr-only">Mi Perfil</h2>
-
+    <div className="flex flex-col gap-6 animate-fade-in">
+      {receiptId !== null && !highlightedReceipt && <p role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-4">El enlace del comprobante no es válido. Volvé al aviso para revisarlo.</p>}
+      {highlightedReceipt && currentUser?.empresaContexto && !currentUser.empresaContexto.todasSedes && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4">Para consultar el comprobante necesitás autorización para todos los establecimientos de la empresa.</p>}
+      {highlightedReceipt && currentUser && (!currentUser.actorId || !['GENERADOR', 'OPERADOR', 'TRANSPORTISTA'].includes(currentUser.rol)) && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4">No pudimos identificar una actividad autorizada para este comprobante. Volvé al aviso o revisá los roles de tu cuenta.</p>}
+      {highlightedReceipt && (!currentUser?.empresaContexto || currentUser.empresaContexto.todasSedes) && currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorReceiptNotice type={currentUser.rol} actorId={currentUser.actorId} documentId={highlightedReceipt} visitKey={location.key} returnPath={mp(receiptReturn)} />}
       <ActorActivities />
-      {import.meta.env.VITE_ENTERPRISE_ENABLED==='true'&&<Button variant="outline" onClick={()=>navigate(location.pathname.startsWith('/mobile/')?'/mobile/empresas':'/empresas')}>Empresas y establecimientos</Button>}
-      {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y sede en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
-      {!currentUser?.empresaContexto&&currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
+      <CompanyAccessLink />
+      {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y establecimiento en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
+      {(!currentUser?.empresaContexto || currentUser.empresaContexto.todasSedes) && currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} highlightId={highlightedCertificate} />}
+      {currentUser?.empresaContexto && !currentUser.empresaContexto.todasSedes && <p className="text-sm text-neutral-600">Para consultar el certificado ambiental de la empresa necesitás autorización para todos sus establecimientos.</p>}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
       {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isLoading && <p role="status">Cargando datos de tu establecimiento…</p>}
@@ -101,7 +116,7 @@ const PerfilPage: React.FC = () => {
       {(isGenerador || isOperador) && actorData && !actorQuery.isError && (
         <Card>
           <CardHeader
-            title="Datos de mi Establecimiento"
+            title="Mi establecimiento"
             className="flex-col sm:flex-row"
             icon={<Building2 size={18} />}
             action={
@@ -109,9 +124,9 @@ const PerfilPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 rightIcon={<ExternalLink size={14} />}
-                onClick={() => navigate('/mi-perfil/solicitar-cambios')}
+                onClick={() => navigate(mp('/mi-perfil/solicitar-cambios'))}
               >
-                Solicitar Cambios
+                Solicitar cambios
               </Button>
             }
           />
@@ -188,7 +203,7 @@ const PerfilPage: React.FC = () => {
               <div className="mt-3">
                 <Badge variant="soft" color="primary">
                   <Shield size={12} className="mr-1" />
-                  {user.rol}
+                  {workspaceRoleLabel(user.rol)}
                 </Badge>
               </div>
             </CardContent>
@@ -202,7 +217,7 @@ const PerfilPage: React.FC = () => {
                   <Key size={16} className="text-neutral-500" />
                   <span className="text-sm font-medium">Contraseña</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => navigate('/configuracion?tab=seguridad')}>Cambiar</Button>
+                <Button variant="outline" size="sm" onClick={() => navigate(mp('/configuracion?tab=seguridad'))}>Cambiar</Button>
               </div>
             </CardContent>
           </Card>

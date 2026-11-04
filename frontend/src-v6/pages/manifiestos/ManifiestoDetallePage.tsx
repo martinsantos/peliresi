@@ -1,3 +1,8 @@
+import { manifestWorkspaceReturn } from '../../utils/manifestListReturn';
+import { TrainingCertificates } from './components/TrainingCertificates';
+import { TransportLegs } from './components/TransportLegs';
+import { transportTrackSegments } from '../../utils/transportTrackSegments';
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiesto Detail Page
  * ==================================
@@ -5,7 +10,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   ArrowLeft,
   FileText,
@@ -26,6 +31,7 @@ import {
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './components/manifest-gps-map.css';
 import { ACTOR_ICONS, ACTOR_COLORS } from '../../utils/map-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -51,6 +57,10 @@ import {
 } from '../../hooks/useManifiestos';
 import { useAuth, type User } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { usePendingDeliveryIds } from '../../hooks/usePendingDeliveryIds';
+import { useQueryOwner } from '../../hooks/useQueryOwner';
+import { gpsContextScope } from '../../services/gpsQueue';
+import { supportRequestContext } from '../../utils/supportSession';
 import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { formatDateTime, formatEstado, formatCuit } from '../../utils/formatters';
@@ -60,6 +70,11 @@ import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
 import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import ManifiestoActions from './components/ManifiestoActions';
+import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
+import { subscribeDeliveryConfirmed } from '../../services/offlineSyncEvents';
+import PersonalManifestNoticeAction from '../../components/PersonalManifestNoticeAction';
+import { needsPersonalManifestChoice } from '../../utils/notificationNavigation';
+import { tripAccessDenied } from '../../services/tripSnapshot';
 
 const ACTOR_SUMMARY = {
   GENERADOR: { label: 'Generador', Icon: Factory, icon: 'bg-purple-50 text-purple-600', interactive: 'hover:bg-purple-50/50' },
@@ -67,10 +82,35 @@ const ACTOR_SUMMARY = {
   OPERADOR: { label: 'Operador', Icon: FlaskConical, icon: 'bg-blue-50 text-blue-600', interactive: 'hover:bg-blue-50/50' },
 };
 
-function ActorSummary({ type, actorId, user, name, detail, to, returnTo }: {
-  type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string;
+const gpsReceptionFormatter = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Mendoza', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+const gpsReceptionDay = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+const gpsReceptionTime = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Mendoza', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+function formatGpsReception(value: string, timeOnly = false): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? (timeOnly ? gpsReceptionTime : gpsReceptionFormatter).format(date) : 'Fecha no disponible';
+}
+function sameGpsReceptionDay(a: string, b: string): boolean {
+  const first = new Date(a), last = new Date(b);
+  return Number.isFinite(first.getTime()) && Number.isFinite(last.getTime()) && gpsReceptionDay.format(first) === gpsReceptionDay.format(last);
+}
+const gpsWindowIcon = (latest: boolean) => L.divIcon({ className: '', iconSize: [44, 44], iconAnchor: [22, 22], popupAnchor: [0, -12],
+  html: `<span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center"><span style="display:block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:${latest ? '4px solid white;background:#08623b' : '3px solid #08623b;background:white'};box-shadow:0 1px 4px #0005"></span></span>`,
+});
+const gpsFirstShownIcon = gpsWindowIcon(false);
+const gpsLatestIcon = gpsWindowIcon(true);
+
+function ActorSummary({ type, actorId, user, name, detail, to, returnTo, roleLabel }: {
+  type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string; roleLabel?: string;
 }) {
-  const { label, Icon, icon, interactive } = ACTOR_SUMMARY[type];
+  const { label: defaultLabel, Icon, icon, interactive } = ACTOR_SUMMARY[type];
+  const label = roleLabel || defaultLabel;
   const readable = canReadActorDetail(user, type, actorId);
   const content = <>
     <span className={`shrink-0 rounded-lg p-2 ${icon}`}><Icon size={20} aria-hidden="true" /></span>
@@ -107,13 +147,23 @@ const ManifiestoDetailPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+  const returnContext = manifestWorkspaceReturn(location.state, mp('/manifiestos'));
+  const returnToList = returnContext.path;
   const isApp = location.pathname.startsWith('/app');
-  const { data: apiData, isLoading, isError } = useManifiesto(id || '');
+  const { data: apiData, isLoading, isError, error: loadError, refetch: reloadManifest } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
 
   // Auth context for role-based visibility
   const { currentUser, isAdmin } = useAuth();
+  const workspaceOwner = useQueryOwner();
+  const requestContext = React.useMemo(() => supportRequestContext(), [currentUser, workspaceOwner]);
+  const contextOwner = gpsContextScope(workspaceOwner, requestContext);
   const userRol = currentUser?.rol || '';
+  const pendingDeliveries = usePendingDeliveryIds(['TRANSPORTISTA', 'ADMIN'].includes(userRol));
+  React.useEffect(() => subscribeDeliveryConfirmed(event => {
+    const detail = (event as CustomEvent<{ id: string; owner: string }>).detail;
+    if (detail?.id === id) void reloadManifest();
+  }), [id, reloadManifest]);
 
   // Action mutations
   const firmar = useFirmarManifiesto();
@@ -125,7 +175,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const registrarTratamiento = useRegistrarTratamiento();
   const cerrar = useCerrarManifiesto();
   const rechazar = useRechazarManifiesto();
-  const registrarIncidente = useRegistrarIncidente();
+  const registrarIncidente = useRegistrarIncidente(id);
   const revertir = useRevertirEstado();
   const cancelar = useCancelarManifiesto();
 
@@ -138,8 +188,10 @@ const ManifiestoDetailPage: React.FC = () => {
     || rechazar.isPending || registrarIncidente.isPending || revertir.isPending;
 
   // Use API data only
-  const manifiesto = apiData;
+  // Do not keep a cached dossier visible after the server revokes access.
+  const manifiesto = isError && tripAccessDenied(loadError) ? undefined : apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
+  const isInSitu = m.modalidad === 'IN_SITU' || (!m.modalidad && !m.transportistaId);
   const quantityTotals = declaredQuantities(Array.isArray(m.residuos) ? m.residuos : []);
 
   // --- Tracking route for GPS map ---
@@ -147,9 +199,10 @@ const ManifiestoDetailPage: React.FC = () => {
     const points = m?.tracking || [];
     if (!points.length) return null;
     const sorted = [...points].sort((a, b) =>
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime() || a.id.localeCompare(b.id)
     );
     return {
+      segments:transportTrackSegments(sorted),
       points: sorted.map((t: any) => [t.latitud, t.longitud] as [number, number]),
       start: [sorted[0].latitud, sorted[0].longitud] as [number, number],
       end: [sorted[sorted.length - 1].latitud, sorted[sorted.length - 1].longitud] as [number, number],
@@ -166,7 +219,7 @@ const ManifiestoDetailPage: React.FC = () => {
   }, [m]);
   const operadorPos = useMemo(() => {
     const o = m.operador;
-    return o?.latitud && o?.longitud ? [o.latitud, o.longitud] as [number, number] : null;
+    return o?.latitud != null && o?.longitud != null ? [o.latitud, o.longitud] as [number, number] : null;
   }, [m]);
 
   // Combined bounds: tracking points + generador/operador positions
@@ -183,7 +236,7 @@ const ManifiestoDetailPage: React.FC = () => {
     return L.latLngBounds(allPoints);
   }, [trackingRoute, generadorPos, operadorPos]);
 
-  const showMap = !!mapBounds;
+  const showMap = !!mapBounds && !isInSitu;
 
   // --- Action Handlers ---
   // M4: actionInFlight ref prevents double-tap before React re-renders isPending
@@ -216,19 +269,26 @@ const ManifiestoDetailPage: React.FC = () => {
     'Retiro confirmado exitosamente',
   );
 
-  const handleConfirmarEntrega = () => handleAction(
-    () => confirmarEntrega.mutateAsync({ id: id! }),
-    'Entrega confirmada exitosamente',
-  );
+  const handleConfirmarEntrega = async () => {
+    if (actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
+    try {
+      const result = await confirmarEntrega.mutateAsync({ id: id! });
+      if (result.status === 'confirmed') toast.success('Entrega confirmada exitosamente');
+      else toast.info('Entrega pendiente', result.message);
+    } catch (err: any) {
+      toast.error('No se pudo preparar la entrega', err?.response?.data?.message || err?.message || 'Revisá el almacenamiento y la sesión.');
+    } finally { actionInFlightRef.current = false; }
+  };
 
   const handleConfirmarRecepcion = () => handleAction(
     () => confirmarRecepcion.mutateAsync({ id: id! }),
-    'Recepcion confirmada exitosamente',
+    'Recepción confirmada exitosamente',
   );
 
   const handleConfirmarRecepcionInSitu = () => handleAction(
     () => confirmarRecepcionInSitu.mutateAsync({ id: id! }),
-    'Recepcion in situ confirmada exitosamente',
+    'Recepción en origen confirmada exitosamente',
   );
 
   const handlePesaje = (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => {
@@ -257,11 +317,18 @@ const ManifiestoDetailPage: React.FC = () => {
     );
   };
 
-  const handleIncidente = (tipo: string, descripcion: string) => {
-    return handleAction(
-      () => registrarIncidente.mutateAsync({ id: id!, tipo, descripcion }),
-      'Incidente registrado exitosamente',
-    );
+  const handleIncidente = async (tipo: string, descripcion: string) => {
+    if (actionInFlightRef.current) return false;
+    actionInFlightRef.current = true;
+    try {
+      const result = await registrarIncidente.mutateAsync({ id: id!, tipo, descripcion });
+      if (result.cleaned) toast.success('Incidente registrado exitosamente');
+      else toast.info('Incidente registrado', 'No pudimos actualizar la copia local. Conservá este dispositivo y comprobá el envío.');
+      return true;
+    } catch (err: any) {
+      toast.error('No se pudo confirmar el incidente', err?.message || 'Comprobá el envío antes de registrar otro.');
+      return false;
+    } finally { actionInFlightRef.current = false; }
   };
 
   const handleCancelar = async () => {
@@ -320,10 +387,10 @@ const ManifiestoDetailPage: React.FC = () => {
   // Redirect TRANSPORTISTA to the trip view for actionable states
   const isTransportista = userRol === 'TRANSPORTISTA';
   const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
-  if (!isLoading && manifiesto && isTransportista && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
+  const historicalApproved = m.estado === EstadoManifiesto.APROBADO && !m.eventos?.some(e => e.tipo === 'PROPUESTA_PARTES_V1');
+  if (!isLoading && manifiesto && isTransportista && !isInSitu && !historicalApproved && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
     const prefix = isApp ? '/app' : '';
-    navigate(`${prefix}/transporte/viaje/${id}`, { replace: true });
-    return null;
+    return <Navigate to={`${prefix}/transporte/viaje/${id}`} replace />;
   }
 
   if (isLoading) {
@@ -352,16 +419,18 @@ const ManifiestoDetailPage: React.FC = () => {
   }
 
   if (!manifiesto && (isError || !isLoading)) {
+    const status = (loadError as { response?: { status?: number } } | null)?.response?.status;
+    const chooseActivity = (status === 403 || status === 404) && !!id && !!currentUser && needsPersonalManifestChoice(currentUser);
     return (
       <div className="space-y-6 animate-fade-in">
-        <Link to="/manifiestos">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
-        </Link>
+        <Button variant="ghost" aria-label={`Volver a ${returnContext.label}`} onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>{returnContext.label}</Button>
         <Card>
           <CardContent className="py-16 text-center">
             <AlertCircle size={48} className="mx-auto text-warning-400 mb-4" />
-            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Manifiesto no encontrado</h3>
-            <p className="text-neutral-600">No se pudo cargar el manifiesto solicitado. Verifica que el ID sea correcto o intenta nuevamente.</p>
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">{chooseActivity ? 'Manifiesto no disponible en esta actividad' : 'Manifiesto no encontrado'}</h3>
+            <p className="text-neutral-600">{chooseActivity ? 'Comprobá si otra de tus actividades puede abrirlo.' : 'No se pudo cargar el manifiesto solicitado. Verificá el enlace o intentá nuevamente.'}</p>
+            {chooseActivity && id && currentUser && <div className="mx-auto mt-4 max-w-lg"><PersonalManifestNoticeAction manifestId={id}
+              target={'/manifiestos/' + id + location.search + location.hash} user={currentUser} onCurrent={() => void reloadManifest()} /></div>}
           </CardContent>
         </Card>
       </div>
@@ -369,17 +438,16 @@ const ManifiestoDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4" data-operational-page>
       {/* Header */}
-      <div className="space-y-2">
-        <Link to="/manifiestos">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
-        </Link>
+      <div className="space-y-3">
+        <Button variant="ghost" aria-label={`Volver a ${returnContext.label}`} onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>{returnContext.label}</Button>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
-          <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
-            {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
+          <Badge variant="soft" color={historicalApproved ? 'warning' : getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
+            {historicalApproved ? 'Aprobado · registro anterior' : formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
           </Badge>
+          {m.modalidad === 'IN_SITU' && <Badge variant="soft" color="info">En origen · sin traslado</Badge>}
           {isError && (
             <Badge variant="soft" color="warning" className="shrink-0">
               <AlertCircle size={12} className="mr-1" />
@@ -392,21 +460,33 @@ const ManifiestoDetailPage: React.FC = () => {
         </p>
         <div className="flex flex-wrap gap-2">
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
-            <Button size="sm" onClick={() => navigate(`/manifiestos/${id}/editar`)}>
+            <Button size="sm" onClick={() => navigate(mp(`/manifiestos/${id}/editar`))}>
               Editar
             </Button>
           )}
         </div>
       </div>
 
+      {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(userRol) && !isInSitu && m.estado !== EstadoManifiesto.EN_TRANSITO && <PendingGpsReceipts key={`${contextOwner}:${id}`} ownerId={currentUser.id} contextOwner={contextOwner} manifestId={id} />}
+
       {/* One action surface, before the long field context on every screen size. */}
       <ManifiestoActions
+        onRetryApprovalCheck={() => void reloadManifest()}
         manifiesto={m}
         manifiestoId={id!}
         isAdmin={isAdmin}
         userRol={userRol}
         isActionPending={isActionPending}
-        isInSitu={!m.transportistaId}
+        deliveryPending={!!id && pendingDeliveries.ids.has(id)}
+        deliveryChecking={m.estado === EstadoManifiesto.EN_TRANSITO && pendingDeliveries.checking}
+        deliveryCheckError={m.estado === EstadoManifiesto.EN_TRANSITO && pendingDeliveries.error}
+        onRetryDeliveryCheck={pendingDeliveries.retry}
+        incidentNotice={['TRANSPORTISTA', 'ADMIN'].includes(userRol) ? {
+          pending: registrarIncidente.pendingIncident, storageError: registrarIncidente.incidentStorageError,
+          checking: registrarIncidente.checkingIncident, busy: registrarIncidente.isPending,
+          onRetry: () => registrarIncidente.retryIncident(), onRefresh: registrarIncidente.refreshIncident,
+        } : undefined}
+        isInSitu={isInSitu}
         mutations={{
           firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
           confirmarRecepcionInSitu,
@@ -430,7 +510,10 @@ const ManifiestoDetailPage: React.FC = () => {
         isCancelling={isCancelling}
       />
 
-      {import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED === 'true' && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
+      {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
+
+      {(currentUser?.training || import.meta.env.VITE_MANIFEST_CERTIFICATES_ENABLED === 'true' || m.eventos?.some(e=>['CERTIFICACION_OPERADOR_V1','CERTIFICADO_OPERADOR_V1'].includes(e.tipo))) && <TrainingCertificates key={m.id} manifest={m} />}
+      {m.transportistaId&&m.modalidad!=='IN_SITU'&&m.estado!==EstadoManifiesto.BORRADOR&&<TransportLegs id={id!}/>}
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -449,6 +532,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 {m.transportistaId ? (
                   <ActorSummary type="TRANSPORTISTA" actorId={m.transportistaId} user={currentUser}
                     name={m.transportista?.razonSocial || '-'} detail={`Hab: ${m.transportista?.numeroHabilitacion || '-'}`}
+                    roleLabel={isInSitu ? 'Transporte aprobador' : undefined}
                     to={mp(`/admin/actores/transportistas/${encodeURIComponent(m.transportistaId)}`)}
                     returnTo={location.pathname + location.search + location.hash} />
                 ) : (
@@ -472,7 +556,7 @@ const ManifiestoDetailPage: React.FC = () => {
           </Card>
 
           {/* Residuos */}
-          {m.transportistaId && <Card>
+          {m.transportistaId && !isInSitu && <Card>
             <CardHeader title="Transporte asignado" icon={<Truck size={20} />} />
             <CardContent>
               <dl className="grid gap-4 sm:grid-cols-2">
@@ -488,7 +572,7 @@ const ManifiestoDetailPage: React.FC = () => {
             </CardContent>
           </Card>}
           <Card>
-            <CardHeader title="Residuos transportados" icon={<Package size={20} />} />
+            <CardHeader title={isInSitu ? 'Residuos declarados' : 'Residuos transportados'} icon={<Package size={20} />} />
             <CardContent>
                 <div className="overflow-x-auto">
                 <table className="w-full">
@@ -524,29 +608,36 @@ const ManifiestoDetailPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Ruta del Viaje */}
+          {/* Posiciones recibidas, limitadas por la consulta de detalle */}
           {showMap && (
             <Card>
               <div className="p-4 border-b border-neutral-100">
-                <div className="flex items-center gap-2">
-                  <MapPin size={18} className="text-primary-600" />
-                  <h3 className="font-semibold text-neutral-900">
-                    {trackingRoute ? 'Ruta del Viaje' : 'Origen y destino'}
+                <div className="flex flex-wrap items-center gap-2">
+                  <MapPin size={18} className="shrink-0 text-primary-600" aria-hidden="true" />
+                  <h3 className="min-w-0 font-semibold text-neutral-900">
+                    {trackingRoute ? 'Ubicaciones GPS recibidas' : 'Ubicaciones de establecimientos'}
                   </h3>
                   {trackingRoute && (
-                    <Badge variant="soft" color="info">{trackingRoute.count} puntos GPS</Badge>
+                    <Badge variant="soft" color="info">{trackingRoute.count >= 100 ? 'Últimos 100 puntos' : `${trackingRoute.count} ${trackingRoute.count === 1 ? 'punto mostrado' : 'puntos mostrados'}`}</Badge>
                   )}
                   {!trackingRoute && m.estado === EstadoManifiesto.EN_TRANSITO && (
                     <Badge variant="soft" color="warning">En tránsito — esperando GPS</Badge>
                   )}
                 </div>
-                {trackingRoute && (
-                  <p className="text-xs text-neutral-500 mt-1">
-                    {formatDateTime(trackingRoute.startTime)} → {formatDateTime(trackingRoute.endTime)}
+                {trackingRoute ? <div className="mt-2 space-y-1 text-sm leading-5 text-neutral-700">
+                  <p>
+                    {trackingRoute.count === 1 ? 'Recepción · ' : 'Recepciones · '}
+                    <time dateTime={trackingRoute.startTime}>{formatGpsReception(trackingRoute.startTime)}</time>
+                    {trackingRoute.count > 1 && <> → <time dateTime={trackingRoute.endTime}>{formatGpsReception(trackingRoute.endTime, sameGpsReceptionDay(trackingRoute.startTime, trackingRoute.endTime))}</time></>}
+                    {' '}· Mendoza
                   </p>
-                )}
+                  <p>La hora de captura no está disponible.
+                    {trackingRoute.segments.some(segment => segment.length > 1) && ' Las líneas no confirman el recorrido.'}</p>
+                </div> : <p className="mt-2 text-sm leading-5 text-neutral-700">
+                  Datos actuales de los establecimientos.{generadorPos && operadorPos && ' La referencia no es una ruta confirmada.'}
+                </p>}
               </div>
-              <div style={{ height: 400 }} className="relative isolate">
+              <div style={{ height: 400 }} className="manifest-gps-map relative isolate" role="region" aria-label="Mapa de ubicaciones recibidas y establecimientos">
                 <MapContainer
                   bounds={mapBounds!}
                   boundsOptions={{ padding: [40, 40] }}
@@ -555,7 +646,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 >
                   <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
 
-                  {/* Ruta planificada (generador → operador) */}
+                  {/* Referencia entre ubicaciones actuales, no ruta vial */}
                   {generadorPos && operadorPos && (
                     <Polyline
                       positions={[generadorPos, operadorPos]}
@@ -566,21 +657,24 @@ const ManifiestoDetailPage: React.FC = () => {
                     />
                   )}
 
-                  {/* Ruta GPS realizada */}
+                  {/* Conexiones visuales entre puntos de un mismo tramo */}
                   {trackingRoute && (
-                    <Polyline positions={trackingRoute.points} color="#0D8A4F" weight={4} opacity={0.8} />
+                    <>{trackingRoute.segments.map((segment,index)=>segment.length > 1 && <Polyline key={index} positions={segment} color="#0D8A4F" weight={4} opacity={0.8} />)}</>
                   )}
 
-                  {/* Marcadores inicio/fin GPS */}
+                  {/* Primera y última posiciones de la ventana mostrada */}
                   {trackingRoute && (
-                    <>
-                      <Marker position={trackingRoute.start} icon={ACTOR_ICONS.gpsStart}>
-                        <Popup>Inicio del viaje GPS</Popup>
-                      </Marker>
-                      <Marker position={trackingRoute.end} icon={ACTOR_ICONS.gpsEnd}>
-                        <Popup>Fin del viaje GPS</Popup>
-                      </Marker>
-                    </>
+                    trackingRoute.count === 1 ?
+                      <Marker position={trackingRoute.start} icon={gpsLatestIcon} title="Única posición recibida">
+                        <Popup>Única posición recibida</Popup>
+                      </Marker> : <>
+                        <Marker position={trackingRoute.start} icon={gpsFirstShownIcon} title="Primera posición mostrada">
+                          <Popup>Primera posición mostrada</Popup>
+                        </Marker>
+                        <Marker position={trackingRoute.end} icon={gpsLatestIcon} title="Última posición recibida">
+                          <Popup>Última posición recibida</Popup>
+                        </Marker>
+                      </>
                   )}
 
                   {/* Generador (origen) */}
@@ -607,11 +701,11 @@ const ManifiestoDetailPage: React.FC = () => {
                 </MapContainer>
               </div>
               {/* Leyenda */}
-              <div className="px-4 py-2.5 border-t border-neutral-100 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-600">
-                {trackingRoute && (
+              <div className="px-4 py-2.5 border-t border-neutral-100 flex flex-wrap gap-x-5 gap-y-1 text-sm text-neutral-700">
+                {trackingRoute && trackingRoute.segments.some(segment => segment.length > 1) && (
                   <span className="flex items-center gap-1.5">
                     <span style={{ width: 20, height: 3, background: '#0D8A4F', display: 'inline-block', borderRadius: 2 }} />
-                    Ruta realizada
+                    Posiciones conectadas
                   </span>
                 )}
                 {generadorPos && operadorPos && (
@@ -632,17 +726,23 @@ const ManifiestoDetailPage: React.FC = () => {
                     Operador
                   </span>
                 )}
-                {trackingRoute && (
+                {trackingRoute && trackingRoute.count > 1 && (
                   <>
                     <span className="flex items-center gap-1.5">
-                      <span style={{ width: 8, height: 8, background: ACTOR_COLORS.gpsStart, borderRadius: '50%', display: 'inline-block' }} />
-                      Inicio GPS
+                      <span style={{ width: 12, height: 12, background: 'white', border: '2px solid #08623b', borderRadius: '50%', display: 'inline-block' }} />
+                      Primera posición mostrada
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span style={{ width: 8, height: 8, background: ACTOR_COLORS.gpsEnd, borderRadius: '50%', display: 'inline-block' }} />
-                      Fin GPS
+                      <span style={{ width: 12, height: 12, background: '#08623b', border: '2px solid white', outline: '1px solid #08623b', borderRadius: '50%', display: 'inline-block' }} />
+                      Última posición recibida
                     </span>
                   </>
+                )}
+                {trackingRoute && trackingRoute.count === 1 && (
+                  <span className="flex items-center gap-1.5">
+                    <span style={{ width: 12, height: 12, background: '#08623b', border: '2px solid white', outline: '1px solid #08623b', borderRadius: '50%', display: 'inline-block' }} />
+                    Única posición recibida
+                  </span>
                 )}
               </div>
             </Card>
@@ -655,7 +755,7 @@ const ManifiestoDetailPage: React.FC = () => {
         {/* Sidebar */}
         <div className="space-y-6 animate-fade-in min-w-0">
           {/* Blockchain Certification */}
-          {m.estado !== 'BORRADOR' && (
+          {m.estado !== 'BORRADOR' && (!currentUser?.empresaContexto || currentUser.empresaContexto.todasSedes) && (
             <BlockchainPanel
               manifiestoId={id!}
               manifiestoEstado={m.estado as string}

@@ -1,5 +1,9 @@
 import type { Response } from 'express';
+import { inspectionMeasureText } from '../domain/inspectionFieldModel';
+import { inspectionMapSummary, inspectionPointText } from '../domain/inspectionMapGeometry';
 import PDFDocument from 'pdfkit';
+import { drawSyntheticPreviewFooter } from './syntheticPreviewPdf.service';
+import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { buildInspectionFieldActPresentation } from './inspectionFieldActPdf.service';
 import {
   buildInspectionDocumentFingerprint,
@@ -9,6 +13,8 @@ import {
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
 import {
   drawMendozaMark,
+  drawInstitutionalMasthead,
+  drawInstitutionalRule,
   drawSitrepMark,
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
@@ -84,13 +90,13 @@ function runningHeader(
   unified = false,
 ) {
   drawMendozaMark(doc, branding, 44, 13, 94, 30);
-  doc.font('Helvetica-Bold').fontSize(5.8).fillColor(C.darkGreen)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 224, lineBreak: false });
-  doc.font('Helvetica').fontSize(5.5).fillColor(C.muted)
-    .text(`${unified ? 'EXPEDIENTE' : 'INFORME TÉCNICO'} · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 224, lineBreak: false });
-  drawSitrepMark(doc, 424, 16, { compact: true, width: 127 });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 270, lineBreak: false });
+  doc.font('Helvetica').fontSize(8).fillColor(C.muted)
+    .text(`${unified ? 'EXPEDIENTE' : 'INFORME TÉCNICO'} · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 270, lineBreak: false });
+  drawSitrepMark(doc, 442, 16, { compact: true, width: 109 });
   doc.moveTo(44, 47).lineTo(doc.page.width - 44, 47).lineWidth(0.9).strokeColor(C.darkGreen).stroke();
-  doc.font('Helvetica').fontSize(6.4).fillColor(C.muted)
+  doc.font('Helvetica').fontSize(7.5).fillColor(C.muted)
     .text(state, 44, 51, { width: doc.page.width - 88, align: 'right', lineBreak: false });
   doc.y = PAGE.top;
 }
@@ -105,18 +111,15 @@ function header(
 ) {
   const actor = actorOf(inspection);
   const state = documentState(inspection, readiness);
-  drawMendozaMark(doc, branding, 44, 20, 154, 48);
-  drawSitrepMark(doc, 358, 23, { width: 193 });
-  doc.font('Helvetica-Bold').fontSize(6.5).fillColor(C.darkGreen)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 71, { width: 355, lineBreak: false });
-  doc.font('Helvetica').fontSize(6.2).fillColor(C.muted)
-    .text(unified ? 'Acta · Evaluación · Evidencias' : 'Documento 2 de 2 · Complementa el acta de campo', 350, 71, { width: 201, align: 'right', lineBreak: false });
-  doc.moveTo(44, 86).lineTo(doc.page.width - 44, 86).lineWidth(1.5).strokeColor(C.darkGreen).stroke();
+  drawInstitutionalMasthead(doc, branding, 44, 16, doc.page.width - 88);
+  doc.font('Helvetica').fontSize(7.5).fillColor(C.muted)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 77, { width: doc.page.width - 88, lineBreak: false });
+  drawInstitutionalRule(doc, 44, 89, doc.page.width - 88);
 
   doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text(unified ? 'EXPEDIENTE DE INSPECCIÓN' : 'INFORME TÉCNICO DE INSPECCIÓN', 44, 103, { characterSpacing: 0.45 });
   doc.font('Helvetica-Bold').fontSize(23).fillColor(C.navy).text(inspection.numero, 44, 120, { width: 315 });
   doc.font('Helvetica').fontSize(8.2).fillColor(C.muted).text(`Versión ${inspection.version} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, 150, { width: 330 });
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('EXPEDIENTE DE INSPECCIÓN', 366, 109, { width: 185, align: 'right' });
+  doc.font('Helvetica').fontSize(8).fillColor(C.muted).text(unified ? 'Acta · Evaluación · Evidencias' : 'Documento 2 de 2 · Complementa el acta de campo', 366, 102, { width: 185, align: 'right' });
   doc.font('Helvetica').fontSize(7.6).fillColor(C.muted).text(`Estado: ${stateLabel(String(inspection.estado))}`, 366, 127, { width: 185, align: 'right' });
   doc.text(`Emitido ${formatDate(generatedAt, true)} ART`, 366, 143, { width: 185, align: 'right' });
 
@@ -317,40 +320,18 @@ function evidenceGallery(doc: PDFKit.PDFDocument, inspection: any, preparedImage
       x + 16, y + 48, { width: imageWidth - 32, align: 'center' },
     );
   };
-  for (let i = 0; i < photos.length; i += 2) {
-    const row = photos.slice(i, i + 2);
-    const rowHeight = Math.max(...row.map((photo: any) => 166 + measureInspectionPdfBlocks(doc, caption(photo), width - 20)), 246);
-    // Very long captions use the full page width and flow across pages with
-    // their persistent identity repeated, rather than clipping a gallery card.
-    if (rowHeight > 450) {
-      row.forEach((photo: any) => {
-        reserve(230);
-        const y = doc.y;
-        drawImage(photo, 44, y, doc.page.width - 88);
-        doc.y = y + 152;
-        drawInspectionPdfBlocks(doc, caption(photo), {
-          x: 54, width: doc.page.width - 108, bottom: doc.page.height - PAGE.bottom,
-          newPage: () => { doc.addPage(); doc.y = PAGE.top; },
-          continuation: `${inspectionEvidenceReference(photo)} - continuación`,
-        });
-        doc.y += 16;
-      });
-      continue;
-    }
-    reserve(rowHeight + 12);
-    const y = doc.y;
-    row.forEach((photo: any, column: number) => {
-      const x = 44 + column * (width + gap);
-      doc.roundedRect(x, y, width, rowHeight, 4).fillAndStroke(C.white, C.line);
-      drawImage(photo, x + 7, y + 7, width - 14);
-      doc.y = y + 154;
-      drawInspectionPdfBlocks(doc, caption(photo), {
-        x: x + 10, width: width - 20, bottom: doc.page.height - PAGE.bottom,
-        newPage: () => { doc.addPage(); doc.y = PAGE.top; },
-        continuation: `${inspectionEvidenceReference(photo)} - continuación`,
-      });
-    });
-    doc.y = y + rowHeight + 10;
+  for (const photo of photos) {
+    doc.addPage(); doc.y = PAGE.top;
+    section(doc, 'Evidencia fotográfica', 'Una fotografía por página, con descripción y referencia al hallazgo', 200);
+    const y = doc.y, imageWidth = doc.page.width - 88;
+    const imageHeight = Math.max(220, doc.page.height - y - PAGE.bottom - Math.min(160, measureInspectionPdfBlocks(doc, caption(photo), imageWidth)) - 20);
+    doc.rect(44, y, imageWidth, imageHeight).fill(C.soft);
+    const prepared = preparedImages.get(photo.id);
+    if (prepared?.buffer) doc.image(prepared.buffer, 44, y, { fit: [imageWidth, imageHeight], align: 'center', valign: 'center' });
+    else doc.font('Helvetica').fontSize(9).fillColor(C.muted).text('Imagen no disponible en esta copia. Se conserva su registro y huella.', 60, y + 50, { width: imageWidth - 32 });
+    doc.y = y + imageHeight + 8;
+    drawInspectionPdfBlocks(doc, caption(photo), { x: 44, width: imageWidth, bottom: doc.page.height - PAGE.bottom,
+      newPage: () => { doc.addPage(); doc.y = PAGE.top; }, continuation: `${inspectionEvidenceReference(photo)} - continuación` });
   }
 }
 
@@ -390,7 +371,7 @@ function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any, unified = f
       target,
       `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)}`,
       evidence.creadoPor ? `Incorporada por ${`${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim()}` : 'Autor sin informar',
-      evidence.latitud != null && evidence.longitud != null ? `Coordenadas ${evidence.latitud}, ${evidence.longitud}` : '',
+      evidence.latitud != null && evidence.longitud != null ? `Coordenadas ${Number(evidence.latitud).toFixed(6)}, ${Number(evidence.longitud).toFixed(6)}` : '',
     ].filter(Boolean).join(' · ');
     const details = [
       evidence.descripcion && !(unified && evidence.tipo === 'FOTO' && !evidence.anuladaAt && !evidence.intercambioId) ? `Descripción: ${evidence.descripcion}` : '',
@@ -628,7 +609,7 @@ function unifiedFieldAct(doc: PDFKit.PDFDocument, inspection: any) {
   const fields = [
     ['Código postal', act.codigoPostal], ['Departamento', act.departamento],
     ['Domicilio constatado', [act.calle || inspection.ubicacion || actor.domicilio, act.numeroDomicilio].filter(Boolean).join(' ')],
-    ['Coordenadas', inspection.latitud != null && inspection.longitud != null ? `${inspection.latitud}, ${inspection.longitud}` : ''],
+    ['Coordenadas', inspection.latitud != null && inspection.longitud != null ? `${Number(inspection.latitud).toFixed(6)}, ${Number(inspection.longitud).toFixed(6)}` : ''],
     ['Titular', act.titular || actor.representanteLegalNombre], ['DNI del titular', act.dniTitular || actor.representanteLegalDNI],
     ['Teléfono', actor.telefono], ['Correo', actor.email],
     ['Atendido por', act.atendidoPor], ['DNI del interviniente', act.dniAtendido], ['Cargo', act.cargoAtendido],
@@ -636,7 +617,10 @@ function unifiedFieldAct(doc: PDFKit.PDFDocument, inspection: any) {
     ['Infraestructura', act.infraestructura ? stateLabel(act.infraestructura) : ''],
     ['Detalle de infraestructura', act.detalleInfraestructura], ['Estado de infraestructura', act.estadoInfraestructura],
     ['Generación / corrientes observadas', act.generacion], ['Acta antecedente', act.actaAnterior],
-    ['Requerimientos consignados', act.requerimientos], ['Observaciones de campo', inspection.observaciones],
+    ['Actividad observada', act.actividadObservada], ['Ampliación respecto de lo declarado', [act.ampliacionEstado, act.ampliacionDetalle].filter(Boolean).join(' · ')],
+    ['Entorno y vecinos', act.entornoObservado], ['Referencia de restricción ambiental', act.restriccionReferencia],
+    ['Receptores cercanos', (act.receptores || []).join(', ')],
+    ['Requerimientos consignados', [act.requerimientos, inspectionMeasureText(act.medidas || [])].filter(Boolean).join('\n')], ['Observaciones de campo', inspection.observaciones],
   ];
   const write = (blocks: InspectionPdfTextBlock[]) => drawInspectionPdfBlocks(doc, blocks, {
     x: 44, width: doc.page.width - 88, bottom: doc.page.height - PAGE.bottom,
@@ -751,6 +735,20 @@ export async function streamInspectionTechnicalReportPdf(
 
   if (!unified || inspection.comparaciones.length) {
   ensureSpace(doc, 150);
+  const location = inspection.datosActa?.ubicacionCampo;
+  if (location) {
+    doc.addPage(); doc.y = PAGE.top;
+    section(doc, 'Ubicación y entorno', 'Punto registrado por el inspector; el mapa no determina por sí solo una restricción ambiental');
+    narrativeBox(doc, `Coordenadas: ${inspectionPointText(location)}`);
+    if (location.mapaImagen) {
+      const y = doc.y; doc.image(Buffer.from(location.mapaImagen.split(',')[1], 'base64'), 44, y, { fit: [507, 300], align: 'center' }); doc.y = y + 310;
+      doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('Mapa guardado durante la visita · © OpenStreetMap contributors', 44, doc.y, { width: 507 });
+    }
+    const mapLines = inspectionMapSummary(location);
+    if (mapLines.length) narrativeBox(doc, mapLines.join('\n'));
+    if (inspection.datosActa.entornoObservado) narrativeBox(doc, inspection.datosActa.entornoObservado);
+    if (inspection.datosActa.restriccionReferencia) narrativeBox(doc, inspection.datosActa.restriccionReferencia);
+  }
   section(doc, 'Declarado y verificado', 'Datos declarados al abrir la inspección y resultado constatado en campo');
   comparisonTable(doc, inspection.comparaciones);
   }
@@ -839,7 +837,8 @@ export async function streamInspectionTechnicalReportPdf(
       .text(`${unified ? 'Expediente' : 'Informe técnico'} · ${inspection.numero} · v${inspection.version}`, 44, footerY, { width: 205, lineBreak: false })
       .text(`Huella ${fingerprint.slice(0, 16)}…`, 224, footerY, { width: 170, align: 'center', lineBreak: false })
       .text(`Página ${i + 1} de ${range.count}`, 421, footerY, { width: 130, align: 'right', lineBreak: false });
-    doc.fontSize(6.1).text(`Gobierno de Mendoza · Ministerio de Energía y Ambiente · Documento oficial generado por SITREP · ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });
+    doc.fontSize(6.1).text(`Gobierno de Mendoza · Ministerio de Energía y Ambiente · Documento ${syntheticPreviewEnabled() ? 'de práctica' : 'oficial'} generado por SITREP · ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });
+    drawSyntheticPreviewFooter(doc, footerY);
     doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();

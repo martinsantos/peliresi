@@ -1,3 +1,6 @@
+import { applicationNoticeContent } from '../services/applicationNotice.service';
+import { verifiedCuit } from '../domain/conciliacionExterna';
+import { linkApprovedRegistration } from '../services/companyRegistration.service';
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -14,7 +17,9 @@ import { generateTokens } from './auth.controller';
 import { registrationActorFields } from '../domain/registrationActorData';
 import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
 import { licenseFields } from '../domain/licenseReading';
-import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { describeDocument, readReceipt, mergeReceiptRead, mergeElectricityRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { electricityReading } from '../domain/electricityReading';
+import { applySolicitudPayments, confirmPayment, notePaymentDecision, paymentAnalysis, requirePaymentIdentity, retainPaymentAllocation, solicitudPaymentScope } from '../services/paymentIdentity.service';
 import {
   getMissingRequiredDocumentTypes,
   getSolicitudRequirements,
@@ -24,7 +29,8 @@ import {
 } from '../services/solicitudRequirements.service';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
-function normalizeCuit(raw: string): string | null {
+function normalizeCuit(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !/^[\d\s-]+$/.test(raw)) return null;
   const digits = raw.replace(/[^0-9]/g, '');
   if (digits.length !== 11) return null;
   return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
@@ -62,10 +68,25 @@ function isAdmin(rol: string): boolean {
   return ADMIN_ROLES.includes(rol);
 }
 
+function canReview(req: AuthRequest, solicitud: { tipoActor: string }): boolean {
+  return !!req.user && !req.user.restricted && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(req.user.rol);
+}
+function canRead(req: AuthRequest, solicitud: { usuarioId: string; tipoActor: string }): boolean {
+  return solicitud.usuarioId === req.user?.id || canReview(req, solicitud);
+}
+function reviewRoles(tipoActor: string): Rol[] { return ['ADMIN', `ADMIN_${tipoActor}`] as Rol[]; }
+
 function assertReviewPermission(req: AuthRequest, solicitud: { tipoActor: string }) {
-  if (!req.user || req.user.restricted || !['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(req.user.rol)) {
+  if (!canReview(req, solicitud)) {
     throw new AppError('No tiene permisos para modificar una solicitud de este sector', 403);
   }
+}
+
+function assertReviewRevision(req: AuthRequest, current: { updatedAt: Date }) {
+  const expected = req.body.expectedUpdatedAt;
+  if (expected === undefined) return; // Older clients remain compatible.
+  if (typeof expected !== 'string' || !Number.isFinite(Date.parse(expected))) throw new AppError('La versión de la solicitud es inválida', 400);
+  if (current.updatedAt.toISOString() !== expected) throw new AppError('La solicitud cambió desde que la consultaste. Revisá los datos actualizados antes de confirmar.', 409);
 }
 
 function jsonObject(value: unknown, allowArray = false): string {
@@ -112,10 +133,11 @@ export const getRequisitosSolicitud = async (req: Request, res: Response, next: 
  */
 export const iniciarSolicitud = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, nombre, tipoActor, cuit } = req.body;
+    const { email: rawEmail, password, nombre, tipoActor, cuit } = req.body;
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
 
     // Validate required fields
-    if (!email || !password || !nombre || !tipoActor || !cuit) {
+    if (!email || typeof password !== 'string' || !password || typeof nombre !== 'string' || !nombre.trim() || !tipoActor || !cuit) {
       throw new AppError('email, password, nombre, tipoActor y cuit son obligatorios', 400);
     }
 
@@ -135,6 +157,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
     // CUIT normalization
     const normalizedCuit = normalizeCuit(cuit);
     if (!normalizedCuit) throw new AppError('CUIT invalido (debe tener 11 digitos)', 400);
+    if (process.env.ENTERPRISE_ENABLED === 'true' && !verifiedCuit(normalizedCuit)) throw new AppError('Revisá el CUIT: el prefijo o el dígito verificador no coinciden. Corregilo antes de crear la cuenta.', 400);
 
     // Check email uniqueness
     const existingByEmail = await prisma.usuario.findUnique({ where: { email } });
@@ -212,7 +235,7 @@ export const getMisSolicitudes = async (req: AuthRequest, res: Response, next: N
       where: { usuarioId: req.user!.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        documentos: { select: { id: true, tipo: true, nombre: true, estado: true, createdAt: true } },
+        documentos: { select: { id: true, tipo: true, nombre: true, estado: true, observaciones: true, createdAt: true } },
         _count: { select: { mensajes: true } },
       },
     });
@@ -244,7 +267,7 @@ export const getSolicitud = async (req: AuthRequest, res: Response, next: NextFu
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
     // Check ownership or admin
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
+    if (!canRead(req, solicitud)) {
       throw new AppError('No tiene permisos para ver esta solicitud', 403);
     }
 
@@ -330,6 +353,8 @@ export const editarDatosRevision = async (req: AuthRequest, res: Response, next:
 export const enviarSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const { expectedUpdatedAt } = req.body || {};
+    if (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt)))) throw new AppError('La versión de la solicitud es inválida', 400);
     const updated = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
     const solicitud = await tx.solicitudInscripcion.findUnique({
@@ -349,6 +374,8 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
       throw new AppError('Solo se pueden enviar solicitudes en estado BORRADOR u OBSERVADA', 400);
     }
+
+    if (expectedUpdatedAt !== undefined && solicitud.updatedAt.toISOString() !== expectedUpdatedAt) throw new AppError('Los datos u observaciones cambiaron. Revisá la solicitud actual antes de reenviar; tu respuesta sigue guardada.', 409);
 
     // Validate required data
     if (!solicitud.datosActor) {
@@ -388,7 +415,7 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
 
     // Notify admins via in-app notification
     const admins = await tx.usuario.findMany({
-      where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] }, activo: true },
+      where: { rol: { in: reviewRoles(solicitud.tipoActor) }, activo: true },
       select: { id: true },
     });
 
@@ -397,14 +424,8 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
         data: {
           usuarioId: admin.id,
           tipo: 'SOLICITUD_ENVIADA',
-          titulo: 'Nueva solicitud de inscripcion',
-          mensaje: `${solicitud.usuario.nombre} envio una solicitud de inscripcion como ${solicitud.tipoActor}.`,
+          ...applicationNoticeContent('SOLICITUD_ENVIADA', solicitud),
           prioridad: 'ALTA',
-          datos: JSON.stringify({
-            tipo: 'solicitud_enviada',
-            solicitudId: id,
-            tipoActor: solicitud.tipoActor,
-          }),
         },
       })
     ));
@@ -437,7 +458,7 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('No se pueden agregar archivos a una solicitud enviada o cerrada', 400);
     }
 
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
+    if (!canRead(req, solicitud)) {
       throw new AppError('No tiene permisos para subir documentos a esta solicitud', 403);
     }
     if (solicitud.usuarioId !== req.user!.id) assertReviewPermission(req, solicitud);
@@ -450,15 +471,17 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
 
     const description = describeDocument(req.file);
     const input = { path: req.file.path, mimeType: description.mimeType };
-    const reading = license ? await readReceipt(input, 'LICENCIA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
-    const analysis = reading && license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : reading;
-    let previous: Array<{ id: string; path: string; sha256: string | null }> = [];
+    const electric = tipo === 'FACTURA_ELECTRICA';
+    const reading = license ? await readReceipt(input, 'LICENCIA') : electric ? await readReceipt(input, 'FACTURA_ELECTRICA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
+    let analysis = reading && license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
+      : reading && electric ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading;
+    let previous: Array<{ id: string; path: string; sha256: string | null; tipo: string; estado: string; analisis: unknown }> = [];
     const documento = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se reemplazó ningún archivo.', 409);
       if (license && !declaredLicenseDocument(JSON.parse(jsonObject(current.datosActor)), tipo)) throw new AppError('El chofer cambió durante la carga. Guardá la lista y reintentá.', 409);
-      previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true } });
+      previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true, tipo: true, estado: true, analisis: true } });
       if (previous[0]?.sha256 === description.sha256) {
         const original = await tx.documentoSolicitud.findUniqueOrThrow({ where: { id: previous[0].id } });
         if (analysis && analysis.lectura === 'LEIDO' && (original.analisis as { lectura?: string } | null)?.lectura !== 'LEIDO') {
@@ -466,7 +489,11 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
         }
         return original;
       }
-      if (analysis && !license) analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
+      if (analysis && tipo === 'COMPROBANTE_PAGO') {
+        for (const old of previous) await retainPaymentAllocation(tx, old, solicitudPaymentScope(id), 'SOLICITUD', 'REEMPLAZADO', req.user!.id);
+        analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
+        analysis = await paymentAnalysis(tx, analysis, solicitudPaymentScope(id));
+      }
       await tx.documentoSolicitud.deleteMany({ where: { solicitudId: id, tipo } });
       const saved = await tx.documentoSolicitud.create({
         data: {
@@ -479,7 +506,7 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
           estado: 'PENDIENTE',
         },
       });
-      if (analysis && !license) await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
+      if (analysis && tipo === 'COMPROBANTE_PAGO') await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
       if (analysis?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: saved.id });
       return saved;
     });
@@ -514,22 +541,26 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
     const original = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
     if (!original || original.solicitudId !== id) throw new AppError('Documento no encontrado', 404);
     const license = isLicenseDocument(original.tipo) && solicitud.tipoActor === 'TRANSPORTISTA';
-    if (original.tipo !== 'COMPROBANTE_PAGO' && !license) throw new AppError('La lectura automática corresponde a comprobantes o licencias de chofer', 400);
+    const electric = original.tipo === 'FACTURA_ELECTRICA';
+    if (original.tipo !== 'COMPROBANTE_PAGO' && !license && !electric) throw new AppError('La lectura automática corresponde a comprobantes, facturas eléctricas o licencias de chofer', 400);
     if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
     const description = describeDocument({ path: original.path, mimetype: original.mimeType });
     if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
     const input = { path: original.path, mimeType: description.mimeType };
-    const reading = license ? await readReceipt(input, 'LICENCIA') : await readReceipt(input);
+    const reading = license ? await readReceipt(input, 'LICENCIA') : electric ? await readReceipt(input, 'FACTURA_ELECTRICA') : await readReceipt(input);
     const documento = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!current || current.solicitudId !== id || current.path !== original.path || current.sha256 !== original.sha256) {
         throw new AppError('El adjunto cambió durante la lectura. Actualizá la solicitud para continuar.', 409);
       }
-      if (!license) reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
-      const analisis = license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : mergeReceiptRead(current.analisis, reading);
+      if (original.tipo === 'COMPROBANTE_PAGO') reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
+      let analisis = license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
+        : electric ? mergeElectricityRead(current.analisis, reading)
+        : mergeReceiptRead(current.analisis, reading);
+      if (original.tipo === 'COMPROBANTE_PAGO' && analisis.pago?.revision !== 'CONFIRMADO') analisis = await paymentAnalysis(tx, analisis, solicitudPaymentScope(id));
       const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
-      if (!license) await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
+      if (original.tipo === 'COMPROBANTE_PAGO') await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
       if (analisis.duplicado && !(current.analisis as { duplicado?: boolean } | null)?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: docId });
       return saved;
     });
@@ -542,7 +573,7 @@ export const downloadDocumentoSolicitud = async (req: AuthRequest, res: Response
   try {
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id: req.params.id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
-    if (solicitud.usuarioId !== req.user?.id && (!req.user || req.user.restricted || !isAdmin(req.user.rol))) throw new AppError('No tiene permisos para consultar este documento', 403);
+    if (!canRead(req, solicitud)) throw new AppError('No tiene permisos para consultar este documento', 403);
     const documento = await prisma.documentoSolicitud.findUnique({ where: { id: req.params.docId } });
     if (!documento || documento.solicitudId !== solicitud.id) throw new AppError('Documento no encontrado', 404);
     if (!fs.existsSync(documento.path)) throw new AppError('Archivo no disponible', 404);
@@ -563,7 +594,7 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
+    if (!canRead(req, solicitud)) {
       throw new AppError('No tiene permisos para eliminar documentos de esta solicitud', 403);
     }
     if (solicitud.usuarioId !== req.user!.id) assertReviewPermission(req, solicitud);
@@ -579,6 +610,7 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
       const saved = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!saved) throw new AppError('Documento no encontrado', 404);
       if (saved.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
+      await retainPaymentAllocation(tx, saved, solicitudPaymentScope(id), 'SOLICITUD', 'RETIRADO', req.user!.id);
       return tx.documentoSolicitud.delete({ where: { id: docId } });
     });
     // Remove bytes only AFTER the database commit. A failed transaction must
@@ -606,7 +638,7 @@ export const getMensajes = async (req: AuthRequest, res: Response, next: NextFun
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
+    if (!canRead(req, solicitud)) {
       throw new AppError('No tiene permisos para ver los mensajes de esta solicitud', 403);
     }
 
@@ -635,10 +667,11 @@ export const getMensajes = async (req: AuthRequest, res: Response, next: NextFun
 export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { contenido } = req.body;
+    const { contenido, clientMessageId } = req.body;
+    if (clientMessageId !== undefined && (typeof clientMessageId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientMessageId))) throw new AppError('La referencia del mensaje es inválida', 400);
 
-    if (!contenido || !contenido.trim()) {
-      throw new AppError('El contenido del mensaje es obligatorio', 400);
+    if (typeof contenido !== 'string' || !contenido.trim() || contenido.length > 5000) {
+      throw new AppError('El mensaje debe contener entre 1 y 5000 caracteres', 400);
     }
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({
@@ -647,7 +680,7 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
+    if (!canRead(req, solicitud)) {
       throw new AppError('No tiene permisos para enviar mensajes en esta solicitud', 403);
     }
 
@@ -656,8 +689,24 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError('La solicitud rechazada sólo permite consultar el resultado', 403);
     }
 
-    const mensaje = await prisma.mensajeSolicitud.create({
+    const messageId = clientMessageId ? 'ui-' + clientMessageId : undefined;
+    const replay = async () => {
+      if (!messageId) return null;
+      const existing = await prisma.mensajeSolicitud.findUnique({ where: { id: messageId } });
+      if (existing && (existing.solicitudId !== id || existing.autorId !== req.user!.id || existing.contenido !== contenido.trim())) throw new AppError('La referencia pertenece a otro mensaje. Revisá la conversación antes de reenviar.', 409);
+      return existing;
+    };
+    const existing = await replay();
+    if (existing) { res.status(201).json({ success: true, data: { mensaje: existing } }); return; }
+    let mensaje;
+    try { mensaje = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || !canRead(req, current)) throw new AppError('La solicitud ya no está disponible para esta cuenta', 403);
+      if (req.user!.restricted && current.estado === 'RECHAZADA') throw new AppError('La solicitud rechazada sólo permite consultar el resultado', 403);
+      const saved = await tx.mensajeSolicitud.create({
       data: {
+        ...(messageId ? { id: messageId } : {}),
         solicitudId: id,
         autorId: req.user!.id,
         autorRol,
@@ -668,34 +717,35 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
     // Notify the other party via in-app notification
     if (autorRol === 'ADMIN') {
       // Notify the candidate
-      await prisma.notificacion.create({
+      await tx.notificacion.create({
         data: {
           usuarioId: solicitud.usuarioId,
           tipo: 'SOLICITUD_MENSAJE',
-          titulo: 'Nuevo mensaje en tu solicitud',
-          mensaje: 'Un administrador envio un mensaje sobre tu solicitud de inscripcion.',
+          ...applicationNoticeContent('SOLICITUD_MENSAJE', solicitud),
           prioridad: 'NORMAL',
-          datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: id }),
         },
       });
     } else {
       // Notify admins
-      const admins = await prisma.usuario.findMany({
-        where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] }, activo: true },
+      const admins = await tx.usuario.findMany({
+        where: { rol: { in: reviewRoles(solicitud.tipoActor) }, activo: true },
         select: { id: true },
       });
       await Promise.all(admins.map((admin) =>
-        prisma.notificacion.create({
+        tx.notificacion.create({
           data: {
             usuarioId: admin.id,
             tipo: 'SOLICITUD_MENSAJE',
-            titulo: 'Nuevo mensaje en solicitud',
-            mensaje: `${solicitud.usuario.nombre} envio un mensaje en su solicitud de inscripcion.`,
+            ...applicationNoticeContent('SOLICITUD_MENSAJE', solicitud),
             prioridad: 'NORMAL',
-            datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: id }),
           },
         })
       ));
+    }
+
+      return saved;
+    }); } catch (error) {
+      if ((error as { code?: string }).code !== 'P2002' || !(mensaje = await replay())) throw error;
     }
 
     res.status(201).json({ success: true, data: { mensaje } });
@@ -721,6 +771,7 @@ export const listarSolicitudes = async (req: AuthRequest, res: Response, next: N
     const where: any = {};
     if (estado) where.estado = estado;
     if (tipoActor) where.tipoActor = tipoActor;
+    if (req.user!.rol !== 'ADMIN') where.tipoActor = req.user!.rol.replace('ADMIN_', '');
     if (search && typeof search === 'string') {
       where.OR = [
         { usuario: { nombre: { contains: search, mode: 'insensitive' } } },
@@ -771,12 +822,19 @@ export const revisarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo se pueden tomar en revision solicitudes en estado ENVIADA', 400);
     }
 
-    const updated = await prisma.solicitudInscripcion.update({
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'ENVIADA') throw new AppError('La solicitud cambió. Actualizá antes de iniciar la revisión.', 409);
+      assertReviewRevision(req, current);
+    return tx.solicitudInscripcion.update({
       where: { id },
       data: {
         estado: 'EN_REVISION',
         revisadoPor: req.user!.id,
       },
+    });
+
     });
 
     res.json({ success: true, data: { solicitud: updated } });
@@ -794,7 +852,7 @@ export const observarSolicitud = async (req: AuthRequest, res: Response, next: N
     const { id } = req.params;
     const { observaciones } = req.body;
 
-    if (!observaciones || !observaciones.trim()) {
+    if (typeof observaciones !== 'string' || !observaciones.trim() || observaciones.length > 5000) {
       throw new AppError('Las observaciones son obligatorias para observar una solicitud', 400);
     }
 
@@ -809,7 +867,11 @@ export const observarSolicitud = async (req: AuthRequest, res: Response, next: N
       throw new AppError('Solo se pueden observar solicitudes en estado EN_REVISION', 400);
     }
 
-    await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'EN_REVISION') throw new AppError('La solicitud cambió. Actualizá antes de enviar las observaciones.', 409);
+      assertReviewRevision(req, current);
       await tx.solicitudInscripcion.update({
         where: { id },
         data: {
@@ -828,21 +890,18 @@ export const observarSolicitud = async (req: AuthRequest, res: Response, next: N
           contenido: observaciones.trim(),
         },
       });
-    });
-
     // Notify candidate
-    await prisma.notificacion.create({
+    await tx.notificacion.create({
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_OBSERVADA',
-        titulo: 'Solicitud observada',
-        mensaje: 'Tu solicitud de inscripcion tiene observaciones. Revisa los comentarios y corrige lo necesario.',
+        ...applicationNoticeContent('SOLICITUD_OBSERVADA', solicitud),
         prioridad: 'ALTA',
-        datos: JSON.stringify({ tipo: 'solicitud_observada', solicitudId: id }),
       },
     });
 
-    const updated = await prisma.solicitudInscripcion.findUnique({ where: { id } });
+      return tx.solicitudInscripcion.findUnique({ where: { id } });
+    });
     res.json({ success: true, data: { solicitud: updated } });
   } catch (error) {
     next(error);
@@ -871,14 +930,16 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
-      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true') {
+      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
         await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${solicitud.usuarioId} FOR UPDATE`;
       }
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || current.estado !== 'EN_REVISION') throw new AppError('La solicitud ya fue procesada por otro usuario', 409);
+      assertReviewRevision(req, current);
       const datosActor = JSON.parse(jsonObject(current.datosActor));
       if (datosActor.cuit && normalizeCuit(String(datosActor.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT declarado no coincide con el de la cuenta solicitante', 400);
       const declared = registrationActorFields(solicitud.tipoActor, datosActor);
+      await applySolicitudPayments(tx, id, solicitud.usuario.cuit || '', req.user!.id);
       const contact = typeof datosActor.emailContacto === 'string' && datosActor.emailContacto.trim()
         ? datosActor.emailContacto.trim() : solicitud.usuario.email;
       let generadorId: string | undefined;
@@ -959,16 +1020,16 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         },
       });
 
+      await linkApprovedRegistration(tx, solicitud, (generadorId || operadorId || transportistaId)!, req.user!);
+
       // Same transaction: a failed internal notice must not leave a committed
       // approval reported as failed to the administrator.
       await tx.notificacion.create({
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_APROBADA',
-        titulo: 'Solicitud aprobada',
-        mensaje: 'Tu solicitud de inscripcion fue aprobada. Ya podes ingresar a SITREP.',
+        ...applicationNoticeContent('SOLICITUD_APROBADA', solicitud),
         prioridad: 'ALTA',
-        datos: JSON.stringify({ tipo: 'solicitud_aprobada', solicitudId: id }),
       },
       });
       return updated;
@@ -989,7 +1050,7 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
     const { id } = req.params;
     const { motivoRechazo, observaciones } = req.body;
 
-    if (!motivoRechazo || !motivoRechazo.trim()) {
+    if (typeof motivoRechazo !== 'string' || !motivoRechazo.trim() || motivoRechazo.length > 5000) {
       throw new AppError('El motivo de rechazo es obligatorio', 400);
     }
 
@@ -1004,7 +1065,12 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
       throw new AppError('Solo se pueden rechazar solicitudes en estado EN_REVISION', 400);
     }
 
-    const updated = await prisma.solicitudInscripcion.update({
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'EN_REVISION') throw new AppError('La solicitud cambió. Actualizá antes de rechazarla.', 409);
+      assertReviewRevision(req, current);
+    const saved = await tx.solicitudInscripcion.update({
       where: { id },
       data: {
         estado: 'RECHAZADA',
@@ -1016,15 +1082,16 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
     });
 
     // Notify candidate
-    await prisma.notificacion.create({
+    await tx.notificacion.create({
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_RECHAZADA',
-        titulo: 'Solicitud rechazada',
-        mensaje: `Tu solicitud de inscripcion fue rechazada. Motivo: ${motivoRechazo.trim()}`,
+        ...applicationNoticeContent('SOLICITUD_RECHAZADA', solicitud),
         prioridad: 'ALTA',
-        datos: JSON.stringify({ tipo: 'solicitud_rechazada', solicitudId: id, motivoRechazo: motivoRechazo.trim() }),
       },
+    });
+
+      return saved;
     });
 
     res.json({ success: true, data: { solicitud: updated } });
@@ -1040,7 +1107,15 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
 export const revisarDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id, docId } = req.params;
-    const { estado, observaciones } = req.body;
+    const { estado, observaciones, expectedDocument } = req.body;
+    if (observaciones !== undefined && (typeof observaciones !== 'string' || observaciones.length > 5000)) {
+      throw new AppError('Las observaciones del documento deben ser un texto de hasta 5000 caracteres.', 400);
+    }
+    if (expectedDocument !== undefined && (!expectedDocument || typeof expectedDocument !== 'object' || Array.isArray(expectedDocument)
+      || !['PENDIENTE', 'APROBADO', 'RECHAZADO'].includes(expectedDocument.estado)
+      || !(expectedDocument.sha256 === null || typeof expectedDocument.sha256 === 'string' && /^[a-f0-9]{64}$/i.test(expectedDocument.sha256)))) {
+      throw new AppError('La referencia del documento no es válida. Actualizá la solicitud.', 400);
+    }
 
     if (!estado || !['APROBADO', 'RECHAZADO'].includes(estado)) {
       throw new AppError('El estado debe ser APROBADO o RECHAZADO', 400);
@@ -1054,18 +1129,48 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
     if (!documento) throw new AppError('Documento no encontrado', 404);
     if (documento.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
 
-    const updated = await prisma.documentoSolicitud.update({
-      where: { id: docId },
-      data: {
-        estado,
-        observaciones: observaciones || undefined,
-        revisadoPor: req.user!.id,
-        revisadoAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const application = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!application || !['EN_REVISION', 'OBSERVADA'].includes(application.estado)) throw new AppError('La solicitud cambió o ya está resuelta. Actualizá antes de revisar documentos.', 409);
+      const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!current || current.solicitudId !== id) throw new AppError('El documento cambió durante la revisión.', 409);
+      if (expectedDocument && (current.estado !== expectedDocument.estado || (current.sha256 || null) !== expectedDocument.sha256)) {
+        throw new AppError('El documento cambió durante la revisión. Actualizá y revisá el original antes de decidir.', 409);
+      }
+      if (current.tipo === 'COMPROBANTE_PAGO') {
+        const user = await tx.usuario.findUniqueOrThrow({ where: { id: solicitud.usuarioId }, select: { cuit: true } });
+        const target = { origen: 'SOLICITUD' as const, documentoId: docId, ambito: solicitudPaymentScope(id), cuit: user.cuit || '', sha256: current.sha256 || '' };
+        if (estado === 'APROBADO') await requirePaymentIdentity(tx, target, current.analisis);
+        await notePaymentDecision(tx, target, current.analisis, estado, req.user!.id);
+      }
+      return tx.documentoSolicitud.update({ where: { id: docId }, data: { estado, observaciones: observaciones === undefined ? undefined : observaciones.trim(), revisadoPor: req.user!.id, revisadoAt: new Date() } });
     });
 
     res.json({ success: true, data: { documento: updated } });
   } catch (error) {
     next(error);
   }
+};
+
+/** Administration confirms only its own actor sector, with a fresh file hash. */
+export const confirmarIdentidadPago = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, docId } = req.params;
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id }, include: { usuario: { select: { cuit: true } } } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
+    const documento = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUniqueOrThrow({ where: { id } });
+      const doc = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!doc || doc.solicitudId !== id || doc.tipo !== 'COMPROBANTE_PAGO' || !doc.sha256) throw new AppError('Comprobante no encontrado o sin huella. Reintentá la lectura del original.', 409);
+      if (!['EN_REVISION', 'OBSERVADA'].includes(current.estado) && doc.estado !== 'APROBADO') throw new AppError('El pago se identifica durante la revisión del alta. La conciliación histórica sólo identifica documentos ya aprobados; no cambia su decisión.', 409);
+      if (req.body.expectedSha256 !== doc.sha256) throw new AppError('El documento cambió. Volvé a cargarlo antes de confirmar.', 409);
+      const pago = await confirmPayment(tx, { origen: 'SOLICITUD', documentoId: docId, ambito: solicitudPaymentScope(id), cuit: solicitud.usuario.cuit || '', sha256: doc.sha256, historico: doc.estado === 'APROBADO', aplicado: current.estado === 'APROBADA' }, req.body, req.user!.id);
+      const analysis = doc.analisis && typeof doc.analisis === 'object' && !Array.isArray(doc.analisis) ? doc.analisis : {};
+      return tx.documentoSolicitud.update({ where: { id: docId }, data: { analisis: { ...analysis, pago } } });
+    }, { timeout: 15_000 });
+    res.json({ success: true, data: { documento } });
+  } catch (error) { next(error); }
 };

@@ -27,6 +27,8 @@ interface KPI {
 }
 
 interface ExportConfig {
+  /** A context change can cancel a download while fonts/images are loading. */
+  canDownload?: () => boolean;
   titulo: string;
   subtitulo?: string;
   periodo: string;
@@ -37,7 +39,7 @@ interface ExportConfig {
   };
 }
 
-const PRIMARY_COLOR: [number, number, number] = [13, 138, 79]; // #0D8A4F
+const PRIMARY_COLOR: [number, number, number] = [27, 94, 60]; // #1B5E3C
 const DARK_COLOR: [number, number, number] = [18, 26, 38]; // #121A26
 const GRAY_COLOR: [number, number, number] = [107, 114, 128];
 const LIGHT_BG: [number, number, number] = [249, 250, 251];
@@ -48,23 +50,21 @@ export async function exportReportePDF(config: ExportConfig) {
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 15;
 
-  // ── Header bar ──
-  doc.setFillColor(...PRIMARY_COLOR);
-  doc.rect(0, 0, pageWidth, 28, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text('SITREP', 14, 12);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Sistema de Trazabilidad de Residuos Peligrosos', 14, 18);
-  doc.text('Provincia de Mendoza', 14, 23);
-
-  // Date on right side
-  doc.setFontSize(9);
-  doc.text(new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }), pageWidth - 14, 12, { align: 'right' });
-  doc.text(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }), pageWidth - 14, 18, { align: 'right' });
+  const mark = new Image();
+  mark.src = import.meta.env.BASE_URL + 'sitrep-mark-green.svg';
+  await mark.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = 150; canvas.height = 150;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No se pudo preparar la marca del documento. Reintentá la descarga.');
+  context.drawImage(mark, 0, 0, 150, 150);
+  const brand = canvas.toDataURL('image/png');
+  const mendoza = new Image();
+  mendoza.src = import.meta.env.BASE_URL + 'mendoza-marca-horizontal-transparente.png';
+  await mendoza.decode();
+  canvas.width = 600; canvas.height = Math.round(600 * mendoza.naturalHeight / mendoza.naturalWidth);
+  context.drawImage(mendoza, 0, 0, canvas.width, canvas.height);
+  const institution = canvas.toDataURL('image/png');
 
   y = 38;
 
@@ -72,15 +72,17 @@ export async function exportReportePDF(config: ExportConfig) {
   doc.setTextColor(...DARK_COLOR);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(config.titulo, 14, y);
-  y += 6;
+  const titleLines = doc.splitTextToSize(config.titulo, pageWidth - 28);
+  doc.text(titleLines, 14, y);
+  y += titleLines.length * 7;
 
   if (config.subtitulo) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...GRAY_COLOR);
-    doc.text(config.subtitulo, 14, y);
-    y += 5;
+    const subtitleLines = doc.splitTextToSize(config.subtitulo, pageWidth - 28);
+    doc.text(subtitleLines, 14, y);
+    y += subtitleLines.length * 5;
   }
 
   doc.setFontSize(9);
@@ -126,6 +128,7 @@ export async function exportReportePDF(config: ExportConfig) {
       head: [config.tabla.headers],
       body: config.tabla.rows.map(row => row.map(cell => String(cell))),
       theme: 'grid',
+      rowPageBreak: 'avoid',
       headStyles: {
         fillColor: PRIMARY_COLOR,
         textColor: [255, 255, 255],
@@ -145,7 +148,7 @@ export async function exportReportePDF(config: ExportConfig) {
         lineColor: [229, 231, 235],
         lineWidth: 0.3,
       },
-      margin: { left: 14, right: 14 },
+      margin: { left: 14, right: 14, top: 38, bottom: 22 },
     });
   }
 
@@ -154,6 +157,24 @@ export async function exportReportePDF(config: ExportConfig) {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const pageH = doc.internal.pageSize.getHeight();
+    // Same two equal cells, assets and proportions as the email masthead.
+    const scale = (pageWidth - 28) / 600, half = (pageWidth - 28) / 2;
+    const pad = 12 * scale, logoW = 100 * scale, gap = 12 * scale;
+    const headerTop = 10, rowHeight = 56 * scale;
+    doc.addImage(institution, 'PNG', 14 + pad, headerTop + (rowHeight - 32 * scale) / 2, logoW, 32 * scale);
+    const textX = 14 + pad + logoW + gap, baseline = headerTop + (rowHeight - 30 * scale) / 2 + 9 * scale;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(12 * scale * 72 / 25.4); doc.setTextColor(52,76,65);
+    doc.text('Dirección General de', textX, baseline);
+    doc.text('Fiscalización Ambiental', textX, baseline + 15 * scale);
+    const brandX = 14 + half + pad, brandY = headerTop + (rowHeight - 26 * scale) / 2;
+    doc.addImage(brand, 'PNG', brandX, brandY, 22 * scale, 22 * scale);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20 * scale * 72 / 25.4); doc.setTextColor(27,94,60);
+    doc.text('SITREP', brandX + 28 * scale, brandY + 17 * scale);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(12 * scale * 72 / 25.4); doc.setTextColor(52,76,65);
+    doc.text('Sistema de Trazabilidad de', brandX + logoW + gap, baseline);
+    doc.text('Residuos Peligrosos', brandX + logoW + gap, baseline + 15 * scale);
+    doc.setLineWidth(0.53);doc.setDrawColor(23,74,126);doc.line(14,29.3,14+half,29.3);
+    doc.setDrawColor(...PRIMARY_COLOR);doc.line(14+half,29.3,pageWidth-14,29.3);
 
     doc.setDrawColor(229, 231, 235);
     doc.line(14, pageH - 15, pageWidth - 14, pageH - 15);
@@ -162,9 +183,13 @@ export async function exportReportePDF(config: ExportConfig) {
     doc.setTextColor(...GRAY_COLOR);
     doc.text('SITREP - Sistema de Trazabilidad RRPP | Generado automáticamente', 14, pageH - 10);
     doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, pageH - 10, { align: 'right' });
+    if (import.meta.env.VITE_SYNTHETIC_PREVIEW === 'true') {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(120, 53, 15);
+      doc.text('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL', pageWidth / 2, pageH - 4, { align: 'center' });
+    }
   }
 
   // Download
   const filename = `${config.titulo.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(filename);
+  if (!config.canDownload || config.canDownload()) doc.save(filename);
 }

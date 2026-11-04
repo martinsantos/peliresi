@@ -95,7 +95,6 @@ export function OfflineDictation({ onText, onActiveChange, disabled = false, act
         <canvas ref={canvas} width={252} height={44} aria-label="Nivel de sonido del micrófono" className="h-11 min-w-0 max-w-[252px] flex-1" />
         <span className="shrink-0 font-mono tabular-nums text-neutral-600">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>
       </div>}
-      {phase === 'idle' && !message && !compact && <span className="text-xs text-neutral-500">Voz a texto · en este dispositivo</span>}
     </div>
     {phase === 'preparing' && <p role="status" className="mt-2 text-neutral-600">La primera vez se descarga el español (~40 MB). Después funciona sin señal. El audio no se envía.</p>}
     {phase === 'listening' && <p className="mt-2 text-neutral-600">Hablá con naturalidad. El texto se incorpora al campo mientras dictás.</p>}

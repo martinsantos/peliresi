@@ -1,14 +1,19 @@
+import { useQueryOwner } from './useQueryOwner';
+import { supportRequestContext } from '../utils/supportSession';
 /**
  * SITREP v6 - Offline Sync Hook
  * ==============================
  * Auto-syncs data to IndexedDB when online. Mount in MobileLayout.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useConnectivity } from './useConnectivity';
 import { syncOfflineData } from '../services/offline-sync';
 import { processSyncQueue, type SyncQueueResult } from '../services/indexeddb';
+import { OFFLINE_QUEUE_WAKE_EVENT } from '../services/offlineSyncEvents';
+import { getAccessToken } from '../services/api';
+import { gpsContextScope } from '../services/gpsQueue';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -19,31 +24,69 @@ export interface OfflineSyncStatus extends SyncQueueResult {
 
 const EMPTY_RESULT: SyncQueueResult = { processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
 
-export function useOfflineSync({ downloadManifests = true }: { downloadManifests?: boolean } = {}): OfflineSyncStatus {
+export function useOfflineSync({ downloadManifests = true, enabled = true }: { downloadManifests?: boolean; enabled?: boolean } = {}): OfflineSyncStatus {
   const { currentUser, isRestricted } = useAuth();
   const { isOnline } = useConnectivity({ enablePing: false });
+  const owner = useQueryOwner();
+  // Bind the snapshot to the server-validated user object. A token/context
+  // change before that user is refreshed must not redirect queued work.
+  const renderedRequestContext = useMemo(() => supportRequestContext(), [currentUser, owner]);
+  const companyScoped = !!currentUser?.empresaContexto;
+  const activeOwner = useRef(owner);
+  activeOwner.current = owner;
   const syncingRef = useRef(false);
+  const resyncRequested = useRef(false);
+  const [syncRequest, setSyncRequest] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncQueueResult>(EMPTY_RESULT);
+  const resultOwner = useRef(owner);
+
+  useEffect(() => {
+    if (!enabled || resultOwner.current !== owner) {
+      resultOwner.current = owner;
+      setResult(EMPTY_RESULT);
+    }
+  }, [enabled, owner]);
 
   const doSync = useCallback(async (manual = false) => {
-    if (!currentUser?.id || !isOnline || isRestricted) return;
-      if (syncingRef.current) return;
+    if (!enabled || !currentUser?.id || !owner || !isOnline || isRestricted) return;
+      if (syncingRef.current) { resyncRequested.current = true; return; }
       syncingRef.current = true;
       setSyncing(true);
+      const context = renderedRequestContext;
+      let token: string | null = null;
+      try { token = getAccessToken(); } catch { /* Storage may be unavailable. */ }
+      if (!token || !context || context !== supportRequestContext()) {
+        syncingRef.current = false;
+        setSyncing(false);
+        setResult({ ...EMPTY_RESULT, auth:1, lastError:'No se pudo verificar la sesión. Volvé a ingresar antes de sincronizar.' });
+        return;
+      }
+      const matches = () => {
+        try { return activeOwner.current === owner && context === supportRequestContext() && getAccessToken() === token; }
+        catch { return false; }
+      };
       try {
-        setResult(await processSyncQueue(currentUser.id, manual));
-        if (downloadManifests && document.visibilityState !== 'hidden') await syncOfflineData(currentUser.id);
+        const next = await processSyncQueue(currentUser.id, { owner, gpsOwner: gpsContextScope(owner, context), role: currentUser.rol, companyScoped }, manual, matches);
+        if (!matches()) return;
+        setResult(next);
+        if (downloadManifests && document.visibilityState !== 'hidden') await syncOfflineData(currentUser.id, owner);
       } catch (error) {
+        if (!matches()) return;
         setResult((current) => ({ ...current, lastError: error instanceof Error ? error.message : 'No se pudo leer la cola local.' }));
       } finally {
         syncingRef.current = false;
         setSyncing(false);
+        if (!matches()) resyncRequested.current = true;
+        if (resyncRequested.current) {
+          resyncRequested.current = false;
+          setSyncRequest(value => value + 1);
+        }
       }
-  }, [currentUser?.id, isOnline, isRestricted, downloadManifests]);
+  }, [currentUser?.id, currentUser?.rol, companyScoped, owner, renderedRequestContext, isOnline, isRestricted, downloadManifests, enabled]);
 
   useEffect(() => {
-    if (!currentUser?.id || !isOnline || isRestricted) return;
+    if (!enabled || !currentUser?.id || !owner || !isOnline || isRestricted) return;
 
     // Sync immediately on mount (login)
     void doSync();
@@ -51,7 +94,13 @@ export function useOfflineSync({ downloadManifests = true }: { downloadManifests
     // Re-sync every 5 minutes while online
     const interval = setInterval(() => void doSync(), SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [currentUser?.id, isOnline, isRestricted, doSync]);
+  }, [currentUser?.id, owner, isOnline, isRestricted, doSync, enabled, syncRequest]);
+
+  useEffect(() => {
+    const wake = () => { void doSync(); };
+    window.addEventListener(OFFLINE_QUEUE_WAKE_EVENT, wake);
+    return () => window.removeEventListener(OFFLINE_QUEUE_WAKE_EVENT, wake);
+  }, [doSync]);
 
   return { ...result, syncing, retry: async () => { await doSync(true); } };
 }

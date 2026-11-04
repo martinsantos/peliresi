@@ -94,20 +94,20 @@ export const TimelineControls: React.FC<Props> = ({
     && Number.isFinite(trip.ultimaPosicion.latitud) && Number.isFinite(trip.ultimaPosicion.longitud)).length ?? 0;
 
   // In PLAYBACK mode, use playback counters for KPIs; in LIVE mode, use liveData
-  const isPlayback = mode === 'PLAYBACK' && playback;
-  const hasKpiData=mode==='PLAYBACK'?!!playback:!!stats;
+  const isPlayback = mode === 'PLAYBACK';
+  const hasKpiData=mode==='PLAYBACK'?!!timelineData && !!playback:!!stats;
 
   const kpiManifiestos = isPlayback
-    ? (playback.counters.totalCreated || 0)
+    ? (playback?.counters.totalCreated || 0)
     : (stats?.manifiestosHoy || 0);
   const kpiEnTransito = isPlayback
-    ? (playback.counters.enTransito || 0)
+    ? (playback?.counters.enTransito || 0)
     : (stats?.enTransitoActivos || 0);
   const kpiTratados = isPlayback
-    ? (playback.counters.tratado || 0)
+    ? (playback?.counters.tratado || 0)
     : 0;
   const kpiTotal = isPlayback
-    ? Object.values(playback.counters).reduce((s, v) => s + v, 0) - (playback.counters.totalCreated || 0)
+    ? Object.values(playback?.counters || {}).reduce((s, v) => s + v, 0) - (playback?.counters.totalCreated || 0)
     : (stats?.total || 0);
 
   return (
@@ -202,7 +202,7 @@ export const TimelineControls: React.FC<Props> = ({
               <span className="text-xs text-neutral-400 flex-shrink-0">Cargando...</span>
             )}
 
-            {playback && !isLoading && (
+            {playback && timelineData && !isLoading && (
               <>
                 {/* Play/Pause button */}
                 <button

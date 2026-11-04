@@ -5,7 +5,10 @@
  */
 
 import React from 'react';
-import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { canAccessMobilePath } from '../utils/mobileAccess';
+import { LoadingIndicator } from './ui/LoadingState';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import AccessUnavailable from './AccessUnavailable';
 import { useAuth, type UserRole } from '../contexts/AuthContext';
 import { actorDetailFromPath, canReadActorDetail, type ActorReadType } from '../utils/actorReadAccess';
 
@@ -26,7 +29,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   actorRead,
   redirectTo = '/login',
 }) => {
-  const { currentUser, isLoading, isRestricted } = useAuth();
+  const { currentUser, isLoading, isRestricted, signOutRedirectPending } = useAuth();
   const location = useLocation();
 
   // Show spinner while auth state is being determined
@@ -34,8 +37,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
-          <p className="text-neutral-600 font-medium">Verificando autenticacion...</p>
+          <LoadingIndicator label="Verificando tu sesión…" size={40} />
         </div>
       </div>
     );
@@ -44,7 +46,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Not authenticated -> redirect to login (save origin for post-login redirect)
   if (!currentUser) {
     const from = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to={redirectTo} state={{ from }} replace />;
+    return <Navigate to={redirectTo} state={signOutRedirectPending ? null : { from }} replace />;
   }
 
   // Restricted users can only access /mi-solicitud
@@ -52,32 +54,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/mi-solicitud" replace />;
   }
 
+  // Share the app's route boundary before rendering a page or fetching its data.
+  if (!canAccessMobilePath(currentUser, location.pathname)) {
+    return <AccessUnavailable />;
+  }
+
   // Authenticated but role not allowed -> access denied
   const actor = actorRead ? actorDetailFromPath(location.pathname) : null;
   const actorDenied = actorRead && (!actor || actor.type !== actorRead || !canReadActorDetail(currentUser, actorRead, actor.id));
   if (actorDenied || (roles && roles.length > 0 && !roles.includes(currentUser.rol) && !(allowInspector && currentUser.esInspector))) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-neutral-800">Acceso denegado</h2>
-          <p className="text-neutral-600">
-            No tienes permisos para acceder a esta seccion. Tu rol actual es{' '}
-            <span className="font-medium">{currentUser.rol}</span>.
-          </p>
-          <Link
-            to={location.pathname.startsWith('/mobile/') ? '/mobile/dashboard' : '/dashboard'}
-            className="mt-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-          >
-            Volver al Dashboard
-          </Link>
-        </div>
-      </div>
-    );
+    return <AccessUnavailable />;
   }
 
   // All checks passed -> render child routes

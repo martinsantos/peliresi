@@ -17,6 +17,7 @@ import { formatDateTime } from '../../../utils/formatters';
 import { hasInspectionCoordinates, operationSubject, type InspectionOperation } from '../../../services/inspectionOperations.service';
 import { INSPECTION_STATE_LABELS, inspectionDate } from '../../inspecciones/inspectionPresentation';
 import type { EnTransitoItem } from '../../../hooks/useCentroControl';
+import { MonitorPosition } from '../../monitor/components/MonitorPosition';
 
 interface ViajeRealizado {
   id: string;
@@ -136,9 +137,12 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                       <span className="mt-1 block space-y-0.5">
                         <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-purple-700">ORIGEN:</span> {m.origen}</span>
                         <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-orange-700">TRANSPORTE:</span> {m.transportista}</span>
+                        {m.tramoActual&&<span className={`block text-xs font-semibold ${m.tramoActual.gpsRecibido?'text-primary-800':'text-warning-800'}`}>Relevo {m.tramoActual.orden}{m.tramoActual.tipo==='EXTERNO'?' · eventual declarado':''} · {m.tramoActual.gpsRecibido?'GPS recibido':'Esperando GPS del reemplazo'}</span>}
                         <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-blue-700">OPERADOR:</span> {m.destino}</span>
                       </span>
                       </button>
+                      {isSelected && <div className="mt-2"><MonitorPosition position={m.ultimaPosicion} /></div>}
+                      {isSelected&&!!m.tramos?.length&&<ol className="mt-2 space-y-1 border-l border-neutral-200 pl-2" aria-label="Historial de transporte">{m.tramos.map(leg=><li key={leg.id} className="text-xs text-neutral-600">{leg.orden===0?'Original':`Relevo ${leg.orden}`}: {leg.empresa} · {leg.fin?'finalizado':'actual'}</li>)}</ol>}
                       {isSelected && m.canViewDetail === true && (
                         <button
                           className="mt-2 min-h-11 w-full text-center text-xs font-semibold text-primary-800 bg-primary-100 hover:bg-primary-200 active:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 rounded-lg py-1.5 transition-colors"
@@ -152,11 +156,6 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                       )}
                       {isSelected && m.canViewDetail !== true && <p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p>}
                     </div>
-                    {m.ultimaPosicion?.velocidad != null && (
-                      <span className="text-xs font-medium text-neutral-500 flex-shrink-0">
-                        {Math.round(m.ultimaPosicion.velocidad)} km/h
-                      </span>
-                    )}
                   </div>
                 );
               })}

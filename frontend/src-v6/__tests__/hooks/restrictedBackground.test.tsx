@@ -7,9 +7,10 @@ const mocks = vi.hoisted(() => ({
   restricted: true, unread: vi.fn(), notices: vi.fn(), list: vi.fn(), sync: vi.fn(), process: vi.fn(), get: vi.fn(), push: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
-  currentUser: { id: 'pending-carrier' }, isTransportista: true, isRestricted: mocks.restricted,
+  currentUser: { id: 'pending-carrier', rol: 'TRANSPORTISTA' }, isTransportista: true, isRestricted: mocks.restricted,
 }) }));
 vi.mock('../../services/api', () => ({ getAccessToken: () => 'synthetic-unit-token', default: { get: mocks.get } }));
+vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => 'synthetic-request-context', supportSessionMatches: () => true }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: { getNoLeidas: mocks.unread, list: mocks.notices } }));
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { list: mocks.list } }));
 vi.mock('../../services/offline-sync', () => ({ syncOfflineData: mocks.sync }));
@@ -35,10 +36,12 @@ beforeEach(() => {
   mocks.get.mockResolvedValue({ data: { data: { notificaciones: [] } } });
 });
 describe('restricted applicants do not start full-access background services', () => {
-  it.each([1, 2])('uses the correct unread notice wording for %s', async count => {
+  it.each([1, 2])('leaves %s existing unread notices in the bell instead of replaying a banner', async count => {
     mocks.restricted = false; mocks.notices.mockResolvedValue({ items: [], noLeidas: count });
     const poller = render(<NotificacionesPoller />, { wrapper });
-    await waitFor(() => expect(toast.add).toHaveBeenCalledWith(expect.objectContaining({ title: `${count} ${count === 1 ? 'aviso' : 'avisos'} sin leer` })));
+    await waitFor(() => expect(mocks.notices).toHaveBeenCalledWith({ limit: 20, leida: false }));
+    await act(async () => { await Promise.resolve(); });
+    expect(toast.add).not.toHaveBeenCalled();
     poller.unmount();
   });
   it('does not poll counters, recover trips, download manifests or process business mutations, even on manual retry', async () => {
@@ -48,6 +51,15 @@ describe('restricted applicants do not start full-access background services', (
     await act(async () => { await result.current.retry(); });
     for (const fn of [mocks.unread, mocks.list, mocks.sync, mocks.process]) expect(fn).not.toHaveBeenCalled();
     unmount();
+  });
+  it('does not process or manually retry the queue while synchronization is disabled', async () => {
+    mocks.restricted = false;
+    const hook = renderHook(({ enabled }: { enabled: boolean }) => useOfflineSync({ enabled, downloadManifests: false }), { wrapper, initialProps: { enabled: false } });
+    await act(async () => { await hook.result.current.retry(); });
+    expect(mocks.process).not.toHaveBeenCalled();
+    hook.rerender({ enabled: true });
+    await waitFor(() => expect(mocks.process).toHaveBeenCalledWith('pending-carrier', expect.objectContaining({role:'TRANSPORTISTA',companyScoped:false}), false, expect.any(Function)));
+    hook.unmount();
   });
   it('does not subscribe push or mount the notice poller for a restricted applicant', () => {
     const { unmount } = render(<NotificacionesPoller />, { wrapper });
@@ -63,5 +75,14 @@ describe('restricted applicants do not start full-access background services', (
     });
     expect(mocks.notices).toHaveBeenCalledWith({ limit: 20, leida: false });
     hook.unmount(); poller.unmount();
+  });
+  it('does not pick a default trip when a carrier has concurrent trips', async () => {
+    mocks.restricted = false;
+    mocks.list.mockResolvedValue({ items: [{ id: 'trip-one' }, { id: 'trip-two' }], total: 2 });
+    const hook = renderHook(() => useActiveTripRecovery(), { wrapper });
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledWith({ estado: 'EN_TRANSITO', limit: 2 }));
+    await act(async () => { await Promise.resolve(); });
+    expect(localStorage.getItem('sitrep_active_trip_id')).toBeNull();
+    hook.unmount();
   });
 });

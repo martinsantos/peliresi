@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -20,16 +20,23 @@ import {
 import { Badge } from '../../components/ui/BadgeV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
+import { InspectionLegalProgress } from './InspectionLegalProgress';
+import { InspectionLegacyExchangeRecovery } from './InspectionLegacyExchangeRecovery';
+import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
 import { toast } from '../../components/ui/Toast';
+import { useInspectionExchangeCommand } from '../../hooks/useInspectionExchangeCommand';
 import { useAuth } from '../../contexts/AuthContext';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { inspeccionService } from '../../services/inspeccion.service';
-import { loadOfflineExchangeDraft, removeOfflineExchangeDraft, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
+import { loadOfflineExchangeDraft, removeOfflineExchangeDraftRevision, replaceOfflineExchangeDraft, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
+import { isSentDraft, loadDraftAlternatives, preserveDraftAlternative, retireSentAlternatives } from '../../services/inspectionDraftAlternatives';
 import type {
   InspectionExchange,
   InspectionExchangeParty,
   InspectionExchangeType,
 } from '../../types/inspection';
 import { INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
+import { INSPECTION_PHASES, inspectionPhaseOf, inspectionExchangeNextStep, inspectionExchangeDeadline, inspectionDeadlineDate, inspectionDeadlineStatus, inspectionFollowUpFromEntries, inspectionFollowUpStatus, inspectionReplyDeadline, inspectionDeadlineInput, inspectionDeadlineFromInput, inspectionLegalFollowUp } from './inspectionProcess';
 
 const TYPE_LABELS: Record<InspectionExchangeType, string> = {
   REQUERIMIENTO: 'Requerimiento',
@@ -65,10 +72,6 @@ const formatBytes = (bytes: number) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
-
-const localDate = (value?: string | null) => value
-  ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
-  : '';
 
 function storedExchangeDraft(key: string): ExchangeDraft | null {
   if (!key) return null;
@@ -212,7 +215,7 @@ function ExchangeLedger({
 
                       <p className="mt-3 max-w-[76ch] whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{entry.cuerpo}</p>
 
-                      {entry.plazoRespuestaAt && <div className="mt-3 flex w-fit max-w-full items-start gap-2 border-l-2 border-warning-500 bg-warning-50 px-3 py-2 text-xs font-semibold leading-5 text-warning-900"><Clock3 size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Plazo de respuesta: {inspectionDate(entry.plazoRespuestaAt, true)}</span></div>}
+                      {entry.plazoRespuestaAt && <div className="mt-3 flex w-fit max-w-full items-start gap-2 border-l-2 border-warning-500 bg-warning-50 px-3 py-2 text-xs font-semibold leading-5 text-warning-900"><Clock3 size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Plazo de este pedido: {inspectionDeadlineDate(entry.plazoRespuestaAt)} · Mendoza</span></div>}
 
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-neutral-600"><span>Puesta a disposición: {inspectionDate(entry.puestaDisposicionAt || entry.createdAt, true)}</span><span className={entry.vistaPorDestinatarioAt ? 'font-semibold text-success-800' : 'font-semibold text-warning-800'}>{entry.vistaPorDestinatarioAt ? `Vista por el destinatario: ${inspectionDate(entry.vistaPorDestinatarioAt, true)}` : 'Aún no abierta por el destinatario'}</span></div>
 
@@ -239,11 +242,19 @@ export interface InspectionExchangePanelProps {
   compact?: boolean;
 }
 
-export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = ({ inspectionId, compact = false }) => {
+export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (props) => {
+  const { currentUser } = useAuth();
+  const owner = inspectionWorkspaceOwner(currentUser);
+  // Reset the entire editor synchronously, including decision/files and in-flight
+  // local reads. Effects alone would expose the previous role for one render.
+  return <ScopedInspectionExchangePanel key={JSON.stringify([owner, props.inspectionId])} {...props} owner={owner} />;
+};
+
+const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { owner: string }> = ({ inspectionId, compact = false, owner }) => {
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const draftKey = currentUser?.id ? `sitrep_exchange_draft_${currentUser.id}_${inspectionId}` : '';
+  const draftKey = currentUser?.id && owner ? `sitrep_exchange_draft_v2_${inspectionContextKey(currentUser.id, owner, inspectionId)}` : '';
   const [restoredDraft] = useState<ExchangeDraft | null>(() => storedExchangeDraft(draftKey));
   const [online, setOnline] = useState(navigator.onLine);
   const [now, setNow] = useState(() => Date.now());
@@ -255,12 +266,27 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   const [expedienteLegal, setExpedienteLegal] = useState('');
   const [decisionFiles, setDecisionFiles] = useState<File[]>([]);
   const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  const draftWrites = useRef<Promise<void>>(Promise.resolve());
+  const persistenceBlocked = useRef(false);
+  const draftSaveEpoch = useRef(0);
+  const draftInteraction = useRef(0);
+  const [persistenceRevision, setPersistenceRevision] = useState(0);
+  const [draftStorageError, setDraftStorageError] = useState(false);
+  const [draftStorageMessage, setDraftStorageMessage] = useState('');
+  const [draftReady, setDraftReady] = useState(false);
+  const draftReadyRef = useRef(false);
+  const recoveryInFlight = useRef(false);
+  const [draftReadRevision, setDraftReadRevision] = useState(0);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const exchangeQuery = useQuery({
-    queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId],
+    queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId, owner],
     queryFn: () => inspeccionService.getExchanges(inspectionId),
     enabled: Boolean(inspectionId && currentUser?.id),
     staleTime: 15_000,
+    refetchInterval: query => query.state.data && inspectionLegalFollowUp(query.state.data.inspeccion.estado) ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
   const timeline = exchangeQuery.data;
   const party = timeline?.parteActual || 'AUTORIDAD';
@@ -280,89 +306,188 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
 
   useEffect(() => {
     if (!draftKey || !composeOpen) return;
-    const timer = window.setTimeout(() => localStorage.setItem(draftKey, JSON.stringify(draft)), 250);
+    const epoch = draftSaveEpoch.current;
+    const timer = window.setTimeout(() => {
+      if (!draftReadyRef.current || recoveryInFlight.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(draft)); } catch { setDraftStorageError(true); }
+    }, 250);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, draft, draftKey]);
+  }, [composeOpen, draft, draftKey, persistenceRevision, draftReady]);
 
   useEffect(() => {
     if (!currentUser?.id || !inspectionId) return;
     let cancelled = false;
-    void loadOfflineExchangeDraft(String(currentUser.id), inspectionId).then((saved) => {
-      if (cancelled || !saved) return;
+    const interaction = draftInteraction.current;
+    void loadOfflineExchangeDraft(String(currentUser.id), inspectionId, owner).then((saved) => {
+      if (cancelled) return;
+      draftReadyRef.current = true; setDraftReady(true);
+      if (!saved || interaction !== draftInteraction.current) return;
       setDraft(saved.draft);
       setFiles(saved.files);
       setRestoredAt(saved.savedAt);
       setComposeOpen(true);
-    }).catch(() => undefined);
+    }).catch(() => { if (!cancelled) setDraftStorageError(true); });
     return () => { cancelled = true; };
-  }, [currentUser?.id, inspectionId]);
+  }, [currentUser?.id, inspectionId, owner, draftReadRevision]);
 
   useEffect(() => {
     if (!composeOpen || !currentUser?.id || !inspectionId) return;
+    const epoch = draftSaveEpoch.current;
     const timer = window.setTimeout(() => {
-      void saveOfflineExchangeDraft(String(currentUser.id), inspectionId, draft, files).catch(() => undefined);
+      if (!draftReadyRef.current || recoveryInFlight.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      // Acknowledgement must wait for every queued write before removing the draft.
+      draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, draft, files)
+        .catch(() => { setDraftStorageError(true); });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, currentUser?.id, draft, files, inspectionId]);
+  }, [composeOpen, currentUser?.id, draft, files, inspectionId, owner, persistenceRevision, draftReady]);
+
+  const departingDraft = useRef({ draft, files, composeOpen });
+  departingDraft.current = { draft, files, composeOpen };
+  useEffect(() => {
+    // A role change or close can happen before debounce. Flush only the old
+    // editor's key; never carry its values into the new account/context.
+    const flush = () => {
+      const snapshot = departingDraft.current;
+      if (!draftReadyRef.current || recoveryInFlight.current || !snapshot.composeOpen || persistenceBlocked.current || !currentUser?.id || !draftKey) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(snapshot.draft)); } catch { setDraftStorageError(true); }
+      draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, snapshot.draft, snapshot.files)
+        .catch(() => { setDraftStorageError(true); });
+    };
+    const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', hidden);
+    return () => { flush(); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', hidden); };
+  }, [currentUser?.id, draftKey, inspectionId, owner]);
 
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId] }),
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'participacion'] }),
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'detail'] }),
+      queryClient.invalidateQueries({ queryKey: ['inspecciones', 'list'] }),
+      queryClient.invalidateQueries({ queryKey: ['inspecciones', 'operaciones'] }),
     ]);
   };
 
-  const presentMutation = useMutation({
-    mutationFn: () => {
-      if (!timeline) throw new Error('Expediente no disponible');
-      return inspeccionService.presentExchange(inspectionId, {
-        version: timeline.inspeccion.version,
-        clienteId: `exchange_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-        tipo: draft.tipo,
-        asunto: draft.asunto.trim(),
-        cuerpo: draft.cuerpo.trim(),
-        respondeAId: draft.respondeAId || undefined,
-        plazoRespuestaAt: draft.plazoRespuestaAt ? new Date(draft.plazoRespuestaAt).toISOString() : undefined,
-        files,
-      });
-    },
-    onSuccess: async () => {
-      if (draftKey) localStorage.removeItem(draftKey);
-      if (currentUser?.id) await removeOfflineExchangeDraft(String(currentUser.id), inspectionId).catch(() => undefined);
-      setDraft(initialDraft(party));
-      setFiles([]);
-      setComposeOpen(false);
-      setRestoredAt(null);
+  const commandScope = useMemo(() => ({ userId: String(currentUser?.id || ''), inspectionId, owner }), [currentUser?.id, inspectionId, owner]);
+  const delivery = useInspectionExchangeCommand(commandScope);
+  const command = delivery.command;
+  const [alternatives, setAlternatives] = useState<Awaited<ReturnType<typeof loadDraftAlternatives>>>([]);
+  const alternativesWrite = useRef<Promise<void>>(Promise.resolve());
+  const [recovering, setRecovering] = useState(false);
+  const focusRecoveredDraft = useRef(false);
+  const commandBlocked = !draftReady || !delivery.ready || delivery.busy || Boolean(command) || recovering;
+  useEffect(() => {
+    if (!focusRecoveredDraft.current || commandBlocked || !composeOpen) return;
+    const form = document.getElementById('inspection-exchange-form');
+    form?.scrollIntoView?.({ block: 'start' });
+    form?.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
+    focusRecoveredDraft.current = false;
+  }, [commandBlocked, composeOpen, recovering, persistenceRevision]);
+  useEffect(() => {
+    let live = true;
+    void loadDraftAlternatives(commandScope).then(saved => { if (live) setAlternatives(saved); }).catch(() => { if (live) setDraftStorageError(true); });
+    return () => { live = false; };
+  }, [commandScope, command]);
+  useEffect(() => {
+    if (!command || !composeOpen || draftInteraction.current === 0) return;
+    // Another tab can claim a send before this editor's debounce. Keep this
+    // editor's distinct text/files without overwriting any competing version.
+    alternativesWrite.current = alternativesWrite.current.catch(() => undefined)
+      .then(() => preserveDraftAlternative(commandScope, draft, files, command));
+    void alternativesWrite.current.catch(() => setDraftStorageError(true));
+  }, [command, commandScope, composeOpen, draft, files]);
+  useEffect(() => {
+    if (timeline && command?.status === 'pending' && !delivery.busy) void delivery.reconcile(timeline);
+  }, [timeline, command, delivery.busy]);
+  const lastConfirmed = useRef<string | null>(null);
+  useEffect(() => {
+    if (command?.status !== 'confirmed' || lastConfirmed.current === command.input.clienteId) return;
+    lastConfirmed.current = command.input.clienteId;
+    // Refresh is independent of the receipt: a read failure never undoes a write.
+    void refresh().catch(() => undefined);
+  }, [command]);
+  useEffect(() => {
+    persistenceBlocked.current = delivery.busy || Boolean(command);
+    if (delivery.busy || command) draftSaveEpoch.current += 1;
+  }, [delivery.busy, command]);
+
+  const releaseCommand = () => void delivery.release(async saved => {
+    await alternativesWrite.current;
+    await draftWrites.current;
+    // Preserve both the visible editor and the last shared revision before any
+    // cleanup. Revision comparison protects a third tab writing during this read.
+    if (composeOpen && draftInteraction.current > 0) await preserveDraftAlternative(commandScope, draft, files, saved);
+    const shared = await loadOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner);
+    if (shared) await preserveDraftAlternative(commandScope, shared.draft, shared.files, saved);
+    const local = storedExchangeDraft(draftKey);
+    if (local && (!shared || JSON.stringify(local) !== JSON.stringify(shared.draft)) &&
+        JSON.stringify(local) !== JSON.stringify(draft)) await preserveDraftAlternative(commandScope, local, [], saved);
+    if (saved.status === 'confirmed') {
+      if (shared && await isSentDraft(saved, shared.draft, shared.files)) await removeOfflineExchangeDraftRevision(String(currentUser?.id), inspectionId, owner, shared.revision);
+      if (local && await isSentDraft(saved, local, saved.input.files || []) && localStorage.getItem(draftKey) === JSON.stringify(local)) localStorage.removeItem(draftKey);
+      await retireSentAlternatives(commandScope, saved);
+      setComposeOpen(false); setDraft(initialDraft(party)); setFiles([]); setRestoredAt(null);
+      setDecision(null); setFundamento(''); setExpedienteLegal(''); setDecisionFiles([]);
       if (fileRef.current) fileRef.current.value = '';
-      await refresh();
-      toast.success('Presentación registrada', 'Quedó incorporada al expediente con huella de integridad. No se envió correo.');
-    },
-    onError: (error) => toast.error('No se pudo presentar', inspectionErrorMessage(error, 'Conserve el borrador y vuelva a intentar.')),
+    } else if (saved.kind === 'presentation') {
+      const restored = { tipo: saved.input.tipo, asunto: saved.input.asunto, cuerpo: saved.input.cuerpo,
+        respondeAId: saved.input.respondeAId || '', plazoRespuestaAt: saved.input.plazoRespuestaAt ? inspectionDeadlineInput(saved.input.plazoRespuestaAt) : '' };
+      await saveOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner, restored, saved.input.files || []);
+      setDraft(restored); setFiles(saved.input.files || []); setComposeOpen(true);
+    } else {
+      setDecision(saved.input.decision); setFundamento(saved.input.fundamento);
+      setExpedienteLegal(saved.input.expedienteLegal || ''); setDecisionFiles(saved.input.files || []);
+    }
+    draftInteraction.current += 1;
+    setPersistenceRevision(value => value + 1);
+    setAlternatives(await loadDraftAlternatives(commandScope));
+    await refresh();
   });
 
-  const decisionMutation = useMutation({
-    mutationFn: () => {
-      if (!timeline || !decision) throw new Error('Decisión incompleta');
-      return inspeccionService.decideExchange(inspectionId, {
-        version: timeline.inspeccion.version,
-        clienteId: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-        decision,
-        fundamento: fundamento.trim(),
-        expedienteLegal: decision === 'DERIVADA_LEGALES' && expedienteLegal.trim() ? expedienteLegal.trim() : undefined,
-        files: decisionFiles,
-      });
-    },
-    onSuccess: async () => {
-      setDecision(null);
-      setFundamento('');
-      setExpedienteLegal('');
-      setDecisionFiles([]);
-      await refresh();
-      toast.success('Decisión registrada', 'El cierre quedó incorporado a la cadena auditable. No se envió correo.');
-    },
-    onError: (error) => toast.error('No se pudo registrar la decisión', inspectionErrorMessage(error, 'Actualice el expediente e intente nuevamente.')),
-  });
+  const recoverAlternative = async (alternative: typeof alternatives[number]) => {
+    if (commandBlocked || recoveryInFlight.current || !mounted.current) return false;
+    recoveryInFlight.current = true;
+    draftSaveEpoch.current += 1;
+    setRecovering(true);
+    try {
+      if (composeOpen) await preserveDraftAlternative(commandScope, draft, files);
+      // Also preserve the shared revision: another tab may have edited it while
+      // this editor was reviewing an older copy.
+      await draftWrites.current;
+      const shared = await loadOfflineExchangeDraft(commandScope.userId, inspectionId, owner);
+      if (shared) await preserveDraftAlternative(commandScope, shared.draft, shared.files);
+      if (!mounted.current) return false;
+      await preserveDraftAlternative(commandScope, alternative.draft, alternative.files);
+      await replaceOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner, alternative.draft, alternative.files, shared?.revision);
+      localStorage.setItem(draftKey, JSON.stringify(alternative.draft));
+      if (!mounted.current) return false;
+      focusRecoveredDraft.current = true;
+      draftInteraction.current += 1;
+      setDraft(alternative.draft); setFiles(alternative.files); setComposeOpen(true); setRestoredAt(alternative.savedAt);
+      setAlternatives(await loadDraftAlternatives(commandScope));
+      return true;
+    } catch (failure) {
+      if (mounted.current) {
+        // Do not resume autosave over a revision that another tab changed.
+        draftReadyRef.current = false; setDraftReady(false); setDraftStorageError(true);
+        setDraftStorageMessage(failure instanceof Error ? failure.message : 'No pudimos recuperar la copia. El original sigue disponible.');
+      }
+      return false;
+    }
+    finally { recoveryInFlight.current = false; if (mounted.current) { setRecovering(false); setPersistenceRevision(value => value + 1); } }
+  };
+
+  const verifyLegacyAccess = async () => {
+    const fresh = await inspeccionService.getExchanges(inspectionId);
+    if (!mounted.current || !timeline || fresh.inspeccion.id !== inspectionId || fresh.parteActual !== timeline.parteActual) throw new Error('Cambió el acceso al requerimiento. Volvé a abrirlo desde Avisos.');
+    if (fresh.inspeccion.version !== timeline.inspeccion.version) {
+      void exchangeQuery.refetch();
+      throw new Error('El expediente cambió. Revisá el historial actualizado y buscá otra vez la copia.');
+    }
+    return fresh;
+  };
 
   const parentById = useMemo(() => new Map((timeline?.intercambios || []).map((entry) => [entry.id, entry])), [timeline?.intercambios]);
   const exchangeCycles = useMemo(() => groupExchangeCycles(timeline?.intercambios || []), [timeline?.intercambios]);
@@ -372,6 +497,8 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   const open = Boolean(timeline && OPEN_STATES.has(timeline.inspeccion.estado));
 
   const beginNew = () => {
+    if (commandBlocked) return;
+    draftInteraction.current += 1;
     const next = initialDraft(party);
     setDraft(next);
     setFiles([]);
@@ -379,6 +506,8 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   };
 
   const beginReply = (entry: InspectionExchange) => {
+    if (commandBlocked) return;
+    draftInteraction.current += 1;
     const next = initialDraft(party);
     next.respondeAId = entry.id;
     next.tipo = party === 'INSPECCIONADO' ? 'DESCARGO' : 'RESPUESTA';
@@ -394,11 +523,20 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
 
   const submitPresentation = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!online) return toast.warning('Sin conexión', 'El texto quedó guardado en este dispositivo. Envíelo al recuperar conexión y vuelva a seleccionar los adjuntos.');
+    if (commandBlocked || !timeline) return;
+    if (!online) return toast.warning('Sin conexión', 'Revisá la copia local del texto y los adjuntos. Enviá manualmente cuando recuperes conexión.');
     if (draft.asunto.trim().length < 5 || draft.cuerpo.trim().length < 10) return toast.warning('Presentación incompleta', 'Complete asunto y contenido antes de presentar.');
     if (party === 'INSPECCIONADO' && !draft.respondeAId) return toast.warning('Seleccione el antecedente', 'Toda presentación del inspeccionado debe responder a una actuación de la autoridad.');
-    if (files.length > 5 || files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024) return toast.warning('Adjuntos excedidos', 'Puede adjuntar hasta 5 archivos y 50 MB por presentación.');
-    presentMutation.mutate();
+    if (files.some(file => file.size > 25 * 1024 * 1024) || files.length > 5 || files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024) return toast.warning('Adjuntos excedidos', 'Puede adjuntar hasta 5 archivos, 25 MB por archivo y 50 MB por presentación.');
+    persistenceBlocked.current = true;
+    draftSaveEpoch.current += 1;
+    draftInteraction.current += 1;
+    void delivery.submit({ kind: 'presentation', input: {
+      version: timeline.inspeccion.version, clienteId: `exchange_${crypto.randomUUID()}`,
+      tipo: draft.tipo, asunto: draft.asunto.trim(), cuerpo: draft.cuerpo.trim(),
+      respondeAId: draft.respondeAId || undefined,
+      plazoRespuestaAt: draft.plazoRespuestaAt ? inspectionDeadlineFromInput(draft.plazoRespuestaAt) : undefined, files,
+    } });
   };
 
   const downloadAttachment = async (entry: InspectionExchange, evidenceId: string, name: string) => {
@@ -417,81 +555,164 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   };
 
   if (exchangeQuery.isLoading) return <Card className="text-sm text-neutral-600">Cargando presentaciones auditadas…</Card>;
-  if (exchangeQuery.isError || !timeline) return <Card className="border-error-200 bg-error-50 text-sm text-error-800">No se pudo abrir el intercambio formal de este expediente.</Card>;
+  if (exchangeQuery.isError || !timeline) {
+    const status = (exchangeQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    const inaccessible = status === 403 || status === 404;
+    return <Card className="border-error-200 bg-error-50 text-sm text-error-800">
+      <div role="alert"><p className="font-semibold">{inaccessible ? 'Requerimiento no disponible para esta cuenta' : 'No se pudo cargar el requerimiento'}</p>
+        <p className="mt-1">{inaccessible ? 'Volvé a Avisos y abrí un pedido dirigido a tu rol y cuenta actual.' : 'Comprobá tu conexión y volvé a intentar.'}</p></div>
+      {!inaccessible && <Button variant="outline" className="mt-3" onClick={() => void exchangeQuery.refetch()}>Reintentar</Button>}
+    </Card>;
+  }
 
-  const deadlineExpired = Boolean(timeline.inspeccion.plazoRespuestaAt && new Date(timeline.inspeccion.plazoRespuestaAt).getTime() < now);
+  const followUp = inspectionFollowUpStatus(timeline.inspeccion.seguimiento || inspectionFollowUpFromEntries(timeline.inspeccion.estado, timeline.intercambios), now);
+  const legal = inspectionLegalFollowUp(timeline.inspeccion.estado);
+  const deadlineExpired = followUp.overdue > 0;
+  const displayedDeadline = followUp.next ? followUp.next.plazoRespuestaAt : inspectionExchangeDeadline(timeline.inspeccion.estado, timeline.inspeccion.plazoRespuestaAt, timeline.intercambios);
+  const nextStep = inspectionExchangeNextStep(timeline.inspeccion.estado, timeline.intercambios, party === 'INSPECCIONADO', now);
+  const selectedDeadline = draft.respondeAId ? inspectionReplyDeadline(timeline.intercambios, draft.respondeAId) : null;
 
   return (
     <section className={compact ? 'space-y-4' : 'space-y-5'} aria-labelledby="inspection-exchange-title">
+      {!delivery.ready && <Card role="status" className="text-sm"><p>{delivery.error || 'Comprobando envíos guardados en este dispositivo…'}</p>{delivery.error && <Button className="mt-3" variant="outline" onClick={() => void delivery.reload()}>Revisar copia local</Button>}</Card>}
+      {delivery.ready && !command && delivery.error && <Card role="alert" className="text-sm text-error-800">{delivery.error}</Card>}
+      {command && <Card padding="sm" role="status" aria-live="polite" className={command.status === 'confirmed' ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}>
+        <h3 className="text-base font-bold text-neutral-900">{command.status === 'confirmed' ? (command.kind === 'decision' ? 'Decisión registrada' : 'Presentación registrada') : command.status === 'rejected' ? 'El envío necesita revisión' : delivery.busy ? 'Confirmando el envío…' : 'Confirmación pendiente'}</h3>
+        <p className="mt-2 text-sm leading-6 text-neutral-800">{command.status === 'confirmed' ? 'El servidor confirmó esta actuación. Podés consultarla en el historial.' : command.status === 'rejected' ? command.rejection : 'La copia original está guardada. Reintentá para confirmar el resultado sin crear una segunda actuación; conservamos el contenido y los adjuntos.'}</p>
+        <details className="mt-3 text-sm"><summary className="min-h-11 cursor-pointer font-semibold text-primary-800">Contenido del envío{command.input.files?.length ? ` · ${command.input.files.length} ${command.input.files.length === 1 ? 'adjunto' : 'adjuntos'}` : ''}</summary>
+          <p className="break-words font-semibold">{command.kind === 'presentation' ? command.input.asunto : command.input.decision === 'CERRADA_CONFORME' ? 'Cierre conforme' : 'Derivación a Legales'}</p>
+          <p className="mt-2 whitespace-pre-wrap break-words">{command.kind === 'presentation' ? command.input.cuerpo : command.input.fundamento}</p>
+          {command.kind === 'decision' && command.input.expedienteLegal && <p className="mt-2 break-words">Expediente legal: {command.input.expedienteLegal}</p>}
+          <ul className="mt-2 space-y-1">{command.input.files?.map((file, index) => <li className="break-words" key={index}>{file.name} · {formatBytes(file.size)}</li>)}</ul>
+        </details>
+        {delivery.error && <p className="mt-2 break-words text-sm text-error-800">{delivery.error}</p>}
+        <Button className="mt-3 w-full sm:w-auto" variant={command.status === 'confirmed' ? 'outline' : 'primary'} disabled={!draftReady || delivery.busy || (command.status === 'pending' && !online)} isLoading={delivery.busy} onClick={command.status === 'pending' ? () => void delivery.retry() : releaseCommand}>{command.status === 'confirmed' ? 'Continuar en el expediente' : command.status === 'rejected' ? 'Revisar presentación' : 'Reintentar confirmación'}</Button>
+      </Card>}
+      {!command && alternatives.length > 0 && <Card padding="sm" className="text-sm" aria-label="Borradores conservados">
+        <h3 className="font-bold">Borradores sin enviar</h3>
+        <p className="mt-1 text-neutral-700">Son versiones guardadas por separado. Revisalas antes de preparar otra presentación.</p>
+        <ul className="mt-3 space-y-3">{alternatives.map((alternative, index) => <li key={alternative.id} className="min-w-0 border-t border-neutral-200 pt-3">
+          <details><summary className="min-h-11 cursor-pointer break-words font-semibold">Borrador {index + 1} · {alternative.draft.asunto || 'Sin asunto'}</summary>
+            <p className="whitespace-pre-wrap break-words">{alternative.draft.cuerpo}</p>
+            {alternative.files.map((file, fileIndex) => <button key={fileIndex} type="button" className="mt-2 flex min-h-11 max-w-full items-center gap-2 break-all text-left text-primary-800 underline" onClick={() => {
+              const url = URL.createObjectURL(file), link = document.createElement('a');
+              link.href = url; link.download = file.name; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}><Download size={16} className="shrink-0" />{file.name}</button>)}
+          </details>
+          {open ? <Button className="mt-2" variant="outline" disabled={commandBlocked || recovering} onClick={() => void recoverAlternative(alternative)}>Recuperar borrador {index + 1}</Button>
+            : <p className="mt-2 text-neutral-600">El expediente ya no admite presentaciones. Podés consultar el texto y descargar sus adjuntos.</p>}
+        </li>)}</ul>
+      </Card>}
+      {!draftReady && !draftStorageError && <p role="status" className="text-sm text-neutral-700">Comprobando el borrador y sus adjuntos…</p>}
+      {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">{draftStorageMessage || 'No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta resolverlo.'}{!draftReady && <Button variant="outline" className="mt-3" onClick={() => { setDraftStorageError(false); setDraftStorageMessage(''); setDraftReadRevision(value => value + 1); }}>Revisar borrador local</Button>}</Card>}
+      <InspectionLegacyExchangeRecovery userId={commandScope.userId} inspectionId={inspectionId}
+        destination={`${currentUser?.nombre || 'Tu cuenta'} · ${workspaceRoleLabel(currentUser?.rol || '')}${currentUser?.empresaContexto ? ' · ' + currentUser.empresaContexto.razonSocial + ' · ' + (currentUser.empresaContexto.establecimiento?.nombre || 'Todas las sedes') : ''} · ${timeline.inspeccion.numero}`}
+        disabled={commandBlocked || recovering || !online} verifyAccess={verifyLegacyAccess}
+        onRecover={copy => copy.draft ? recoverAlternative({ id: 'legacy-' + copy.id, draft: copy.draft, files: copy.files, savedAt: copy.savedAt }) : Promise.resolve(false)} />
       <Card className="overflow-hidden !p-0">
         <div className="border-b border-neutral-200 bg-[#F8FAF8] px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E6F4EC] text-[#1B5E3C]"><Scale size={21} /></div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">Instancia contradictoria</p>
-                <h3 id="inspection-exchange-title" className="mt-1 text-xl font-extrabold tracking-tight text-[#10213A]">Presentaciones y respuestas</h3>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">Cada actuación identifica autor y destinatario, registra puesta a disposición y primera apertura, vincula sus adjuntos y encadena huellas SHA-256. Este canal registra en SITREP; no envía correos.</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">{party === 'INSPECCIONADO' ? 'Expediente · '+timeline.inspeccion.numero : 'PSIP · '+INSPECTION_PHASES[inspectionPhaseOf(timeline.inspeccion.estado)].label}</p>
+                <h3 id="inspection-exchange-title" className="mt-1 text-xl font-extrabold tracking-tight text-[#10213A]">{party === 'INSPECCIONADO' ? 'Requerimiento de la autoridad' : 'Presentaciones y respuestas'}</h3>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{party === 'INSPECCIONADO' ? (timeline.inspeccion.actor?.razonSocial || 'Comunicación dirigida a tu cuenta') : 'Observaciones de la autoridad, respuesta del inspeccionado y decisión en el mismo expediente.'}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <Badge color={INSPECTION_STATE_COLORS[timeline.inspeccion.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[timeline.inspeccion.estado]}</Badge>
-              <Badge color={party === 'AUTORIDAD' ? 'primary' : 'info'} variant="outline">Vista: {party === 'AUTORIDAD' ? 'Organismo' : 'Inspeccionado'}</Badge>
+              {party === 'AUTORIDAD' && <Badge color="primary" variant="outline">Organismo</Badge>}
             </div>
           </div>
         </div>
-        <div className="grid gap-0 divide-y divide-neutral-200 px-4 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
-          <div className="py-3 sm:pr-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Expediente</p><p className="mt-1 font-bold text-[#10213A]">{timeline.inspeccion.numero}</p></div>
-          <div className="py-3 sm:px-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Presentaciones</p><p className="mt-1 font-bold text-[#10213A]">{timeline.intercambios.length}</p></div>
-          <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Plazo vigente</p><p className={`mt-1 font-bold ${deadlineExpired ? 'text-error-700' : 'text-[#10213A]'}`}>{timeline.inspeccion.plazoRespuestaAt ? inspectionDate(timeline.inspeccion.plazoRespuestaAt, true) : 'Sin plazo abierto'}</p></div>
+        <div className={`grid gap-0 divide-y divide-neutral-200 px-4 sm:px-6 ${party === 'AUTORIDAD' ? 'sm:grid-cols-3 sm:divide-x sm:divide-y-0' : ''}`}>
+          {party === 'AUTORIDAD' && <div className="py-3 sm:pr-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Expediente</p><p className="mt-1 font-bold text-[#10213A]">{timeline.inspeccion.numero}</p></div>}
+          {party === 'AUTORIDAD' && <div className="py-3 sm:px-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Presentaciones</p><p className="mt-1 font-bold text-[#10213A]">{timeline.intercambios.length}</p></div>}
+          <div className={`py-3 ${party === 'AUTORIDAD' ? 'sm:pl-4' : ''}`}><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{!open ? 'Último plazo · histórico' : followUp.next ? `Plazo del pedido #${followUp.next.secuencia}` : 'Último plazo registrado · referencia'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{inspectionDeadlineDate(displayedDeadline)}</p>{displayedDeadline && <p className="mt-1 text-xs text-neutral-500">Hora de Mendoza</p>}</div>
+        </div>
+        <div data-testid="inspection-next-step" className="border-t border-neutral-200 px-4 py-4 sm:px-6">
+          <p data-testid="inspection-responsible" className="mb-2 text-xs font-bold uppercase tracking-wide text-primary-800">{legal ? 'Debe actuar: Administración competente' : followUp.responsible ? `Debe actuar: ${followUp.responsible}` : 'Sin intercambio abierto'}</p>
+          <p className="flex items-center gap-2 font-bold text-neutral-900"><Reply size={18} className="shrink-0 text-primary-800" aria-hidden="true" />{nextStep.title}</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{nextStep.detail}</p>
+          {open && nextStep.pending.length > 0 && <div aria-label="Requerimientos sin respuesta" role="region" className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200">
+            {nextStep.pending.map(entry => {
+              const status = inspectionDeadlineStatus(entry.plazoRespuestaAt, now);
+              return <div key={entry.id} data-testid="inspection-pending-request" className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="col-span-2 min-w-0 sm:col-span-1"><p className="break-words text-sm font-semibold text-neutral-900">#{entry.secuencia} · {entry.asunto}</p><p className="mt-1 text-xs text-neutral-600">{inspectionDeadlineDate(entry.plazoRespuestaAt)}{entry.plazoRespuestaAt ? ' · Mendoza' : ''}</p></div>
+                {party === 'INSPECCIONADO' && <p className="col-span-2 whitespace-pre-wrap break-words text-sm leading-6 text-neutral-700 sm:col-span-3">{entry.cuerpo}</p>}
+                <Badge className="justify-self-start" color={status === 'Vencido' ? 'error' : status === 'Vence hoy' ? 'warning' : 'neutral'}>{status}</Badge>
+                {party === 'INSPECCIONADO' && <Button aria-label={`Responder requerimiento #${entry.secuencia}`} className="justify-self-end" size="sm" variant="outline" disabled={commandBlocked} onClick={() => beginReply(entry)}>Responder</Button>}
+              </div>;
+            })}
+          </div>}
+          {party === 'AUTORIDAD' ? (<p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>) : open ? <p className="mt-3 text-xs text-neutral-600">Tu respuesta queda registrada y la autoridad recibe un aviso.</p> : null}
         </div>
       </Card>
 
+      {legal && <InspectionLegalProgress id={inspectionId} state={timeline.inspeccion.estado} version={timeline.inspeccion.version} canManage={canDecide && party === 'AUTORIDAD'} online={online} onRecorded={() => exchangeQuery.refetch()} />}
+
+      {timeline.inspeccion.estado === 'FINALIZADA' && timeline.resultadoAdministrativo && <Card data-testid="inspection-public-result" className="space-y-3"><h3 className="flex items-center gap-2 text-lg font-bold text-neutral-900"><FileCheck2 size={21} className="shrink-0 text-primary-800" aria-hidden="true" />Resultado administrativo registrado</h3><p className="whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{timeline.resultadoAdministrativo.detalle || 'La administración registró la finalización sin un resumen público adicional.'}</p><p className="text-xs text-neutral-600">{inspectionDeadlineDate(timeline.resultadoAdministrativo.createdAt)} · Mendoza. El registro no acredita por sí solo sanción ni firmeza.</p></Card>}
+
       {!online && <div role="status" className="flex items-start gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-900"><WifiOff className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Sin conexión: no se enviará ninguna actuación.</p><p className="mt-0.5 leading-5">El texto y los adjuntos seleccionados se conservan en el almacenamiento local del navegador de este dispositivo. Al reconectar, revise la versión y confirme manualmente; SITREP nunca autoenvía un descargo.</p></div></div>}
-      {restoredAt && composeOpen && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}
-      {deadlineExpired && open && <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-900"><AlertTriangle className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Plazo vencido</p><p className="mt-0.5">El sistema admite la presentación y la marcará como fuera de plazo; la valoración corresponde a la autoridad competente.</p></div></div>}
+      {restoredAt && composeOpen && !command && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}
+      {deadlineExpired && open && <div data-testid="inspection-overdue" className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-900"><AlertTriangle className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">{followUp.overdue} {followUp.overdue === 1 ? 'requerimiento vencido sin respuesta' : 'requerimientos vencidos sin respuesta'}</p><p className="mt-0.5">Se admiten presentaciones; la marca fuera de plazo depende del pedido al que respondés. La autoridad debe evaluar lo presentado; no se aplica una decisión automática.</p></div></div>}
 
       {timeline.intercambios.length === 0 ? (
         <Card className="py-10 text-center"><Files className="mx-auto text-neutral-300" size={36} /><p className="mt-3 font-bold text-[#10213A]">Todavía no hay presentaciones formales</p><p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-neutral-600">La autoridad inicia el circuito con un requerimiento. El inspeccionado podrá responder sobre ese antecedente.</p></Card>
       ) : (
+        party === 'INSPECCIONADO' ? <details open={nextStep.pending.length === 0} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-primary-800">Historial y documentación</summary>
         <ExchangeLedger
           cycles={exchangeCycles}
           parentById={parentById}
           party={party}
-          open={open}
+          open={open && !commandBlocked && nextStep.pending.length === 0}
           onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
           onReply={beginReply}
         />
+        </details> : (
+        <ExchangeLedger
+          cycles={exchangeCycles}
+          parentById={parentById}
+          party={party}
+          open={open && !commandBlocked}
+          onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
+          onReply={beginReply}
+        />
+        )
       )}
 
-      {open && !composeOpen && party === 'AUTORIDAD' && <Button leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
-      {open && !composeOpen && party === 'INSPECCIONADO' && timeline.intercambios.some((entry) => entry.parte === 'AUTORIDAD') && <p className="rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900">Para contestar, seleccione <strong>Responder esta actuación</strong> en el requerimiento correspondiente. Así la relación queda inequívoca.</p>}
+      {open && !composeOpen && party === 'AUTORIDAD' && <Button disabled={commandBlocked} leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
 
-      {open && composeOpen && (
-        <Card id="inspection-exchange-form" className="border-primary-200">
-          <form onSubmit={submitPresentation} className="space-y-4">
-            <div className="flex items-start justify-between gap-3 border-b border-neutral-200 pb-4">
+      {open && composeOpen && !command && (
+        <Card padding="sm" id="inspection-exchange-form" className="border-primary-200">
+          <form onSubmit={submitPresentation} onChange={() => { draftInteraction.current += 1; }} className="space-y-4">
+            <fieldset disabled={commandBlocked} className="min-w-0 space-y-4"><div className="flex items-start justify-between gap-3 border-b border-neutral-200 pb-4">
               <div><p className="text-xs font-bold uppercase tracking-wide text-primary-700">Nueva presentación formal</p><h4 className="mt-1 text-lg font-extrabold text-[#10213A]">{draft.respondeAId ? 'Respuesta vinculada' : 'Requerimiento de la autoridad'}</h4></div>
-              <button type="button" aria-label="Cerrar formulario" className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" onClick={() => setComposeOpen(false)}><X size={18} /></button>
+              <button type="button" aria-label="Cerrar formulario" className="min-h-11 min-w-11 rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" onClick={() => setComposeOpen(false)}><X size={18} /></button>
             </div>
             {draft.respondeAId && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">Antecedente: presentación #{parentById.get(draft.respondeAId)?.secuencia || '—'} · {parentById.get(draft.respondeAId)?.asunto}</div>}
+            {party === 'INSPECCIONADO' && draft.respondeAId && <p data-testid="inspection-reply-deadline" className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-800">Plazo del pedido respondido: <strong>{inspectionDeadlineDate(selectedDeadline)}{selectedDeadline ? ' · Mendoza' : ''}</strong>{selectedDeadline && <span className="ml-2 font-semibold">{inspectionDeadlineStatus(selectedDeadline, now)}</span>}</p>}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="text-sm font-semibold text-neutral-800">Tipo de actuación<select value={draft.tipo} onChange={(event) => setDraft((value) => ({ ...value, tipo: event.target.value as InspectionExchangeType, plazoRespuestaAt: event.target.value === 'REQUERIMIENTO' ? value.plazoRespuestaAt : '' }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 font-normal">{exchangeTypeOptions(party, Boolean(draft.respondeAId)).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-              {party === 'AUTORIDAD' && draft.tipo === 'REQUERIMIENTO' && <label className="text-sm font-semibold text-neutral-800">Plazo de respuesta<input type="datetime-local" min={localDate(new Date(now).toISOString())} value={draft.plazoRespuestaAt} onChange={(event) => setDraft((value) => ({ ...value, plazoRespuestaAt: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>}
+              {party === 'AUTORIDAD' && draft.tipo === 'REQUERIMIENTO' && <label className="text-sm font-semibold text-neutral-800">Plazo de respuesta<input aria-label="Plazo de respuesta" type="datetime-local" min={inspectionDeadlineInput(new Date((Math.floor(now / 60_000) + 1) * 60_000).toISOString())} value={draft.plazoRespuestaAt} onChange={(event) => setDraft((value) => ({ ...value, plazoRespuestaAt: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /><span className="mt-1 block text-xs font-normal text-neutral-600">Fecha y hora de Mendoza. Sin fecha, este pedido queda sin plazo registrado.</span></label>}
             </div>
             <label className="block text-sm font-semibold text-neutral-800">Asunto<input value={draft.asunto} maxLength={180} onChange={(event) => setDraft((value) => ({ ...value, asunto: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" placeholder="Objeto preciso de la presentación" /></label>
             <label className="block text-sm font-semibold text-neutral-800">Contenido<textarea value={draft.cuerpo} maxLength={12_000} onChange={(event) => setDraft((value) => ({ ...value, cuerpo: event.target.value }))} className="mt-1.5 min-h-36 w-full resize-y rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Exponga hechos, documentación y petición de forma clara." /></label>
             <label className="block text-sm font-semibold text-neutral-800">Adjuntos probatorios <span className="font-normal text-neutral-500">(hasta 5 archivos, 50 MB total)</span><input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" onChange={(event) => setFiles(Array.from(event.target.files || []))} className="mt-1.5 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:font-semibold file:text-primary-800" /></label>
             {files.length > 0 && <ul className="grid gap-2 sm:grid-cols-2">{files.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-700"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.name}</span><span className="ml-auto shrink-0 text-neutral-500">{formatBytes(file.size)}</span></li>)}</ul>}
-            <div className="flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-xs text-neutral-500"><ShieldCheck size={15} />Se registra autor, fecha, canal, versión, adjuntos y huella encadenada.</p><Button type="submit" disabled={!online} isLoading={presentMutation.isPending} leftIcon={<Send size={16} />}>Presentar en expediente</Button></div>
-          </form>
+            <div className="flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-xs text-neutral-500"><ShieldCheck size={15} />Se registra autor, fecha, canal, versión, adjuntos y huella encadenada.</p><Button type="submit" disabled={!online} isLoading={delivery.busy} leftIcon={<Send size={16} />}>Presentar en expediente</Button></div>
+          </fieldset></form>
         </Card>
       )}
 
-      {canDecide && open && timeline.intercambios.length > 0 && (
+      {canDecide && open && !command && timeline.intercambios.length > 0 && (
         <Card className="border-neutral-300">
           <div className="flex items-start gap-3"><Landmark className="mt-0.5 text-[#1B5E3C]" size={21} /><div><h4 className="font-extrabold text-[#10213A]">Decisión de la autoridad competente</h4><p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">El cierre o la derivación concluye esta instancia de intercambio. Requiere fundamento expreso y queda encadenado al expediente.</p></div></div>
-          {!decision ? <div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button variant="outline" leftIcon={<CheckCircle2 size={17} />} onClick={() => setDecision('CERRADA_CONFORME')}>Cerrar conforme</Button><Button variant="danger" leftIcon={<Scale size={17} />} onClick={() => setDecision('DERIVADA_LEGALES')}>Derivar a Legales</Button></div> : <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); if (fundamento.trim().length >= 20) decisionMutation.mutate(); }}><div className={`rounded-lg border px-3 py-2 text-sm font-bold ${decision === 'CERRADA_CONFORME' ? 'border-success-200 bg-success-50 text-success-900' : 'border-error-200 bg-error-50 text-error-900'}`}>{decision === 'CERRADA_CONFORME' ? 'Cierre conforme del intercambio' : 'Derivación formal a Legales'}</div><label className="block text-sm font-semibold text-neutral-800">Fundamento de la decisión<textarea value={fundamento} onChange={(event) => setFundamento(event.target.value)} className="mt-1.5 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Fundamento verificable, hechos considerados y alcance de la decisión." /></label>{decision === 'DERIVADA_LEGALES' && <label className="block text-sm font-semibold text-neutral-800">Referencia de expediente legal <span className="font-normal text-neutral-500">(si ya fue asignada)</span><input value={expedienteLegal} onChange={(event) => setExpedienteLegal(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>}<label className="block text-sm font-semibold text-neutral-800">Adjuntos de la decisión <span className="font-normal text-neutral-500">(dictamen, nota o constancia)</span><input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" onChange={(event) => setDecisionFiles(Array.from(event.target.files || []))} className="mt-1.5 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:font-semibold file:text-primary-800" /></label>{decisionFiles.length > 0 && <ul className="grid gap-2 sm:grid-cols-2">{decisionFiles.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-700"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.name}</span><span className="ml-auto shrink-0 text-neutral-500">{formatBytes(file.size)}</span></li>)}</ul>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={() => { setDecision(null); setDecisionFiles([]); }}>Cancelar</Button><Button type="submit" variant={decision === 'DERIVADA_LEGALES' ? 'danger' : 'primary'} disabled={fundamento.trim().length < 20 || !online || decisionFiles.length > 5 || decisionFiles.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024} isLoading={decisionMutation.isPending}>{decision === 'CERRADA_CONFORME' ? 'Confirmar cierre conforme' : 'Confirmar derivación'}</Button></div></form>}
+          {!decision ? <div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button variant="outline" leftIcon={<CheckCircle2 size={17} />} disabled={commandBlocked} onClick={() => setDecision('CERRADA_CONFORME')}>Cerrar conforme</Button><Button variant="danger" leftIcon={<Scale size={17} />} disabled={commandBlocked} onClick={() => setDecision('DERIVADA_LEGALES')}>Derivar a Legales</Button></div> : <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); if (!commandBlocked && online && fundamento.trim().length >= 20) void delivery.submit({ kind: 'decision', input: {
+            version: timeline.inspeccion.version, clienteId: `decision_${crypto.randomUUID()}`, decision,
+            fundamento: fundamento.trim(), expedienteLegal: decision === 'DERIVADA_LEGALES' ? expedienteLegal.trim() || undefined : undefined, files: decisionFiles,
+          } }); }}><fieldset disabled={commandBlocked} className="min-w-0 space-y-4"><div className={`rounded-lg border px-3 py-2 text-sm font-bold ${decision === 'CERRADA_CONFORME' ? 'border-success-200 bg-success-50 text-success-900' : 'border-error-200 bg-error-50 text-error-900'}`}>{decision === 'CERRADA_CONFORME' ? 'Cierre conforme del intercambio' : 'Derivación formal a Legales'}</div><label className="block text-sm font-semibold text-neutral-800">Fundamento de la decisión<textarea maxLength={12_000} value={fundamento} onChange={(event) => setFundamento(event.target.value)} className="mt-1.5 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Fundamento verificable, hechos considerados y alcance de la decisión." /></label>{decision === 'DERIVADA_LEGALES' && <label className="block text-sm font-semibold text-neutral-800">Referencia de expediente legal <span className="font-normal text-neutral-500">(si ya fue asignada)</span><input maxLength={180} value={expedienteLegal} onChange={(event) => setExpedienteLegal(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>}<label className="block text-sm font-semibold text-neutral-800">Adjuntos de la decisión <span className="font-normal text-neutral-500">(dictamen, nota o constancia)</span><input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" onChange={(event) => setDecisionFiles(Array.from(event.target.files || []))} className="mt-1.5 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:font-semibold file:text-primary-800" /></label>{decisionFiles.length > 0 && <ul className="grid gap-2 sm:grid-cols-2">{decisionFiles.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-700"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.name}</span><span className="ml-auto shrink-0 text-neutral-500">{formatBytes(file.size)}</span></li>)}</ul>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={() => { setDecision(null); setDecisionFiles([]); }}>Cancelar</Button><Button type="submit" variant={decision === 'DERIVADA_LEGALES' ? 'danger' : 'primary'} disabled={fundamento.trim().length < 20 || !online || decisionFiles.some(file => file.size > 25 * 1024 * 1024) || decisionFiles.length > 5 || decisionFiles.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024} isLoading={delivery.busy}>{decision === 'CERRADA_CONFORME' ? 'Confirmar cierre conforme' : 'Confirmar derivación'}</Button></div></fieldset></form>}
         </Card>
       )}
     </section>

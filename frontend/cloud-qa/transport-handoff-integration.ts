@@ -1,0 +1,118 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {assertCloudDatabase,backendRequire} from './safety.ts';
+await assertCloudDatabase();
+assert.equal(process.env.MANIFEST_TRANSPORT_HANDOFF_ENABLED,'true');
+const {PrismaClient}=backendRequire('@prisma/client');const db=new PrismaClient();
+const bcrypt=backendRequire('bcryptjs');const jwt=backendRequire('jsonwebtoken');
+const run=randomUUID().slice(0,8),password=randomUUID()+randomUUID();
+const checks:string[]=[];
+const request=async(method:string,url:string,token?:string,body?:unknown)=>{
+  const res=await fetch('http://127.0.0.1:3037/api'+url,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+  return {status:res.status,body:await res.json()};
+};
+try{
+  const hash=await bcrypt.hash(password,10);
+  const users:Record<string,any>={};
+  for(const [name,rol] of Object.entries({origin:'TRANSPORTISTA',replacement:'TRANSPORTISTA',foreign:'TRANSPORTISTA',generator:'GENERADOR',operator:'OPERADOR',admin:'ADMIN'})){
+    users[name]=await db.usuario.create({data:{email:`handoff-${run}-${name}@qa.invalid`,nombre:'QA '+name,password:hash,rol,activo:true,emailVerified:true,notifEmail:false}});
+  }
+  const actorFields=(name:string)=>({usuarioId:users[name].id,razonSocial:`QA relevo ${name} ${run}`,cuit:`99-${run}-${name}`,domicilio:'QA domicilio artificial',telefono:'QA sin teléfono',email:users[name].email});
+  const carriers:Record<string,any>={};
+  for(const name of ['origin','replacement','foreign'])carriers[name]=await db.transportista.create({data:{...actorFields(name),numeroHabilitacion:'QA declarada'}});
+  const generator=await db.generador.create({data:{...actorFields('generator'),numeroInscripcion:'QA',categoria:'QA'}});
+  const operator=await db.operador.create({data:{...actorFields('operator'),numeroHabilitacion:'QA',categoria:'QA'}});
+  const vehicle=await db.vehiculo.create({data:{transportistaId:carriers.replacement.id,patente:'QA-RELEVO',marca:'QA',modelo:'QA',anio:2026,capacidad:1000,numeroHabilitacion:'QA',vencimiento:new Date('2099-01-01')}});
+  const createTrip=(suffix:string)=>db.manifiesto.create({data:{numero:`QA-HANDOFF-${run}-${suffix}`,generadorId:generator.id,operadorId:operator.id,transportistaId:carriers.origin.id,creadoPorId:users.origin.id,
+    estado:'EN_TRANSITO',modalidad:'FIJO',fechaRetiro:new Date(),isDemoData:true,asignacionTransporte:{version:1,transportistaId:carriers.origin.id,vehiculo:null,chofer:null}}});
+  const manifest=await createTrip('HTTP');
+  const tokens:Record<string,string>={};
+  for(const name of Object.keys(users)){const login=await request('POST','/auth/login',undefined,{email:users[name].email,password});assert.equal(login.status,200,JSON.stringify(login.body));tokens[name]=login.body.data.tokens.accessToken;}
+  const state=()=>request('GET',`/manifiestos/${manifest.id}/tramos`,tokens.origin);
+  assert.equal((await state()).body.data.puedeRegistrar,true);
+  const command={id:randomUUID(),anteriorId:null,tipo:'EXTERNO',datos:{},motivo:'Rotura artificial de QA'};
+  for(const name of ['operator','admin','foreign'])assert.ok([403,404].includes((await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens[name],command)).status));
+  checks.push('custody-original-carrier-only');
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/ubicacion`,tokens.origin,{latitud:-32.8,longitud:-68.8})).status,200);
+  const first=await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,command);assert.equal(first.status,201,JSON.stringify(first.body));const firstLeg=first.body.data.tramo,firstToken=first.body.data.acceso;
+  assert.equal(firstLeg.tipo,'EXTERNO');assert.deepEqual(firstLeg.datos,{});assert.equal(firstLeg.transportistaId,null);
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,command)).status,201);
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,{...command,motivo:'Otra cosa'})).status,409);
+  assert.equal(await db.tramoTransporte.count({where:{manifiestoId:manifest.id}}),2);
+  const preserved=await db.manifiesto.findUniqueOrThrow({where:{id:manifest.id}});assert.equal(preserved.transportistaId,manifest.transportistaId);assert.deepEqual(preserved.asignacionTransporte,manifest.asignacionTransporte);assert.equal(preserved.fechaRetiro!.getTime(),manifest.fechaRetiro!.getTime());
+  checks.push('incomplete-external-no-actor-invention','immutable-original-and-idempotent-handoff');
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/ubicacion`,tokens.origin,{latitud:-32.9,longitud:-68.9})).status,409);
+  const notices=await db.notificacion.findMany({where:{manifiestoId:manifest.id,titulo:'Cambio de transporte en tránsito'}});
+  for(const name of ['origin','generator','operator','admin'])assert.equal(notices.filter((n:any)=>n.usuarioId===users[name].id).length,1);
+  const cc=await request('GET','/centro-control/actividad?capas=transito',tokens.admin);assert.equal(cc.status,200);
+  const active=cc.body.data.enTransito.find((m:any)=>m.manifiestoId===manifest.id);assert.equal(active.tramoActual.gpsRecibido,false);assert.equal(active.ultimaPosicion,null);assert.deepEqual(active.ruta,[]);
+  checks.push('source-gps-blocked-after-handoff','transactional-party-and-c3-notices','c3-does-not-reuse-old-leg-position');
+  assert.equal((await request('GET',`/seguimiento-relevo/${firstLeg.id}`,firstToken)).status,200);
+  for(const url of ['/auth/profile','/manifiestos'])assert.equal((await request('GET',url,firstToken)).status,401);
+  assert.equal((await request('GET',`/seguimiento-relevo/${randomUUID()}`,firstToken)).status,401);
+  const expired=jwt.sign({purpose:'transport-leg-gps',jti:jwt.decode(firstToken).jti},process.env.JWT_SECRET,{subject:firstLeg.id,audience:'transport-leg-gps',expiresIn:-1});
+  assert.equal((await request('GET',`/seguimiento-relevo/${firstLeg.id}`,expired)).status,401);
+  const gps=await request('POST',`/seguimiento-relevo/${firstLeg.id}/ubicacion`,firstToken,{latitud:-33,longitud:-69,precision:12});assert.equal(gps.status,200,JSON.stringify(gps.body));assert.equal(gps.body.data.tracking.tramoId,firstLeg.id);
+  const saved=await db.trackingGPS.findUniqueOrThrow({where:{id:gps.body.data.tracking.id}});assert.equal(saved.tramoId,firstLeg.id);assert.match(saved.emisor!,/^acceso-relevo:/);
+  await db.usuario.update({where:{id:users.origin.id},data:{activo:false}});
+  assert.equal((await request('GET',`/seguimiento-relevo/${firstLeg.id}`,firstToken)).status,403);
+  await db.usuario.update({where:{id:users.origin.id},data:{activo:true}});
+  checks.push('limited-token-not-user-login','token-leg-binding-and-expiry','gps-attributed-to-leg-and-emitter','issuer-suspension-revokes-delegated-gps');
+  const registered={id:randomUUID(),anteriorId:firstLeg.id,tipo:'REGISTRADO',transportistaId:carriers.replacement.id,vehiculoId:vehicle.id,datos:{},motivo:'Reemplazo registrado de QA'};
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,{...registered,transportistaId:carriers.foreign.id})).status,400);
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,{...registered,anteriorId:null})).status,409);
+  const second=await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,registered);assert.equal(second.status,201,JSON.stringify(second.body));const secondLeg=second.body.data.tramo;
+  assert.equal(secondLeg.datos.patente,'QA-RELEVO');assert.equal((await request('GET',`/seguimiento-relevo/${firstLeg.id}`,firstToken)).status,403);
+  assert.equal(secondLeg.datos.registro.vehiculo.id,vehicle.id);
+  await db.vehiculo.update({where:{id:vehicle.id},data:{patente:'QA-PADRÓN-EDITADO'}});
+  assert.equal((await state()).body.data.tramos.find((leg:any)=>leg.id===secondLeg.id).datos.patente,'QA-RELEVO');
+  assert.equal((await request('GET',`/manifiestos/${manifest.id}`,tokens.replacement)).status,404);
+  const assigned=await request('GET','/manifiestos/relevos-asignados',tokens.replacement);assert.equal(assigned.status,200);assert.ok(assigned.body.data.some((leg:any)=>leg.tramoId===secondLeg.id));
+  const access=await request('POST',`/manifiestos/relevos-asignados/${secondLeg.id}/acceso`,tokens.replacement,{});assert.equal(access.status,200);
+  assert.equal((await request('POST',`/manifiestos/relevos-asignados/${secondLeg.id}/acceso`,tokens.foreign,{})).status,404);
+  await request('POST',`/manifiestos/${manifest.id}/tramos/${secondLeg.id}/acceso`,tokens.origin,{revocar:true});
+  assert.equal((await request('GET',`/seguimiento-relevo/${secondLeg.id}`,access.body.data.acceso)).status,403);
+  assert.equal((await request('POST',`/manifiestos/relevos-asignados/${secondLeg.id}/acceso`,tokens.replacement,{})).status,403);
+  const renewed=await request('POST',`/manifiestos/${manifest.id}/tramos/${secondLeg.id}/acceso`,tokens.origin,{revocar:false});assert.equal(renewed.status,200);
+  assert.equal((await request('GET',`/seguimiento-relevo/${secondLeg.id}`,renewed.body.data.acceso)).status,200);
+  checks.push('registered-fleet-snapshot-and-limited-access','unrelated-carrier-denied','renewal-and-revocation-across-requests');
+  const concurrent=await Promise.all([1,2].map(n=>request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,{...command,id:randomUUID(),anteriorId:secondLeg.id,motivo:'Relevo concurrente '+n})));
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[201,409]);assert.equal(await db.tramoTransporte.count({where:{manifiestoId:manifest.id,fin:null}}),1);
+  assert.equal(await db.notificacion.count({where:{manifiestoId:manifest.id,usuarioId:users.replacement.id,titulo:'Cambio de transporte en tránsito'}}),2);
+  const current=concurrent.find(r=>r.status===201)!.body.data;
+  const sameCompany=await request('POST',`/manifiestos/${manifest.id}/tramos`,tokens.origin,{id:randomUUID(),anteriorId:current.tramo.id,tipo:'REGISTRADO',transportistaId:carriers.origin.id,datos:{},motivo:'Móvil de reemplazo de la misma empresa'});
+  assert.equal(sameCompany.status,201);assert.equal((await request('GET',`/seguimiento-relevo/${current.tramo.id}`,current.acceso)).status,403);
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/ubicacion`,tokens.origin,{latitud:-33,longitud:-69})).status,409);
+  assert.equal((await request('POST',`/seguimiento-relevo/${sameCompany.body.data.tramo.id}/ubicacion`,sameCompany.body.data.acceso,{latitud:-33,longitud:-69})).status,200);
+  checks.push('same-company-replacement-has-distinct-gps-emitter');
+  assert.equal((await request('POST',`/manifiestos/${manifest.id}/confirmar-entrega`,tokens.origin,{observaciones:'Entrega QA tras relevo'})).status,200);
+  assert.equal((await request('POST',`/seguimiento-relevo/${sameCompany.body.data.tramo.id}/ubicacion`,sameCompany.body.data.acceso,{latitud:-33.1,longitud:-69.1})).status,403);
+  assert.equal(await db.tramoTransporte.count({where:{manifiestoId:manifest.id,fin:null}}),0);
+  const ownHistory=await request('GET','/manifiestos/relevos-asignados',tokens.replacement);
+  assert.ok(ownHistory.body.data.find((leg:any)=>leg.tramoId===secondLeg.id&&leg.fin&&!leg.accesoDisponible));
+  checks.push('concurrent-stale-handoffs-one-winner','delivery-closes-leg-and-revokes-gps');
+  for(const action of ['cancel','reverse']){
+    const ended=await createTrip(action.toUpperCase());
+    const delegated=await request('POST',`/manifiestos/${ended.id}/tramos`,tokens.origin,{...command,id:randomUUID()});
+    assert.equal(delegated.status,201);
+    const change=action==='cancel'
+      ? await request('POST',`/manifiestos/${ended.id}/cancelar`,tokens.generator,{motivo:'Cancelación sintética con relevo activo'})
+      : await request('POST',`/manifiestos/${ended.id}/revertir-estado`,tokens.admin,{estadoNuevo:'APROBADO',motivo:'Reversión sintética antes de otro retiro'});
+    assert.equal(change.status,200,JSON.stringify(change.body));
+    const closed=await db.tramoTransporte.findUniqueOrThrow({where:{id:delegated.body.data.tramo.id}});
+    assert.ok(closed.fin);assert.equal(closed.accesoVersion,null);assert.equal(closed.accesoHasta,null);
+    assert.equal((await request('POST',`/seguimiento-relevo/${closed.id}/ubicacion`,delegated.body.data.acceso,{latitud:-33,longitud:-69})).status,403);
+    if(action==='reverse'){
+      assert.equal((await request('POST',`/manifiestos/${ended.id}/confirmar-retiro`,tokens.origin,{})).status,200);
+      assert.equal((await request('GET',`/seguimiento-relevo/${closed.id}`,delegated.body.data.acceso)).status,403);
+      await request('POST',`/manifiestos/${ended.id}/cancelar`,tokens.generator,{motivo:'Fin del ensayo de reanudación'});
+    }
+    checks.push(action==='cancel'?'cancellation-closes-custody-and-revokes-gps':'state-reversal-and-new-pickup-never-revive-old-gps');
+  }
+  const browsers={web:await createTrip('BROWSER-WEB'),app:await createTrip('BROWSER-APP')};
+  await writeFile(path.join(process.env.QA_ARTIFACTS!,'handoff-private.json'),JSON.stringify({password,users:Object.fromEntries(Object.entries(users).map(([name,user])=>[name,{id:user.id,email:user.email}])),carriers,vehicleId:vehicle.id,browsers}),{mode:0o600});
+  await writeFile(path.join(process.env.QA_ARTIFACTS!,'handoff-http.json'),JSON.stringify({passed:true,checks,manifestId:manifest.id,production:false,externalDelivery:false},null,2));
+  console.log('PASS: '+checks.length+' HTTP/DB handoff groups; synthetic preview only');
+}finally{await db.$disconnect();}

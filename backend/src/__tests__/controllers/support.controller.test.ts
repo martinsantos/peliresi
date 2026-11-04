@@ -7,7 +7,7 @@ vi.mock('../../lib/prisma', () => ({ default: {
   adjuntoSoporte: { findFirst: mocks.file }, $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/supportFile.service', () => ({ persistSupportFiles: mocks.persist, discardSupportFiles: mocks.discard, describeSupportFile: vi.fn(), resolveSupportFile: vi.fn() }));
-import { accionarTicket, obtenerTicket, listarTickets, crearTicket, descargarAdjuntoSoporte, comprobarEnvioTicket, equipoSoporte } from '../../controllers/support.controller';
+import { accionarTicket, recuperarAccionTicket, obtenerTicket, listarTickets, crearTicket, descargarAdjuntoSoporte, comprobarEnvioTicket, equipoSoporte } from '../../controllers/support.controller';
 const user = { id: 'owner', rol: 'GENERADOR', activo: true, restricted: false };
 const ticket = { id: 'ticket', numero: 1, autorId: 'owner', responsableId: 'agent', estado: 'EN_CURSO', version: 2, huella: 'hash', clienteId: 'creation123' };
 const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis(), setHeader: vi.fn(), type: vi.fn(), download: vi.fn() });
@@ -76,7 +76,7 @@ describe('support identity, visibility and transactional workflow', () => {
   it('filters private notes and events on the server for the reporter', async () => {
     const res = response(); await obtenerTicket(request() as never, res as never, vi.fn());
     expect(mocks.messages).toHaveBeenCalledWith(expect.objectContaining({ where: { ticketId: 'ticket', interno: false } }));
-    expect(mocks.events).toHaveBeenCalledWith(expect.objectContaining({ where: { ticketId: 'ticket', interno: false } }));
+    expect(mocks.events).toHaveBeenCalledWith(expect.objectContaining({ where: { ticketId: 'ticket', accion: { not: 'ENVIO_RETIRADO' }, interno: false } }));
     expect(res.json.mock.calls[0][0].data.huella).toBeUndefined();
   });
   it('cannot download the attachment of a private note', async () => {
@@ -86,7 +86,7 @@ describe('support identity, visibility and transactional workflow', () => {
   });
   it('rejects stale versions before any mutation, event or notice', async () => {
     const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 1, cuerpo: 'Respuesta del usuario' }) as never, response() as never, next);
-    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 }); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.createNotices).not.toHaveBeenCalled();
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 }); expect(next.mock.calls[0][0].code).toBeUndefined(); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.createNotices).not.toHaveBeenCalled();
   });
   it('does not grant support power through a sector role or inspector flag', async () => {
     const next = vi.fn(); await accionarTicket(request({ accion: 'TOMAR', version: 2 }, { ...user, rol: 'ADMIN_GENERADOR' }) as never, response() as never, next);
@@ -116,6 +116,43 @@ describe('support identity, visibility and transactional workflow', () => {
     expect(next).not.toHaveBeenCalled(); expect(mocks.createEvent).toHaveBeenCalledTimes(1);
     expect(mocks.createNotices.mock.calls[0][0].data).toEqual([expect.objectContaining({ usuarioId: 'owner', tipo: 'INFO_GENERAL' })]);
   });
+  it.each([
+    ['RESPONDER', 'EN_CURSO', 'Nueva respuesta en el ticket'],
+    ['TOMAR', 'EN_CURSO', 'Ticket con responsable asignado'],
+    ['ESPERAR', 'EN_CURSO', 'Se solicitó una respuesta'],
+    ['CERRAR', 'EN_CURSO', 'Ticket cerrado'],
+    ['REABRIR', 'CERRADO', 'Ticket reabierto'],
+  ])('describes %s to the reporter without exposing the private message', async (accion, estado, titulo) => {
+    mocks.ticket.mockResolvedValue({ ...ticket, estado });
+    const next = vi.fn();
+    await accionarTicket(request({ accion, version: 2, cuerpo: 'Contenido privado de prueba' }, { ...user, id: 'agent', rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const [notice] = mocks.createNotices.mock.calls[0][0].data;
+    expect(notice).toMatchObject({ usuarioId: 'owner', titulo });
+    expect(notice.mensaje).toContain('SOP-000001');
+    expect(notice.mensaje).not.toContain('Contenido privado');
+    expect(JSON.parse(notice.datos)).toMatchObject({ tipo: 'soporte', evento: accion, interno: false, ticketId: 'ticket', ruta: '/soporte/ticket' });
+  });
+  it('reports reopening when the author replies to a closed ticket', async () => {
+    mocks.ticket.mockResolvedValue({ ...ticket, estado: 'CERRADO' });
+    const next = vi.fn();
+    await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'El problema continúa.' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const [notice] = mocks.createNotices.mock.calls[0][0].data;
+    expect(notice).toMatchObject({ usuarioId: 'agent', titulo: 'Ticket reabierto' });
+    expect(JSON.parse(notice.datos)).toMatchObject({ evento: 'REABRIR', ticketId: 'ticket' });
+    expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ accion: 'RESPONDER' }) }));
+  });
+  it('limits a notice about a private note to the assigned support agent', async () => {
+    const next = vi.fn();
+    await accionarTicket(request({ accion: 'NOTA', version: 2, cuerpo: 'Diagnóstico interno reservado.' }, { ...user, id: 'admin', rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const notices = mocks.createNotices.mock.calls[0][0].data;
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({ usuarioId: 'agent', titulo: 'Nueva nota interna de soporte' });
+    expect(JSON.parse(notices[0].datos)).toMatchObject({ evento: 'NOTA', interno: true });
+    expect(notices[0].mensaje).not.toContain('Diagnóstico interno');
+  });
   it('checks uncertain sends only under the current owner', async () => {
     const res = response(); await comprobarEnvioTicket(request() as never, res as never, vi.fn());
     expect(mocks.ticket).toHaveBeenCalledWith({ where: { autorId_clienteId: { autorId: 'owner', clienteId: 'creation123' } } });
@@ -143,5 +180,52 @@ describe('support identity, visibility and transactional workflow', () => {
   it('rejects a reused creation key with different contents and does not write', async () => {
     const next = vi.fn(); await crearTicket(request({ asunto: 'GPS no responde', descripcion: 'No muestra el marcador después del permiso.', categoria: 'GPS' }) as never, response() as never, next);
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 }); expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not claim non-application for a reused key with another payload', async () => {
+    mocks.event.mockResolvedValueOnce({ huella: 'different' });
+    const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'Respuesta diferente' }) as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 });
+    expect(next.mock.calls[0][0].code).toBeUndefined(); expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it('does not claim non-application when access fails before checking the key', async () => {
+    mocks.ticket.mockResolvedValueOnce(null);
+    const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'Respuesta pendiente' }) as never, response() as never, next);
+    expect(next).toHaveBeenCalled(); expect(next.mock.calls[0][0].code).toBeUndefined(); expect(mocks.event).not.toHaveBeenCalled();
+  });
+
+  it('withdraws an absent key durably without changing workflow, messages or notices', async () => {
+    const res = response(), next = vi.fn(); await recuperarAccionTicket(request() as never, res as never, next);
+    expect(next).not.toHaveBeenCalled(); expect(mocks.lock).toHaveBeenCalledOnce();
+    expect(mocks.event).toHaveBeenCalledWith({ where: { ticketId_usuarioId_clienteId: { ticketId: 'ticket', usuarioId: 'owner', clienteId: 'request123' } } });
+    expect(mocks.createEvent).toHaveBeenCalledWith({ data: expect.objectContaining({ accion: 'ENVIO_RETIRADO', version: 2, interno: true, estadoAnterior: 'EN_CURSO', estadoNuevo: 'EN_CURSO' }) });
+    expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.createMessage).not.toHaveBeenCalled(); expect(mocks.createNotices).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'ticket', version: 2, status: 'rejected', replay: false } });
+  });
+  it('returns the original receipt when application won the lock first', async () => {
+    mocks.event.mockResolvedValueOnce({ accion: 'NOTA', version: 1 });
+    const res = response(); await recuperarAccionTicket(request() as never, res as never, vi.fn());
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'ticket', version: 1, status: 'confirmed', replay: true } });
+    expect(mocks.createEvent).not.toHaveBeenCalled();
+  });
+  it('repeats withdrawal without another technical event', async () => {
+    mocks.event.mockResolvedValueOnce({ accion: 'ENVIO_RETIRADO', version: 2 });
+    const res = response(); await recuperarAccionTicket(request() as never, res as never, vi.fn());
+    expect(res.json.mock.calls[0][0].data.status).toBe('rejected'); expect(mocks.createEvent).not.toHaveBeenCalled();
+  });
+  it('prevents a delayed action from applying after its key was withdrawn', async () => {
+    mocks.event.mockResolvedValueOnce({ accion: 'ENVIO_RETIRADO', huella: '', version: 2 });
+    const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'Respuesta tardía' }) as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409, code: 'SUPPORT_ACTION_NOT_APPLIED' });
+    expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.createMessage).not.toHaveBeenCalled();
+  });
+  it('refuses recovery for another actor ticket without creating a receipt', async () => {
+    const next = vi.fn(); await recuperarAccionTicket(request({}, { ...user, id: 'foreign' }) as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 404 }); expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+  it('does not acknowledge withdrawal if the receipt transaction fails', async () => {
+    mocks.createEvent.mockRejectedValueOnce(new Error('DB unavailable'));
+    const next = vi.fn(), res = response(); await recuperarAccionTicket(request() as never, res as never, next);
+    expect(next).toHaveBeenCalled(); expect(res.json).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,5 @@
+import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
+import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Transportista Detail Page
  * ======================================
@@ -37,6 +39,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
+import { ActorDocuments } from '../../components/ActorDocuments';
 import {
   useTransportista,
   useCreateVehiculo,
@@ -48,11 +51,12 @@ import {
 } from '../../hooks/useActores';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
+import { actorInspectionAccess } from '../../utils/actorReadAccess';
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorSummary } from '../../components/ActorSummary';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
@@ -66,6 +70,7 @@ const TransportistaDetallePage: React.FC = () => {
   // Removed isMobile — React Router handles basename
   const { isAdmin, currentUser } = useAuth();
   const mp = useMobilePrefix();
+  const detailTabs = useActorDetailNavigation(["info","flota","documentos","historial"].concat(actorInspectionAccess(currentUser, 'TRANSPORTISTA', id) ? ['inspecciones'] : []));
   const showInspections = Boolean(actorInspectionAccess(currentUser, 'TRANSPORTISTA', id));
 
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
@@ -80,7 +85,7 @@ const TransportistaDetallePage: React.FC = () => {
   const [flotaSort, setFlotaSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [choferSort, setChoferSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  const { data: apiTransportista, isLoading } = useTransportista(id || '');
+  const { data: apiTransportista, isLoading, refetch } = useTransportista(id || '');
   const createVehiculo = useCreateVehiculo();
   const createChofer = useCreateChofer();
   const updateVehiculo = useUpdateVehiculo();
@@ -154,7 +159,9 @@ const TransportistaDetallePage: React.FC = () => {
     return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  const backPath = actorReturnPath(location.state, mp(isAdmin || currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? '/admin/actores/transportistas' : '/dashboard'));
+  const actorNavigation = useActorNavigation();
+  const backPath = actorNavigation?.backPath || mp('/dashboard');
+  const backLabel = actorNavigation?.backLabel || 'Volver a Inicio';
 
   const openCreateVehiculo = () => {
     if (!isAdmin) return;
@@ -305,7 +312,7 @@ const TransportistaDetallePage: React.FC = () => {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
         </div>
         <Card className="py-12">
           <div className="text-center">
@@ -317,7 +324,7 @@ const TransportistaDetallePage: React.FC = () => {
     );
   }
 
-  if (!transportista) return null;
+  if (!transportista) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} backLabel={backLabel} />;
 
   const habVencimiento = transportista.vencimientoHab !== '-' ? new Date(transportista.vencimientoHab) : null;
   const diasHastaVencimiento = habVencimiento ? Math.ceil((habVencimiento.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
@@ -343,7 +350,7 @@ const TransportistaDetallePage: React.FC = () => {
       {/* Header */}
       <div className="space-y-2">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-          Volver
+          {backLabel}
         </Button>
         <div className="flex items-center gap-3">
           <MapCategorySymbol category="transportista" size="hero" />
@@ -366,26 +373,22 @@ const TransportistaDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`))}>Editar datos del padrón</Button>}
+      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="TRANSPORTISTA" actorId={id || ''} />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Vehículos</p>
-          <p className="text-3xl font-bold text-neutral-900">{transportista.flota.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Conductores</p>
-          <p className="text-3xl font-bold text-neutral-900">{transportista.conductores.length}</p>
-        </Card>
-      </div>
+      {detailTabs.activeTab === 'info' && <section aria-label="Resumen del transportista">
+        <ActorSummary items={[
+          { key: 'vehiculos', label: 'Vehículos', value: transportista.flota.length },
+          { key: 'conductores', label: 'Conductores', value: transportista.conductores.length },
+        ]} />
+      </section>}
 
       {/* Tabs */}
-      <Tabs defaultTab="info" variant="default">
+      <Tabs {...detailTabs} variant="default">
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
+          <Tab id="documentos" icon={<FileText size={16} />}>Documentos</Tab>
           {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
@@ -721,6 +724,10 @@ const TransportistaDetallePage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabPanel>
+
+        <TabPanel id="documentos">
+          <ActorDocuments actorType="TRANSPORTISTA" actorId={id || ''} cuit={transportista.cuit} />
         </TabPanel>
 
         {/* Tab: Trazabilidad */}

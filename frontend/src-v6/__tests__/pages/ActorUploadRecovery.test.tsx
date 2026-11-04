@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NuevoGeneradorPage from '../../pages/admin/NuevoGeneradorPage';
 import NuevoOperadorPage from '../../pages/admin/NuevoOperadorPage';
 
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'admin-qa', rol: 'ADMIN' } }) }));
+
 const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), upload: vi.fn(), navigate: vi.fn() }));
-vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn(), clear: vi.fn(), assertSession: vi.fn() }) }));
+vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn().mockResolvedValue(true), clear: vi.fn().mockResolvedValue(true), assertSession: vi.fn() }) }));
 vi.mock('react-router-dom', async importOriginal => ({
   ...await importOriginal<typeof import('react-router-dom')>(), useNavigate: () => mocks.navigate,
 }));
@@ -83,6 +85,7 @@ for (const actor of [
     mocks.create.mockReturnValue(new Promise(resolve => { finish = resolve; }));
     const button = prepare();
     act(() => { fireEvent.click(button); fireEvent.click(button); });
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
     const count = mocks.create.mock.calls.length;
     finish({ id: 'created-actor' });
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalled());

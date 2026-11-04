@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { Inspection, InspectionEvent } from '../../types/inspection';
 import { Button } from '../../components/ui/ButtonV2';
+import { isInspectionFollowUp } from './inspectionProcess';
 
 type EventInput = {
   tipo: 'COMENTARIO_INTERNO' | 'NOTIFICACION_PREPARADA';
@@ -69,14 +70,14 @@ function eventPresentation(event: InspectionEvent): {
   };
 }
 
-function deadlinePresentation(value?: string | null) {
+function deadlinePresentation(value: string | null | undefined, active: boolean) {
   if (!value) return null;
   const deadline = new Date(value);
   if (Number.isNaN(deadline.getTime())) return null;
-  const expired = deadline.getTime() < Date.now();
+  const expired = active && deadline.getTime() < Date.now();
   return {
     expired,
-    label: deadline.toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' }),
+    label: deadline.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', dateStyle: 'medium', timeStyle: 'short' }), historical: !active,
   };
 }
 
@@ -92,7 +93,7 @@ export function InspectionTimeline({ inspection, canComment, busy, onAdd }: {
   const [recipient, setRecipient] = useState('');
   const [file, setFile] = useState<File | undefined>();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const deadline = deadlinePresentation(inspection.plazoRespuestaAt);
+  const deadline = deadlinePresentation(inspection.plazoRespuestaAt, isInspectionFollowUp(inspection.estado));
 
   const eventCounts = useMemo(() => inspection.eventos.reduce((counts, event) => {
     counts.total += 1;
@@ -125,7 +126,7 @@ export function InspectionTimeline({ inspection, canComment, busy, onAdd }: {
           <div className="col-span-2 rounded-lg bg-neutral-100 px-3 py-2 sm:col-span-1"><span className="font-extrabold text-neutral-700">{eventCounts.internal}</span><span className="ml-1 text-neutral-600">Internos</span></div>
         </div>
 
-        {deadline && <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs ${deadline.expired ? 'border-error-200 bg-error-50 text-error-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><CalendarClock size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>Plazo del expediente:</strong> {deadline.label}{deadline.expired ? ' · vencido' : ' · vigente'}</span></div>}
+        {deadline && <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs ${deadline.historical ? 'border-neutral-200 bg-neutral-50 text-neutral-700' : deadline.expired ? 'border-error-200 bg-error-50 text-error-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><CalendarClock size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>{deadline.historical ? 'Último plazo registrado · histórico:' : 'Plazo del expediente:'}</strong> {deadline.label} · Mendoza{deadline.historical ? '' : deadline.expired ? ' · vencido' : ' · vigente'}</span></div>}
       </div>
 
       {open && <div className="space-y-3 border-b border-neutral-200 bg-neutral-50 p-4 sm:p-5">

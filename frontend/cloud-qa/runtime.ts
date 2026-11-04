@@ -1,13 +1,18 @@
 import { Server } from 'node:net';
-import { assertCloudDatabase, backendRequire, root } from './safety.ts';
-import path from 'node:path';
+import { assertCloudDatabase, backendRequire } from './safety.ts';
+import { qaBackendEntry } from './rollback-backend.ts';
 
 await assertCloudDatabase();
 // Production entrypoint is unchanged; only its QA listener is bound to loopback.
 const listen = Server.prototype.listen;
 Server.prototype.listen = function (...args: unknown[]) {
-  if(args[0]===3037 && typeof args[1]!=='string')args.splice(1,0,'127.0.0.1');
+  if(args[0]===3037) {
+    // Optional second API for bounded cross-process concurrency tests. Both
+    // listeners remain private and share the same cgroup/database guardrails.
+    if(process.env.QA_SECONDARY_LISTENER==='true') args[0]=3038;
+    if(typeof args[1]!=='string')args.splice(1,0,'127.0.0.1');
+  }
   return Reflect.apply(listen,this,args);
 } as typeof Server.prototype.listen;
 console.log('Cloud QA safety PASS: isolated DB, loopback and external delivery disabled');
-backendRequire(path.join(root,'backend/dist/index.js'));
+backendRequire(qaBackendEntry());

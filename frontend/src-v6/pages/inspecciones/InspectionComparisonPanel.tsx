@@ -15,7 +15,9 @@ const OPTIONS: Array<{ value: InspectionComparisonResult; label: string; icon: R
 ];
 const BLOCK_SIZE = 6;
 
-export function InspectionComparisonPanel({ inspectionId, comparisons, declaredDocuments = [], editable, onChange, onEvidence, embedded = false, onSave, saving = false, saveStatus, saveDisabled = false }: {
+export function InspectionComparisonPanel({ inspectionId, comparisons, declaredDocuments = [], editable, onChange, onEvidence, embedded = false, flat = false, onSave, saving = false, saveStatus, saveDisabled = false }: {
+  /** One flat list: every group open, a row's detail shown by its content or an explicit tap, nothing collapses on its own. */
+  flat?: boolean;
   inspectionId: string;
   comparisons: InspectionComparison[];
   declaredDocuments?: InspectionDeclaredDocument[];
@@ -35,6 +37,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
   // Independent groups do not collapse content above the inspector's finger.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(groups.slice(0, 1)));
   const [expandedRow, setExpandedRow] = useState<{ id: string; hash: string } | null>(null);
+  const [manuallyOpened, setManuallyOpened] = useState<Set<string>>(() => new Set());
   const [indexOpen, setIndexOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -57,7 +60,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
   try { linkedCode = decodeURIComponent(location.hash.slice('#declaracion/'.length)); } catch { /* malformed anchors use the first category */ }
   const linkedRow = location.hash.startsWith('#declaracion/') ? comparisons.find((row) => row.codigo === linkedCode) : undefined;
   const linkedRowId = linkedRow?.id;
-  const groupIsOpen = (group: string) => expandedGroups.has(group) || linkedRow?.categoria === group;
+  const groupIsOpen = (group: string) => flat || expandedGroups.has(group) || linkedRow?.categoria === group;
   const blockFor = (group: string, rows: InspectionComparison[]) => linkedRow?.categoria === group
     ? Math.floor(rows.findIndex((row) => row.id === linkedRow.id) / BLOCK_SIZE)
     : Math.min(blockByGroup[group] || 0, Math.max(0, Math.ceil(rows.length / BLOCK_SIZE) - 1));
@@ -75,6 +78,8 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
   };
   const openComparison = (row?: InspectionComparison, align = true) => {
     if (!row) return;
+    // Flat list: the index scrolls to the row (the inspector asked for it); nothing else moves.
+    if (flat) { setIndexOpen(false); setIndexQuery(''); setManuallyOpened((current) => new Set(current).add(row.id)); document.getElementById('comparison-' + row.id)?.scrollIntoView?.({ block: 'start' }); return; }
     preserveAnchor.current = !align ? preserveInspectionAnchor(document.getElementById('comparison-' + row.id)) : null;
     setSelectedRows([]);
     setReviewSelection(false);
@@ -106,6 +111,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
     };
   }, [indexOpen]);
   useLayoutEffect(() => {
+    if (flat) return;
     if (pendingScrollHash.current !== null && pendingScrollHash.current !== location.hash) return;
     if (pendingScrollHash.current === null && handledScrollHash.current === location.hash) return;
     pendingScrollHash.current = null;
@@ -116,7 +122,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
     return () => cancelAnimationFrame(frame);
   }, [linkedRowId, location.hash, expandedGroups, expandedRow, comparisons]);
   useLayoutEffect(() => {
-    if (!blockRevealId) return;
+    if (flat || !blockRevealId) return;
     const frame = requestAnimationFrame(() => {
       revealInspectionAnchor(document.getElementById('comparison-' + blockRevealId));
       setBlockRevealId(null);
@@ -194,7 +200,8 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
 
   return (
     <section className={embedded ? "min-w-0 bg-white" : "rounded-xl border border-neutral-200 bg-white"}>
-      {embedded && <div className="border-b border-neutral-300 pb-4"><h2 className="flex items-center gap-2 text-base font-bold text-primary-900"><FileSearch size={20} aria-hidden="true" />Contraste con lo declarado</h2><p className="mb-3 mt-1 text-sm text-neutral-700">Compará el registro con lo que verificaste en el lugar.</p><p className="text-sm font-semibold text-neutral-800">{completed} de {comparisons.length} revisados{differences > 0 && <span className="text-error-800"> · {differences} diferencias</span>}</p><div role="progressbar" aria-label="Datos declarados revisados" aria-valuemin={0} aria-valuemax={comparisons.length} aria-valuenow={completed} className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-700" style={{ width: `${100 * completed / Math.max(1, comparisons.length)}%` }} /></div></div>}
+      {embedded && flat && <p className="border-b border-neutral-300 pb-3 text-sm font-semibold text-neutral-700">Lo declarado al abrir el expediente, comparado con lo encontrado · {completed} de {comparisons.length}{differences > 0 && <span className="text-error-800"> · {differences} {differences === 1 ? 'diferencia' : 'diferencias'}</span>}</p>}
+      {embedded && !flat && <div className="border-b border-neutral-300 pb-4"><h2 className="flex items-center gap-2 text-base font-bold text-primary-900"><FileSearch size={20} aria-hidden="true" />Contraste con lo declarado</h2><p className="mb-3 mt-1 text-sm text-neutral-700">Compará el registro con lo que verificaste en el lugar.</p><p className="text-sm font-semibold text-neutral-800">{completed} de {comparisons.length} revisados{differences > 0 && <span className="text-error-800"> · {differences} diferencias</span>}</p><div role="progressbar" aria-label="Datos declarados revisados" aria-valuemin={0} aria-valuemax={comparisons.length} aria-valuenow={completed} className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-700" style={{ width: `${100 * completed / Math.max(1, comparisons.length)}%` }} /></div></div>}
       {!embedded && <div className="border-b border-neutral-200 px-4 py-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -249,18 +256,21 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
         const rows = comparisons.filter((row) => row.categoria === group);
         const open = groupIsOpen(group);
         const activeBlock = blockFor(group, rows);
-        const visibleRows = rows.slice(activeBlock * BLOCK_SIZE, (activeBlock + 1) * BLOCK_SIZE);
+        const visibleRows = flat ? rows : rows.slice(activeBlock * BLOCK_SIZE, (activeBlock + 1) * BLOCK_SIZE);
         const groupDone = rows.filter((row) => row.resultado !== 'PENDIENTE').length;
         return (
           <div key={group} className="mt-5">
-            <button type="button" aria-expanded={open} onClick={(event) => toggleGroup(group, event.currentTarget)} style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-3 text-left sm:px-5">
+            {flat ? <div className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-3 text-left sm:px-5">
+              <span className="flex min-w-0 flex-wrap items-center gap-2.5"><FileSearch size={19} className="shrink-0 text-primary-700" /><span className="font-bold text-[#10213A]">{group}</span><span className="text-xs font-semibold text-neutral-600">{groupDone}/{rows.length} revisados{groupDone < rows.length ? ` · ${rows.length - groupDone} pendientes` : ''}</span></span>
+            </div> : <button type="button" aria-expanded={open} onClick={(event) => toggleGroup(group, event.currentTarget)} style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-3 text-left sm:px-5">
               <span className="flex min-w-0 flex-wrap items-center gap-2.5"><FileSearch size={19} className="shrink-0 text-primary-700" /><span className="font-bold text-[#10213A]">{group}</span><span className="text-xs font-semibold text-neutral-600">{groupDone}/{rows.length} revisados{groupDone < rows.length ? ` · ${rows.length - groupDone} pendientes` : ''}</span></span>
               {open ? <ChevronUp size={18} className="shrink-0" /> : <ChevronDown size={18} className="shrink-0" />}
-            </button>
-            {open && rows.length > BLOCK_SIZE && <p className="px-3 py-3 text-sm text-neutral-700 sm:px-5">Mostrando {activeBlock * BLOCK_SIZE + 1}–{Math.min(rows.length, (activeBlock + 1) * BLOCK_SIZE)} de {rows.length}</p>}
+            </button>}
+            {!flat && open && rows.length > BLOCK_SIZE && <p className="px-3 py-3 text-sm text-neutral-700 sm:px-5">Mostrando {activeBlock * BLOCK_SIZE + 1}–{Math.min(rows.length, (activeBlock + 1) * BLOCK_SIZE)} de {rows.length}</p>}
             {open && bulkMode && editable && <label className="flex min-h-12 items-center gap-3 border-b border-neutral-100 px-4 text-sm text-neutral-700"><input type="checkbox" aria-label={`Seleccionar pendientes de este bloque · ${group}`} className="h-5 w-5 accent-primary-700" checked={visibleRows.some((row) => row.resultado === 'PENDIENTE') && visibleRows.filter((row) => row.resultado === 'PENDIENTE').every((row) => selectedRows.includes(row.id))} onChange={(event) => { const ids = visibleRows.filter((row) => row.resultado === 'PENDIENTE').map((row) => row.id); setReviewSelection(false); setSelectedRows((current) => event.target.checked ? [...new Set([...current, ...ids])] : current.filter((id) => !ids.includes(id))); }} />Seleccionar pendientes de este bloque</label>}
             {open && visibleRows.map((row) => {
-              const expanded = expandedRow?.hash === location.hash ? expandedRow.id === row.id : linkedRow?.id === row.id;
+              const expanded = flat ? row.resultado === 'DIFIERE' || row.resultado === 'NO_VERIFICADO' || Boolean(row.valorObservado) || Boolean(row.observacion) || row.evidencias.length > 0 || manuallyOpened.has(row.id)
+                : expandedRow?.hash === location.hash ? expandedRow.id === row.id : linkedRow?.id === row.id;
               const showFullDeclared = declaredLines(row).length > 1 || (row.valorDeclarado || '').length > 120 || (row.codigo === 'DOC-VIGENTES' && declaredDocuments.length > 0);
               return <article key={row.id} id={'comparison-' + row.id} data-inspection-anchor={'declaracion/' + row.codigo} data-result={row.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`mt-3 rounded-lg border border-l-4 px-3 py-4 sm:px-5 ${row.resultado === 'DIFIERE' ? 'border-error-300 border-l-error-600 bg-error-50/30' : expanded ? 'border-primary-300 border-l-primary-700 bg-primary-50/50' : 'border-neutral-300 border-l-neutral-300 bg-white'}`}>
                 <div className="min-w-0">
@@ -276,7 +286,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
                       return <button key={option.value} type="button" aria-pressed={selected} disabled={!editable} onClick={() => selectResult(row, option.value)} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1 text-center text-sm font-semibold leading-tight transition-colors min-[480px]:min-h-11 min-[480px]:flex-row min-[480px]:gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50'} disabled:cursor-default`}>{option.icon}<span>{option.label}</span></button>;
                     })}
                   </div></>}
-                  {!expanded && <button type="button" aria-expanded={false} aria-controls={'comparison-detail-' + row.id} onClick={() => toggleDetail(row, false)} className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm font-semibold text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.resultado !== 'PENDIENTE' ? editable ? 'Ver o corregir detalle' : 'Ver detalle' : row.observacion || row.valorObservado || row.evidencias.length ? 'Ver detalle y evidencia' : bulkMode ? 'Verificar individualmente' : 'Anotar lo encontrado'}<ChevronDown size={16} /></button>}
+                  {!expanded && (flat ? <button type="button" onClick={() => setManuallyOpened((current) => new Set(current).add(row.id))} className="mt-2 inline-flex min-h-11 items-center rounded-md px-1 text-sm font-semibold text-primary-800 underline">{row.resultado !== 'PENDIENTE' ? 'Ver o corregir lo encontrado' : 'Anotar lo encontrado'}</button> : <button type="button" aria-expanded={false} aria-controls={'comparison-detail-' + row.id} onClick={() => toggleDetail(row, false)} className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm font-semibold text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.resultado !== 'PENDIENTE' ? editable ? 'Ver o corregir detalle' : 'Ver detalle' : row.observacion || row.valorObservado || row.evidencias.length ? 'Ver detalle y evidencia' : bulkMode ? 'Verificar individualmente' : 'Anotar lo encontrado'}<ChevronDown size={16} /></button>)}
                 </div>
                 {expanded && <div id={'comparison-detail-' + row.id} className="mt-3 border-t border-neutral-200 pt-3">
                   <div className={showFullDeclared ? 'grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)] md:items-start' : 'min-w-0'}>
@@ -291,11 +301,11 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
                   {editable && <div className="mt-3 border-t border-neutral-200 pt-3">
                     {!embedded && <p role="status" className={`min-h-5 text-sm leading-snug ${saveStatus?.tone === 'error' ? 'text-error-800' : saveStatus?.tone === 'success' ? 'text-primary-800' : 'text-neutral-700'}`}>{saveStatus?.message || 'Sin guardar en el servidor.'}</p>}
                     <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                      {nextPendingAfter(row) && <button type="button" onClick={() => openComparison(nextPendingAfter(row))} className="min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 sm:w-auto">Siguiente pendiente</button>}
+                      {!flat && nextPendingAfter(row) && <button type="button" onClick={() => openComparison(nextPendingAfter(row))} className="min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 sm:w-auto">Siguiente pendiente</button>}
                       {!embedded && onSave && <button type="button" disabled={saving || saveDisabled} onClick={() => void onSave()} className="min-h-12 w-full rounded-lg bg-primary-700 px-4 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto">{saving ? 'Guardando…' : 'Guardar cambios'}</button>}
                     </div>
                   </div>}
-                  <button type="button" aria-expanded={true} aria-controls={'comparison-detail-' + row.id} onClick={() => toggleDetail(row, true)} className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm font-semibold text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Ocultar detalle<ChevronUp size={16} /></button>
+                  {!flat && <button type="button" aria-expanded={true} aria-controls={'comparison-detail-' + row.id} onClick={() => toggleDetail(row, true)} className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm font-semibold text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Ocultar detalle<ChevronUp size={16} /></button>}
                 </div>}
               </article>;
             })}

@@ -36,6 +36,14 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Safe content')).toBeInTheDocument();
   });
 
+  it('explains an unavailable screen and avoids retrying a cached failed import', () => {
+    function UnavailableScreen(): never { throw new TypeError('Failed to fetch dynamically imported module: /assets/LoginPage.js'); }
+    render(<ErrorBoundary><UnavailableScreen /></ErrorBoundary>);
+    expect(screen.getByRole('heading',{name:'No pudimos abrir esta pantalla'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Recargar página'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Intentar de nuevo'})).not.toBeInTheDocument();
+  });
+
   it('renders fallback UI when a child throws', () => {
     shouldThrow = true;
     render(

@@ -12,6 +12,8 @@ vi.mock('../../lib/prisma', () => {
     vehiculo: { deleteMany: mocks.deleteChildren }, chofer: { deleteMany: mocks.deleteChildren },
     agenteSoporte: { deleteMany: mocks.deleteAgent },
     emailQueue: { create: vi.fn() },
+    solicitudInscripcion: { count: vi.fn().mockResolvedValue(0) }, responsableEmpresa: { count: vi.fn().mockResolvedValue(0) },
+    autorizacionEmpresa: { count: vi.fn().mockResolvedValue(0) }, eventoEmpresa: { count: vi.fn().mockResolvedValue(0) },
     manifiesto: { count: mocks.businessCount }, ticketSoporte: { count: mocks.ticketCount },
     mensajeSoporte: { count: mocks.messageCount }, eventoSoporte: { count: mocks.eventCount }, $queryRaw: mocks.lock };
   mocks.transaction.mockImplementation(callback => callback(db));
@@ -50,5 +52,10 @@ describe('support history must not cause a partial account/actor deletion', () =
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400 });
     expect(next.mock.calls[0][0].message).toMatch(/referencias pendientes/);
     // Actual PostgreSQL rollback is measured separately by the HTTP integration.
+  });
+  it('preserves the shared identity when another actor activity exists', async () => {
+    mocks.ticketCount.mockResolvedValue(0); mocks.findUser.mockResolvedValue({ generador: actor, operador: { id: 'other' } });
+    const next=vi.fn(); await deleteGenerador(request as never,response() as never,next);
+    expect(next.mock.calls[0][0].message).toMatch(/varias actividades/); expect(mocks.deleteActor).not.toHaveBeenCalled();
   });
 });

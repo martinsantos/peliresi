@@ -23,19 +23,21 @@ interface Transition {
 }
 
 const STATES: State[] = [
-  { id: 'BORRADOR',       label: 'Borrador',       color: '#F3F4F6', textColor: '#374151', description: 'Manifiesto creado, pendiente de firma' },
-  { id: 'APROBADO',       label: 'Aprobado',        color: '#DBEAFE', textColor: '#1E40AF', description: 'Firmado por el generador, listo para retiro' },
-  { id: 'EN_TRANSITO',    label: 'En Tránsito',     color: '#FFF7ED', textColor: '#9A3412', description: 'Transportista retiró el residuo, GPS activo' },
+  { id: 'BORRADOR',       label: 'Borrador',       color: '#F3F4F6', textColor: '#374151', description: 'Borrador anterior: revisá si puede firmarse o requiere una nueva propuesta' },
+  { id: 'PENDIENTE_APROBACION', label: 'Pendiente de aprobación', color: '#FEF3C7', textColor: '#92400E', description: 'Propuesta presentada: cada parte confirma desde su propia cuenta' },
+  { id: 'APROBADO',       label: 'Aprobado',        color: '#DBEAFE', textColor: '#1E40AF', description: 'Tres aprobaciones completas en ambas modalidades para las propuestas nuevas. Después se inicia la coordinación, antes del retiro o la recepción en origen' },
+  { id: 'EN_TRANSITO',    label: 'En Tránsito',     color: '#FFF7ED', textColor: '#9A3412', description: 'Transportista confirmó el retiro. Revisá el permiso de ubicación y el último punto recibido para comprobar el GPS' },
   { id: 'ENTREGADO',      label: 'Entregado',       color: '#FEF3C7', textColor: '#92400E', description: 'Llegó a la planta del operador' },
-  { id: 'RECIBIDO',       label: 'Recibido',        color: '#D1FAE5', textColor: '#065F46', description: 'Operador confirmó recepción y pesaje' },
+  { id: 'RECIBIDO',       label: 'Recibido',        color: '#D1FAE5', textColor: '#065F46', description: 'Operador confirmó la recepción; el pesaje se registra por separado' },
   { id: 'EN_TRATAMIENTO', label: 'En Tratamiento',  color: '#E0E7FF', textColor: '#3730A3', description: 'Proceso de tratamiento en curso' },
-  { id: 'TRATADO',        label: 'Tratado',         color: '#A7F3D0', textColor: '#064E3B', description: 'Disposición final completa — certificado emitido' },
-  { id: 'RECHAZADO',      label: 'Rechazado',       color: '#FEE2E2', textColor: '#991B1B', description: 'Operador rechazó la carga al recibirla' },
-  { id: 'CANCELADO',      label: 'Cancelado',       color: '#F3F4F6', textColor: '#6B7280', description: 'Manifiesto cancelado antes del cierre' },
+  { id: 'TRATADO',        label: 'Tratado',         color: '#A7F3D0', textColor: '#064E3B', description: 'Tratamiento cerrado. El operador emite el certificado final por separado, con las adendas resueltas y las corrientes halladas completamente tratadas' },
+  { id: 'RECHAZADO',      label: 'Rechazado',       color: '#FEE2E2', textColor: '#991B1B', description: 'Una parte rechazó su participación o el operador rechazó la carga. El historial indica el motivo' },
+  { id: 'CANCELADO',      label: 'Cancelado',       color: '#F3F4F6', textColor: '#4B5563', description: 'Manifiesto cancelado antes del cierre' },
 ];
 
 const TRANSITIONS: Transition[] = [
-  { from: 'BORRADOR',       to: 'APROBADO',       label: 'Firmar',            roles: 'GENERADOR / ADMIN' },
+  { from: 'PENDIENTE_APROBACION', to: 'APROBADO', label: 'Aprobar la participación', roles: 'Generador + Transporte + Operador' },
+  { from: 'BORRADOR',       to: 'APROBADO',       label: 'Firma anterior (si está habilitada)', roles: 'GENERADOR / ADMIN' },
   { from: 'APROBADO',       to: 'EN_TRANSITO',    label: 'Confirmar Retiro',  roles: 'TRANSPORTISTA / ADMIN' },
   { from: 'EN_TRANSITO',    to: 'ENTREGADO',      label: 'Confirmar Entrega', roles: 'TRANSPORTISTA / ADMIN' },
   { from: 'ENTREGADO',      to: 'RECIBIDO',       label: 'Confirmar Recepción', roles: 'OPERADOR / ADMIN' },
@@ -50,8 +52,8 @@ const stateById = Object.fromEntries(STATES.map(s => [s.id, s]));
 const WorkflowDiagram: React.FC = () => {
   const [activeState, setActiveState] = useState<string | null>(null);
 
-  const mainFlow = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
-  const sideStates = ['RECHAZADO', 'CANCELADO'];
+  const mainFlow = ['PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
+  const sideStates = ['BORRADOR', 'RECHAZADO', 'CANCELADO'];
 
   const getActiveTransitions = (stateId: string) =>
     TRANSITIONS.filter(t => t.from === stateId || t.to === stateId);
@@ -60,6 +62,7 @@ const WorkflowDiagram: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-neutral-700">En las propuestas nuevas con traslado, las tres partes aprueban desde sus cuentas. En origen también aprueban generador, transporte y operador; luego inician la coordinación y el operador confirma la recepción, sin viaje ni GPS. Los registros anteriores conservan sus decisiones; algunos borradores pueden requerir una nueva propuesta.</p>
       {/* Main flow */}
       <div className="flex flex-wrap items-center gap-2">
         {mainFlow.map((stateId, idx) => {
@@ -72,9 +75,11 @@ const WorkflowDiagram: React.FC = () => {
           return (
             <React.Fragment key={stateId}>
               <button
+                type="button"
                 onClick={() => setActiveState(isActive ? null : stateId)}
+                aria-pressed={isActive}
                 className={`
-                  px-3 py-2 rounded-lg font-semibold text-sm border-2 transition-all duration-200
+                  min-h-11 px-3 py-2 rounded-lg font-semibold text-sm border-2 transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700
                   ${isActive ? 'scale-105 shadow-md border-current' : 'border-transparent hover:border-current hover:scale-102'}
                   ${!activeState || isActive || isRelated ? 'opacity-100' : 'opacity-40'}
                 `}
@@ -104,9 +109,11 @@ const WorkflowDiagram: React.FC = () => {
           return (
             <button
               key={stateId}
+              type="button"
               onClick={() => setActiveState(isActive ? null : stateId)}
+              aria-pressed={isActive}
               className={`
-                px-3 py-1.5 rounded-lg font-semibold text-sm border-2 transition-all duration-200
+                min-h-11 px-3 py-1.5 rounded-lg font-semibold text-sm border-2 transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700
                 ${isActive ? 'scale-105 shadow-md border-current' : 'border-transparent hover:border-current'}
                 ${!activeState || isActive || isRelated ? 'opacity-100' : 'opacity-40'}
               `}
@@ -131,7 +138,7 @@ const WorkflowDiagram: React.FC = () => {
           <p className="text-sm text-neutral-700 mb-3">{activeInfo.description}</p>
           <div className="space-y-1">
             {getActiveTransitions(activeState!).map((t, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs text-neutral-600">
+              <div key={i} className="flex flex-wrap items-center gap-2 text-xs text-neutral-700">
                 <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded">
                   {t.from === activeState ? `→ ${stateById[t.to]?.label}` : `← ${stateById[t.from]?.label}`}
                 </span>
@@ -144,7 +151,7 @@ const WorkflowDiagram: React.FC = () => {
       )}
 
       {!activeState && (
-        <p className="text-xs text-neutral-400">Haz clic en un estado para ver sus transiciones</p>
+        <p className="text-xs text-neutral-400">Elegí un estado para ver sus transiciones</p>
       )}
     </div>
   );

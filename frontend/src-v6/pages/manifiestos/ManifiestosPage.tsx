@@ -1,3 +1,7 @@
+import { manifestProposalsVisible } from '../../utils/manifestFeatures';
+import { ManifestAgenda } from './components/ManifestAgenda';
+import { PageToolbar } from '../../components/ui/PageToolbar';
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiestos Page
  * ============================
@@ -6,10 +10,10 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
-  ShieldCheck, Download, FileDown, Printer, Calendar, RefreshCw,
+  ShieldCheck, Download, FileDown, Printer, Calendar, RefreshCw, Clock3, Route, CircleCheck,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -20,7 +24,7 @@ import { toast } from '../../components/ui/Toast';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useAuth } from '../../contexts/AuthContext';
-import { canOfferManifestDelete } from '../../utils/manifestActions';
+import { canOfferManifestCreate, canOfferManifestDelete, canOfferManifestEdit } from '../../utils/manifestActions';
 import { useGeneradores } from '../../hooks/useGeneradores';
 import { useOperadores } from '../../hooks/useOperadores';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -109,24 +113,50 @@ function mapRow(m: any): MRow {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-const ManifiestosPage: React.FC = () => {
+const ManifestList: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const updateFilters = (values: Record<string, string>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value); else next.delete(key);
+    }
+    setSearchParams(next, { replace: true });
+  };
+  // Router transitions can update the address before rows re-render. Capture
+  // the current query at the click, including a fast click after filtering.
+  const listState = () => ({ manifestListReturn: location.pathname + window.location.search });
+  const openManifestLink = (event: React.MouseEvent, id: string) => {
+    event.stopPropagation();
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    navigate(mp(`/manifiestos/${id}`), { state: listState() });
+  };
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [estadoFilter, setEstadoFilter] = useState(searchParams.get('estado') || '');
-  const [fechaDesde, setFechaDesde] = useState(searchParams.get('fechaDesde') || '');
-  const [fechaHasta, setFechaHasta] = useState(searchParams.get('fechaHasta') || '');
-  const [generadorFilter, setGeneradorFilter] = useState('');
-  const [operadorFilter, setOperadorFilter] = useState('');
+  const searchTerm = searchParams.get('q') || '';
+  const setSearchTerm = (value: string) => updateFilters({ q: value });
+  const estadoFilter = searchParams.get('estado') || '';
+  const setEstadoFilter = (value: string) => updateFilters({ estado: value, fase: '' });
+  const rawPhase = searchParams.get('fase');
+  const faseFilter = rawPhase === 'pendientes' || rawPhase === 'en_curso' || rawPhase === 'terminados' ? rawPhase : 'all';
+  const fechaDesde = searchParams.get('fechaDesde') || '';
+  const setFechaDesde = (value: string) => updateFilters({ fechaDesde: value });
+  const fechaHasta = searchParams.get('fechaHasta') || '';
+  const setFechaHasta = (value: string) => updateFilters({ fechaHasta: value });
+  const generadorFilter = searchParams.get('generadorId') || '';
+  const setGeneradorFilter = (value: string) => updateFilters({ generadorId: value });
+  const operadorFilter = searchParams.get('operadorId') || '';
+  const setOperadorFilter = (value: string) => updateFilters({ operadorId: value });
   const [showFilters, setShowFilters] = useState(false);
 
   // Sort
-  const [sortBy, setSortBy] = useState<SortCol>('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const rawSort = searchParams.get('sortBy');
+  const sortBy: SortCol = rawSort && ['createdAt', 'numero', 'estado', 'generador', 'operador'].includes(rawSort) ? rawSort as SortCol : 'createdAt';
+  const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
   // Infinite scroll
   const [page, setPage] = useState(1);
@@ -160,20 +190,15 @@ const ManifiestosPage: React.FC = () => {
   }, []);
 
   const handleSort = (col: SortCol) => {
-    if (sortBy === col) {
-      setSortOrder(o => o === 'desc' ? 'asc' : 'desc');
-    } else {
-      setSortBy(col);
-      setSortOrder('desc');
-    }
+    updateFilters({ sortBy: col, sortOrder: sortBy === col && sortOrder === 'desc' ? 'asc' : 'desc' });
   };
 
-  const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter].filter(Boolean).length;
+  const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter, faseFilter !== 'all' ? faseFilter : ''].filter(Boolean).length;
   const estadoOptions = [{ value: '', label: 'Todos los estados' }, ...Object.values(EstadoManifiesto).map((e) => ({ value: e, label: ESTADO_LABELS[e] || e }))];
-  const showEventuales = import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '');
+  const showEventuales = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED, currentUser) && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '');
 
   // Reset accumulator when any filter/sort changes
-  const filterKey = `${searchTerm}|${estadoFilter}|${generadorFilter}|${operadorFilter}|${fechaDesde}|${fechaHasta}|${sortBy}|${sortOrder}`;
+  const filterKey = `${searchTerm}|${estadoFilter}|${faseFilter}|${generadorFilter}|${operadorFilter}|${fechaDesde}|${fechaHasta}|${sortBy}|${sortOrder}`;
   useEffect(() => {
     setPage(1);
     setAllRows([]);
@@ -187,6 +212,7 @@ const ManifiestosPage: React.FC = () => {
   const { data: apiData, isLoading, isFetching, isError, refetch } = useManifiestos({
     search: searchTerm || undefined,
     estado: (estadoFilter || undefined) as EstadoManifiesto | undefined,
+    fase: !estadoFilter && faseFilter !== 'all' ? faseFilter : undefined,
     generadorId: generadorFilter || undefined,
     operadorId: operadorFilter || undefined,
     fechaDesde: fechaDesde || undefined,
@@ -287,43 +313,41 @@ const ManifiestosPage: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-4" data-operational-page>
       {/* Header — on phones the shell bar already names the page: one compact row of actions. */}
-      <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-4 xl:max-w-7xl xl:mx-auto">
-        <h2 className="sr-only md:not-sr-only text-xl font-bold text-neutral-900">Manifiestos</h2>
-        {showEventuales && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-800 md:order-last md:basis-full md:border-0 md:bg-transparent md:px-0 md:font-medium md:text-primary-700 md:underline" to={mp('/manifiestos/baja-intensidad')}>Eventuales</Link>}
+      <PageToolbar label="Acciones de Manifiestos">
+        {showEventuales && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/manifiestos/baja-intensidad')}>Eventuales</Link>}
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" aria-label="Actualizar listado" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}><span className="sr-only sm:not-sr-only">Actualizar listado</span></Button>
-          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-neutral-600 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir">
-            <Printer size={13} />
-          </button>
-          <button
+          <Button variant="outline" className="max-sm:w-11 max-sm:gap-0 max-sm:px-0" aria-label="Actualizar listado" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}><span className="sr-only sm:not-sr-only">Actualizar listado</span></Button>
+          <Button variant="outline" onClick={() => window.print()} className="hidden w-11 px-0 sm:inline-flex" aria-label="Imprimir listado" title="Imprimir"><Printer size={16} /></Button>
+          <Button variant="outline" leftIcon={<Download size={16} />}
             onClick={() => {
               const headers = ['Numero', 'Generador', 'Operador', 'Estado', 'Actividad', 'Peso', 'Unidad'];
               const rows = allRows.map(m => [m.numero, m.generadorNombre, m.operadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), typeof m.peso === 'number' ? m.peso : 0, m.unidad]);
               downloadCsv(`manifiestos-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows, { titulo: 'Listado de Manifiestos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', filtros: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', total: totalCount });
             }}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors" title="CSV"
-          ><Download size={13} /> CSV</button>
-          <button
+            className="hidden sm:inline-flex" title="Exportar CSV"
+          >CSV</Button>
+          <Button variant="outline" leftIcon={<FileDown size={16} />}
             onClick={() => {
               exportReportePDF({ titulo: 'Listado de Manifiestos', subtitulo: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', kpis: [{ label: 'Cargados', value: allRows.length }, { label: 'Total', value: totalCount }], tabla: { headers: ['Numero', 'Generador', 'Estado', 'Actividad', 'Peso'], rows: allRows.map(m => [m.numero, m.generadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), `${typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} ${m.unidad}`]) } });
             }}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
-          ><FileDown size={13} /> PDF</button>
-          <Button size="sm" aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>
+            className="hidden sm:inline-flex" title="Exportar PDF"
+          >PDF</Button>
+          {canOfferManifestCreate(currentUser?.rol, currentUser?.training) && <Button aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'), { state: listState() })}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>}
         </div>
-      </div>
+      </PageToolbar>
 
-      {/* Filters — sticky. Phones: search + Filtros in one row; state joins the other filters. */}
-      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-1 pb-2 md:pt-2">
+
+      {/* Expanded phone filters scroll away so they cannot cover the results. */}
+      <div ref={filterBarRefCb} className={`${showFilters ? 'relative md:sticky' : 'sticky'} top-0 z-20 bg-[#FAFAF8]`}>
         <Card padding="sm" className="md:p-5">
           <div className="flex gap-2 md:gap-3">
             <div className="min-w-0 flex-1">
               <Input aria-label="Buscar manifiestos" placeholder="Buscar por número o generador..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} leftIcon={<Search size={18} />} />
             </div>
             <div className="hidden md:block md:w-48">
-              <Select value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
+              <Select value={estadoFilter} onChange={setEstadoFilter} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
             </div>
             <button type="button" aria-label={filterCount > 0 ? `Filtros, ${filterCount} activos` : 'Filtros'} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-300 hover:border-neutral-400'}`}>
               <Filter size={15} />
@@ -332,6 +356,18 @@ const ManifiestosPage: React.FC = () => {
               <ChevronDown size={14} className={`hidden sm:block transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
           </div>
+          <nav aria-label="Etapa de los manifiestos" className="mt-3 grid grid-cols-4 gap-1.5">
+            {([
+              ['all', 'Todos', FileText],
+              ['pendientes', 'Por iniciar', Clock3],
+              ['en_curso', 'En curso', Route],
+              ['terminados', 'Terminados', CircleCheck],
+            ] as const).map(([value, label, Icon]) => <button key={value} type="button" aria-pressed={faseFilter === value && !estadoFilter}
+              onClick={() => updateFilters({ fase: value === 'all' ? '' : value, estado: '' })}
+              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] font-semibold sm:flex-row sm:gap-2 sm:text-sm ${faseFilter === value && !estadoFilter ? 'bg-primary-800 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-primary-50'}`}>
+              <Icon size={16} aria-hidden="true" /><span>{label}</span>
+            </button>)}
+          </nav>
           {!showFilters && activeFilters.length > 0 && (
             <ul aria-label="Filtros activos" className="mt-2 flex flex-wrap gap-2">
               {activeFilters.map(filter => (
@@ -346,7 +382,7 @@ const ManifiestosPage: React.FC = () => {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
               <div className="md:hidden">
-                <Select label="Estado" value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
+                <Select label="Estado" value={estadoFilter} onChange={setEstadoFilter} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
               </div>
               <div className="flex flex-col gap-1 w-full sm:w-auto">
                 <label className="text-xs font-medium text-neutral-500">Ordenar por</label>
@@ -367,7 +403,7 @@ const ManifiestosPage: React.FC = () => {
                     />
                   </div>
                   <button
-                    onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                    onClick={() => updateFilters({ sortOrder: sortOrder === 'desc' ? 'asc' : 'desc' })}
                     className="flex items-center gap-1 px-3 py-2 text-sm border border-neutral-200 rounded-xl bg-white hover:bg-neutral-50 transition-colors"
                   >
                     {sortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
@@ -410,14 +446,14 @@ const ManifiestosPage: React.FC = () => {
                 </div>
               </div>
               {filterCount > 0 && (
-                <button type="button" onClick={() => { setEstadoFilter(''); setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
+                <button type="button" onClick={() => updateFilters({ estado: '', fase: '', fechaDesde: '', fechaHasta: '', generadorId: '', operadorId: '' })} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
               )}
             </div>
           )}
         </Card>
       </div>
 
-      <div className="xl:max-w-7xl xl:mx-auto">
+      <div className="min-w-0">
         {/* Initial loading */}
         {isLoading && allRows.length === 0 && (
           <div className="flex items-center justify-center py-12"><Loader2 size={32} className="animate-spin text-primary-500" /></div>
@@ -425,22 +461,22 @@ const ManifiestosPage: React.FC = () => {
 
         {/* ── Mobile Card View ──────────────────────────────── */}
         {allRows.length > 0 && (
-          <div className="md:hidden space-y-1 mt-3 -mx-4 px-4 overflow-visible">
+          <div className="md:hidden space-y-1 -mx-4 px-4 overflow-visible">
             {allRows.map((m, idx) => (
               <React.Fragment key={m.id}>
                 {isGroupStart(idx) && (
-                  <div className="sticky z-10 -mx-4 px-4 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 mt-3 first:mt-0" style={{ top: `${filterBarH}px` }}>
+                  <div className="sticky z-10 -mx-4 px-4 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 mt-3 first:mt-0" style={{ top: showFilters ? 0 : `${filterBarH}px` }}>
                     <div className="flex items-center gap-1.5">
                       <Calendar size={11} className="text-primary-500" />
                       <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">{getGroupLabel(getGroupKey(m, sortBy), sortBy)}</span>
                     </div>
                   </div>
                 )}
-                <Card padding="none" className="cursor-pointer hover:bg-neutral-50 focus-within:bg-neutral-50" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}>
+                <Card padding="none" className="cursor-pointer hover:bg-neutral-50 focus-within:bg-neutral-50" onClick={() => navigate(mp(`/manifiestos/${m.id}`), { state: listState() })}>
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Link to={mp(`/manifiestos/${m.id}`)} onClick={event => event.stopPropagation()} className="font-mono font-semibold text-sm text-neutral-900 hover:underline">{m.numero}</Link>
+                        <Link to={mp(`/manifiestos/${m.id}`)} state={listState()} onClick={event => openManifestLink(event, m.id)} className="font-mono font-semibold text-sm text-neutral-900 hover:underline">{m.numero}</Link>
                         <BcBadge status={m.blockchainStatus} />
                       </div>
                       <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'} className="text-xs shrink-0">
@@ -451,7 +487,7 @@ const ManifiestosPage: React.FC = () => {
                     <div className="flex items-center justify-between mt-1.5">
                       <span className="text-[11px] text-neutral-400">{formatDateTime(m.actividad)}</span>
                       <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                        <Button aria-label={`Ver manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}><Eye size={14} /></Button>
+                        <Button aria-label={`Ver manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`), { state: listState() })}><Eye size={14} /></Button>
                         {canOfferManifestDelete(currentUser?.rol, m.estado) && <Button aria-label={`Eliminar manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1 text-error-700" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>}
                       </div>
                     </div>
@@ -460,13 +496,12 @@ const ManifiestosPage: React.FC = () => {
               </React.Fragment>
             ))}
             {hasMore && <div ref={mobileSentinelRef} className="flex items-center justify-center py-4 gap-2 text-neutral-400">{isFetching && <><Loader2 size={16} className="animate-spin" /><span className="text-xs">Cargando...</span></>}</div>}
-            {!hasMore && allRows.length > 0 && <p className="text-center text-xs text-neutral-400 py-3">{totalCount} manifiestos</p>}
           </div>
         )}
 
         {/* ── Desktop Grid List — div-based so sticky works reliably ── */}
         {allRows.length > 0 && (
-          <div className="hidden md:block mt-3 rounded-xl border border-[#E0E0DC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="hidden md:block rounded-xl border border-[#E0E0DC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div ref={scrollRef} className="overflow-y-auto rounded-xl" style={{ maxHeight: 'calc(100vh - 220px)' }}>
               {/* Column header — sticky */}
               <div ref={theadRefCb} className="sticky top-0 z-10 bg-[#F5F5F3] border-b border-neutral-200 shadow-[0_1px_0_rgba(0,0,0,0.04)] grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1">
@@ -500,10 +535,10 @@ const ManifiestosPage: React.FC = () => {
                   )}
                   <div
                     className="grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1 border-b border-neutral-50 hover:bg-neutral-50/60 cursor-pointer transition-colors"
-                    onClick={() => navigate(mp(`/manifiestos/${m.id}`))}
+                    onClick={() => navigate(mp(`/manifiestos/${m.id}`), { state: listState() })}
                   >
                     <div className="px-3 py-2 flex items-center gap-2 min-w-0">
-                      <Link to={mp(`/manifiestos/${m.id}`)} onClick={event => event.stopPropagation()} className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap hover:underline">{m.numero}</Link>
+                      <Link to={mp(`/manifiestos/${m.id}`)} state={listState()} onClick={event => openManifestLink(event, m.id)} className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap hover:underline">{m.numero}</Link>
                       <BcBadge status={m.blockchainStatus} />
                     </div>
                     <div className="px-3 py-2 text-sm text-neutral-700 truncate" title={m.generadorNombre}>{m.generadorNombre}</div>
@@ -514,8 +549,8 @@ const ManifiestosPage: React.FC = () => {
                     <div className="px-3 py-2 text-xs text-neutral-500 whitespace-nowrap hidden lg:block">{formatDateTime(m.actividad)}</div>
                     <div className="px-3 py-2 text-sm text-neutral-700 whitespace-nowrap hidden lg:block">{typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}</div>
                     <div className="px-3 py-2 flex items-center justify-end gap-0.5">
-                      <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`)); }}><Eye size={15} /></button>
-                      <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>
+                      <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`), { state: listState() }); }}><Eye size={15} /></button>
+                      {canOfferManifestEdit(currentUser?.rol, m.estado) && <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>}
                       {canOfferManifestDelete(currentUser?.rol, m.estado) && <button aria-label={`Eliminar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>}
                     </div>
                   </div>
@@ -528,7 +563,6 @@ const ManifiestosPage: React.FC = () => {
                   {isFetching && <><Loader2 size={16} className="animate-spin" /><span className="text-xs">Cargando más...</span></>}
                 </div>
               )}
-              {!hasMore && allRows.length > 0 && <p className="text-center text-xs text-neutral-400 py-3 border-t border-neutral-100">{totalCount} manifiestos</p>}
             </div>
           </div>
         )}
@@ -554,7 +588,7 @@ const ManifiestosPage: React.FC = () => {
         {/* Status bar */}
         {allRows.length > 0 && (
           <div className="px-3 py-1.5 mt-2 flex items-center gap-2 text-xs text-neutral-400">
-            <span>{allRows.length} de {totalCount}</span>
+            <span>{allRows.length} de {totalCount} {totalCount === 1 ? 'manifiesto' : 'manifiestos'}</span>
             {isFetching && <Loader2 size={12} className="animate-spin" />}
           </div>
         )}
@@ -579,8 +613,23 @@ const ManifiestosPage: React.FC = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
+/** One view at a time; URL filters survive switching and opening a detail. */
+const ManifiestosPage: React.FC = () => {
+  const {currentUser}=useAuth();
+  const [params,setParams]=useSearchParams();
+  const scheduled=manifestProposalsVisible(currentUser)&&params.get('vista')==='programados';
+  return <div className="space-y-4">
+    {manifestProposalsVisible(currentUser)&&<nav aria-label="Vista de manifiestos" className="flex gap-2">
+      {([['listado','Listado'],['programados','Programados']] as const).map(([value,label])=>
+        <button key={value} type="button" aria-pressed={scheduled===(value==='programados')}
+          onClick={()=>{const next=new URLSearchParams(params);if(value==='programados')next.set('vista',value);else next.delete('vista');setParams(next,{replace:true});}}
+          className={`min-h-11 rounded-lg border px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${scheduled===(value==='programados')?'border-primary-800 bg-primary-800 text-white':'border-neutral-200 bg-white text-neutral-700 hover:bg-primary-50'}`}>{label}</button>)}
+    </nav>}
+    {scheduled?<ManifestAgenda/>:<ManifestList/>}
+  </div>;
+};
 export default ManifiestosPage;

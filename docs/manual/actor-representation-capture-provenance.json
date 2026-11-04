@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "browserTestsPassed": 15,
+  "suite": "actor-representation.spec.ts",
+  "attempt": "people-browser",
+  "date": "2026-10-22",
+  "files": [
+    {
+      "file": "desktop/entidad-representantes-20261022.png",
+      "sha256": "0b3211bb5dded7110fc3959844df8a1d29f5d0dff5796f6cb2743f5375e37d94",
+      "width": 1024,
+      "height": 394,
+      "project": "web-desktop",
+      "source": "people-browser/actor-representation-two-r-e1535-y-without-changing-identity-web-desktop/manual-entity-people.png"
+    },
+    {
+      "file": "desktop/entidad-conciliar-cambios-20261022.png",
+      "sha256": "aedbc0d05a7cefd63a8e86bc2ad584f425cf282c88d507f7de0f33b1f7ef6150",
+      "width": 982,
+      "height": 281,
+      "project": "web-desktop",
+      "source": "people-browser/actor-representation-a-rea-b52eb-chooses-how-to-reconcile-it-web-desktop/manual-company-conflict.png"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 /**
- * Calculo TEF - Tasa de Evaluacion y Fiscalizacion
- * Decreto 2625/99 - Ley 5917 (Mendoza)
+ * Fórmula heredada conservada para trazabilidad, NO apta para liquidar ni simular pagos.
+ * Contraste 26/10/2026: difiere del anexo ATM 2026, art. 19 (Z+A, tramos, operadores).
+ * Ver docs/CONCILIACION-TEF-20261026.md. La UI sólo reutiliza las entradas declaradas.
  *
  * Formula: TEF = M x R x ISO_factor
  * Donde:   R = Z x A x D x C
@@ -163,6 +164,7 @@ export interface TEFResult {
   TEF: number;
 }
 
+/** @deprecated No usar para determinar importes; pendiente de conciliación fiscal versionada. */
 export function calcularTEF(input: TEFInput): TEFResult {
   const M = input.m ?? M_COEFICIENTE;
   const zonaObj = ZONAS.find(z => z.id === input.zona);

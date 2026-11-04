@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -74,9 +74,12 @@ export async function nonObstructingNotices(page: Page) {
 /** Page overflow alone misses clipped text in fixed navigation and dialog actions. */
 export async function readableFixedAction(action: Locator, container: Locator) {
   await expect(action).toBeVisible();
-  const containerBounds = await container.boundingBox();
-  expect(containerBounds).not.toBeNull();
+  const containerElement = await container.elementHandle();
+  expect(containerElement).not.toBeNull();
   const result = await action.evaluate((element, parent) => {
+    // Measure both rectangles in the same browser frame. A resize/React layout
+    // update between separate round trips must not compare two viewport sizes.
+    const containerBounds = parent.getBoundingClientRect();
     const bounds = element.getBoundingClientRect();
     const viewport = window.visualViewport;
     const visible = { left: viewport?.offsetLeft ?? 0, top: viewport?.offsetTop ?? 0,
@@ -96,9 +99,10 @@ export async function readableFixedAction(action: Locator, container: Locator) {
     }
     return { name: element.textContent?.trim(), width: bounds.width, height: bounds.height,
       button: { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom }, visible,
-      containedByParent: inside(bounds, { left: parent.x, top: parent.y, right: parent.x + parent.width, bottom: parent.y + parent.height }),
+      containedByParent: parent.isConnected && parent.contains(element) && inside(bounds, containerBounds),
       containedByViewport: inside(bounds, visible), textContained: texts.every(rect => inside(rect, bounds)), texts };
-  }, containerBounds!);
+  }, containerElement!);
+  await containerElement!.dispose();
   expect(result, `Readable fixed action: ${result.name}`).toMatchObject({ containedByParent: true, containedByViewport: true, textContained: true });
   expect(result.height).toBeGreaterThanOrEqual(44);
 }
@@ -148,10 +152,51 @@ export async function readableMapLayers(group: Locator) {
 
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
 
+/** Build the v3 key from this test page's already validated synthetic session.
+ * The token stays in the browser; only the storage key is returned to the test. */
+export async function activeGpsQueueKey(page:Page, owner:string, manifestId:string):Promise<string> {
+  await expect.poll(()=>page.evaluate(()=>{
+    const raw=sessionStorage.getItem('sitrep_offline_session_v1')??localStorage.getItem('sitrep_offline_session_v1');
+    try{return raw?String(JSON.parse(raw).user.id):'';}catch{return '';}
+  })).toBe(String(owner));
+  return page.evaluate(({id,ownerId})=>{
+    const raw=sessionStorage.getItem('sitrep_offline_session_v1')??localStorage.getItem('sitrep_offline_session_v1');
+    const user=JSON.parse(raw!).user,token=localStorage.getItem('sitrep_access_token')!;
+    const part=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const claims=JSON.parse(atob(part.padEnd(Math.ceil(part.length/4)*4,'=')));
+    if(String(user.id)!==String(ownerId)||claims.id!==String(ownerId))throw new Error('QA account scope changed');
+    const baseOwner=claims.restricted||claims.impersonatedBy?null:claims.id;
+    const actRaw=baseOwner?(sessionStorage.getItem('sitrep_activity:'+baseOwner)??localStorage.getItem('sitrep_activity:'+baseOwner)):null;
+    const activity=['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(actRaw||'')?actRaw:null;
+    let company:unknown=null;
+    try {const value=baseOwner?(sessionStorage.getItem('sitrep_company:'+baseOwner)??localStorage.getItem('sitrep_company:'+baseOwner)):null;company=value?JSON.parse(value):null;}catch{company=null;}
+    const request=JSON.stringify([claims.id,claims.rol,claims.impersonatedBy,!!claims.restricted,activity,company]);
+    const selected=user.empresaContexto;
+    const companyScope=selected?`${selected.empresaId}:${selected.actividadId}:${selected.establecimientoId||'todos'}`:'personal';
+    const workspace=JSON.stringify([user.id,user.rol,user.actorId,companyScope,selected?.autorizacionId,selected?.revision,!!user.esInspector,!!user.training]);
+    const scope=JSON.stringify([workspace,request]);
+    return `sitrep_gps_v3_${encodeURIComponent(JSON.stringify([String(ownerId),id,scope]))}`;
+  },{id:manifestId,ownerId:String(owner)});
+}
+
 const fixturePages = new WeakSet<Page>();
-async function isolatedMapTiles(page: Page, info: TestInfo) {
+let consoleCapture = 0;
+export async function isolatedMapTiles(page: Page, info: TestInfo) {
   if (process.env.SITREP_QA_EXECUTOR !== 'preview-container' || fixturePages.has(page)) return;
   fixturePages.add(page);
+  await page.route(/^https?:\/\/(?:sitrep\.ultimamilla\.com\.ar|rptrazar\.mendoza\.gov\.ar)(?:\/|$)/, async route => {
+    await route.abort('blockedbyclient');
+    throw new Error('QA blocked an attempted production request: '+new URL(route.request().url()).pathname);
+  });
+  if (process.env.QA_REVIEW_CONSOLE === 'true') {
+    const capture = consoleCapture++;
+    const events: Array<{type: string; text: string}> = [];
+    const redact = (text: string) => text.replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[JWT omitted]');
+    page.on('console', message => { if (['error', 'warning'].includes(message.type())) events.push({type: message.type(), text: redact(message.text())}); });
+    page.on('pageerror', error => events.push({type: 'uncaught', text: redact(error.message)}));
+    page.on('response', response => { if (response.status() >= 400) events.push({type: 'http-'+response.status(), text: response.request().method()+' '+new URL(response.url()).pathname}); });
+    page.once('close', () => writeFileSync(info.outputPath('console-'+capture+'.json'), JSON.stringify({url: page.url().split('#')[0], events}, null, 2)));
+  }
   const fontRoot=path.resolve(process.env.QA_ARTIFACTS!,'../.qa-fonts');
   const fonts=JSON.parse(readFileSync(path.join(fontRoot,'manifest.json'),'utf8'));
   info.annotations.push({type:'provider-cache',description:'Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography.'});
@@ -162,6 +207,15 @@ async function isolatedMapTiles(page: Page, info: TestInfo) {
     const body=readFileSync(path.join(fontRoot,asset.file));
     expect(createHash('sha256').update(body).digest('hex')).toBe(asset.sha256);
     await route.fulfill({body,contentType:asset.contentType,headers:{'access-control-allow-origin':'*'}});
+  });
+  info.annotations.push({ type: 'provider-fixture', description: 'Artificial addresses receive an explicit empty geocoder result; no address is sent outside the isolated preview. Real geocoding availability is not certified.' });
+  await page.route(/^https:\/\/nominatim\.openstreetmap\.org\/search\?/, async route => {
+    expect(route.request().method()).toBe('GET');
+    const query = new URL(route.request().url()).searchParams;
+    expect(query.get('q')).toBeTruthy();
+    expect(query.get('format')).toBe('json');
+    expect(query.get('countrycodes')).toBe('ar');
+    await route.fulfill({ contentType: 'application/json', body: '[]', headers: { 'access-control-allow-origin': '*' } });
   });
   info.annotations.push({ type: 'provider-fixture', description: 'OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified.' });
   await page.route('https://tile.openstreetmap.org/**', async route => {
