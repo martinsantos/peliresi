@@ -21,6 +21,8 @@ type Props = {
   userId: string; owner: string; role: string; isAdmin: boolean; mobile: boolean; online: boolean;
   initialType: InspectionActorType | ''; initialActor: string; returnState: unknown;
   open: boolean; source: InspectionIntake | null; onOpen: () => void; onClose: () => void;
+  /** `banner: false` deja el aviso de apertura guardada a cargo del padre, que lo recibe por `onStateChange`. */
+  banner?: boolean; onStateChange?: (state: { available: InspectionOpeningDraft | null; error: string }) => void;
 };
 const actorType = (value: string): value is InspectionActorType => ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(value);
 
@@ -35,7 +37,7 @@ function openingValues(role: string, initialType: InspectionActorType | '', init
 
 /** The server remains authoritative. An uncertain opening is replayed with the
  * original bytes and key; no background send or silent replacement is allowed. */
-export function InspectionOpening({ userId, owner, role, isAdmin, mobile, online, initialType, initialActor, returnState, open, source, onOpen, onClose }: Props) {
+export function InspectionOpening({ userId, owner, role, isAdmin, mobile, online, initialType, initialActor, returnState, open, source, onOpen, onClose, banner = true, onStateChange }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<InspectionOpeningDraft | null>(null);
@@ -100,6 +102,7 @@ export function InspectionOpening({ userId, owner, role, isAdmin, mobile, online
     window.addEventListener('focus', refresh); window.addEventListener('storage', refresh);
     return () => { alive.current = false; window.removeEventListener('focus', refresh); window.removeEventListener('storage', refresh); };
   }, [owner, open, active]);
+  useEffect(() => { onStateChange?.({ available, error }); }, [available, error, onStateChange]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (!saved.current) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -197,7 +200,7 @@ export function InspectionOpening({ userId, owner, role, isAdmin, mobile, online
   };
 
   return <>
-    {!open && (available || error) && <div role={error ? 'alert' : 'status'} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-950">
+    {banner && !open && (available || error) && <div role={error ? 'alert' : 'status'} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-950">
       <p>{error || (available?.command?.status === 'confirmed' ? `Apertura confirmada: ${available.command.receipt?.numero}.` : available?.command ? 'Hay una apertura que necesita confirmación.' : 'Hay una apertura guardada en este dispositivo.')}</p>
       {!error && <Button size="sm" variant="outline" onClick={onOpen}>Continuar apertura</Button>}
     </div>}

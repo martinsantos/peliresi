@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import InspeccionesPage from '../../pages/inspecciones/InspeccionesPageV2';
 import { saveInspectionResume } from '../../services/inspectionResume';
+import { inspectionOpeningKey, type InspectionOpeningDraft } from '../../services/inspectionOpeningDraft';
+import { supportRequestContext } from '../../utils/supportSession';
 import type { Inspection } from '../../types/inspection';
 
 const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn() }));
@@ -206,5 +208,55 @@ describe('InspeccionesPage', () => {
     expect(screen.getByRole('link', { name: /Retomar expediente I-2026-000001/ })).toHaveAttribute('href', '/inspecciones/inspection-1#checklist/DOC-01');
     expect(screen.getByRole('button', { name: 'Nueva inspección' })).toBeDisabled();
     expect(screen.queryByText('No hay inspecciones para estos filtros')).not.toBeInTheDocument();
+  });
+  const fieldInspection = {
+    id: 'inspection-1', numero: 'I-2026-000001', numeroActa: null, estado: 'EN_CAMPO', tipoActor: 'GENERADOR', inspectorId: 'admin-1',
+    inspector: { id: 'admin-1', nombre: 'Inspectora' }, generador: { id: 'actor-1', razonSocial: 'Planta QA', cuit: '30-12345678-9' },
+    updatedAt: '2026-09-22T12:00:00.000Z', createdAt: '2026-09-22T12:00:00.000Z', items: [], comparaciones: [], evidencias: [], eventos: [],
+  } as Inspection;
+  const openingOwner = () => JSON.stringify([inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), supportRequestContext()]);
+  const openingDraft = (command?: InspectionOpeningDraft['command']): InspectionOpeningDraft => ({ version: 1, owner: openingOwner(), command,
+    values: { type: 'GENERADOR', actorId: 'actor-1', withoutActor: false, inspectionType: 'GENERADOR', description: '', assignedInspector: '', numeroActa: '', ubicacion: '', fechaProgramada: '', source: null } });
+
+  it('keeps one primary action on the list and moves the secondary ones into a menu', () => {
+    saveInspectionResume('admin-1', 'inspection-1', '#checklist/DOC-01', 'Controles · Documentación', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }));
+    mocks.useInspections.mockReturnValue({ data: { items: [fieldInspection], total: 1, totalPages: 1 }, isLoading: false, isError: false, refetch: mocks.refetch });
+    render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
+    const toolbar = screen.getByLabelText('Acciones de Inspecciones');
+    expect(toolbar.querySelectorAll('button')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Nueva inspección' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Denuncia / hallazgo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar mi inspección en campo' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Retomar expediente I-2026-000001 en Controles · Documentación' })).toHaveAttribute('href', '/inspecciones/inspection-1#checklist/DOC-01');
+    fireEvent.click(screen.getByRole('button', { name: 'Más acciones' }));
+    expect(screen.getByRole('button', { name: 'Denuncia / hallazgo' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Exportar listado' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Cómo funciona PSIP' })).toHaveAttribute('href', '/manual/tutorial.html?guide=psip-flujo-inspecciones');
+    expect(screen.queryByText('Administración de inspectores')).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Secciones de Inspecciones' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: 'Etapas PSIP' })).toBeVisible();
+    expect(screen.getByLabelText('Buscar inspección')).toBeInTheDocument();
+  });
+
+  it('continues a saved opening from the primary action and shows a confirmed one on its own card', async () => {
+    localStorage.setItem(inspectionOpeningKey(openingOwner()), JSON.stringify(openingDraft()));
+    mocks.useInspections.mockReturnValue({ data: { items: [fieldInspection], total: 1, totalPages: 1 }, isLoading: false, isError: false, refetch: mocks.refetch });
+    const view = render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
+    expect(await screen.findByRole('button', { name: 'Continuar apertura' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva inspección' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar apertura' }));
+    expect(await screen.findByRole('dialog', { name: 'Nueva inspección' })).toBeInTheDocument();
+    view.unmount();
+
+    localStorage.setItem(inspectionOpeningKey(openingOwner()), JSON.stringify(openingDraft({ status: 'confirmed', attempts: 1, receipt: { id: 'inspection-1', numero: 'I-2026-000001' },
+      input: { clienteId: '7f1c2a44-3d5e-4b6f-8a9b-0c1d2e3f4a5b', tipoInspeccion: 'GENERADOR', tipoActor: 'GENERADOR', actorId: 'actor-1' } })));
+    render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
+    const note = await screen.findByText('Apertura confirmada en este dispositivo');
+    expect(note.closest('[data-testid="inspection-row-inspection-1"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Nueva inspección' })).toBeEnabled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar apertura' }));
+    expect(await screen.findByRole('dialog', { name: 'Nueva inspección' })).toHaveTextContent('Apertura confirmada · I-2026-000001');
   });
 });

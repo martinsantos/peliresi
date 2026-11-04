@@ -1,8 +1,11 @@
 import { InspectionManagementPanel } from './InspectionManagementPanel';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, MapPin, Plus, Search, SlidersHorizontal, UserRound } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, HelpCircle, MapPin, MoreHorizontal, Plus, Search, SlidersHorizontal, UserRound, Users } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import { DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger } from '../../components/ui/DropdownMenu';
+import { Modal } from '../../components/ui/Modal';
+import type { InspectionOpeningDraft } from '../../services/inspectionOpeningDraft';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
@@ -71,6 +74,12 @@ const InspeccionesPageV2: React.FC = () => {
   const [findingActorType, setFindingActorType] = useState<InspectionActorType>();
   const { isOnline } = useConnectivity({ enablePing: false, debounceMs: 0 });
   const [findingRequest, setFindingRequest] = useState(0);
+  const [managementOpen, setManagementOpen] = useState(false);
+  const [opening, setOpening] = useState<{ available: InspectionOpeningDraft | null; error: string }>({ available: null, error: '' });
+  const managementAllowed = Boolean(isAdmin && import.meta.env.VITE_INSPECTION_FIELD_MODEL_ENABLED === 'true');
+  // Una apertura guardada se continúa con la misma acción principal; el expediente ya confirmado la muestra en su tarjeta.
+  const openingReceipt = !showCreate && opening.available?.command?.status === 'confirmed' ? opening.available.command.receipt : undefined;
+  const openingPending = !showCreate && !opening.error && Boolean(opening.available) && !openingReceipt;
 
   const allowed = Boolean(isAdmin || currentUser?.esJefeInspecciones || currentUser?.esInspector || currentUser?.rol.startsWith('ADMIN_'));
   const listFilters = { estado: state || undefined, estados: phase ? INSPECTION_PHASES[phase].states : undefined, tipoInspeccion: inspectionFilter || undefined, tipoActor: typeFilter || undefined, actorId: actorFilter || undefined, search: search || undefined };
@@ -113,19 +122,26 @@ const InspeccionesPageV2: React.FC = () => {
   const stateCounts = inspections.data?.summary?.byState || {};
   const deadlines = inspections.data?.summary?.openDeadlines || 0;
   const totalPages = inspections.data?.totalPages || 1;
-  const resumeInspection = rows.filter((row) => row.estado === 'EN_CAMPO' && String(row.inspectorId || row.inspector?.id) === String(currentUser?.id)).sort((left, right) => (readInspectionResume(currentUser!.id, right.id, owner)?.updatedAt || 0) - (readInspectionResume(currentUser!.id, left.id, owner)?.updatedAt || 0))[0];
-  const resumePoint = resumeInspection && currentUser ? readInspectionResume(currentUser.id, resumeInspection.id, owner) : null;
 
   return <div className="min-w-0 space-y-4" data-operational-page>
-    {isAdmin && import.meta.env.VITE_INSPECTION_FIELD_MODEL_ENABLED === 'true' && <InspectionManagementPanel />}
     <PageToolbar label="Acciones de Inspecciones">
       <h2 className="sr-only">Inspecciones</h2>
-      <Button variant="outline" onClick={() => { updateFilters({ vista: '' }); setFindingRequest((value) => value + 1); }} aria-label="Denuncia / hallazgo"><span className="sm:hidden">Hallazgo</span><span className="hidden sm:inline">Denuncia / hallazgo</span></Button>
-      <Button className="ml-auto" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }} aria-label="Nueva inspección">Nueva<span className="hidden sm:inline"> inspección</span></Button>
+      <Button className="flex-1 sm:ml-auto sm:flex-none" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }} aria-label={openingPending ? 'Continuar apertura' : 'Nueva inspección'}>{openingPending ? 'Continuar apertura' : <>Nueva<span className="hidden sm:inline"> inspección</span></>}</Button>
+      <DropdownMenu>
+        <DropdownTrigger asChild><Button variant="outline" aria-label="Más acciones" leftIcon={<MoreHorizontal size={18} />}><span className="sr-only sm:not-sr-only">Más</span></Button></DropdownTrigger>
+        <DropdownContent align="end">
+          <DropdownItem icon={<AlertTriangle size={16} />} onClick={() => { updateFilters({ vista: '' }); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</DropdownItem>
+          <DropdownItem icon={<FileDown size={16} />} disabled={offline || inspections.isError || exporting} onClick={() => void exportList()}>{exporting ? 'Exportando…' : 'Exportar listado'}</DropdownItem>
+          <a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-sm !text-neutral-700 !no-underline hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"><HelpCircle size={16} className="shrink-0 text-neutral-500" aria-hidden="true" />Cómo funciona PSIP</a>
+          {managementAllowed && <><DropdownSeparator /><DropdownItem icon={<Users size={16} />} onClick={() => setManagementOpen(true)}>Administración de inspectores</DropdownItem></>}
+        </DropdownContent>
+      </DropdownMenu>
     </PageToolbar>
+    {managementAllowed && <Modal isOpen={managementOpen} onClose={() => setManagementOpen(false)} title="Administración de inspectores"><InspectionManagementPanel embedded /></Modal>}
     {currentUser?.id && <InspectionOpening key={openingOwner} userId={String(currentUser.id)} owner={openingOwner} role={currentUser.rol} isAdmin={Boolean(isAdmin)} mobile={mobile} online={isOnline}
-      initialType={initialType} initialActor={initialActor} returnState={returnState} open={showCreate} source={sourceIntake}
+      initialType={initialType} initialActor={initialActor} returnState={returnState} open={showCreate} source={sourceIntake} banner={false} onStateChange={setOpening}
       onOpen={() => { setSourceIntake(null); setShowCreate(true); }} onClose={() => setShowCreate(false)} />}
+    {!showCreate && opening.error && <p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900">{opening.error}</p>}
     <nav aria-label="Secciones de Inspecciones" className="flex border-b border-neutral-200">
       {[
         { section: '', label: 'Expedientes', Icon: ClipboardCheck },
@@ -142,9 +158,6 @@ const InspeccionesPageV2: React.FC = () => {
     {agendaOpen && <InspectionOperationsPanel embedded />}
     {!showQueue && !agendaOpen && <>
 
-    {resumeInspection && <Link state={returnState} data-testid="inspection-resume-task" aria-label="Continuar mi inspección en campo" to={`${mobile ? '/mobile' : ''}/inspecciones/${resumeInspection.id}${resumePoint?.hash || '#checklist'}`} className="flex min-h-16 items-center justify-between gap-3 rounded-lg border-l-4 border-primary-600 bg-primary-50 px-4 py-3 !no-underline hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"><div className="min-w-0"><p className="text-xs font-semibold text-primary-800">En campo · {resumeInspection.numero}</p><h3 className="mt-0.5 truncate text-sm font-semibold text-neutral-900">{inspectionActor(resumeInspection)?.razonSocial || 'Inspección en curso'}</h3>{resumePoint && <p className="mt-0.5 text-xs text-neutral-600">Retomá en {resumePoint.label}</p>}</div><span className="flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-primary-800"><span className="sr-only sm:not-sr-only">Continuar inspección</span><ChevronRight size={20} /></span></Link>}
-
-
     {offline && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"><p className="font-bold">Sin conexión · copias de este dispositivo</p><p className="mt-1">Sólo aparecen expedientes que abriste aquí antes. Los cambios y las fotos pendientes siguen sin confirmar en el servidor.</p><button type="button" onClick={() => void inspections.refetch()} className="mt-2 min-h-10 font-semibold underline underline-offset-2">Reintentar conexión</button></div>}
     {inspections.isError && rows.length > 0 && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">No se pudo actualizar el listado. Estos resultados pueden estar desactualizados. <button type="button" onClick={() => void inspections.refetch()} className="font-bold underline underline-offset-2">Reintentar</button></div>}
 
@@ -155,23 +168,15 @@ const InspeccionesPageV2: React.FC = () => {
     <nav aria-label="Etapas PSIP" className="flex items-center gap-x-4 overflow-x-auto border-b border-neutral-200 text-sm sm:flex-wrap [&>button]:shrink-0 [&>button]:whitespace-nowrap">
       <button aria-pressed={!phase && !state} className={!phase && !state ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => updateFilters({ etapa: '', estado: '', page: 1 })}>Todas</button>
       {(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).map((key) => <button key={key} aria-pressed={phase === key} className={phase === key ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => updateFilters({ etapa: key, estado: '', page: 1 })}>{INSPECTION_PHASES[key].label} <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : INSPECTION_PHASES[key].states.reduce((sum, value) => sum + (stateCounts[value] || 0), 0)}</span></button>)}
-      <Button aria-label="Exportar" title="Exportar listado" className="ml-auto hidden shrink-0 sm:inline-flex" variant="ghost" size="sm" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}><span className="sr-only sm:not-sr-only">Exportar</span></Button>
     </nav>
     {phase && <p className="text-sm text-neutral-600">{INSPECTION_PHASES[phase].description}</p>}
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      {!totalsUnknown && deadlines>0 && <span className="text-neutral-600">{deadlines} con plazo vigente sin responder</span>}
-      <a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="ml-auto hidden min-h-11 items-center font-semibold text-primary-800 underline underline-offset-2 sm:inline-flex">Cómo funciona PSIP</a>
-    </div>
+    {!totalsUnknown && deadlines>0 && <p className="text-sm text-neutral-600">{deadlines} con plazo vigente sin responder</p>}
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-xl border border-[#E0E0DC] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:grid-cols-2 sm:p-4 lg:grid-cols-[minmax(160px,1fr)_190px_170px]">
       <label className="relative sm:col-span-2 lg:col-span-1"><span className="sr-only">Buscar inspección</span><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={17} /><input value={search} onChange={(event) => updateFilters({ search: event.target.value, page: 1 })} placeholder="Buscar…" className="h-11 w-full rounded-lg border border-neutral-400 bg-white pl-10 pr-3 text-base sm:text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100" /></label>
       <Button variant="outline" aria-label="Filtros de inspecciones" aria-expanded={filtersOpen} aria-controls="inspection-secondary-filters" className="sm:hidden" leftIcon={<SlidersHorizontal size={17} />} onClick={() => updateFilters({ filtros: filtersOpen ? '' : 'abiertos' })}>Filtros{(state || inspectionFilter) && <span className="ml-1">{Number(Boolean(state)) + Number(Boolean(inspectionFilter))}</span>}</Button>
       <div id="inspection-secondary-filters" className={`${filtersOpen ? 'grid' : 'hidden'} col-span-2 grid-cols-1 gap-3 sm:contents`}>
       <select aria-label="Filtrar por estado" value={state} onChange={(event) => { const value = event.target.value as InspectionState | ''; updateFilters({ estado: value, etapa: value ? inspectionPhaseOf(value) : phase, page: 1 }); }} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">{phase ? 'Todos en esta etapa' : 'Todos los estados'}</option>{(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).filter((key) => !phase || phase === key).map((key) => <optgroup key={key} label={INSPECTION_PHASES[key].label}>{INSPECTION_PHASES[key].states.map((value) => <option key={value} value={value}>{INSPECTION_STATE_LABELS[value]}</option>)}</optgroup>)}</select>
       <select aria-label="Filtrar por tipo de inspección" value={inspectionFilter} onChange={(event) => updateFilters({ tipoInspeccion: event.target.value, tipoActor: '', actorId: '', page: 1 })} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">Todos los tipos</option>{Object.entries(INSPECTION_TYPES).map(([value, type]) => <option key={value} value={value}>{type.label}</option>)}</select>
-      <div className="flex flex-wrap items-center gap-3 sm:hidden">
-        <Button variant="ghost" aria-label="Exportar" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}>Exportar</Button>
-        <a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-800 underline">Cómo funciona PSIP</a>
-      </div>
       </div>
       {(state || inspectionFilter) && <p className="col-span-2 text-xs text-neutral-600 sm:hidden">{[state && INSPECTION_STATE_LABELS[state], inspectionFilter && INSPECTION_TYPES[inspectionFilter].label].filter(Boolean).join(' · ')}</p>}
     </div>
@@ -184,7 +189,7 @@ const InspeccionesPageV2: React.FC = () => {
         const inspectionRoute = `${mobile ? '/mobile' : ''}/inspecciones/${inspection.id}`;
         const resume = currentUser?.id ? readInspectionResume(currentUser.id, inspection.id, owner) : null;
         return <div key={inspection.id} onClick={(event) => { if (!(event.target as HTMLElement).closest('a,button,input')) navigate(inspectionRoute + (resume?.hash || ''), { state: returnState }); }} data-testid={`inspection-row-${inspection.id}`} className="group grid w-full min-w-0 cursor-pointer grid-cols-1 gap-2 border-b border-neutral-100 p-4 text-left transition-colors last:border-0 hover:bg-neutral-50/60 active:bg-neutral-100/60 focus-within:bg-neutral-50 focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 lg:grid-cols-[0.92fr_1.35fr_1fr_1fr_auto] lg:items-center lg:gap-4 lg:px-4 lg:py-2.5">
-          <div><div className="flex flex-wrap items-center justify-between gap-2 lg:justify-start"><Link state={returnState} to={inspectionRoute + (resume?.hash || '')} aria-label={`${resume ? 'Retomar' : 'Abrir'} expediente ${inspection.numero}${resume ? ` en ${resume.label}` : ''}`} className="rounded font-mono text-sm font-semibold text-neutral-900 hover:text-primary-700 focus-visible:ring-2 focus-visible:ring-primary-500">{inspection.numero}</Link>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación</Badge>}<Badge className="lg:hidden" color={INSPECTION_STATE_COLORS[inspection.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[inspection.estado]}</Badge></div><p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-500"><CalendarDays size={14} className="text-neutral-400" />{inspectionDate(dateValue)}</p>{resume && <p className="mt-1 line-clamp-2 text-xs font-semibold text-primary-800">Retomar: {resume.label}</p>}</div>
+          <div><div className="flex flex-wrap items-center justify-between gap-2 lg:justify-start"><Link state={returnState} to={inspectionRoute + (resume?.hash || '')} aria-label={`${resume ? 'Retomar' : 'Abrir'} expediente ${inspection.numero}${resume ? ` en ${resume.label}` : ''}`} className="rounded font-mono text-sm font-semibold text-neutral-900 hover:text-primary-700 focus-visible:ring-2 focus-visible:ring-primary-500">{inspection.numero}</Link>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación</Badge>}<Badge className="lg:hidden" color={INSPECTION_STATE_COLORS[inspection.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[inspection.estado]}</Badge></div><p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-500"><CalendarDays size={14} className="text-neutral-400" />{inspectionDate(dateValue)}</p>{resume && <p className="mt-1 line-clamp-2 text-xs font-semibold text-primary-800">Retomar: {resume.label}</p>}{openingReceipt?.id === inspection.id && <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-primary-900"><span className="font-semibold">Apertura confirmada en este dispositivo</span><button type="button" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Continuar apertura</button></p>}</div>
           <div className="min-w-0">{actor ? <Link to={inspectionActorRoute(inspection.tipoActor, actor.id, mobile)} state={{ inspectionReturn: inspectionRoute }} aria-label={'Abrir ficha de ' + actor.razonSocial} className="inline-block max-w-full rounded text-sm font-medium text-neutral-700 hover:text-primary-700 hover:underline focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link> : <p className="font-semibold text-neutral-900">{INSPECTION_TYPES[inspectionTypeOf(inspection)].label}</p>}<p className="mt-1 text-xs text-neutral-500">{INSPECTION_TYPES[inspectionTypeOf(inspection)].label}{!inspection.tipoActor && ' · Sin responsable vinculado'}{actor?.cuit ? ` · CUIT ${actor.cuit}` : ''}</p>{(isInspectionFollowUp(inspection.estado) || inspectionPhaseOf(inspection.estado) === 'DERIVACIONES') && <InspectionFollowUpSummary seguimiento={inspection.seguimiento} now={now} state={inspection.estado} />}</div>
           <div className="space-y-1.5 text-sm text-neutral-600"><p className="flex items-center gap-2"><UserRound size={15} className="shrink-0 text-neutral-400" />{inspection.inspector?.nombre || 'Sin asignar'} {inspection.inspector?.apellido || ''}</p><p className="flex items-center gap-2 text-xs text-neutral-500"><MapPin size={14} className="shrink-0" /><span className="line-clamp-2">{inspection.ubicacion || 'Sin ubicación'}</span></p></div>
           <div className="hidden lg:block"><Badge color={INSPECTION_STATE_COLORS[inspection.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[inspection.estado]}</Badge></div>

@@ -28,8 +28,15 @@ import { readActiveTrip, readTripSnapshot, tripAccessDenied } from '../../servic
 import { EstadoManifiesto, type Manifiesto } from '../../types/models';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import { Button } from '../../components/ui/ButtonV2';
+import { InspectorHome } from './InspectorHome';
 
+/** Inicio por rol: quien inspecciona ve su día, no manifiestos. Los demás roles conservan el panel de manifiestos. */
 export const MobileDashboardPage: React.FC = () => {
+  const { currentUser } = useAuth();
+  return currentUser?.esInspector || currentUser?.esJefeInspecciones ? <InspectorHome /> : <ManifestDashboard />;
+};
+
+const ManifestDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const owner = useQueryOwner();
