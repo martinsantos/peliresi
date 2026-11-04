@@ -304,4 +304,26 @@ describe('inspection offline evidence queue adversarial invariants', () => {
       else Reflect.deleteProperty(navigator, 'locks');
     }
   });
+  it('retries a legacy antivirus rejection with the same identity, bytes and written description', async () => {
+    const original = { ...valid('legacy-antivirus'), failureKind: 'terminal' as const, attempts: 4, lastError: 'La evidencia no supero el escaneo antivirus' };
+    const store = memoryQueue([original]);
+    const upload = vi.fn().mockRejectedValueOnce({ response: { status: 503, data: { code: 'INSPECTION_SCAN_UNAVAILABLE', message: 'Antivirus no disponible' } } }).mockResolvedValueOnce({});
+    await syncPendingInspectionEvidence({ ...scope, upload });
+    expect(upload).not.toHaveBeenCalled();
+    await syncPendingInspectionEvidence({ ...scope, upload, onlyId: original.id, manual: true });
+    const retained = store.get(original.id)!;
+    expect(retained).toMatchObject({ failureKind: 'retryable', failureCode: 'INSPECTION_SCAN_UNAVAILABLE', sha256: original.sha256, fields: original.fields });
+    expect(await retained.file.arrayBuffer()).toEqual(await original.file.arrayBuffer());
+    expect(indexedDbMocks.removeOffline).not.toHaveBeenCalled();
+    await syncPendingInspectionEvidence({ ...scope, upload, onlyId: original.id, manual: true });
+    expect(upload).toHaveBeenCalledTimes(2);
+    for (const [entry] of upload.mock.calls) {
+      expect(entry.id).toBe(original.id);
+      expect(entry.fields.descripcion).toBe(original.fields.descripcion);
+      expect(entry.sha256).toBe(original.sha256);
+      expect(await entry.file.arrayBuffer()).toEqual(await original.file.arrayBuffer());
+    }
+    expect(store.size).toBe(0);
+  });
+
 });

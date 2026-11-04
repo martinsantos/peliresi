@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -135,7 +136,7 @@ describe('inspection checklist evidence', () => {
   });
 
   it('returns an already synchronized client capture without persisting it twice', async () => {
-    mocks.duplicate.mockResolvedValueOnce({ id: 'evidence-existing', clienteId: 'capture_12345678', itemId: 'item-1' });
+    mocks.duplicate.mockResolvedValueOnce({ id: 'evidence-existing', clienteId: 'capture_12345678', itemId: 'item-1', sha256: createHash('sha256').update('png-bytes').digest('hex') });
     const res = response();
     const next = vi.fn();
 
@@ -145,4 +146,22 @@ describe('inspection checklist evidence', () => {
     expect(mocks.persist).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: 'evidence-existing' }) }));
   });
+  it.each(['descripcion', 'transcripcion'])('keeps a different %s pending for identical photo bytes', async (field) => {
+    mocks.duplicate.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'previous', itemId: 'item-1', [field]: 'nota anterior' });
+    const res = response(), next = vi.fn();
+    await subirEvidencia(request({ itemId: 'item-1', clienteId: 'capture_12345678', [field]: 'nota nueva' }), res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409, message: expect.stringContaining('otro texto') }));
+    expect(res.json).not.toHaveBeenCalled();
+    expect(mocks.remove).toHaveBeenCalledTimes(1);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('never acknowledges different bytes under the same client capture id', async () => {
+    mocks.duplicate.mockResolvedValueOnce({ itemId: 'item-1', sha256: 'a'.repeat(64) });
+    const res = response(), next = vi.fn();
+    await subirEvidencia(request({ itemId: 'item-1', clienteId: 'capture_12345678' }), res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409 }));
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CloudUpload, Download, FileText } from 'lucide-react';
-import { INSPECTION_EVIDENCE_ACCEPT, INSPECTION_PHOTO_ACCEPT, type PendingInspectionEvidence } from '../../services/inspectionOfflineEvidence';
+import { INSPECTION_EVIDENCE_ACCEPT, INSPECTION_PHOTO_ACCEPT, pendingEvidenceScanState, type PendingInspectionEvidence } from '../../services/inspectionOfflineEvidence';
 
 export interface PendingEvidenceActions {
   busy: boolean;
@@ -28,21 +28,26 @@ export function PendingEvidenceThumbnail({ evidence, actions }: { evidence: Pend
     finally { setBusy(false); }
   };
   const disabled = busy || actions?.busy;
+  const scanState = pendingEvidenceScanState(evidence);
+  const diagnostic = scanState === 'legacy'
+    ? 'La versión anterior no pudo distinguir un rechazo del archivo de una falla del antivirus. Reintentá para comprobarlo; no necesitás volver a tomar la foto.'
+    : evidence.lastError;
   return <figure data-testid="pending-inspection-evidence" className="min-w-0 overflow-hidden rounded-xl border border-amber-300 bg-amber-50">
     {evidence.mimeType.startsWith('image/') && url ? <img src={url} alt={`Captura pendiente: ${evidence.fileName}`} className="aspect-[4/3] w-full object-cover" /> : <div className="flex aspect-[4/3] items-center justify-center text-amber-800"><FileText size={22} /></div>}
     <figcaption className="space-y-2 p-3">
       <p className="break-words text-xs font-bold text-[#10213A]">{evidence.fileName}</p>
-      <p className="flex items-start gap-1 text-xs font-bold text-amber-900"><CloudUpload size={14} className="shrink-0" />{evidence.uploaded ? 'Recibida; falta confirmar la copia local' : evidence.failureKind === 'terminal' ? 'Requiere corrección o revisión' : 'Pendiente de sincronizar'}</p>
-      {evidence.lastError && <p role="alert" className="break-words text-xs leading-relaxed text-error-800">{evidence.lastError}</p>}
+      <p className="flex items-start gap-1 text-xs font-bold text-amber-900"><CloudUpload size={14} className="shrink-0" />{evidence.uploaded ? 'Recibida; falta confirmar la copia local' : scanState ? 'Verificación de seguridad pendiente' : evidence.failureKind === 'terminal' ? 'Requiere corrección o revisión' : 'Pendiente de sincronizar'}</p>
+      {diagnostic && <p role="alert" className="break-words text-xs leading-relaxed text-error-800">{diagnostic}</p>}
+      {scanState && !evidence.uploaded && <p className="text-xs text-amber-950">La foto y su descripción siguen guardadas en este dispositivo. El acta se habilitará cuando el servidor confirme la carga.</p>}
       {evidence.recoveredManually && !evidence.uploaded && <p className="text-xs text-amber-950">Recuperada de una versión anterior. Revisá el archivo antes de cargarlo; no se enviará automáticamente.</p>}
       {evidence.fields.descripcion && <p className="break-words text-xs text-neutral-700">{evidence.fields.descripcion}</p>}
       {evidence.attempts >= 3 && !evidence.uploaded && <p className="text-xs text-amber-950">Los intentos automáticos están pausados. Revisá el error y reintentá cuando esté resuelto.</p>}
       <a href={url} download={evidence.fileName} className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-xs font-bold text-primary-800"><Download size={14} />Descargar copia original</a>
       {!actions && <a href="#evidencias" className="inline-flex min-h-10 items-center px-2 text-xs font-bold text-primary-800">Revisar pendiente en Evidencias</a>}
       {actions && <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={disabled || !actions.online} onClick={() => void run(() => actions.onRetry(evidence.id))} className="min-h-11 rounded-md border border-amber-400 bg-white px-2 text-xs font-bold text-amber-950 disabled:opacity-50">{evidence.uploaded ? 'Confirmar sincronización' : evidence.recoveredManually ? 'Guardar y cargar archivo' : 'Reintentar carga'}</button>
+        <button type="button" disabled={disabled || !actions.online} onClick={() => void run(() => actions.onRetry(evidence.id))} className="min-h-11 rounded-md border border-amber-400 bg-white px-2 text-xs font-bold text-amber-950 disabled:opacity-50">{busy ? 'Reintentando…' : evidence.uploaded ? 'Confirmar sincronización' : evidence.recoveredManually ? 'Guardar y cargar archivo' : 'Reintentar carga'}</button>
         {!evidence.uploaded && <>
-          {evidence.failureKind === 'terminal' && <button type="button" disabled={disabled} onClick={() => setConfirm('replace')} className="min-h-10 rounded-md border border-neutral-300 bg-white px-2 text-xs font-bold">Corregir archivo</button>}
+          {evidence.failureKind === 'terminal' && !scanState && <button type="button" disabled={disabled} onClick={() => setConfirm('replace')} className="min-h-10 rounded-md border border-neutral-300 bg-white px-2 text-xs font-bold">Corregir archivo</button>}
           <button type="button" disabled={disabled} onClick={() => setConfirm('discard')} className="min-h-10 rounded-md px-2 text-xs font-bold text-error-800">Descartar pendiente</button>
         </>}
       </div>}

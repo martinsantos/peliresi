@@ -53,14 +53,28 @@ function storageKeyPath(storageKey: string): string {
   return resolved;
 }
 
+function scanUnavailable(): AppError {
+  const error = new AppError('No se pudo verificar el archivo porque el servicio antivirus no está disponible. Reintentá la carga más tarde; no hace falta reemplazar el archivo.', 503);
+  error.code = 'INSPECTION_SCAN_UNAVAILABLE';
+  return error;
+}
+
 async function scanEvidencePath(filePath: string): Promise<void> {
   if (process.env.FILE_SCAN_MODE !== 'required') return;
   const [command, ...args] = String(process.env.CLAMAV_SCAN_CMD || '').split(/\s+/).filter(Boolean);
-  if (!command) throw new AppError('Escaneo antivirus no configurado', 500);
+  if (!command) throw scanUnavailable();
   try {
     await execFileAsync(command, [...args, filePath], { timeout: 30_000 });
-  } catch {
-    throw new AppError('La evidencia no supero el escaneo antivirus', 400);
+  } catch (failure) {
+    // ClamAV: 1 = detection; 2, signals and spawn failures = no scan verdict.
+    // Never turn an unavailable scanner into a clean result or blame the file.
+    const result = failure as { code?: unknown; killed?: boolean; signal?: unknown };
+    if (result.code === 1 && !result.killed && !result.signal) {
+      const error = new AppError('El antivirus rechazó el archivo por una detección de seguridad. Conservá el original y solicitá su revisión antes de reemplazarlo.', 400);
+      error.code = 'INSPECTION_SCAN_REJECTED';
+      throw error;
+    }
+    throw scanUnavailable();
   }
 }
 
