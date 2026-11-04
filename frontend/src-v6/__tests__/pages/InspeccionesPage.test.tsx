@@ -10,7 +10,7 @@ import { inspectionOpeningKey, type InspectionOpeningDraft } from '../../service
 import { supportRequestContext } from '../../utils/supportSession';
 import type { Inspection } from '../../types/inspection';
 
-const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn(), isAdmin: true }));
 const originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
 const clients: QueryClient[] = [];
 function render(ui: ReactElement) {
@@ -25,7 +25,7 @@ vi.mock('../../pages/inspecciones/InspectionIntakePanel', () => ({
 vi.mock('../../services/inspectionOperations.service', async (original) => ({ ...await original<typeof import('../../services/inspectionOperations.service')>(), inspectionOperationsService: { inspectors: vi.fn().mockResolvedValue([]) } }));
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', esInspector: false }, isAdmin: true }),
+  useAuth: () => ({ currentUser: { id: 'admin-1', rol: mocks.isAdmin ? 'ADMIN' : 'GENERADOR', esInspector: !mocks.isAdmin }, isAdmin: mocks.isAdmin }),
 }));
 
 vi.mock('../../hooks/useInspecciones', () => ({
@@ -49,6 +49,8 @@ function NavigationProbe() {
 
 describe('InspeccionesPage', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_INSPECTION_FIELD_MODEL_ENABLED', 'false');
+    mocks.isAdmin = true;
     localStorage.clear(); sessionStorage.clear();
     const payload = btoa(JSON.stringify({ id: 'admin-1', rol: 'ADMIN' })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
     localStorage.setItem('sitrep_access_token', `fixture.${payload}.signature`);
@@ -64,6 +66,7 @@ describe('InspeccionesPage', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
     for (const client of clients.splice(0)) client.clear();
     if (originalLocks) Object.defineProperty(navigator, 'locks', originalLocks);
     else Reflect.deleteProperty(navigator, 'locks');
@@ -236,6 +239,29 @@ describe('InspeccionesPage', () => {
     expect(screen.getByRole('navigation', { name: 'Secciones de Inspecciones' })).toBeVisible();
     expect(screen.getByRole('navigation', { name: 'Etapas PSIP' })).toBeVisible();
     expect(screen.getByLabelText('Buscar inspección')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['true', true, true],
+    ['true', false, false],
+    ['false', true, false],
+    ['false', false, false],
+  ] as const)('gates inspection management by feature=%s and admin=%s', (flag, isAdmin, visible) => {
+    vi.stubEnv('VITE_INSPECTION_FIELD_MODEL_ENABLED', flag);
+    mocks.isAdmin = isAdmin;
+    render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: 'Administración de inspectores' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Más acciones' }));
+    const management = screen.queryByRole('button', { name: 'Administración de inspectores' });
+    if (visible) {
+      expect(management).toBeVisible();
+      fireEvent.click(management!);
+      expect(screen.getByRole('dialog', { name: 'Administración de inspectores' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Consultar equipo' })).toBeEnabled();
+    } else {
+      expect(management).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Administración de inspectores' })).not.toBeInTheDocument();
+    }
   });
 
   it('continues a saved opening from the primary action and shows a confirmed one on its own card', async () => {
