@@ -152,14 +152,16 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     return () => { region?.removeEventListener('scroll', remember); cancelAnimationFrame(frame); };
   }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, resumeOwner, constrainedViewport, pageScroll]);
 
-  // In a continuous section every task is already open: a hash change scrolls to its heading.
-  const previousActive = useRef(active.id);
+  // In a continuous section every task is already open: arriving at a task other than the
+  // first (deep link, resume, Continuar) scrolls to its heading. Sub-anchors scroll themselves.
+  const scrolledFor = useRef('');
   useEffect(() => {
-    const changed = previousActive.current !== active.id; previousActive.current = active.id;
-    if (!continuous || !changed || location.hash.includes('/')) return;
+    if (!continuous || location.hash.includes('/') || scrolledFor.current === active.id) return;
+    scrolledFor.current = active.id;
+    if (active.id === selectedSection?.entries[0]?.id) return;
     const heading = document.getElementById('inspection-task-heading-' + active.id);
     if (heading && typeof heading.scrollIntoView === 'function') heading.scrollIntoView({ block: 'start' });
-  }, [active.id, continuous, location.hash]);
+  }, [active.id, continuous, location.hash, selectedSection]);
   const go = (event: React.MouseEvent<HTMLAnchorElement>, step: InspectionWorkspaceStep) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
