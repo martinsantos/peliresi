@@ -1,4 +1,4 @@
-import { webcrypto } from 'node:crypto';
+import { domSubtleCrypto } from '../helpers/domSubtleCrypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { matchingExchangeReceipt, fileDigest } from '../../services/inspectionCommandReceipt';
 import type { ExchangeCommand } from '../../services/inspectionExchangeCommand';
@@ -11,7 +11,7 @@ const receipt = async (): Promise<InspectionExchange> => ({ id: 'entry', cliente
   versionExpediente: 4, tipo: 'DESCARGO', asunto: 'Constancia', cuerpo: 'Contenido íntegro.', respondeAId: 'request', plazoRespuestaAt: null,
   adjuntos: [{ nombreOriginal: 'constancia.pdf', bytes: 8, sha256: await fileDigest(file()) }] } as InspectionExchange);
 describe('read-only acknowledgement of PSIP commands', () => {
-  beforeEach(() => Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle }));
+  beforeEach(() => Object.defineProperty(crypto, 'subtle', { configurable: true, value: domSubtleCrypto }));
   it('matches the authorized receipt and original bytes', async () => {
     const entry = await receipt(); expect(await matchingExchangeReceipt(command(), [entry], 'INSPECCIONADO')).toBe(entry);
   });

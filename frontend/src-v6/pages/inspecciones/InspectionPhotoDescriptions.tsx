@@ -18,6 +18,7 @@ function Photo({ inspection, photo, editable, actions }: { actions?: (photo: Ins
   const { currentUser } = useAuth();
   const key = inspectionFieldDraftKey(currentUser?.id || '', inspectionWorkspaceOwner(currentUser), inspection.id) + ':photo:' + photo.id;
   const ownership = useInspectionDraftOwnership(key, editable);
+  const canWrite = ownership.canWrite;
   const [ready, setReady] = useState(false), [localSaved, setLocalSaved] = useState(true), [conflict, setConflict] = useState(false);
   const base = useRef(photo.descripcion || ''), alive = useRef(true), pending = useRef(Promise.resolve());
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -26,15 +27,15 @@ function Photo({ inspection, photo, editable, actions }: { actions?: (photo: Ins
     if (ownership.status !== 'owned') return;
     void (async () => { try {
       const durable = await readInspectionFieldCheckpoint(key), journal = localStorage.getItem(key);
-      if (!active || !ownership.canWrite()) return;
+      if (!active || !canWrite()) return;
       const copies = [durable, journal].filter(Boolean).map(raw => JSON.parse(raw!)).filter(d => typeof d.text === 'string' && d.text.length <= 2000 && typeof d.base === 'string').sort((a,b) => b.checkpointAt-a.checkpointAt);
       const draft = copies[0]; base.current = draft?.base ?? (photo.descripcion || '');
       setText(draft?.text ?? (photo.descripcion || '')); setConflict(!!draft && draft.base !== (photo.descripcion || '') && draft.text !== (photo.descripcion || '')); setReady(true);
     } catch { if (active) setError('No pudimos recuperar la descripción local. No reemplazamos la copia guardada.'); } })();
     return () => { active = false; };
-  }, [key, ownership.status]);
+  }, [key, ownership.status, canWrite, photo.descripcion]);
   function edit(value: string) {
-    if (!ready || !ownership.canWrite()) return;
+    if (!ready || !canWrite()) return;
     setText(value); setLocalSaved(false);
     const raw = JSON.stringify({ text: value, base: base.current, checkpointAt: Date.now() });
     try { localStorage.setItem(key, raw); } catch { setError('No se guardó la copia local. Conservá esta pantalla abierta.'); }
@@ -42,8 +43,8 @@ function Photo({ inspection, photo, editable, actions }: { actions?: (photo: Ins
   }
   useEffect(() => { const guard = (e: BeforeUnloadEvent) => { if (!localSaved) { e.preventDefault(); e.returnValue = ''; } }; window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard); }, [localSaved]);
   async function save() {
-    if (!editable || !ready || conflict || !ownership.canWrite() || inFlight.current) return; inFlight.current = true; setBusy(true); setError('');
-    try { await pending.current; if (!ownership.canWrite()) return; await api.patch(`/inspecciones/${inspection.id}/evidencias/${photo.id}/descripcion`, { version: inspection.version, descripcion: text }); if (ownership.canWrite()) { await writeInspectionFieldCheckpoint(key, null); localStorage.removeItem(key); base.current = text; } await query.invalidateQueries({ queryKey: ['inspecciones', 'detail'] }); }
+    if (!editable || !ready || conflict || !canWrite() || inFlight.current) return; inFlight.current = true; setBusy(true); setError('');
+    try { await pending.current; if (!canWrite()) return; await api.patch(`/inspecciones/${inspection.id}/evidencias/${photo.id}/descripcion`, { version: inspection.version, descripcion: text }); if (canWrite()) { await writeInspectionFieldCheckpoint(key, null); localStorage.removeItem(key); base.current = text; } await query.invalidateQueries({ queryKey: ['inspecciones', 'detail'] }); }
     catch(e) { setError(inspectionErrorMessage(e, 'No se guardó la descripción. El texto sigue aquí.')); }
     finally { setBusy(false); inFlight.current = false; }
   }

@@ -44,7 +44,7 @@ it('refreshes the real owned list after a confirmed create even when its cache w
   const back = await screen.findByRole('link', { name: 'Volver a tickets', exact: true });
   expect(await screen.findByText('360 × 800')).toHaveClass('whitespace-nowrap');
   expect(screen.getByRole('button', { name: new RegExp(filename) })).toHaveClass('max-w-full', '[overflow-wrap:anywhere]');
-  expect(screen.getByLabelText('Adjuntar captura o documento')).toHaveClass('file:min-h-11', 'file:border-neutral-400');
+  expect(await screen.findByLabelText('Adjuntar captura o documento')).toHaveClass('file:min-h-11', 'file:border-neutral-400');
   fireEvent.click(back);
   expect(await screen.findByText('1 ticket en esta vista')).toBeVisible();
   const row = screen.getByRole('link', { name: new RegExp(subject) }); expect(row).toHaveAttribute('href', '/soporte/new-ticket');

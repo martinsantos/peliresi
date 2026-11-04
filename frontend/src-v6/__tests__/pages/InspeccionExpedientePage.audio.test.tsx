@@ -67,7 +67,7 @@ async function renderRecorder(dirty = false) {
     <Route path="/mobile/inspecciones" element={<h1>Inspecciones disponibles</h1>} />
   </Routes></MemoryRouter>);
   if (dirty) fireEvent.change(await screen.findByLabelText('Registro de lo observado'), { target: { value: 'Hallazgo conservado tras el error de audio' } });
-  fireEvent.click(await screen.findByRole('link', { name: 'Fotos y archivos', exact: true }));
+  fireEvent.click(await screen.findByRole('link', { name: 'Evidencias', exact: true }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Volver a Inspecciones' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Grabar audio', exact: true }));
   expect(await screen.findByText('Grabando audio de campo')).toBeInTheDocument();

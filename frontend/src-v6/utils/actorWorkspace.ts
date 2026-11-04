@@ -1,3 +1,4 @@
+import { hasAsciiControlCharacters } from './controlCharacters';
 import type { User } from '../contexts/AuthContext';
 import { canAccessMobilePath } from './mobileAccess';
 import { canUseCompanySection } from '../services/companyContext';
@@ -17,19 +18,19 @@ export function actorWorkspaceRoute(pathname: string) {
   const prefix = match[1] ? '/' + match[1] : '';
   let id: string | undefined;
   try { id = match[4] && decodeURIComponent(match[4]); } catch { return null; }
-  if (id && (!id.trim() || /[\\/\u0000-\u001f]/.test(id) || id === '.' || id === '..')) return null;
+  if (id && (!id.trim() || (/[\\/]/.test(id) || hasAsciiControlCharacters(id)) || id === '.' || id === '..')) return null;
   const stage = !id ? 'list' : id === 'nuevo' ? 'create' : match[5] === 'editar' ? 'edit' : match[5] === 'renovar' ? 'renew' : 'detail';
   if ((!id || id === 'nuevo') && match[5]) return null;
   return { ...actors[kind], kind, prefix, id: id === 'nuevo' ? undefined : id, stage, listPath: `${prefix}/admin/actores/${kind}` };
 }
 
 function localTarget(value: unknown, prefix: string) {
-  if (typeof value !== 'string' || value.length > 6000 || !/^\/(?!\/)/.test(value) || /[\\\u0000-\u001f]/.test(value)) return null;
+  if (typeof value !== 'string' || value.length > 6000 || !/^\/(?!\/)/.test(value) || (/[\\]/.test(value) || hasAsciiControlCharacters(value))) return null;
   try {
     const url = new URL(value, 'https://sitrep.invalid');
     const rawPath = value.split(/[?#]/)[0];
     const decoded = decodeURIComponent(rawPath);
-    if (url.origin !== 'https://sitrep.invalid' || url.pathname !== rawPath || /[\\\u0000-\u001f]/.test(decoded) || decoded.split('/').some(s => s === '.' || s === '..')) return null;
+    if (url.origin !== 'https://sitrep.invalid' || url.pathname !== rawPath || (/[\\]/.test(decoded) || hasAsciiControlCharacters(decoded)) || decoded.split('/').some(s => s === '.' || s === '..')) return null;
     const surface = /^\/(app|mobile)(?=\/|$)/.exec(url.pathname)?.[0] || '';
     if (surface !== prefix) return null;
     return { path: url.pathname.slice(prefix.length), target: url.pathname + url.search + url.hash };

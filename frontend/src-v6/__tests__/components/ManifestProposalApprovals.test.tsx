@@ -39,8 +39,7 @@ it('does not present approval or a start action from status alone when a party i
 });
 it.each([null,undefined,{},[],[{rol:'GENERADOR',aprobada:true}],
  [{rol:'GENERADOR',aprobada:true},{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:true}],
- [{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:'false'},{rol:'OPERADOR',aprobada:true}]].map(partes=>[partes]))
- ('keeps the detail usable and requests refresh when approval data is invalid: %j',async partes=>{
+ [{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:'false'},{rol:'OPERADOR',aprobada:true}]].map(partes=>[partes]))('keeps the detail usable and requests refresh when approval data is invalid: %j',async partes=>{
   vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
   mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',partes}}});
   const client=new QueryClient({defaultOptions:{queries:{retry:false}}});

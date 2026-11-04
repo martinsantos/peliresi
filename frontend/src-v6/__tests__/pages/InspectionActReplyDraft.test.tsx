@@ -27,7 +27,7 @@ beforeEach(() => {
   ] } } });
   http.post.mockReset();
 });
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('staff reply to a limited-link presentation', () => {
   it('recovers an unpublished reply after closing and reopening', async () => {
@@ -91,4 +91,16 @@ describe('staff reply to a limited-link presentation', () => {
     expect(screen.getByText('Preparado, no enviado: el envío de correos está desactivado')).toBeTruthy();
     expect(screen.getByText('Recibimos tu consulta sobre el acta QA-001')).toBeTruthy();
   });
+});
+
+it('keeps an unsaved reply through a detail refresh when local storage fails', () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = () => <QueryClientProvider client={client}><InspectionActAccessPanel inspection={inspection()} /></QueryClientProvider>;
+  const view = render(tree());
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Quota exceeded'); });
+  fireEvent.change(box(), { target: { value: reply } });
+  view.rerender(tree());
+  expect(box()).toHaveValue(reply);
+  expect(http.post).not.toHaveBeenCalled();
+  expect(screen.getByText(/no permite guardar el borrador/)).toBeVisible();
 });

@@ -180,7 +180,7 @@ it('retains observation on failure and reports the server reason inside the dial
 });
 it('successful message clears only its own draft and prevents concurrent sends',async()=>{
  let finish!:()=>void;state.send.mockReturnValue(new Promise<void>(resolve=>{finish=resolve;}));
- let view=render(tree());fireEvent.change(screen.getByLabelText('Mensaje sobre la solicitud'),{target:{value:'Consulta de práctica'}});
+ const view=render(tree());fireEvent.change(screen.getByLabelText('Mensaje sobre la solicitud'),{target:{value:'Consulta de práctica'}});
  const send=screen.getByRole('button',{name:'Enviar mensaje sobre la solicitud'});
  fireEvent.click(send);fireEvent.click(send);expect(state.send).toHaveBeenCalledOnce();
  expect(screen.getByLabelText('Mensaje sobre la solicitud')).toBeDisabled();
