@@ -1933,8 +1933,65 @@ async function publish(commit: string,expected: string,bundle: string,id: string
   });
   return {publishedCommit:commit,...migrationOutcome(migrationAttempted,databaseMigrated,list,backupRoot),environmentPreserved:true,uploadsPreserved:true,backupRecorded:true};
 }
+export function inspectionFeatureEnvironment(original: string): string {
+  const matches=[...original.matchAll(/^INSPECTION_FIELD_MODEL_ENABLED=(.*)$/gm)];
+  if(matches.length>1 || (matches.length && !/^(?:true|false|"true"|"false")$/.test(matches[0][1])))throw new Error('Ambiguous inspection feature configuration');
+  if(matches.length)return original.replace(/^INSPECTION_FIELD_MODEL_ENABLED=.*$/m,'INSPECTION_FIELD_MODEL_ENABLED="true"');
+  return original+(original.endsWith('\n')?'':'\n')+'INSPECTION_FIELD_MODEL_ENABLED="true"\n';
+}
+function inspectionRuntimeFlags(): Json {
+  const pid=environment().pid;
+  const values: Json={};
+  for(const entry of fs.readFileSync(`/proc/${pid}/environ`,'utf8').split('\0')) {
+    const at=entry.indexOf('=');if(at<1)continue;
+    const key=entry.slice(0,at);
+    if(key.endsWith('_ENABLED') || ['DISABLE_EMAILS','TRAINING_DIRECT_LOGIN_UNTIL','EMAIL_NOTIFICATION_FAMILIES','EMAIL_DELIVERY_NOT_BEFORE'].includes(key))values[key]=entry.slice(at+1);
+  }
+  return values;
+}
+export function assertInspectionDeliveryClosed(flags: Json): void {
+  if(flags.DISABLE_EMAILS!=='true' || flags.PUSH_MANIFEST_NOTICES_ENABLED!=='false'
+      || !Number.isFinite(Date.parse(flags.TRAINING_DIRECT_LOGIN_UNTIL)) || Date.parse(flags.TRAINING_DIRECT_LOGIN_UNTIL)>Date.now()
+      || flags.INSPECTION_ACT_MAIL_ENABLED==='true')throw new Error('Inspection activation requires CAP closed and external delivery disabled');
+}
+export function assertInspectionFlagsPreserved(before: Json,after: Json): void {
+  assertInspectionDeliveryClosed(after);
+  if(after.INSPECTION_FIELD_MODEL_ENABLED!=='true')throw new Error('Inspection feature was not activated');
+  for(const key of new Set([...Object.keys(before),...Object.keys(after)]))if(key!=='INSPECTION_FIELD_MODEL_ENABLED' && before[key]!==after[key])throw new Error('Unrelated feature configuration changed');
+}
+async function activateInspectionFieldModel(expected: string,id: string): Promise<Json> {
+  const before=current();if(before.revision!==expected)throw new Error('Unexpected active revision');
+  const flags=inspectionRuntimeFlags();assertInspectionDeliveryClosed(flags);
+  const table=run('docker',[...DB_ARGS,'-c',"SELECT to_regclass('public.inspection_staff_roles') IS NOT NULL;"]);
+  if(table!=='t')throw new Error('Inspection management schema is not installed');
+  const target=ENVIRONMENT[1];ordinary(target);
+  const original=fs.readFileSync(target,'utf8'),replacement=inspectionFeatureEnvironment(original);
+  const root=path.join(ROOT,'backups',id);directory(root);
+  fs.writeFileSync(path.join(root,'inspection-environment.before.credentials.env'),original,{flag:'wx',mode:0o600});
+  save(path.join(root,'inspection-activation.before.json'),{revision:before.revision,environmentSha256:digest(original),enabled:flags.INSPECTION_FIELD_MODEL_ENABLED==='true'});
+  let changed=false;
+  await activateWithRollback(async()=>{
+    sameCurrent(before,current());
+    atomic(target,replacement,digest(original));changed=true;
+    run('systemctl',['restart',SERVICE]);await waitBackend();
+  },async()=>{
+    const after=current();
+    for(const key of ['revision','backend','frontend','codeDigest','frontendDigest','proxyHash','secretFingerprint','dropin','baseUnit','liveOverride','unitFiles'])if(JSON.stringify(before[key])!==JSON.stringify(after[key]))throw new Error('Runtime changed outside the authorized feature activation');
+    if(hash(ENVIRONMENT[0])!==before.environment[0][1] || hash(target)!==digest(replacement))throw new Error('Concurrent environment change');
+    assertInspectionFlagsPreserved(flags,inspectionRuntimeFlags());
+    save(path.join(root,'inspection-activation.complete.json'),{revision:expected,feature:'INSPECTION_FIELD_MODEL_ENABLED',enabled:true,beforeSha256:digest(original),afterSha256:digest(replacement),otherFlagsPreserved:true,capClosed:true,emailsDisabled:true,pushDisabled:true,businessDataModified:false});
+  },async()=>{
+    if(changed){atomic(target,original,digest(replacement));run('systemctl',['restart',SERVICE]);await waitBackend();}
+    save(path.join(root,'inspection-activation.rollback.json'),{environmentRestored:changed,businessDataModified:false});
+  });
+  return {activeRevision:expected,feature:'INSPECTION_FIELD_MODEL_ENABLED',enabled:true,backup:root,capClosed:true,emailsDisabled:true,pushDisabled:true,businessDataModified:false};
+}
 async function main(): Promise<void> {
   const [operation,commit,expected,bundle,id,ack]=process.argv.slice(2);
+  if(operation==='activate-inspection-field-model') {
+    if(!SHA.test(commit) || !/^[0-9]+-[0-9]+$/.test(expected) || bundle!=='SITREP-HOSTINGER-INSPECTIONS' || id || ack)throw new Error('Explicit inspection activation identity and acknowledgement required');
+    process.umask(0o077);console.log(JSON.stringify(await activateInspectionFieldModel(commit,expected)));return;
+  }
   if(operation==='preflight') {
     if(!SHA.test(commit) || expected || bundle || id || ack)throw new Error('Read-only preflight requires only the active revision');
     const state=current();
