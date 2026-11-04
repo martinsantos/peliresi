@@ -114,7 +114,10 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     const previous = scrollRef.current;
     if (region) {
       region.style.removeProperty('--inspection-scroll-reserve');
-      region.scrollTop = previous && previous !== region && scrollStepRef.current === active.id ? previous.scrollTop : scrollPositions.current.get(active.id) || 0;
+      // A continuous section scrolls to the linked task or control itself; a later re-run of this
+      // effect (viewport change after mount) must not pull it back to the top.
+      const stored = scrollPositions.current.get(active.id);
+      region.scrollTop = previous && previous !== region && scrollStepRef.current === active.id ? previous.scrollTop : stored !== undefined ? stored : continuous ? region.scrollTop : 0;
     }
     scrollRef.current = region;
     scrollStepRef.current = active.id;
