@@ -169,7 +169,7 @@ export default function InspectionLocationMap({ value, disabled, onChange }: { v
       {!disabled && <div data-testid="map-crosshair" aria-hidden="true" className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center">
         <span className="relative block h-9 w-9 rounded-full border-[3px] border-green-800 bg-white/30 shadow-[0_0_0_2px_rgba(255,255,255,0.9)]"><span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-green-800" /></span>
       </div>}
-      {!disabled && locked && <p className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] bg-white/90 py-1.5 text-center text-xs font-semibold text-neutral-800">Tocá el mapa para moverlo</p>}
+      {!disabled && locked && <p className="pointer-events-none absolute left-1/2 top-2 z-[500] -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-neutral-800 shadow">Tocá el mapa para moverlo</p>}
     </div>
     {!disabled && <div className="flex flex-wrap gap-2">
       <button type="button" disabled={!center} onClick={mark} className={`${button} border-green-800 bg-green-800 text-white`}>{MARK_LABEL[activeMode]}</button>
