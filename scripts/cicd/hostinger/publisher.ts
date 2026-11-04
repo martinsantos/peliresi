@@ -1663,7 +1663,7 @@ function chmodTree(root: string): void {
     if (info.isDirectory()) chmodTree(file); else if (info.isFile()) fs.chmodSync(file,0o644); else throw new Error('Unexpected static release link');
   }
 }
-const RUNTIME_LINKS=['node_modules','data','uploads'];
+const RUNTIME_LINKS=Object.freeze(['node_modules','data','uploads']);
 export function nativeLinks(backend: string,currentBackend: string,privatePrisma=false,privateDependencies=false): void {
   if(privateDependencies) {
     dependencyDigest(path.join(backend,'runtime-dependencies'));
@@ -1681,7 +1681,7 @@ export function nativeLinks(backend: string,currentBackend: string,privatePrisma
   fs.cpSync(path.join(backend,'runtime-prisma/generated'),path.join(modules,'.prisma/client'),{recursive:true});
 }
 function runtimeLinks(backend: string): string[] {
-  if(fs.lstatSync(path.join(backend,'node_modules')).isSymbolicLink())return RUNTIME_LINKS;
+  if(fs.lstatSync(path.join(backend,'node_modules')).isSymbolicLink())return [...RUNTIME_LINKS];
   const result=['data','uploads'];
   for(const name of fs.readdirSync(path.join(backend,'node_modules')).sort())if(!['@prisma','.prisma'].includes(name))result.push('node_modules/'+name);
   for(const name of fs.readdirSync(path.join(backend,'node_modules/@prisma')).sort())if(name!=='client')result.push('node_modules/@prisma/'+name);
@@ -1769,7 +1769,7 @@ export function assertPrepared(ready: Json,root: string,bundle: string,beforePro
       || fileMapHash(inventory(ready.frontend))!==fileMapHash(expectedFrontend)
       || fileMapHash(inventory(ready.rollback))!==fileMapHash(expectedRollback))throw new Error('Prepared payload differs from the reviewed bundle and baseline');
   const expectedLinks=migrations(manifest).length && !dependencies(manifest)?['data','uploads',...fs.readdirSync(path.join(ready.before.backend,'node_modules')).filter(name=>!['@prisma','.prisma'].includes(name)).map(name=>'node_modules/'+name),...fs.readdirSync(path.join(ready.before.backend,'node_modules/@prisma')).filter(name=>name!=='client').map(name=>'node_modules/@prisma/'+name)]:RUNTIME_LINKS;
-  if(JSON.stringify(runtimeLinks(ready.backend).sort())!==JSON.stringify(expectedLinks.sort()))throw new Error('Prepared dependency overlay changed');
+  if(JSON.stringify([...runtimeLinks(ready.backend)].sort())!==JSON.stringify([...expectedLinks].sort()))throw new Error('Prepared dependency overlay changed');
   for(const name of expectedLinks) {
     const target=dependencies(manifest) && name==='node_modules'?path.join(ready.backend,'runtime-dependencies/node_modules'):fs.realpathSync(path.join(ready.before.backend,name));
     if(fs.readlinkSync(path.join(ready.backend,name))!==target)throw new Error('Prepared runtime link target changed');
