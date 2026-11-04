@@ -59,6 +59,8 @@ El usuario eligió la opción 1. Implementado en `379d9323` y el ajuste de despl
 - **Quitados:** el botón «Ver los 11 controles / Volver al control actual» y el enlace «Volver al índice de controles» de cada tarjeta. Se conserva «Siguiente pendiente», el buscador «Ir a un control» y, en pantallas anchas, «Ir al siguiente pendiente (n)».
 - **Enlaces profundos y reanudación** (`#checklist/DOC-01`, «Retomá en…») siguen funcionando: al llegar a una tarea distinta de la primera, la pantalla baja hasta su encabezado.
 - Prueba adaptada: el caso «cierra el control enfocado y conserva la observación al reabrir» ahora describe la lista plana (sin el botón que dejó de existir).
+- Commits: `379d9323` (lista continua), `dc54ad03` (bajar hasta la tarea enlazada), `4dd9c565` (sin bloque vacío en tarjetas pendientes). Verificado en el preview a 344 px: al abrir `#checklist` o `#declaracion` el encabezado queda bajo la barra de la app; 11 tarjetas visibles con sus respuestas; sin desborde horizontal. En web (1365 px) la misma lista continua no se revisó visualmente en este corte.
+- Nota de procedencia: la sesión paralela que trabaja Inicio y lista amendó por error el commit `aa7ce512` (quedó como `dc54ad03`) agregándole dos líneas de su propio registro; el código es el mismo. Se le pidió no volver a hacerlo.
 
 ## Pruebas
 
