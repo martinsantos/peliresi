@@ -59,7 +59,7 @@ El usuario eligió la opción 1. Implementado en `379d9323` y el ajuste de despl
 - **Quitados:** el botón «Ver los 11 controles / Volver al control actual» y el enlace «Volver al índice de controles» de cada tarjeta. Se conserva «Siguiente pendiente», el buscador «Ir a un control» y, en pantallas anchas, «Ir al siguiente pendiente (n)».
 - **Enlaces profundos y reanudación** (`#checklist/DOC-01`, «Retomá en…») siguen funcionando: al llegar a una tarea distinta de la primera, la pantalla baja hasta su encabezado.
 - Prueba adaptada: el caso «cierra el control enfocado y conserva la observación al reabrir» ahora describe la lista plana (sin el botón que dejó de existir).
-- Commits: `379d9323` (lista continua), `dc54ad03` (bajar hasta la tarea enlazada), `4dd9c565` (sin bloque vacío en tarjetas pendientes). Verificado en el preview a 344 px: al abrir `#checklist` o `#declaracion` el encabezado queda bajo la barra de la app; 11 tarjetas visibles con sus respuestas; sin desborde horizontal. En web (1365 px) la misma lista continua no se revisó visualmente en este corte.
+- Commits: `379d9323` (lista continua), `dc54ad03` (bajar hasta la tarea enlazada), `4dd9c565` (sin bloque vacío en tarjetas pendientes). Verificado en el preview a 344 px: al abrir `#checklist` o `#declaracion` el encabezado queda bajo la barra de la app; 11 tarjetas visibles con sus respuestas; sin desborde horizontal. En web (1365 px) la lista continua se revisó: sin acordeones ni desborde ([captura](evidence/inspection-simplify-344-20261103/capturas/despues-constatar-web-1365.jpg)). «Guardar y continuar» desde cualquier bloque de Constatar va a Evidencias (`0e9f5c17`): en una sola pantalla, «continuar» es la sección siguiente, no un bloque que ya se pasó.
 - Nota de procedencia: la sesión paralela que trabaja Inicio y lista amendó por error el commit `aa7ce512` (quedó como `dc54ad03`) agregándole dos líneas de su propio registro; el código es el mismo. Se le pidió no volver a hacerlo.
 
 ## Pruebas
@@ -87,11 +87,11 @@ Lo observado en el preview con la cuenta artificial de inspector en tres pantall
 4. **Las pantallas por rol reutilizan la del administrador.** El Inicio del inspector hereda métricas que no le corresponden.
 
 **Qué haría a continuación, por orden**
-1. Constatar en una sola lista (decisión de arriba).
-2. Un Inicio por rol: para el inspector, «Hoy» con sus visitas y nada de manifiestos.
-3. Lista de Inspecciones con una sola acción principal y las demás en un menú; «Continuar apertura» integrado a la tarjeta de ese expediente.
+1. ~~Constatar en una sola lista~~ — hecho en esta tanda (ver arriba).
+2. Un Inicio por rol y 3. lista de Inspecciones con una sola acción principal — en curso en una sesión paralela (`docs/INSPECCION-INICIO-LISTA-344-20261103.md`).
 4. Un rótulo único por paso en web y app.
 5. Revisión del texto defensivo pantalla por pantalla: conservar lo que tiene valor legal (en una línea), quitar lo demás y llevarlo al manual.
+6. La posición de reanudación («Retomá en…») se toma de la tarea del ancla, no de dónde se desplazó la persona: en Constatar, si se contestan controles con el ancla en `#acta`, «Retomá» dice Hechos. Pendiente.
 
 Ninguno de estos puntos se tocó en esta tanda: el código cambiado es sólo del formulario de inspección.
 

@@ -88,5 +88,17 @@
       "textParas": 83
     }
   },
-  "nota": "navBottom en Visita es menor porque su título cabe en una línea con «Paso 1 de 4». La barra pasó por 61 px con el estado al lado de los botones, pero el texto se partía; a 81 px el estado tiene su propia línea legible."
+  "nota": "navBottom en Visita es menor porque su título cabe en una línea con «Paso 1 de 4». La barra pasó por 61 px con el estado al lado de los botones, pero el texto se partía; a 81 px el estado tiene su propia línea legible.",
+  "constatar_lista": {
+    "commit": "0e9f5c17",
+    "acordeones": "3 → 0",
+    "controles visibles al llegar (teléfono)": "1 → 11",
+    "toques hasta la primera respuesta de un control": "2 → 0",
+    "botones de navegación interna quitados": [
+      "Ver los 11 controles / Volver al control actual",
+      "Volver al índice de controles"
+    ],
+    "encabezado de Controles al abrir #checklist (344 px)": "81 px bajo la barra de la app",
+    "colapsar una tarjeta enlazada mueve la página": "no (344 px)"
+  }
 }
