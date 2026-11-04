@@ -157,7 +157,7 @@ jobs:
           npm audit --omit=dev --audit-level=high
           npm run lint
           npm run lint:critical
-          npm test -- --maxWorkers=1
+          VITE_API_URL=/api npm test -- --maxWorkers=1
           npm run build
           npx vite build --config vite.config.app.ts
       - name: Prune candidate-only dependencies after tests, never on the server
