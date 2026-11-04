@@ -118,6 +118,7 @@ describe('inspection participant exchange controller', () => {
       evidenciaInspeccion: { create: mocks.createEvidence },
       eventoInspeccion: { create: mocks.createEvent, findFirst: mocks.publicResult },
       usuario: { findMany: mocks.recipients },
+      empresaActividad: { findMany: vi.fn().mockResolvedValue([]) },
       notificacion: { createMany: mocks.notices },
     }));
   });

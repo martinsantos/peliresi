@@ -8,6 +8,11 @@ import { queueInspectionEvidence, syncPendingInspectionEvidence } from '../../se
 import { toast } from '../../components/ui/Toast';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 
+// Map, signature and act delivery have independent suites; this suite exercises recording recovery.
+vi.mock('../../pages/inspecciones/InspectionLocationMap', () => ({ default: () => <div>Mapa</div> }));
+vi.mock('../../pages/inspecciones/InspectionSignaturePanel', () => ({ InspectionSignaturePanel: () => <section>Firma</section> }));
+vi.mock('../../pages/inspecciones/InspectionActAccessPanel', () => ({ InspectionActAccessPanel: () => <section>Copia del acta</section> }));
+
 const useInspectionMock = vi.hoisted(() => vi.fn());
 vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined), writeInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 const canWrite = () => true;
@@ -57,13 +62,13 @@ const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDe
 
 async function renderRecorder(dirty = false) {
   useInspectionMock.mockReturnValue({ data: inspection, isLoading: false, refetch: vi.fn().mockResolvedValue({ data: inspection }) });
-  render(<MemoryRouter initialEntries={['/mobile/inspecciones/inspection-audio#acta']}><Routes>
+  render(<MemoryRouter initialEntries={['/mobile/inspecciones/inspection-audio?vista=expediente#acta']}><Routes>
     <Route path="/mobile/inspecciones/:id" element={<InspeccionExpedientePage />} />
     <Route path="/mobile/inspecciones" element={<h1>Inspecciones disponibles</h1>} />
   </Routes></MemoryRouter>);
   if (dirty) fireEvent.change(await screen.findByLabelText('Registro de lo observado'), { target: { value: 'Hallazgo conservado tras el error de audio' } });
   fireEvent.click(await screen.findByRole('link', { name: 'Fotos y archivos', exact: true }));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar y salir de la inspección' })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Volver a Inspecciones' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Grabar audio', exact: true }));
   expect(await screen.findByText('Grabando audio de campo')).toBeInTheDocument();
   return MockMediaRecorder.instances[0];
@@ -94,7 +99,10 @@ describe('Inspection audio failure recovery', () => {
   it('releases the microphone and lets the inspector save and leave immediately after an error', async () => {
     const recorder = await renderRecorder(true);
     expect(screen.getByRole('button', { name: 'Guardar cambios', exact: true })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Guardar y salir de la inspección' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a Inspecciones' }));
+    expect(screen.queryByRole('heading', { name: 'Inspecciones disponibles' })).not.toBeInTheDocument();
+    expect(screen.getByText('Grabando audio de campo')).toBeInTheDocument();
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
 
     act(() => recorder.onerror?.());
 
@@ -105,8 +113,8 @@ describe('Inspection audio failure recovery', () => {
     expect(screen.getByRole('button', { name: 'Guardar cambios', exact: true })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios', exact: true }));
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledWith(inspection.id, expect.objectContaining({ observaciones: 'Hallazgo conservado tras el error de audio' })));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar y salir de la inspección' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir de la inspección' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Volver a Inspecciones' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a Inspecciones' }));
     expect(await screen.findByRole('heading', { name: 'Inspecciones disponibles' })).toBeInTheDocument();
   });
 

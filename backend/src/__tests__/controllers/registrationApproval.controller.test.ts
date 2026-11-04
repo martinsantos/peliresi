@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mock = vi.hoisted(() => ({ find: vi.fn(), lock: vi.fn(), create: vi.fn(), update: vi.fn(), activate: vi.fn(), notify: vi.fn(), transaction: vi.fn() }));
+const mock = vi.hoisted(() => ({ find: vi.fn(), lock: vi.fn(), create: vi.fn(), update: vi.fn(), activate: vi.fn(), notify: vi.fn(), link: vi.fn(), transaction: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   solicitudInscripcion: { findUnique: mock.find }, $transaction: mock.transaction,
   notificacion: { create: mock.notify },
@@ -9,6 +9,8 @@ vi.mock('../../utils/logger', () => ({ default: { error: vi.fn() } }));
 vi.mock('../../services/email.service', () => ({ emailService: { sendEmailVerification: vi.fn() } }));
 vi.mock('../../controllers/auth.controller', () => ({ generateTokens: vi.fn() }));
 vi.mock('fs', async original => { const actual = await original<typeof import('fs')>(); return { ...actual, default: { ...actual, existsSync: () => true } }; });
+
+vi.mock('../../services/companyRegistration.service', () => ({ linkApprovedRegistration: mock.link }));
 
 import { aprobarSolicitud } from '../../controllers/solicitud.controller';
 
@@ -26,14 +28,17 @@ async function approve(role = 'ADMIN') {
   await aprobarSolicitud({ params: { id: 'draft' }, user: { id: 'admin', rol: role }, body: {} } as never, res as never, next);
   return { error: next.mock.calls[0]?.[0], res };
 }
+afterEach(() => vi.unstubAllEnvs());
 beforeEach(() => {
+  vi.stubEnv('ENTERPRISE_ENABLED', 'true');
+  vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
   vi.clearAllMocks(); mock.find.mockResolvedValue(draft()); mock.lock.mockResolvedValue([]);
   mock.create.mockResolvedValue({ id: 'new-actor' }); mock.update.mockImplementation(async ({ data }) => ({ ...draft(), ...data }));
   mock.transaction.mockImplementation(callback => callback({ $queryRaw: mock.lock,
     solicitudInscripcion: { findUnique: mock.find, update: mock.update },
     documentoSolicitud: { findMany: vi.fn().mockResolvedValue([]) },
     generador: { create: mock.create }, operador: { create: mock.create }, transportista: { create: mock.create },
-    usuario: { update: mock.activate }, notificacion: { create: mock.notify },
+    usuario: { update: mock.activate, findUniqueOrThrow: vi.fn().mockResolvedValue({ ...identity, activo: false, rol: 'GENERADOR' }) }, notificacion: { create: mock.notify },
   }));
 });
 
@@ -41,6 +46,8 @@ describe('approved registration preserves declarations, not invented fiscal auth
   it.each(['GENERADOR', 'OPERADOR'])('%s transfers activity, split addresses and actual contact, keeping explicit zero', async type => {
     mock.find.mockResolvedValue(draft(type));
     expect((await approve()).error).toBeUndefined();
+    expect(mock.link).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'draft', usuarioId: 'owner', tipoActor: type }), 'new-actor', expect.objectContaining({ id: 'admin' }));
+    expect(mock.link.mock.invocationCallOrder[0]).toBeLessThan(mock.notify.mock.invocationCallOrder[0]);
     expect(JSON.parse(mock.notify.mock.calls[0][0].data.datos)).toMatchObject({solicitudId:'draft',tipoActor:type});
     expect(mock.notify.mock.calls[0][0].data.titulo).toContain(type==='GENERADOR'?'Generador':'Operador');
     const data = mock.create.mock.calls[0][0].data;
@@ -50,6 +57,14 @@ describe('approved registration preserves declarations, not invented fiscal auth
     expect(data).not.toHaveProperty('factorR'); expect(data).not.toHaveProperty('montoMxR');
     expect(data).not.toHaveProperty('activo');
     expect(data[type === 'GENERADOR' ? 'corrientesControl' : 'corrientesY']).toBe('Y8, Y12');
+  });
+  it('does not acknowledge approval or issue its notice when company linking fails', async () => {
+    const failure = new Error('company linking unavailable');
+    mock.link.mockRejectedValueOnce(failure);
+    const result = await approve();
+    expect(result.error).toBe(failure);
+    expect(result.res.json).not.toHaveBeenCalled();
+    expect(mock.notify).not.toHaveBeenCalled();
   });
   it('preserves the operator representatives without granting unrecognized database fields', async () => {
     mock.find.mockResolvedValue(draft('OPERADOR')); await approve();
@@ -83,7 +98,12 @@ describe('approved registration preserves declarations, not invented fiscal auth
   it('rechecks the state inside the transaction before creating an actor', async () => {
     mock.find.mockResolvedValueOnce(draft()).mockResolvedValue({ ...draft(), estado: 'RECHAZADA' });
     expect((await approve()).error).toMatchObject({ statusCode: 409 });
-    expect(mock.lock).toHaveBeenCalledOnce(); expect(mock.create).not.toHaveBeenCalled(); expect(mock.activate).not.toHaveBeenCalled();
+    expect(mock.lock).toHaveBeenCalledTimes(2);
+    expect(mock.lock.mock.calls[0][0].join('?')).toBe('SELECT id FROM solicitudes_inscripcion WHERE id = ? FOR UPDATE');
+    expect(mock.lock.mock.calls[0][1]).toBe('draft');
+    expect(mock.lock.mock.calls[1][0].join('?')).toBe('SELECT id FROM usuarios WHERE id = ? FOR UPDATE');
+    expect(mock.lock.mock.calls[1][1]).toBe('owner');
+    expect(mock.create).not.toHaveBeenCalled(); expect(mock.activate).not.toHaveBeenCalled();
   });
   it.each(['-1', 'Infinity', 'no es un numero'])('rejects invalid activity %j with no actor creation', async value => {
     mock.find.mockResolvedValue({ ...draft(), datosActor: JSON.stringify({ ...declared, tefPotencia: value }) });
