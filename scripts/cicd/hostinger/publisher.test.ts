@@ -34,6 +34,19 @@ function schemaFixture(): {root:string;current:string;candidate:string} {
   fakePrisma(path.join(candidate,'runtime-prisma'),'new-client',AFTER_SCHEMA);
   return {root,current,candidate};
 }
+test('cold-process integrity checks remain repeatable before backup, migration and activation',()=>{
+  for(const [schema,privateDependencies] of [[false,false],[true,false],[true,true]]) {
+    const f=preparedFixture(schema,privateDependencies);
+    const captured=JSON.stringify(f.ready.artifacts);
+    for(let pass=0;pass<5;pass++) {
+      assertPrepared(f.ready,f.root,f.bundle,f.original);
+      assert.equal(JSON.stringify(capturePrepared(f.ready,f.root)),captured);
+    }
+    fs.appendFileSync(path.join(f.ready.frontend,'index.html'),'tampered after repeated checks');
+    assert.throws(()=>assertPrepared(f.ready,f.root,f.bundle,f.original),/integrity/);
+  }
+});
+
 test('baseline admits only verified component identities and every pinned file hash',()=>{
   const release={webSource:REVIEWED_REVISION,appSource:REVIEWED_REVISION,backendSource:REVIEWED_BACKEND_REVISION,manualSource:REVIEWED_BACKEND_REVISION};
   assert.equal(Object.keys(REVIEWED_FILES.backend).length,442);
