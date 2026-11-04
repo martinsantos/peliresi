@@ -1,3 +1,4 @@
+import { hasAsciiControlCharacters } from './controlCharacters';
 import type { Renovacion, SolicitudInscripcion } from '../types/api';
 import { ZONAS } from './calculoTEF';
 
@@ -77,6 +78,6 @@ export function renewalChanges(r: Renovacion) {
 }
 export function applicationReturn(state: unknown, base: string, owner: string): string {
   const saved = (state as { admissionReturn?: { owner?: string; path?: string } } | null)?.admissionReturn;
-  if (saved?.owner !== owner || typeof saved.path !== 'string' || /[\\\u0000-\u001f]/.test(saved.path)) return base;
+  if (saved?.owner !== owner || typeof saved.path !== 'string' || (/[\\]/.test(saved.path) || hasAsciiControlCharacters(saved.path))) return base;
   try { const url = new URL(saved.path, 'https://sitrep.invalid'); return url.origin === 'https://sitrep.invalid' && url.pathname === base ? base + url.search : base; } catch { return base; }
 }

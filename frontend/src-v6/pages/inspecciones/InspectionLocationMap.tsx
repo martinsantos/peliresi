@@ -19,7 +19,10 @@ const numberIcon = (n: number) => divIcon({ className: '', iconSize: [28, 28], i
 const touchDevice = () => typeof window !== 'undefined' && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
 /** Any drawing change invalidates the saved picture: the act must never show an outdated sketch. */
 const withoutPicture = (value: InspectionFieldLocation, patch: Partial<InspectionFieldLocation>): InspectionFieldLocation => {
-  const { mapaImagen: _image, mapaZoom: _zoom, ...rest } = value; return { ...rest, ...patch };
+  const rest = { ...value };
+  delete rest.mapaImagen;
+  delete rest.mapaZoom;
+  return { ...rest, ...patch };
 };
 /** A new point keeps the premises radius: the circle follows the point. */
 const movedPoint = (value: InspectionFieldLocation | undefined, point: MapPoint, patch: Partial<InspectionFieldLocation>): InspectionFieldLocation => {
@@ -33,7 +36,8 @@ type Center = MapPoint & { zoom: number };
 function Viewport({ value, locked, onCenter, onUnlock }: { value?: InspectionFieldLocation; locked: boolean; onCenter: (c: Center) => void; onUnlock: () => void }) {
   const map = useMapEvents({ move: () => { const c = map.getCenter(); onCenter({ latitud: c.lat, longitud: c.lng, zoom: map.getZoom() }); }, click: onUnlock });
   useEffect(() => { const c = map.getCenter(); onCenter({ latitud: c.lat, longitud: c.lng, zoom: map.getZoom() }); }, [map, onCenter]);
-  useEffect(() => { if (value) map.setView([value.latitud, value.longitud], value.zoom || map.getZoom()); }, [map, value?.latitud, value?.longitud]);
+  const { latitud, longitud, zoom } = value || {};
+  useEffect(() => { if (latitud !== undefined && longitud !== undefined) map.setView([latitud, longitud], zoom || map.getZoom()); }, [map, latitud, longitud, zoom]);
   useEffect(() => { const node = map.getContainer(); const observer = new ResizeObserver(() => map.invalidateSize()); observer.observe(node); return () => observer.disconnect(); }, [map]);
   useEffect(() => {
     const container = map.getContainer();

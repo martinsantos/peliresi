@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { InspectionActData } from '../../types/inspection';
@@ -6,7 +6,8 @@ import { InspectionClosingQuestions } from '../../pages/inspecciones/InspectionC
 
 let last: InspectionActData = {};
 function Harness({ initial = {} }: { initial?: InspectionActData }) {
-  const [value, setValue] = useState<InspectionActData>(initial); last = value;
+  const [value, setValue] = useState<InspectionActData>(initial);
+  useLayoutEffect(() => { last = value; }, [value]);
   return <InspectionClosingQuestions value={value} disabled={false} onChange={v => { last = v; setValue(v); }} />;
 }
 

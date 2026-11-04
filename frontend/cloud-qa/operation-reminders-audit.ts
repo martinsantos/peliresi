@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -18,7 +19,7 @@ const browser = load('browser-final.json').stats;
 assert.equal(browser.expected, 12); assert.equal(browser.unexpected, 0); assert.equal(browser.skipped, 0);
 const geometry = load('browser-geometry.json').stats;
 assert.equal(geometry.expected, 2); assert.equal(geometry.unexpected, 0); assert.equal(geometry.skipped, 0);
-const strip = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, '');
+const strip = (s: string) => stripVTControlCharacters(s);
 assert.match(strip(readFileSync(path.join(out, 'backend-final.log'), 'utf8')), /233 passed/);
 assert.match(strip(readFileSync(path.join(out, 'frontend-final.log'), 'utf8')), /172 passed/);
 const manual = readFileSync(path.join(out, 'manual.log'), 'utf8');

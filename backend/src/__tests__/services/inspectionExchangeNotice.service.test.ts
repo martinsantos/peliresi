@@ -6,7 +6,7 @@ const exchange = { id: 'exchange-1', secuencia: 3, tipo: 'REQUERIMIENTO' as cons
 beforeEach(() => vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'false'));
 afterEach(() => vi.unstubAllEnvs());
 function transaction(recipients = [{ id: 'recipient' }]) {
-  return { usuario: { findMany: vi.fn().mockResolvedValue(recipients) }, notificacion: { createMany: vi.fn().mockResolvedValue({ count: recipients.length }) } };
+  return { empresaActividad: { findMany: vi.fn().mockResolvedValue([]) }, usuario: { findMany: vi.fn().mockResolvedValue(recipients) }, notificacion: { createMany: vi.fn().mockResolvedValue({ count: recipients.length }) } };
 }
 
 describe('PSIP transactional notices without direct delivery', () => {
@@ -34,8 +34,8 @@ describe('PSIP transactional notices without direct delivery', () => {
     const row = tx.notificacion.createMany.mock.calls[0][0].data[0];
     expect(row).toMatchObject({ tipo: 'INFO_GENERAL', prioridad: 'NORMAL', titulo: expect.stringMatching(/^PSIP · /), mensaje: expect.stringContaining('QA-PSIP-1 · Actuación #3.') });
     expect(JSON.parse(row.datos)).toEqual({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', numero: 'QA-PSIP-1', intercambioId: 'exchange-1', secuencia: 3, evento: tipo, parte: 'AUTORIDAD', destino: 'participacion', correoVersion: 1, tipoActor: 'GENERADOR' });
-    // The transaction exposes only user lookup and notice insertion. No external dispatcher.
-    expect(Object.keys(tx)).toEqual(['usuario', 'notificacion']);
+    // The transaction exposes recipient lookups and notice insertion, never an external dispatcher.
+    expect(Object.keys(tx)).toEqual(['empresaActividad', 'usuario', 'notificacion']);
   });
   it('does not infer recipients from an unlinked spontaneous contact or notify inactive accounts', async () => {
     const tx = transaction();

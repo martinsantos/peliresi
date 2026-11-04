@@ -120,7 +120,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
     if (!linkedRowId) return;
     const frame = requestAnimationFrame(() => revealInspectionAnchor(document.getElementById('comparison-' + linkedRowId)));
     return () => cancelAnimationFrame(frame);
-  }, [linkedRowId, location.hash, expandedGroups, expandedRow, comparisons]);
+  }, [linkedRowId, location.hash, expandedGroups, expandedRow, comparisons, flat]);
   useLayoutEffect(() => {
     if (flat || !blockRevealId) return;
     const frame = requestAnimationFrame(() => {
@@ -128,7 +128,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
       setBlockRevealId(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [blockRevealId]);
+  }, [blockRevealId, flat]);
   const changeBlock = (group: string, block: number, rows: InspectionComparison[]) => {
     setSelectedRows([]);
     setReviewSelection(false);

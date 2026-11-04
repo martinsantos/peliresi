@@ -5,7 +5,7 @@ import { startLocalDictation, type DictationSession } from '../../services/local
 type Phase = 'idle' | 'preparing' | 'listening' | 'stopping';
 
 /** Microphone waveform and streaming local transcription; no audio attachment. */
-export function OfflineDictation({ onText, onActiveChange, disabled = false, active = true, buttonLabel = 'Dictar', compact = false }: { onText: (text: string) => void; onActiveChange?: (active: boolean) => void; disabled?: boolean; active?: boolean; buttonLabel?: string; compact?: boolean }) {
+export function OfflineDictation({ onText, onActiveChange, disabled = false, active = true, buttonLabel = 'Dictar' }: { onText: (text: string) => void; onActiveChange?: (active: boolean) => void; disabled?: boolean; active?: boolean; buttonLabel?: string; compact?: boolean }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState('');
   const [partial, setPartial] = useState('');

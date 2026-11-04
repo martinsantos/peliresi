@@ -1,4 +1,4 @@
-import { webcrypto } from 'node:crypto';
+import { domSubtleCrypto } from '../helpers/domSubtleCrypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadDraftAlternatives, preserveDraftAlternative, retireSentAlternatives } from '../../services/inspectionDraftAlternatives';
 import { removeOfflineExchangeDraftRevision } from '../../services/inspectionOfflineExchange';
@@ -15,7 +15,7 @@ const files = () => [new File(['archivo'], 'constancia.pdf', { type: 'applicatio
 const command = (): ExchangeCommand => ({ id: 'key', scope, savedAt: '', status: 'confirmed', kind: 'presentation',
   input: { ...draft, cuerpo: 'Versión enviada.', version: 3, clienteId: 'send-1', files: files() } });
 describe('alternative drafts at send acknowledgement', () => {
-  beforeEach(() => { records.clear(); Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle }); });
+  beforeEach(() => { records.clear(); Object.defineProperty(crypto, 'subtle', { configurable: true, value: domSubtleCrypto }); });
   it('retains concurrent distinct versions and deduplicates the same content', async () => {
     await Promise.all([preserveDraftAlternative(scope, draft, files(), command()), preserveDraftAlternative(scope, { ...draft, cuerpo: 'Segunda pestaña.' }, files(), command())]);
     await preserveDraftAlternative(scope, draft, files(), command());

@@ -31,17 +31,17 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "ms": "^2.1.3",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "node-cron": "^4.6.0",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.3.1",
     "pdfkit": "^0.17.2",
     "pino": "^10.3.1",
     "qrcode": "^1.5.3",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "web-push": "^3.6.7",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -82,16 +82,17 @@
   "license": "MIT",
   "overrides": {
     "brace-expansion": "1.1.21",
-    "body-parser": "1.20.8",
-    "ip-address": "10.7.2",
+    "body-parser": "1.20.9",
+    "ip-address": "10.7.6",
     "js-yaml": "4.3.2",
     "nanoid@3": "3.3.19",
     "postcss": "8.5.28",
     "undici@7": "7.29.1",
-    "qs": "6.16.0",
+    "qs": "6.17.1",
     "yaml": "2.9.1",
     "swagger-jsdoc": {
       "yaml": "2.0.0-1"
-    }
+    },
+    "proxy-addr": "2.0.8"
   }
 }

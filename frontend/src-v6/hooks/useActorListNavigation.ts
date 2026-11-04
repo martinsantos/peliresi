@@ -1,3 +1,4 @@
+import { hasAsciiControlCharacters } from '../utils/controlCharacters';
 import { useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -34,7 +35,7 @@ export function useActorListNavigation() {
 /** Creation/editing may return to its category or the actor overview on the same surface. */
 export function actorListReturn(state: unknown, listPath: string): string {
   const value = (state as { actorReturn?: unknown } | null)?.actorReturn;
-  if (typeof value !== 'string' || value.length > 6000 || /[\\\u0000-\u001f]/.test(value)) return listPath;
+  if (typeof value !== 'string' || value.length > 6000 || (/[\\]/.test(value) || hasAsciiControlCharacters(value))) return listPath;
   try {
     const url = new URL(value, 'https://sitrep.invalid');
     const match = /^(\/(?:app|mobile))?\/admin\/actores\/(?:generadores|transportistas|operadores)$/.exec(listPath);

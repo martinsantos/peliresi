@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { webcrypto } from 'node:crypto';
+import { domSubtleCrypto } from '../helpers/domSubtleCrypto';
 const api = vi.hoisted(() => ({ readLegacyExchangeCopies: vi.fn(), legacyExchangeBlocker: vi.fn() }));
 vi.mock('../../services/inspectionLegacyExchange', () => api);
 import { InspectionLegacyExchangeRecovery } from '../../pages/inspecciones/InspectionLegacyExchangeRecovery';
@@ -10,7 +10,7 @@ const props = () => ({ userId: 'user', inspectionId: 'case', destination: 'Gener
 function show(p = props()) { const view = render(<InspectionLegacyExchangeRecovery {...p} />); fireEvent.click(screen.getByText('Copias de respuestas anteriores')); return { ...view, p }; }
 async function search() { fireEvent.click(screen.getByRole('button', { name: 'Buscar respuestas guardadas' })); await screen.findByRole('link', { name: 'Descargar texto original' }); }
 describe('legacy response review', () => {
-  beforeEach(() => { vi.clearAllMocks(); api.readLegacyExchangeCopies.mockResolvedValue([copy()]); api.legacyExchangeBlocker.mockResolvedValue(null); URL.createObjectURL = vi.fn(() => 'blob:original'); URL.revokeObjectURL = vi.fn(); Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle }); });
+  beforeEach(() => { vi.clearAllMocks(); api.readLegacyExchangeCopies.mockResolvedValue([copy()]); api.legacyExchangeBlocker.mockResolvedValue(null); URL.createObjectURL = vi.fn(() => 'blob:original'); URL.revokeObjectURL = vi.fn(); Object.defineProperty(crypto, 'subtle', { configurable: true, value: domSubtleCrypto }); });
   afterEach(cleanup);
   it('reads only after explicit authorized search, and recovery revalidates without sending', async () => {
     const { p } = show(); expect(api.readLegacyExchangeCopies).not.toHaveBeenCalled(); await search();

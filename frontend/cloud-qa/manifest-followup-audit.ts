@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -8,7 +9,7 @@ import { qaBackendEntry } from './rollback-backend.ts';
 await assertCloudDatabase();
 const out = '/work/sitrep/.qa-followup-notice-20261030'; assert.equal(process.env.QA_ARTIFACTS, out);
 const load = (name: string) => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
-const strip = (name: string) => readFileSync(path.join(out, name), 'utf8').replace(/\u001b\[[0-9;]*m/g, '');
+const strip = (name: string) => stripVTControlCharacters(readFileSync(path.join(out, name), 'utf8'));
 assert.match(strip('backend-before.log'), /3 failed/); assert.match(strip('frontend-before.log'), /3 failed/);
 assert.match(strip('backend-final.log'), /214 passed/); assert.match(strip('frontend-final.log'), /239 passed/);
 assert.match(strip('manual-final.log'), /# pass 37\b/); assert.match(strip('manual-final.log'), /# fail 0\b/);

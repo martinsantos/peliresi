@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { webcrypto } from 'node:crypto';
+import { domSubtleCrypto } from '../helpers/domSubtleCrypto';
 const db = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../services/indexeddb', () => ({ getOffline: db.read }));
 import { legacyExchangeBlocker, readLegacyExchangeCopies, type LegacyExchangeCopy } from '../../services/inspectionLegacyExchange';
@@ -11,7 +11,7 @@ const record = () => ({ id: 'user:case', userId: 'user', inspectionId: 'case', s
 const timeline = () => ({ inspeccion: { id: 'case', estado: 'NOTIFICADA' }, parteActual: 'INSPECCIONADO', intercambios: [{ id: 'pedido', parte: 'AUTORIDAD', tipo: 'REQUERIMIENTO', adjuntos: [] }] } as unknown as InspectionExchangeTimeline);
 const copy = (): LegacyExchangeCopy => ({ id: 'checkpoint', raw: JSON.stringify(draft), draft, files: [file()], savedAt: '', unreadableFiles: false });
 describe('explicit legacy exchange recovery', () => {
-  beforeEach(() => { localStorage.clear(); db.read.mockResolvedValue(record()); Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle }); });
+  beforeEach(() => { localStorage.clear(); db.read.mockResolvedValue(record()); Object.defineProperty(crypto, 'subtle', { configurable: true, value: domSubtleCrypto }); });
   it('keeps complete checkpoint and distinct last text, leaving old storage untouched', async () => {
     const raw = JSON.stringify({ ...draft, cuerpo: 'Otro texto todavía no enviado.' });
     localStorage.setItem('sitrep_exchange_draft_user_case', raw);

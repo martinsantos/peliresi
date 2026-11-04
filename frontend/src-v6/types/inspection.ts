@@ -195,7 +195,18 @@ export interface InspectionDeclaredSnapshot {
   documents?: InspectionDeclaredDocument[];
 }
 
+/** Fields emitted by the signed-act access and reply endpoints. */
+export interface InspectionActEventMetadata {
+  respondeAId?: string;
+  accesoId?: string;
+  expiresAt?: string;
+  tipo?: string;
+  nombre?: string;
+  firma?: { nombre?: string };
+}
+
 export interface InspectionEvent {
+  metadata?: InspectionActEventMetadata | null;
   id: string;
   tipo: string;
   titulo: string;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -360,7 +360,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     return () => { flush(); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', hidden); };
   }, [currentUser?.id, draftKey, inspectionId, owner]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId] }),
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'participacion'] }),
@@ -368,11 +368,12 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'list'] }),
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'operaciones'] }),
     ]);
-  };
+  }, [queryClient, currentUser?.id, inspectionId]);
 
   const commandScope = useMemo(() => ({ userId: String(currentUser?.id || ''), inspectionId, owner }), [currentUser?.id, inspectionId, owner]);
   const delivery = useInspectionExchangeCommand(commandScope);
   const command = delivery.command;
+  const reconcile = delivery.reconcile;
   const [alternatives, setAlternatives] = useState<Awaited<ReturnType<typeof loadDraftAlternatives>>>([]);
   const alternativesWrite = useRef<Promise<void>>(Promise.resolve());
   const [recovering, setRecovering] = useState(false);
@@ -399,15 +400,15 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     void alternativesWrite.current.catch(() => setDraftStorageError(true));
   }, [command, commandScope, composeOpen, draft, files]);
   useEffect(() => {
-    if (timeline && command?.status === 'pending' && !delivery.busy) void delivery.reconcile(timeline);
-  }, [timeline, command, delivery.busy]);
+    if (timeline && command?.status === 'pending' && !delivery.busy) void reconcile(timeline);
+  }, [timeline, command, delivery.busy, reconcile]);
   const lastConfirmed = useRef<string | null>(null);
   useEffect(() => {
     if (command?.status !== 'confirmed' || lastConfirmed.current === command.input.clienteId) return;
     lastConfirmed.current = command.input.clienteId;
     // Refresh is independent of the receipt: a read failure never undoes a write.
     void refresh().catch(() => undefined);
-  }, [command]);
+  }, [command, refresh]);
   useEffect(() => {
     persistenceBlocked.current = delivery.busy || Boolean(command);
     if (delivery.busy || command) draftSaveEpoch.current += 1;

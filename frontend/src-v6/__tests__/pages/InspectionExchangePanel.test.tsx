@@ -7,7 +7,7 @@ import { inspectionDeadlineDate } from '../../pages/inspecciones/inspectionProce
 import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExchangePanel';
 import type { InspectionExchangeTimeline } from '../../types/inspection';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
-import { webcrypto } from 'node:crypto';
+import { domSubtleCrypto } from '../helpers/domSubtleCrypto';
 import { claimExchangeCommand } from '../../services/inspectionExchangeCommand';
 import { loadDraftAlternatives, preserveDraftAlternative } from '../../services/inspectionDraftAlternatives';
 
@@ -78,7 +78,7 @@ function renderPanel() {
 describe('InspectionExchangePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle });
+    Object.defineProperty(crypto, 'subtle', { configurable: true, value: domSubtleCrypto });
     localStorage.clear(); localCommands.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     auth.currentUser = { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [] };
