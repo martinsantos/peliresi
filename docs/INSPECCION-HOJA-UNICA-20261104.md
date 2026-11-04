@@ -103,3 +103,12 @@ El alto no bajó: lo que domina es el bloque Controles (11 controles y 6 datos d
 - Cada vértice nuevo dispara, 2,5 s después, la descarga de unas 12 teselas y la preparación de la imagen del acta, más el guardado automático. En campo con señal débil conviene observarlo.
 - Los dos archivos de prueba que ya fallaban antes (`InspectionInlineSave.test.tsx`, «Guardar y salir de la inspección»; `InspectionWorkspace.keyboard.test.tsx`, barra fija) ahora contradicen el diseño aprobado. Siguen fuera del arnés. Decisión pendiente: actualizarlos o retirarlos.
 - Android físico sigue pendiente de dispositivo; el bloqueo táctil del mapa se probó con emulación táctil de Chromium, no con un teléfono.
+
+
+## Corrección urgente: guardado visible (04/11/2026)
+
+La hoja de campo ocultaba Guardar y dependía sólo del autoguardado, mientras la firma pedía guardar. Se restaura una acción explícita en la barra de sección, visible al desplazarse en web y app. Reutiliza la misma operación y bloqueo de concurrencia: un doble toque no duplica el envío. Confirma Guardado sólo tras la respuesta del servidor y permite reintentar un fallo sin editar de nuevo.
+
+El bloqueo de firma ahora distingue cambios sin confirmar, capturas pendientes, conflicto de versiones, organización pendiente y modo consulta. Cuando el texto ya está guardado y queda una captura, lo indica y ofrece volver a las evidencias. No se descartan archivos ni se omite su validación.
+
+Las pruebas de regresión cubren ambas rutas, doble clic, confirmación del servidor, reintento tras fallo y evidencia pendiente. El criterio anterior «sin botón Guardar» queda reemplazado por esta corrección; el autoguardado se conserva.

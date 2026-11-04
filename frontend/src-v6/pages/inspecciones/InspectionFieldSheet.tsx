@@ -5,8 +5,8 @@ export interface InspectionFieldBlock { id: string; title: string; content: Reac
 
 /** The field form as one page: numbered blocks in the order of a visit, one scroll, nothing
  * moves on its own. A thin bar pinned to the top says which block is under the finger and lists
- * the others. Saving is automatic; the only button is the one that changes the stage. */
-export function InspectionFieldSheet({ blocks, start, status, action }: { blocks: InspectionFieldBlock[]; start?: React.ReactNode; status: React.ReactNode; action?: React.ReactNode }) {
+ * the others. Automatic saving is complemented by an explicit save action kept beside the section selector. */
+export function InspectionFieldSheet({ blocks, start, status, action, saveAction }: { blocks: InspectionFieldBlock[]; start?: React.ReactNode; status: React.ReactNode; action?: React.ReactNode; saveAction?: React.ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(0);
   const [open, setOpen] = useState(false);
@@ -32,10 +32,13 @@ export function InspectionFieldSheet({ blocks, start, status, action }: { blocks
   const jump = (id: string) => { setOpen(false); document.getElementById(id)?.scrollIntoView?.({ block: 'start' }); };
   return <div ref={root} data-testid="inspection-field-sheet" className="inspection-field-sheet mx-auto w-full max-w-3xl min-w-0 [--inspection-anchor-offset:56px]">
     <nav data-sheet-bar aria-label="Dónde estoy en el formulario" className="sticky top-0 z-20 -mx-3 mb-3 border-b border-neutral-300 bg-white px-3 sm:mx-0 sm:rounded-b-lg">
-      <button type="button" aria-expanded={open} aria-controls="field-sheet-blocks" onClick={() => setOpen(value => !value)} className="flex min-h-12 w-full items-center justify-between gap-3 text-left">
+      <div className="flex min-w-0 items-center gap-2">
+      <button type="button" aria-expanded={open} aria-controls="field-sheet-blocks" onClick={() => setOpen(value => !value)} className="flex min-h-12 min-w-0 flex-1 items-center justify-between gap-2 text-left">
         <span className="min-w-0 truncate text-sm font-bold text-neutral-900"><span className="text-primary-800">{current + 1}</span> · {blocks[current]?.title}</span>
         <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-neutral-600">{current + 1} de {blocks.length}<ChevronDown size={16} aria-hidden="true" className={open ? 'rotate-180' : ''} /></span>
       </button>
+      {saveAction && <div className="shrink-0">{saveAction}</div>}
+      </div>
       {open && <ol id="field-sheet-blocks" className="border-t border-neutral-200 py-2">{blocks.map((block, index) => <li key={block.id}><button type="button" aria-current={index === current ? 'location' : undefined} onClick={() => jump(block.id)} className={`flex min-h-11 w-full items-center gap-2 text-left text-sm ${index === current ? 'font-bold text-primary-900' : 'text-neutral-800'}`}><span className="w-5 text-primary-800">{index + 1}</span>{block.title}</button></li>)}</ol>}
     </nav>
     {start && <div data-testid="inspection-start" className="mb-4 rounded-xl border border-primary-200 bg-primary-50 p-4">{start}</div>}

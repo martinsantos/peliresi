@@ -201,11 +201,11 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(heading.parentElement?.parentElement).toContainElement(screen.getByRole('link', { name: 'Abrir actor inspeccionado: Planta Auditada SA', exact: true }));
   });
 
-  it('saves the field sheet on its own after an edit, with no Guardar button and no step tabs', async () => {
+  it('saves the field sheet automatically and keeps explicit save available without step tabs', async () => {
     const { inspeccionService } = await import('../../services/inspeccion.service');
     const rendered = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true);
     const editor = await waitFor(() => { const field = rendered.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
-    expect(screen.queryByRole('button', { name: /guardar/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Guardar cambios', exact: true })).toBeDisabled();
     expect(screen.queryByRole('navigation', { name: 'Secciones del expediente' })).toBeNull();
     expect(screen.queryByTestId('inspection-action-bar')).toBeNull();
     expect(screen.getByTestId('inspection-field-status')).toHaveTextContent(/^Guardado \d{2}:\d{2}$/);

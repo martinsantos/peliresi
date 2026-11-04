@@ -16,7 +16,7 @@ import { inspectionErrorMessage } from './inspectionPresentation';
 import { InspectionEvidenceImage } from './InspectionEvidenceImage';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function InspectionSignaturePanel({ inspectionId, saved, editable }: { inspectionId: string; saved: boolean; editable: boolean }) {
+export function InspectionSignaturePanel({ inspectionId, saved, editable, blockedReason, blockedAction }: { inspectionId: string; saved: boolean; editable: boolean; blockedReason?: string; blockedAction?: React.ReactNode }) {
   const [preview, setPreview] = useState<SignaturePreview | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [read, setRead] = useState(false); const [image, setImage] = useState('');
   const [name, setName] = useState(''); const [document, setDocument] = useState(''); const [character, setCharacter] = useState('');
@@ -51,7 +51,7 @@ export function InspectionSignaturePanel({ inspectionId, saved, editable }: { in
   return <section aria-label="Revisión y firma del acta" className="space-y-5">
     <h3 className="text-lg font-semibold">Revisar el acta con la persona presente</h3>
     <p className="text-sm text-neutral-600">La firma manuscrita deja constancia de lectura y recepción; no implica conformidad con los hallazgos. No es una firma digital certificada.</p>
-    {!saved && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm">Guardá los cambios y sincronizá las fotos antes de preparar la firma.</p>}
+    {!saved && <div role="status" className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm"><p>{blockedReason || 'Guardá los cambios y sincronizá las fotos antes de preparar la firma.'}</p>{blockedAction}</div>}
     <button type="button" disabled={!saved || busy} onClick={() => void load()} className="min-h-11 rounded-lg bg-green-800 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Procesando…' : 'Preparar acta para lectura'}</button>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-900">{error}</p>}
     {preview && <>
