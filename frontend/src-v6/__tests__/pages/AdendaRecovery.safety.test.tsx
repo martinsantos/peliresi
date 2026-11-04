@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -45,7 +45,9 @@ it('does not allow changing or replacing an addendum when its response was lost'
   expect(screen.getByLabelText('Motivo de la adenda')).toBeDisabled();
 });
 
-it('can retry a failed reference read without treating it as an empty queue', async () => {
+it.each([false, true])('can retry a failed reference read without treating it as an empty queue (delayed data: %s)', async delayed => {
+  let resolveData: ((value: { data: { data: typeof data } }) => void) | undefined;
+  if (delayed) mocks.get.mockReturnValue(new Promise(resolve => { resolveData = resolve; }));
   const original = Storage.prototype.getItem; let denied = true;
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function(key) {
     if (denied && key.startsWith('sitrep:adenda-submission:')) throw new Error('temporary read failure');
@@ -53,7 +55,12 @@ it('can retry a failed reference read without treating it as an empty queue', as
   });
   view();
   expect(await screen.findByText(/No pudimos leer la referencia/)).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Informar hallazgo' })).toBeDisabled();
+  if (delayed) {
+    expect(screen.queryByRole('button', { name: 'Informar hallazgo' })).not.toBeInTheDocument();
+    expect(mocks.post).not.toHaveBeenCalled();
+    await act(async () => { resolveData?.({ data: { data } }); });
+  }
+  expect(await screen.findByRole('button', { name: 'Informar hallazgo' })).toBeDisabled();
   denied = false; fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Informar hallazgo' })).toBeEnabled());
   expect(mocks.post).not.toHaveBeenCalled();
