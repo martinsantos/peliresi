@@ -1086,7 +1086,15 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
     if (preserveAnchor.current) { preserveAnchor.current(); preserveAnchor.current = null; return; }
     if (!linkedItemId) return;
     const frame = requestAnimationFrame(() => revealInspectionAnchor(document.getElementById('control-' + linkedItemId)));
-    return () => cancelAnimationFrame(frame);
+    // On a fresh load the first frame can run before the blocks above have their final height;
+    // a late pass reveals the linked control if it is still out of view.
+    const late = window.setTimeout(() => {
+      const element = document.getElementById('control-' + linkedItemId), region = element?.closest<HTMLElement>('[data-inspection-scroll]');
+      if (!element || !region) return;
+      const offset = element.getBoundingClientRect().top - region.getBoundingClientRect().top;
+      if (offset < 0 || offset > region.clientHeight * 0.6) revealInspectionAnchor(element);
+    }, 400);
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(late); };
   }, [linkedItemId, location.hash, expandedItem]);
   const [expandedEvidence, setExpandedEvidence] = useState<string[]>([]);
   const updateItem = (id: string, patch: Partial<InspectionItem>) => {
