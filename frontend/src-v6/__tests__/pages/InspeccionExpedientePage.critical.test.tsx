@@ -224,12 +224,12 @@ describe('InspeccionExpedientePage critical review UX', () => {
     const view = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#acta');
     const editor = await waitFor(() => { const field = view.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
     fireEvent.change(editor, { target: { value: 'Este texto debe sobrevivir a un fallo al continuar.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar a Controles en campo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar a Fotos y archivos' }));
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar y continuar a Controles en campo' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar y continuar a Fotos y archivos' })).toBeEnabled());
     expect(editor).toBeVisible();
     expect(editor).toHaveValue('Este texto debe sobrevivir a un fallo al continuar.');
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar a Controles en campo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar a Fotos y archivos' }));
     expect(await screen.findByRole('region', { name: 'Recorrido de campo' })).toBeVisible();
     expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(2);
   });

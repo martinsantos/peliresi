@@ -19,5 +19,9 @@ export const inspectionTaskLabel = (step: { id: string; label: string }) => task
 export function nextInspectionTask(active: string, available: string[]): string | undefined {
   const ordered = inspectionJourney.flatMap(section => section.ids).filter(id => available.includes(id));
   const position = ordered.indexOf(active);
-  return position < 0 ? undefined : ordered[position + 1];
+  if (position < 0) return undefined;
+  // In a continuous section every task is already on screen: «continuar» means the next section.
+  const section = inspectionJourney.find(entry => entry.ids.includes(active));
+  if (section?.continuous) return ordered.find((id, index) => index > position && !section.ids.includes(id));
+  return ordered[position + 1];
 }

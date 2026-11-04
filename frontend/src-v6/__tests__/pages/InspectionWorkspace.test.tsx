@@ -42,6 +42,15 @@ describe('InspectionWorkspace navigation contract', () => {
     expect(screen.getByText('Paso 2 de 4')).toBeVisible();
   });
 
+  it('opens every Constatar task in one scroll with a heading link each, no accordions', () => {
+    setup('#checklist');
+    const headings = screen.getAllByRole('heading', { level: 3 }).filter(heading => heading.id.startsWith('inspection-task-heading-'));
+    expect(headings.map(heading => heading.id)).toContain('inspection-task-heading-checklist');
+    expect(screen.getByRole('link', { name: /Controles en campo/ })).toHaveAttribute('aria-current', 'location');
+    expect(document.querySelectorAll('a[aria-expanded]')).toHaveLength(0);
+    expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
+  });
+
   it('preserves a child note when leaving and returning, and never offers generic save for it', () => {
     setup('#trazabilidad');
     const note = screen.getByRole('textbox', { name: 'Nota sin enviar' });

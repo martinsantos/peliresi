@@ -5,7 +5,10 @@ describe('inspection journey', () => {
   it('finishes the field journey before entering administrative tools', () => {
     const path: string[] = ['resumen'];
     while (nextInspectionTask(path.at(-1)!, available)) path.push(nextInspectionTask(path.at(-1)!, available)!);
-    expect(path).toEqual(available.slice(0, 8));
+    // Constatar is one scroll: from the act, «continuar» goes to the next section, not to the next open task.
+    expect(path).toEqual(['resumen', 'acta', 'evidencias', 'firma', 'entrega', 'revision']);
+    expect(nextInspectionTask('checklist', available)).toBe('evidencias');
+    expect(nextInspectionTask('declaracion', available)).toBe('evidencias');
   });
   it('skips unavailable comparisons without inventing steps or business transitions', () => {
     expect(nextInspectionTask('checklist', available.filter(id => id !== 'declaracion'))).toBe('evidencias');

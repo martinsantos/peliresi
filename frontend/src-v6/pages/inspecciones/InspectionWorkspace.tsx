@@ -156,9 +156,10 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   // first (deep link, resume, Continuar) scrolls to its heading. Sub-anchors scroll themselves.
   const scrolledFor = useRef('');
   useEffect(() => {
-    if (!continuous || location.hash.includes('/') || scrolledFor.current === active.id) return;
+    if (!continuous || scrolledFor.current === active.id) return;
     scrolledFor.current = active.id;
-    if (active.id === selectedSection?.entries[0]?.id) return;
+    // A sub-anchor (#checklist/GEN-01) scrolls itself; collapsing that card later must not jump to the heading.
+    if (location.hash.includes('/') || active.id === selectedSection?.entries[0]?.id) return;
     const heading = document.getElementById('inspection-task-heading-' + active.id);
     if (heading && typeof heading.scrollIntoView === 'function') heading.scrollIntoView({ block: 'start' });
   }, [active.id, continuous, location.hash, selectedSection]);
