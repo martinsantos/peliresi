@@ -52,6 +52,7 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const availableSections = inspectionJourney.map((section) => ({ ...section, entries: section.ids.flatMap((id) => all.filter((step) => step.id === id)) })).filter((section) => section.entries.length);
   const supplemental = all.filter(step => !inspectionJourney.some(section => section.ids.includes(step.id)));
   const selectedSection = availableSections.find((section) => section.ids.includes(active.id));
+  const continuous = Boolean(selectedSection?.continuous);
   const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
   const resumeLabel = selectedAnchor ? active.label + ' · ' + selectedAnchor.label : active.label;
   const editableSection = steps.some((step) => step.id === active.id);
@@ -151,6 +152,14 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     return () => { region?.removeEventListener('scroll', remember); cancelAnimationFrame(frame); };
   }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, resumeOwner, constrainedViewport, pageScroll]);
 
+  // In a continuous section every task is already open: a hash change scrolls to its heading.
+  const previousActive = useRef(active.id);
+  useEffect(() => {
+    const changed = previousActive.current !== active.id; previousActive.current = active.id;
+    if (!continuous || !changed || location.hash.includes('/')) return;
+    const heading = document.getElementById('inspection-task-heading-' + active.id);
+    if (heading && typeof heading.scrollIntoView === 'function') heading.scrollIntoView({ block: 'start' });
+  }, [active.id, continuous, location.hash]);
   const go = (event: React.MouseEvent<HTMLAnchorElement>, step: InspectionWorkspaceStep) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
@@ -180,14 +189,15 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       {all.map(step => {
         const inGroup = selectedSection?.ids.includes(step.id);
         const visible = inGroup || step.id === active.id;
-        const expanded = step.id === active.id;
+        const expanded = (continuous && inGroup) || step.id === active.id;
         return <div key={step.id} hidden={!visible} className="mb-3 min-w-0 border-y border-neutral-200 sm:mx-6 sm:rounded-lg sm:border">
-          {selectedSection && selectedSection.entries.length > 1 && <a href={'#' + step.id} onClick={event => go(event, step)} aria-expanded={expanded} aria-controls={'inspection-task-' + step.id} className={'flex min-h-14 items-center justify-between gap-3 rounded-t-lg px-4 py-3 !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 ' + (expanded ? 'bg-primary-50 text-primary-900' : 'text-neutral-800 hover:bg-neutral-50')}>
+          {selectedSection && selectedSection.entries.length > 1 && continuous && <h3 id={'inspection-task-heading-' + step.id} className="flex min-h-12 items-end justify-between gap-3 rounded-t-lg px-4 pb-2 pt-4 text-base font-bold"><a href={'#' + step.id} onClick={event => go(event, step)} aria-current={step.id === active.id ? 'location' : undefined} className={'min-w-0 !no-underline ' + (step.id === active.id ? 'text-primary-900' : 'text-neutral-900')}>{inspectionTaskLabel(step)}{step.detail && <span className="mt-0.5 block text-xs font-normal text-neutral-600">{step.detail}</span>}</a></h3>}
+          {selectedSection && selectedSection.entries.length > 1 && !continuous && <a href={'#' + step.id} onClick={event => go(event, step)} aria-expanded={expanded} aria-controls={'inspection-task-' + step.id} className={'flex min-h-14 items-center justify-between gap-3 rounded-t-lg px-4 py-3 !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 ' + (expanded ? 'bg-primary-50 text-primary-900' : 'text-neutral-800 hover:bg-neutral-50')}>
             <span className="min-w-0"><span className="block text-sm font-bold">{inspectionTaskLabel(step)}</span>{step.detail && <span className="mt-0.5 block text-xs font-normal text-neutral-600">{step.detail}</span>}</span>
             <ChevronDown size={18} aria-hidden="true" className={'shrink-0 ' + (expanded ? 'rotate-180' : '')} />
           </a>}
           <div id={'inspection-task-' + step.id} hidden={!expanded}>
-            <section aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={expanded ? 'inspection-step-content' : undefined} className="min-w-0 space-y-6 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
+            <section aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-6 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
               {(expanded || visited.has(step.id)) && step.content}
             </section>
           </div>

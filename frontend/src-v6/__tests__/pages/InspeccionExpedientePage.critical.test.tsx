@@ -438,7 +438,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(screen.getByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toBeVisible();
   });
 
-  it('closes the current mobile control in focused mode and preserves the observation when reopened', async () => {
+  it('closes a control in the flat list and preserves the observation when reopened', async () => {
     const width = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 });
     try {
@@ -446,7 +446,6 @@ describe('InspeccionExpedientePage critical review UX', () => {
       renderPage({ ...base, items: [...base.items, { ...base.items[0], id: 'item-2', codigo: 'DOC-02', etiqueta: 'Otro control', resultado: 'PENDIENTE' }] }, true, '#checklist/DOC-01');
       const observation = await screen.findByRole('textbox', { name: 'Observación: Documentación obligatoria' });
       fireEvent.change(observation, { target: { value: 'Nota en campo que no debe perderse' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Volver al control actual' }));
       const header = within(document.getElementById('control-item-1')!).getByRole('button', { name: /Documentación obligatoria/ });
       fireEvent.click(header);
       expect(header).toHaveAttribute('aria-expanded', 'false');

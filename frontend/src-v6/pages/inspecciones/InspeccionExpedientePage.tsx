@@ -1058,7 +1058,6 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
   const linkedItem = location.hash.startsWith('#checklist/') ? items.find((item) => item.codigo === linkedCode) : undefined;
   const linkedItemId = linkedItem?.id;
   const activeItem = linkedItem?.id ?? expandedItem ?? orderedItems.find((item) => item.resultado === 'PENDIENTE')?.id ?? orderedItems[0]?.id;
-  const [showOverview, setShowOverview] = useState(true);
   const remaining = orderedItems.filter((item) => item.resultado === 'PENDIENTE');
   const nextPendingAfter = (item?: InspectionItem) => {
     const position = item ? orderedItems.indexOf(item) : -1;
@@ -1075,7 +1074,6 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
     setExpandedItem(item?.id || '');
     // Closing the focused mobile item must leave the headers available, not an
     // empty focused view. Decisions and observations remain in the parent draft.
-    if (!item) setShowOverview(true);
     navigate({ pathname: location.pathname, search: location.search, hash: item ? '#checklist/' + encodeURIComponent(item.codigo) : '#checklist' }, { replace: true });
   };
   useLayoutEffect(() => {
@@ -1115,7 +1113,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
       const groupItems = items.filter((item) => item.categoria === group);
       const groupCompleted = groupItems.filter((item) => item.resultado !== 'PENDIENTE').length;
       const groupFails = groupItems.filter((item) => item.resultado === 'NO_CUMPLE').length;
-      return <div key={group} className={`mt-5 ${!showOverview && !groupItems.some((item) => item.id === activeItem) ? 'max-lg:hidden' : ''}`}>
+      return <div key={group} className="mt-5">
         <div style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-12 items-center justify-between gap-3 rounded-t-lg border border-neutral-300 bg-neutral-100 px-3 py-2 sm:px-5">
           <p className="font-bold text-[#10213A]">{group}</p>
           <div className="text-right text-xs font-semibold text-neutral-600"><span>{groupCompleted}/{groupItems.length} revisados</span>{groupCompleted < groupItems.length && <span className="text-warning-800"> · {groupItems.length - groupCompleted} pendientes</span>}{groupFails > 0 && <span className="text-error-800"> · {groupFails} {groupFails === 1 ? 'no cumple' : 'no cumplen'}</span>}</div>
@@ -1129,19 +1127,26 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           // Observation and photos appear once a result is chosen: a pending card shows only the three answers.
           const showObservation = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0 || (editable && item.resultado !== 'PENDIENTE');
           const expanded = activeItem === item.id;
-          return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`mt-2 rounded-lg border border-l-4 px-3 py-1 sm:px-5 ${!showOverview && !expanded ? 'max-lg:hidden' : ''} ${isFail ? 'border-error-300 border-l-error-600 bg-error-50/30' : expanded ? 'border-primary-300 border-l-primary-700 bg-primary-50/50' : 'border-neutral-300 border-l-neutral-300 bg-white'}`}>
+          return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`mt-2 rounded-lg border border-l-4 px-3 py-1 sm:px-5 ${isFail ? 'border-error-300 border-l-error-600 bg-error-50/30' : expanded ? 'border-primary-300 border-l-primary-700 bg-primary-50/50' : 'border-neutral-300 border-l-neutral-300 bg-white'}`}>
             <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item, false)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{orderedItems.indexOf(item) + 1}</span>}</div>
               <div className="min-w-0 flex-1"><p className="text-base font-semibold leading-relaxed text-[#10213A]">{item.etiqueta}</p><div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"><span className="text-xs font-medium text-neutral-500">{item.codigo}</span><span data-testid={'inspection-item-status-' + item.id} className={'rounded-md px-2 py-1 text-xs font-semibold ' + (item.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-900' : isFail ? 'bg-error-50 text-error-800' : item.resultado === 'CUMPLE' ? 'bg-success-50 text-success-800' : 'bg-neutral-100 text-neutral-700')}>{itemStatus(item)}</span>{item.observacion && <span className="text-xs text-neutral-600">Observación</span>}{itemEvidence.length + pendingItemEvidence.length > 0 && <span className="text-xs text-neutral-600">{itemEvidence.length + pendingItemEvidence.length} adjuntos</span>}</div></div>
               {expanded ? <ChevronUp size={17} className="mt-1 shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="mt-1 shrink-0 text-neutral-500" />}
             </button>
-            {expanded && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
-              <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2">
+            {/* The three answers stay at hand on every card; details open with a tap or once a result is chosen. */}
+            {editable && <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2 pb-3 pl-0 sm:pl-10">
                 {RESULTS.map((option) => {
                   const selected = item.resultado === option.value;
                   return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:flex-row sm:gap-1.5 sm:text-sm ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
                 })}
-              </div>
+              </div>}
+            {expanded && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
+              {!editable && <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2">
+                {RESULTS.map((option) => {
+                  const selected = item.resultado === option.value;
+                  return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:flex-row sm:gap-1.5 sm:text-sm ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
+                })}
+              </div>}
               {showObservation && <div className={`mt-3 border-l-2 pl-3 ${isFail ? 'border-error-300' : 'border-neutral-300'}`}>
                 <label><span className={`mb-1 block text-sm font-bold ${isFail ? 'text-error-900' : 'text-neutral-900'}`}>{isFail ? 'Hallazgo: qué no cumple' : 'Observación de este control'}</span><textarea disabled={!editable} aria-label={`Observación: ${item.etiqueta}`} value={item.observacion || ''} onChange={(event) => updateItem(item.id, { observacion: event.target.value })} rows={2} placeholder={isFail ? 'Qué encontraste, dónde y qué evidencia lo respalda' : 'Qué observaste en este control'} className={`w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-base outline-none focus:ring-2 ${isFail ? 'border-error-300 focus:border-error-600 focus:ring-error-100' : 'border-neutral-400 focus:border-primary-700 focus:ring-primary-100'}`} /></label>
                 {editable && <div className="mt-2"><OfflineDictation buttonLabel="Dictar observación" active={expanded && location.hash.startsWith('#checklist')} onActiveChange={onDictationActiveChange} onText={(text) => onDictatedText(item.id, text)} /></div>}
@@ -1160,13 +1165,12 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                   </label>
                 </div>}
               </div>}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><a href="#checklist" onClick={(event) => { event.preventDefault(); revealInspectionAnchor(document.getElementById('checklist')); }} className="rounded-md px-2 py-2 text-xs font-semibold text-neutral-600 !no-underline hover:bg-neutral-100">Volver al índice de controles</a><button type="button" disabled={!nextPendingAfter(item)} onClick={() => openControl(nextPendingAfter(item))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(item) ? 'Siguiente pendiente' : remaining.length ? 'Último control pendiente' : 'Checklist revisado'}</button></div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><button type="button" disabled={!nextPendingAfter(item)} onClick={() => openControl(nextPendingAfter(item))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(item) ? 'Siguiente pendiente' : remaining.length ? 'Último control pendiente' : 'Checklist revisado'}</button></div>
             </div>}
           </div>;
         })}
       </div>;
     })}
-    <button type="button" disabled={!activeItem} aria-expanded={showOverview} onClick={() => setShowOverview((value) => !value)} className="min-h-12 w-full border-t border-neutral-200 px-4 text-sm font-semibold text-primary-800 disabled:text-neutral-500 lg:hidden">{showOverview ? activeItem ? 'Volver al control actual' : 'Elegí un control para continuar' : `Ver los ${items.length} controles`}</button>
   </section>;
 }
 export function EvidenceCard({ inspection, separatePhotos = false, pendingEvidence, pendingActions, editable, recording, onCamera, onFile, onAudio, onAnnul }: { separatePhotos?: boolean; inspection: NonNullable<ReturnType<typeof useInspection>['data']>; pendingEvidence: PendingInspectionEvidence[]; pendingActions?: PendingEvidenceActions; editable: boolean; recording: boolean; onCamera: () => void; onFile: () => void; onAudio: () => void; onAnnul: (evidenceId: string, reason: string) => Promise<void> }) {
