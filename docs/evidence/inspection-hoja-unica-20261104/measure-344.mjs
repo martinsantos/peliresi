@@ -66,6 +66,14 @@ try {
   await page.waitForTimeout(1500);
   results.pages.app344 = await page.evaluate(probe);
   await page.screenshot({ path: join(outDir, 'capturas', 'hoja-344-arriba.jpg'), type: 'jpeg', quality: 80 });
+  // Bloqueo táctil del mapa: arranca bloqueado (la página se desplaza por encima), un toque lo activa, un scroll de la página lo vuelve a bloquear.
+  const mapLock = async () => page.evaluate(() => { const c = document.querySelector('.leaflet-container'); return { dragClass: Boolean(c?.classList.contains('leaflet-touch-drag')), touchAction: c?.style.touchAction || '', hint: Boolean([...document.querySelectorAll('p')].find((p) => p.textContent === 'Tocá el mapa para moverlo')) }; });
+  const lock = { beforeTap: await mapLock() };
+  const map = await page.locator('.leaflet-container').boundingBox();
+  if (map) { await page.touchscreen.tap(map.x + map.width / 2, map.y + map.height / 2 + 60); await page.waitForTimeout(300); lock.afterTap = await mapLock(); }
+  await page.evaluate(() => { const r = document.querySelector('[data-inspection-page-scroll]'); if (r) r.scrollTop += 40; });
+  await page.waitForTimeout(300); lock.afterPageScroll = await mapLock();
+  results.pages.app344.mapLock = lock;
   // Desplazamiento a Controles y respuesta en un control: la página no debe moverse sola.
   const region = () => document.querySelector('[data-inspection-page-scroll]');
   await page.evaluate(() => { const el = document.getElementById('checklist'); const r = document.querySelector('[data-inspection-page-scroll]'); if (el && r) r.scrollTop += el.getBoundingClientRect().top - r.getBoundingClientRect().top - 8; });

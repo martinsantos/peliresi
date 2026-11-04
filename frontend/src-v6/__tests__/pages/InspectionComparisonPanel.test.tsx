@@ -28,6 +28,20 @@ describe('InspectionComparisonPanel', () => {
     fireEvent.click(within(document.getElementById('comparison-row-1')!).getByRole('button', { name: 'Ver o corregir detalle' }));
     expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 1' })).toHaveValue('Observado');
   });
+  it('flat: every group open, rows revealed by content or by a tap, nothing with aria-expanded but the index', () => {
+    const comparisons = ['Documentos', 'Residuos', 'Residuos'].map((categoria, index) => ({ id: `row-${index}`, codigo: `QA-${index}`, categoria, etiqueta: `Dato ${index}`, origen: 'actor', valorDeclarado: 'Declarado', valorObservado: index === 2 ? 'Observado' : null, resultado: (index === 2 ? 'DIFIERE' : 'PENDIENTE') as 'DIFIERE' | 'PENDIENTE', observacion: null, orden: index, evidencias: [] }));
+    render(<MemoryRouter><InspectionComparisonPanel inspectionId="qa" comparisons={comparisons} editable embedded flat onChange={vi.fn()} onEvidence={vi.fn()} /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: /^Residuos\s*1\/2/ })).toBeNull();
+    expect(screen.getByText('Dato 0')).toBeVisible(); expect(screen.getByText('Dato 1')).toBeVisible(); expect(screen.getByText('Dato 2')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 2' })).toHaveValue('Observado');
+    expect(screen.queryByRole('textbox', { name: 'Valor verificado: Dato 0' })).toBeNull();
+    fireEvent.click(within(document.getElementById('comparison-row-0')!).getByRole('button', { name: 'Anotar lo encontrado' }));
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 0' })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 2' })).toBeVisible();
+    expect(document.querySelectorAll('[aria-expanded]')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Ocultar detalle' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Contraste con lo declarado' })).toBeNull();
+  });
   it('opens groups independently and really collapses the selected group without losing decisions', () => {
     const comparisons = ['Documentos', 'Residuos'].map((categoria, index) => ({ id: `row-${index}`, codigo: `QA-${index}`, categoria, etiqueta: `Dato ${index}`, origen: 'actor', valorDeclarado: 'Declarado', valorObservado: 'Observado', resultado: 'DIFIERE' as const, observacion: 'Hallazgo', orden: index, evidencias: [] }));
     render(<MemoryRouter><InspectionComparisonPanel inspectionId="qa" comparisons={comparisons} editable onChange={vi.fn()} onEvidence={vi.fn()} /></MemoryRouter>);
