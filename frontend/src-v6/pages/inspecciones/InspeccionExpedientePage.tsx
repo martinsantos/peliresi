@@ -1140,7 +1140,8 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                   return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:flex-row sm:gap-1.5 sm:text-sm ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
                 })}
               </div>}
-            {expanded && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
+            {/* A pending editable card has nothing to unfold yet: no empty details block with a lone «Siguiente pendiente». */}
+            {expanded && (showObservation || !editable) && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
               {!editable && <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2">
                 {RESULTS.map((option) => {
                   const selected = item.resultado === option.value;
