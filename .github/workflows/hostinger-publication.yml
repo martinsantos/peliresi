@@ -9,7 +9,7 @@ on:
     inputs:
       operation:
         type: choice
-        options: [preflight, prepare, publish]
+        options: [preflight, prepare, publish, activate-inspection-field-model]
         default: preflight
         description: Preflight only reads the current runtime; prepare stages; publish activates an exact reviewed bundle
       release_commit:
@@ -90,10 +90,13 @@ jobs:
       - name: Require explicit immutable release identities
         run: |
           set -euo pipefail
-          [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish ]]
+          [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish || "$OPERATION" == activate-inspection-field-model ]]
           [[ "$EXPECTED_ACTIVE" =~ ^[0-9a-f]{40}$ ]]
           if [[ "$OPERATION" == preflight ]]; then
             [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
+          elif [[ "$OPERATION" == activate-inspection-field-model ]]; then
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-INSPECTIONS ]]
           else
             [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           fi
@@ -144,6 +147,7 @@ jobs:
           VITE_API_URL: https://sitrep.ultimamilla.com.ar/api
           VITE_PUBLIC_DEMO_MODE: 'false'
           VITE_DEMO_LOGIN_ENABLED: 'false'
+          VITE_INSPECTION_FIELD_MODEL_ENABLED: 'true'
         run: |
           set -euo pipefail
           cd candidate/backend
@@ -234,7 +238,7 @@ jobs:
             ssh "${opts[@]}" "$target" "/usr/bin/node --input-type=module - preflight $EXPECTED_ACTIVE" < "$RUNNER_TEMP/publisher.mjs"
             exit 0
           fi
-          [[ "$BUNDLE_SHA" =~ ^[0-9a-f]{64}$ ]]
+          if [[ "$OPERATION" != activate-inspection-field-model ]]; then [[ "$BUNDLE_SHA" =~ ^[0-9a-f]{64}$ ]]; fi
           root=/srv/umsa-sitrep-publisher
           incoming="$root/incoming/$id"
           ssh "${opts[@]}" "$target" "test \"\$(hostname)\" = srv2101069.hstgr.cloud && test \"\$(cat /srv/umsa-migration/.target)\" = 179.198.115.115 && test -f /srv/umsa-migration/production.active && test ! -L $root && test ! -e $incoming && install -d -m 0755 $root $root/releases && install -d -m 0700 $root/incoming $root/staged $root/backups $incoming"
@@ -242,6 +246,10 @@ jobs:
           local_hash=$(sha256sum "$RUNNER_TEMP/publisher.mjs" | cut -d ' ' -f1)
           remote_hash=$(ssh "${opts[@]}" "$target" "sha256sum $incoming/publisher.mjs" | cut -d ' ' -f1)
           [[ "$local_hash" = "$remote_hash" ]]
+          if [[ "$OPERATION" == activate-inspection-field-model ]]; then
+            ssh "${opts[@]}" "$target" "flock --nonblock /run/lock/umsa-sitrep-publisher.lock /usr/bin/node $incoming/publisher.mjs $OPERATION $EXPECTED_ACTIVE $id $ACKNOWLEDGEMENT"
+            exit 0
+          fi
           if [[ "$OPERATION" == prepare ]]; then
             scp "${opts[@]}" "$RUNNER_TEMP/bundle/release.tar.gz" "$RUNNER_TEMP/bundle/release.json" "$target:$incoming/"
           fi

@@ -8,7 +8,7 @@ import {gunzipSync} from 'node:zlib';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
 import { compatible,proxyFor,safeArchiveEntries,inventory,activateWithRollback,loopbackIndex,
-  digest,codeDigest,capturePrepared,assertPrepared,withPrepared,
+  digest,codeDigest,capturePrepared,assertPrepared,withPrepared,inspectionFeatureEnvironment,assertInspectionDeliveryClosed,assertInspectionFlagsPreserved,
   REVIEWED_REVISION,REVIEWED_BACKEND_REVISION,REVIEWED_FILES,REVIEWED_MIGRATION,
   assertReviewedHashes,migrations,assertAcknowledgement,assertMigrationPending,migrationTransaction,
   nativeLinks,backedActivation,migrationOutcome,REVIEWED_DEPENDENCIES,dependencies,
@@ -465,6 +465,50 @@ test('private dependency tampering cannot be blessed by rewriting prepared check
     assert.equal(activated,false);
   });
 });
+test('inspection activation changes only its named flag and rejects ambiguous configuration',()=>{
+  const original='DISABLE_EMAILS="true"\nPUSH_MANIFEST_NOTICES_ENABLED="false"\nPRIVATE_KEY="keep-byte-for-byte"\n';
+  assert.equal(inspectionFeatureEnvironment(original),original+'INSPECTION_FIELD_MODEL_ENABLED="true"\n');
+  for(const value of ['false','"false"','true','"true"']) {
+    const configured=original+'INSPECTION_FIELD_MODEL_ENABLED='+value+'\n';
+    const enabled=inspectionFeatureEnvironment(configured);
+    assert.equal(enabled,original+'INSPECTION_FIELD_MODEL_ENABLED="true"\n');
+    assert.equal(inspectionFeatureEnvironment(enabled),enabled);
+  }
+  for(const suffix of ['INSPECTION_FIELD_MODEL_ENABLED=maybe\n','INSPECTION_FIELD_MODEL_ENABLED=false\nINSPECTION_FIELD_MODEL_ENABLED=true\n'])assert.throws(()=>inspectionFeatureEnvironment(original+suffix));
+});
+test('inspection activation fails closed for delivery, CAP and unrelated flag changes',()=>{
+  const before={DISABLE_EMAILS:'true',PUSH_MANIFEST_NOTICES_ENABLED:'false',TRAINING_DIRECT_LOGIN_UNTIL:'2000-01-01T00:00:00Z',MANIFEST_ADDENDA_ENABLED:'true'};
+  const after={...before,INSPECTION_FIELD_MODEL_ENABLED:'true'};
+  assertInspectionDeliveryClosed(before);assertInspectionFlagsPreserved(before,after);
+  for(const changed of [{DISABLE_EMAILS:'false'},{PUSH_MANIFEST_NOTICES_ENABLED:'true'},{TRAINING_DIRECT_LOGIN_UNTIL:'2999-01-01'},{TRAINING_DIRECT_LOGIN_UNTIL:'invalid'},{INSPECTION_ACT_MAIL_ENABLED:'true'}])assert.throws(()=>assertInspectionDeliveryClosed({...before,...changed}));
+  assert.throws(()=>assertInspectionFlagsPreserved(before,{...after,MANIFEST_ADDENDA_ENABLED:'false'}));
+  assert.throws(()=>assertInspectionFlagsPreserved(before,{...after,UNRELATED_ENABLED:'true'}));
+  assert.throws(()=>assertInspectionFlagsPreserved(before,before));
+});
+test('inspection flag activation uses the reviewed workflow, explicit acknowledgement and publication lock',()=>{
+  const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
+  assert.match(workflow,/options: \[preflight, prepare, publish, activate-inspection-field-model\]/);
+  assert.match(workflow,/ACKNOWLEDGEMENT.*SITREP-HOSTINGER-INSPECTIONS/);
+  assert.match(workflow,/flock --nonblock \/run\/lock\/umsa-sitrep-publisher.lock \/usr\/bin\/node \$incoming\/publisher.mjs \$OPERATION \$EXPECTED_ACTIVE \$id \$ACKNOWLEDGEMENT/);
+  const code=fs.readFileSync(new URL('./publisher.ts',import.meta.url),'utf8');
+  const operation=code.slice(code.indexOf('async function activateInspectionFieldModel'),code.indexOf('async function main'));
+  assert.ok(operation.indexOf('inspection-environment.before.credentials.env')<operation.indexOf('atomic(target,replacement'));
+  assert.match(operation,/atomic\(target,original,digest\(replacement\)\)/);
+  assert.doesNotMatch(operation,/applyMigration\(|pg_dump|UPDATE |INSERT |DELETE /);
+});
+
+test('reviewed builds expose inspection management on both surfaces while external delivery stays disabled',()=>{
+  const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
+  const block=workflow.slice(workflow.indexOf('      - name: Build and test only'),workflow.indexOf('      - name: Prune candidate-only'));
+  assert.match(block,/VITE_INSPECTION_FIELD_MODEL_ENABLED: 'true'/);
+  assert.match(block,/DISABLE_EMAILS: 'true'/);
+  assert.match(block,/PUSH_MANIFEST_NOTICES_ENABLED: 'false'/);
+  assert.match(block,/VITE_DEMO_LOGIN_ENABLED: 'false'/);
+  assert.match(block,/VITE_PUBLIC_DEMO_MODE: 'false'/);
+  assert.match(block,/npm run build\s+npx vite build --config vite.config.app.ts/);
+  assert.doesNotMatch(block,/VITE_INSPECTION_FIELD_MODEL_ENABLED=false|INSPECTION_ACT_MAIL_ENABLED: 'true'/);
+});
+
 test('workflow prunes only candidate modules and requires sealed runtime smoke before SSH',()=>{
   const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
   assert.match(workflow,/dependency_update:/);assert.match(workflow,/DEPENDENCY_UPDATE: \$\{\{ inputs.dependency_update \}\}/);
