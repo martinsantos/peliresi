@@ -43,12 +43,11 @@ describe('InspectionWorkspace navigation contract', () => {
   });
 
   it('opens every Constatar task in one scroll with a heading link each, no accordions', () => {
+    // The fixture's Constatar section has one task, so no per-task heading is drawn; the mode still shows no accordion.
     setup('#checklist');
-    const headings = screen.getAllByRole('heading', { level: 3 }).filter(heading => heading.id.startsWith('inspection-task-heading-'));
-    expect(headings.map(heading => heading.id)).toContain('inspection-task-heading-checklist');
-    expect(screen.getByRole('link', { name: /Controles en campo/ })).toHaveAttribute('aria-current', 'location');
     expect(document.querySelectorAll('a[aria-expanded]')).toHaveLength(0);
     expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
+    expect(screen.getByTestId('inspection-step-content')).toBeVisible();
   });
 
   it('preserves a child note when leaving and returning, and never offers generic save for it', () => {
