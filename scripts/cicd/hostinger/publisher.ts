@@ -1601,6 +1601,7 @@ function linkEvidence(backend: string): Json {
     const file=path.join(backend,name);const link=fs.lstatSync(file);
     if(!link.isSymbolicLink())throw new Error('Preserved runtime link was replaced');
     const target=fs.statSync(file);
+    if(RUNTIME_LINKS.includes(name) && !target.isDirectory())throw new Error('Preserved runtime link target is not a directory');
     links[name]={target:fs.readlinkSync(file),resolved:fs.realpathSync(file),
       linkDevice:link.dev,linkInode:link.ino,linkMode:link.mode,linkOwner:link.uid,
       targetDevice:target.dev,targetInode:target.ino};
