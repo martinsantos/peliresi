@@ -50,14 +50,15 @@ Nada se eliminó del modelo de datos ni de las reglas; sólo se reubicó, se aco
 
 Al mover «Copias de versiones anteriores» a «Expediente y seguimiento», esa tarea quedó sin barra de guardado (la barra sólo acompaña a los pasos editables). Quien revisaba una copia quedaba en una pantalla sin «Guardar», aunque el texto del panel lo mencionaba. Corregido en `3db8edc1`: al revisar un texto se vuelve al paso Hechos (acta) y al recuperar un archivo, a Evidencias, donde está la barra; el texto del panel lo dice. «Asignación y programación» tiene su propio botón de confirmación y no depende de la barra.
 
-## Lo que se dejó deliberadamente sin tocar (decisión de diseño pendiente)
+## Constatar en una sola lista (decisión del usuario, 03/11)
 
-**Constatar sigue siendo la parte confusa.** Tres acordeones apilados con tres vocabularios distintos (hechos / controles / comparar con lo declarado), y dentro de «Controles» once tarjetas, cada una con sus respuestas, observación, dictado, fotos y dos enlaces de navegación (índice / siguiente pendiente). Aplanarlo es una decisión de producto, no una limpieza. Dos opciones concretas:
+El usuario eligió la opción 1. Implementado en `379d9323` y el ajuste de desplazamiento posterior:
 
-1. **Una sola lista con cabeceras fijas por grupo:** hechos arriba (un cuadro de texto), después los controles en una lista continua agrupada (Residuos, Seguridad, Trazabilidad, Habilitación, Documentación) y al final el contraste con lo declarado. Sin acordeones; el desplazamiento es el recorrido.
-2. **Mantener los tres acordeones**, pero con un solo vocabulario («Qué observaste», «Controles», «Lo declarado») y abriendo el siguiente al cerrar el anterior.
-
-Recomiendo la opción 1 para campo. Requiere rehacer el componente de controles y sus pruebas; no se hizo en esta tanda.
+- **Una sola pantalla de desplazamiento** para el paso 2: Hechos, actividad y entorno → Controles en campo → Comparar con lo declarado, cada bloque con un encabezado (enlace al ancla) y su estado («Sin registrar», «0 de 11 controles»). Desaparecen los tres acordeones; «Guardar y continuar» baja al bloque siguiente.
+- **Controles como lista plana en el teléfono:** antes se mostraba un solo control «enfocado» y había que volver al índice para ver otro; ahora los once están visibles, agrupados (Residuos, Seguridad, Trazabilidad, Habilitación, Documentación) con sus cabeceras fijas. Cada tarjeta muestra siempre sus tres respuestas (Cumple / No cumple / No aplica); la observación, el dictado y las fotos se abren con un toque o al elegir una respuesta.
+- **Quitados:** el botón «Ver los 11 controles / Volver al control actual» y el enlace «Volver al índice de controles» de cada tarjeta. Se conserva «Siguiente pendiente», el buscador «Ir a un control» y, en pantallas anchas, «Ir al siguiente pendiente (n)».
+- **Enlaces profundos y reanudación** (`#checklist/DOC-01`, «Retomá en…») siguen funcionando: al llegar a una tarea distinta de la primera, la pantalla baja hasta su encabezado.
+- Prueba adaptada: el caso «cierra el control enfocado y conserva la observación al reabrir» ahora describe la lista plana (sin el botón que dejó de existir).
 
 ## Pruebas
 
