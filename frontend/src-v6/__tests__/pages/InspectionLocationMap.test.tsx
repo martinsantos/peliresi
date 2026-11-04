@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InspectionFieldLocation } from '../../types/inspection';
@@ -27,7 +27,8 @@ import InspectionLocationMap from '../../pages/inspecciones/InspectionLocationMa
 const base: InspectionFieldLocation = { latitud: -32.89, longitud: -68.84, origen: 'MANUAL', registradaAt: '2026-11-03T15:00:00.000Z', zoom: 17, mapaImagen: 'data:image/png;base64,AAAA', mapaZoom: 17 };
 let last: InspectionFieldLocation | undefined;
 function Harness({ initial, disabled = false }: { initial?: InspectionFieldLocation; disabled?: boolean }) {
-  const [value, setValue] = useState(initial); last = value;
+  const [value, setValue] = useState(initial);
+  useLayoutEffect(() => { last = value; }, [value]);
   return <InspectionLocationMap value={value} disabled={disabled} onChange={v => { last = v; setValue(v); }} />;
 }
 // Set per test: the suite config restores stubbed globals between tests.

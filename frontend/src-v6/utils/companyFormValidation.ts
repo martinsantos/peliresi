@@ -10,7 +10,7 @@ export function companyEmailError(value: string): string | undefined {
   if (!text) return 'Ingresá el correo de la persona.';
   if (text.length > 254) return 'Usá hasta 254 caracteres.';
   // Same email shape as the server schema; validity never grants access.
-  return /^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/.test(text)
+  return /^(?:[A-Za-z0-9_'+-]+\.)*[A-Za-z0-9_'+-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/.test(text)
     ? undefined : 'Ingresá un correo válido, por ejemplo nombre@empresa.com.';
 }
 export function companyIdentityErrors(form: { cuit?: string; razonSocial: string; nombreFantasia?: string; calle: string; localidad: string; departamento: string; motivo?: string }, create: boolean): CompanyFieldErrors {

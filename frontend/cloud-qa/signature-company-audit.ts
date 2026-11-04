@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -21,7 +22,7 @@ assert.deepEqual({ titulars: after.titulars, representatives: after.representati
   emailAttempts: 0, emailSent: 0, pushEnabled: false });
 const browser = load('browser-final.json').stats;
 assert.equal(browser.expected, 14); assert.equal(browser.unexpected, 0); assert.equal(browser.skipped, 0);
-const strip = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, '');
+const strip = (s: string) => stripVTControlCharacters(s);
 assert.match(strip(readFileSync(path.join(out, 'backend-final.log'), 'utf8')), /203 passed/);
 assert.match(strip(readFileSync(path.join(out, 'frontend-after.log'), 'utf8')), /171 passed/);
 const manual = readFileSync(path.join(out, 'manual.log'), 'utf8');

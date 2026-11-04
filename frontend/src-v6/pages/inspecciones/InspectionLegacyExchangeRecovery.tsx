@@ -1,3 +1,4 @@
+import { useBlobDownload } from '../../hooks/useBlobDownload';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { History } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
@@ -57,9 +58,8 @@ export function InspectionLegacyExchangeRecovery(props: Props) {
   </details>;
 }
 function Download({ blob, name, label }: { blob: Blob; name: string; label: string }) {
-  const [url, setUrl] = useState('');
-  useEffect(() => { const next = URL.createObjectURL(blob); setUrl(next); return () => URL.revokeObjectURL(next); }, [blob]);
-  return <a className="flex min-h-11 items-center break-all rounded px-2 text-primary-800 underline focus-visible:outline focus-visible:outline-2" href={url} download={name}>{label}</a>;
+  const downloadRef = useBlobDownload(blob);
+  return <a className="flex min-h-11 items-center break-all rounded px-2 text-primary-800 underline focus-visible:outline focus-visible:outline-2" ref={downloadRef} download={name}>{label}</a>;
 }
 function OriginalText({ raw }: { raw: string }) {
   const blob = useMemo(() => new Blob([raw], { type: 'application/json' }), [raw]);

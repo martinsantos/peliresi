@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -22,7 +23,7 @@ assert.equal(baseline.stats.unexpected, 4); assert.equal(labels.stats.unexpected
 function failure(report: any, title: string, project: string): string {
   const specs = report.suites.flatMap((suite: any) => suite.specs || []).filter((spec: any) => spec.title === title);
   const test = specs.flatMap((spec: any) => spec.tests).find((item: any) => item.projectName === project);
-  assert.ok(test); assert.equal(test.status, 'unexpected'); return test.results[0].error.message.replace(/\u001b\[[0-9;]*m/g, '');
+  assert.ok(test); assert.equal(test.status, 'unexpected'); return stripVTControlCharacters(test.results[0].error.message);
 }
 for (const surface of ['web-desktop', 'app']) {
   assert.match(failure(baseline, 'incident dialog keeps keyboard focus and restores it on Escape', surface), /getByRole\('dialog'/);

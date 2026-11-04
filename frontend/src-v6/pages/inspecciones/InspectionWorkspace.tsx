@@ -28,6 +28,10 @@ interface Props {
   resumeIdentity?: { userId: string | number; inspectionId: string; owner: string };
 }
 
+function restoreScrollPosition(region: HTMLElement, position: number) {
+  region.scrollTop = position;
+}
+
 /** Direct navigation. Existing deep links, drafts and file selections remain valid. */
 export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate, resumeIdentity, pageScroll = false, continuationManaged = false }: Props) {
   const location = useLocation();
@@ -117,11 +121,11 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       // A continuous section scrolls to the linked task or control itself; a later re-run of this
       // effect (viewport change after mount) must not pull it back to the top.
       const stored = scrollPositions.current.get(active.id);
-      region.scrollTop = previous && previous !== region && scrollStepRef.current === active.id ? previous.scrollTop : stored !== undefined ? stored : continuous ? region.scrollTop : 0;
+      restoreScrollPosition(region, previous && previous !== region && scrollStepRef.current === active.id ? previous.scrollTop : stored !== undefined ? stored : continuous ? region.scrollTop : 0);
     }
     scrollRef.current = region;
     scrollStepRef.current = active.id;
-  }, [active.id, constrainedViewport, pageScroll]);
+  }, [active.id, constrainedViewport, pageScroll, continuous]);
 
   useEffect(() => {
     if (!pageScroll) return;

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useBlobDownload } from '../../hooks/useBlobDownload';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Download, History } from 'lucide-react';
 import { readLegacyFieldCopies, recoverLegacyFieldEvidence, type LegacyFieldCopies } from '../../services/inspectionLegacyRecovery';
 import type { PendingInspectionEvidence } from '../../services/inspectionOfflineEvidence';
@@ -81,9 +82,8 @@ function ScopedLegacyRecovery(props: Props) {
 }
 
 function DownloadCopy({ blob, name }: { blob: Blob; name: string }) {
-  const [url, setUrl] = useState('');
-  useEffect(() => { const next = URL.createObjectURL(blob); setUrl(next); return () => URL.revokeObjectURL(next); }, [blob]);
-  return <a href={url} download={name} className="inline-flex min-h-11 items-center gap-2 rounded px-2 font-medium text-primary-800 focus-visible:outline focus-visible:outline-2"><Download size={16} aria-hidden="true" />Descargar original</a>;
+  const downloadRef = useBlobDownload(blob);
+  return <a ref={downloadRef} download={name} className="inline-flex min-h-11 items-center gap-2 rounded px-2 font-medium text-primary-800 focus-visible:outline focus-visible:outline-2"><Download size={16} aria-hidden="true" />Descargar original</a>;
 }
 function TextCopy({ raw, source, disabled, onReview }: { raw: string; source: string; disabled: boolean; onReview: () => void }) {
   const blob = useMemo(() => new Blob([raw], { type: 'application/json' }), [raw]);

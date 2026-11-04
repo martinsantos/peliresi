@@ -1,3 +1,4 @@
+import { hasAsciiControlCharacters } from '../utils/controlCharacters';
 import { useLayoutEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,7 +36,7 @@ export function useActorDetailNavigation(tabs: string[]) {
 export function actorEditReturn(state: unknown, listPath: string, id: string): string {
   const fallback = listPath + '/' + encodeURIComponent(id);
   const value = (state as { actorDetailReturn?: unknown } | null)?.actorDetailReturn;
-  if (typeof value !== 'string' || value.length > 6000 || /[\\\\\u0000-\u001f]/.test(value)) return fallback;
+  if (typeof value !== 'string' || value.length > 6000 || (/[\\\\]/.test(value) || hasAsciiControlCharacters(value))) return fallback;
   try {
     const url = new URL(value, 'https://sitrep.invalid');
     return url.origin === 'https://sitrep.invalid' && url.pathname === fallback ? fallback + url.search : fallback;

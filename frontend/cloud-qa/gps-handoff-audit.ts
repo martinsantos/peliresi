@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -21,7 +22,7 @@ const specs = baseline.suites.flatMap((suite: any) => suite.specs || []);
 function baselineError(title: string, project: string): string {
   const matching = specs.filter((item: any) => item.title === title); assert.ok(matching.length);
   const test = matching.flatMap((item: any) => item.tests).find((item: any) => item.projectName === project); assert.ok(test);
-  assert.equal(test.status, 'unexpected'); return test.results[0].error.message.replace(/\u001b\[[0-9;]*m/g, '');
+  assert.equal(test.status, 'unexpected'); return stripVTControlCharacters(test.results[0].error.message);
 }
 assert.match(baselineError('explains an unreadable GPS copy before a handoff and keeps the form', 'app'), /No se pudo verificar o guardar el recorrido/);
 assert.match(baselineError('explains an unreadable GPS copy before a handoff and keeps the form', 'web-desktop'), /browserType\.launch/);

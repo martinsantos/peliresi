@@ -1,4 +1,4 @@
-import { chromium, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { login, prefix, readableFixedAction } from './helpers';
@@ -372,12 +372,12 @@ test('a failed actor catalogue is explained and the selection can be retried', a
   await expect(dialog.getByRole('combobox', { name: 'Actor inspeccionado', exact: true })).toBeFocused();
 });
 
-test('the draft survives closing and reopening the browser profile', async ({}, info) => {
+test('the draft survives closing and reopening the browser profile', async ({ playwright }, info) => {
   test.skip(process.env.QA_OPENING_RUN === 'before');
   const profile = info.outputPath('synthetic-browser-profile');
   const options = { headless: true, baseURL: 'http://127.0.0.1:4177', serviceWorkers: 'block' as const,
     viewport: info.project.name === 'app' ? { width: 320, height: 800 } : { width: 1365, height: 900 } };
-  let context = await chromium.launchPersistentContext(profile, options);
+  let context = await playwright.chromium.launchPersistentContext(profile, options);
   try {
     const page = context.pages()[0] || await context.newPage();
     await login(page, info, 'inspector');
@@ -386,7 +386,7 @@ test('the draft survives closing and reopening the browser profile', async ({}, 
     await page.getByRole('combobox', { name: 'Tipo de inspección', exact: true }).selectOption('ESPONTANEA');
     await page.getByLabel('Descripción inicial').fill('QA texto después de cerrar el navegador');
     await context.close();
-    context = await chromium.launchPersistentContext(profile, options);
+    context = await playwright.chromium.launchPersistentContext(profile, options);
     const restored = context.pages()[0] || await context.newPage();
     await restored.goto(`${prefix(info)}/inspecciones`);
     await restored.getByRole('button', { name: 'Continuar apertura', exact: true }).click();

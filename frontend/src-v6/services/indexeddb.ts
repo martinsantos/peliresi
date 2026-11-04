@@ -81,8 +81,7 @@ const DB_OPEN_TIMEOUT_MS = 12_000;
 function getDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
 
-  let pending: Promise<IDBDatabase>;
-  pending = new Promise<IDBDatabase>((resolve, reject) => {
+  const pending = new Promise<IDBDatabase>((resolve, reject) => {
     let settled = false;
     let blocked = false;
     const fail = (error: Error) => {

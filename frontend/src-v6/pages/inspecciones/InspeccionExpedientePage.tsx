@@ -11,7 +11,7 @@ import { warmInspectionShell } from '../../services/warmInspectionShell';
 
 import { isAxiosError } from 'axios';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArchiveX, ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, Eye, FileAudio, FileText, History, Loader2, Mic, Paperclip, Play, RotateCcw, Save, Search, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
+import { ArchiveX, ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, Eye, FileAudio, FileText, History, Loader2, Mic, Paperclip, Play, RotateCcw, Save, Search, Send, ShieldCheck, Square, Trash2, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
@@ -1076,7 +1076,6 @@ function DossierReadinessPanel({ readiness }: { readiness: InspectionDossierRead
   </section>;
 }
 
-function Meta({ icon, label, value, detail, to, onNavigate, returnTo }: { icon: React.ReactNode; label: string; value: string; detail?: string; to?: string; onNavigate?: () => boolean; returnTo?: string }) { return <div className="flex gap-3"><span className="mt-0.5 shrink-0 text-neutral-500 [&>svg]:h-[19px] [&>svg]:w-[19px]">{icon}</span><div className="min-w-0"><p className="text-xs text-neutral-500">{label}</p>{to ? <Link to={to} state={{ inspectionReturn: returnTo }} onClick={event => { if (onNavigate?.() === false) event.preventDefault(); }} className="rounded-sm font-bold text-[#10213A] transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label={`Abrir ${label.toLowerCase()}: ${value}`}>{value}</Link> : <p className="font-bold text-[#10213A]">{value}</p>}{detail && <p className="text-xs text-neutral-500">{detail}</p>}</div></div>; }
 function DraftSaveFeedback({ status }: { status: DraftSaveStatus }) {
   const color = status.tone === 'error' ? 'text-error-800' : status.tone === 'success' ? 'text-success-800' : 'text-neutral-700';
   // On a phone the status shares one row with two buttons: one or two words, never a sentence.
@@ -1171,7 +1170,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
       if (offset < 0 || offset > region.clientHeight * 0.6) revealInspectionAnchor(element);
     }, 400);
     return () => { cancelAnimationFrame(frame); window.clearTimeout(late); };
-  }, [linkedItemId, location.hash, expandedItem]);
+  }, [linkedItemId, location.hash, expandedItem, flat]);
   const [expandedEvidence, setExpandedEvidence] = useState<string[]>([]);
   const updateItem = (id: string, patch: Partial<InspectionItem>) => {
     // Keep the initial pending control in place after a decision; advancing is explicit.

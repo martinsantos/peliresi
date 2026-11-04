@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it } from 'vitest';
@@ -7,7 +7,8 @@ let update: ReturnType<typeof useScopedSearchParams>[1];
 let navigate: ReturnType<typeof useNavigate>;
 function Workspace({ owner }: { owner: string }) {
   const [params, setParams] = useScopedSearchParams('rapid-test', ['search', 'estado', 'page'], owner);
-  update = setParams; navigate = useNavigate();
+  const currentNavigate = useNavigate();
+  useLayoutEffect(() => { update = setParams; navigate = currentNavigate; }, [setParams, currentNavigate]);
   const location = useLocation();
   return <><output aria-label="Filters">{params.toString()}</output><output aria-label="Path">{location.pathname}</output></>;
 }
