@@ -6,12 +6,13 @@ import type { Inspection } from '../../types/inspection';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 import { inspeccionService } from '../../services/inspeccion.service';
 import { toast } from '../../components/ui/Toast';
+import { listPendingInspectionEvidence } from '../../services/inspectionOfflineEvidence';
 import { startLocalDictation } from '../../services/localDictation';
 
 // Map and delivery panels have independent coverage; this suite exercises draft persistence.
 vi.mock('../../pages/inspecciones/InspectionLocationMap', () => ({ default: () => <div>Mapa</div> }));
 vi.mock('../../hooks/useCatalogos', () => ({ useCatalogoGeneradores: () => ({ data: [] }), useCatalogoOperadores: () => ({ data: [] }), useCatalogoTransportistas: () => ({ data: [] }) }));
-vi.mock('../../pages/inspecciones/InspectionSignaturePanel', () => ({ InspectionSignaturePanel: () => <section>Firma</section> }));
+vi.mock('../../pages/inspecciones/InspectionSignaturePanel', () => ({ InspectionSignaturePanel: ({ saved, blockedReason, blockedAction }: { saved: boolean; blockedReason?: string; blockedAction?: React.ReactNode }) => <section aria-label="Firma">{!saved && <>{blockedReason}{blockedAction}</>}</section> }));
 vi.mock('../../pages/inspecciones/InspectionActAccessPanel', () => ({ InspectionActAccessPanel: () => <section>Copia del acta</section> }));
 
 const queryMock = vi.hoisted(() => vi.fn());
@@ -58,6 +59,7 @@ describe('shared explicit save for the complete inspection draft', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.training = false;
+    vi.mocked(listPendingInspectionEvidence).mockResolvedValue([]);
     checkpoint.read.mockResolvedValue(undefined); checkpoint.write.mockResolvedValue(undefined);
     localStorage.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
@@ -65,6 +67,54 @@ describe('shared explicit save for the complete inspection draft', () => {
     vi.mocked(inspeccionService.saveDraft).mockResolvedValue({ version: 2 } as Inspection);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it.each(['/inspecciones', '/app/inspecciones'])('keeps an explicit save in the sticky field navigation at %s', async (base) => {
+    let confirm!: (value: Inspection) => void;
+    vi.mocked(inspeccionService.saveDraft).mockImplementation(() => new Promise(resolve => { confirm = resolve; }));
+    render(<MemoryRouter initialEntries={[base + '/inspection-1#resumen']}><Routes><Route path={base + '/:id'} element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>);
+    const field = await screen.findByRole('textbox', { name: 'Registro de lo observado' });
+    const navigation = within(screen.getByRole('navigation', { name: 'Dónde estoy en el formulario' }));
+    const save = navigation.getByRole('button', { name: 'Guardar cambios' });
+    expect(save).toBeVisible();
+    fireEvent.change(field, { target: { value: 'Hallazgo conservado con guardado explícito' } });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
+    expect(inspeccionService.saveDraft).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ observaciones: 'Hallazgo conservado con guardado explícito', version: 1 }));
+    expect(save).toBeDisabled();
+    await act(async () => confirm({ version: 2 } as Inspection));
+    await waitFor(() => expect(save).toHaveTextContent('Guardado'));
+    expect(save).toBeDisabled();
+    expect(field).toHaveValue('Hallazgo conservado con guardado explícito');
+    expect(inspeccionService.transition).not.toHaveBeenCalled();
+    expect(inspeccionService.uploadEvidence).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed automatic save from the field button without editing again', async () => {
+    vi.mocked(inspeccionService.saveDraft).mockRejectedValueOnce(new Error('network unavailable')).mockResolvedValue({ version: 2 } as Inspection);
+    render(<MemoryRouter initialEntries={['/inspecciones/inspection-1#resumen']}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>);
+    const field = await screen.findByRole('textbox', { name: 'Registro de lo observado' });
+    fireEvent.change(field, { target: { value: 'Hallazgo pendiente de confirmar' } });
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByTestId('inspection-field-status')).toHaveTextContent(/No se confirmó el guardado/));
+    const save = within(screen.getByRole('navigation', { name: 'Dónde estoy en el formulario' })).getByRole('button', { name: 'Guardar cambios' });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() => expect(save).toHaveTextContent('Guardado'));
+    expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(2);
+    expect(field).toHaveValue('Hallazgo pendiente de confirmar');
+  });
+
+  it('distinguishes saved text from a pending capture and points to the evidence section', async () => {
+    vi.mocked(listPendingInspectionEvidence).mockResolvedValue([{ id: 'pending-1', inspectionId: fixture.id, file: new File(['pending'], 'foto.jpg', { type: 'image/jpeg' }), userId: 'inspector-1', owner: inspectionWorkspaceOwner({ id: 'inspector-1', rol: 'ADMIN', training: false }), fileName: 'foto.jpg', mimeType: 'image/jpeg', lastModified: 0, fields: { descripcion: 'Captura pendiente' }, capturedAt: '2026-11-04T12:00:00Z', sha256: 'a'.repeat(64), createdAt: '2026-11-04T12:00:00Z', attempts: 1, failureKind: 'terminal', lastError: 'Archivo rechazado por validación' }] as Awaited<ReturnType<typeof listPendingInspectionEvidence>>);
+    render(<MemoryRouter initialEntries={['/inspecciones/inspection-1#firma']}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Firma' })).toHaveTextContent('El contenido está guardado. Falta resolver 1 captura pendiente'));
+    expect(screen.getByRole('link', { name: 'Revisar capturas pendientes' })).toHaveAttribute('href', '#evidencias');
+    expect(document.getElementById('evidencias')).toBeInTheDocument();
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+    expect(inspeccionService.uploadEvidence).not.toHaveBeenCalled();
+  });
 
   it('does not offer official documents during training, while retaining operational downloads', async () => {
     auth.training = true;
