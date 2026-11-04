@@ -16,6 +16,17 @@ export const REVIEWED_MIGRATION = Object.freeze({
   sha256:'5ad722be27b2510ffd2dbc20b3e5aa4eaab5e5bd869b4333db0c6e96814767eb',
   beforeSchema:'124c6bf94c57f8513788e291fcba09979cadb11415e87a31dc185676a1618afc',
   afterSchema:'b0ae0578e12dc55ef6b5102f8e6c213f432308574c5ee7d887da117a7bbb9e61',
+  // Prisma 5.22 formats its generated schema; verified by isolated regeneration.
+  generatedSchema:'bd7a751422dfbd8169e56902dbc88e5157f303574ee75798306b35107fd664b6',
+});
+// Explicit exception for the reviewed security updates in PR #44. Unknown lockfiles
+// still require a new publisher review; no installation ever runs on the live host.
+export const REVIEWED_DEPENDENCIES = Object.freeze({
+  id:'runtime-20261104',
+  beforePackage:'e9974b1a330da6de922e3aafc5dfa61f0c5c292f60db2773a393bf2a6c913cf1',
+  beforeLock:'b7315c794d3e77740d2f94fdd6b25c888696042a95aaf86d1916bdd202b53b52',
+  afterPackage:'6f233e0965b74b5dbf415ca95f3559abbf045710f65bc302077df735055de6e1',
+  afterLock:'c3809b72d9488a8fd3b1d51121284e8b6a756b80f3e51dc4af752be7aee759e8',
 });
 const ROOT = '/srv/umsa-sitrep-publisher';
 const BACKEND = '/srv/umsa-clean-apps/sitrep-backend';
@@ -32,8 +43,8 @@ const SECRET_KEYS = ['DATABASE_URL','JWT_SECRET','JWT_REFRESH_SECRET','DOCUMENT_
 export function digest(data: string | Buffer): string { return crypto.createHash('sha256').update(data).digest('hex'); }
 function hash(file: string): string { return digest(fs.readFileSync(file)); }
 function read(file: string): Json { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-function run(command: string, args: string[]): string {
-  try { return execFileSync(command, args, { encoding:'utf8', timeout:120000, stdio:['ignore','pipe','pipe'] }).trim(); }
+function run(command: string, args: string[], maxBuffer=1024**2): string {
+  try { return execFileSync(command, args, { encoding:'utf8', timeout:120000, maxBuffer, stdio:['ignore','pipe','pipe'] }).trim(); }
   catch { throw new Error(`Required operation failed: ${command} ${args[0] || ''}; preserve private release evidence`); }
 }
 function ordinary(file: string): void {
@@ -75,6 +86,7 @@ export function codeDigest(backend: string): string {
   return digest(JSON.stringify({dist:inventory(path.join(backend,'dist')),
     package:hash(path.join(backend,'package.json')),lock:hash(path.join(backend,'package-lock.json')),
     schema:hash(path.join(backend,'prisma/schema.prisma')),
+    ...(fs.existsSync(path.join(backend,'runtime-dependencies'))?{privateDependencies:dependencyDigest(path.join(backend,'runtime-dependencies'))}:{}),
     ...(fs.existsSync(path.join(backend,'runtime-prisma'))?{privatePrisma:inventory(path.join(backend,'runtime-prisma'))}:{})}));
 }
 export function loopbackIndex(source: string): string {
@@ -97,6 +109,9 @@ export function safeArchiveEntries(entries: string[], verbose: string[]): void {
   }
   if (verbose.some(line=>line && !['-','d'].includes(line[0]))) throw new Error('Archive links or special objects are forbidden');
 }
+export function inspectArchive(archive: string): void {
+  safeArchiveEntries(run('tar',['-tzf',archive],64*1024**2).split('\n'),run('tar',['-tvzf',archive],64*1024**2).split('\n'));
+}
 export function migrations(manifest: Json): Json[] {
   if (manifest.databaseMigrations===false) return [];
   const list=manifest.databaseMigrations;
@@ -105,13 +120,84 @@ export function migrations(manifest: Json): Json[] {
       || manifest.schemaSha256!==REVIEWED_MIGRATION.afterSchema) throw new Error('Unreviewed database migration');
   return list;
 }
+export function dependencies(manifest: Json): Json | null {
+  const entry=manifest.dependencies;
+  if(entry===undefined || entry===false)return null;
+  if(manifest.format!==3 || !entry || entry.id!==REVIEWED_DEPENDENCIES.id
+      || entry.beforePackage!==REVIEWED_DEPENDENCIES.beforePackage || entry.beforeLock!==REVIEWED_DEPENDENCIES.beforeLock
+      || entry.afterPackage!==REVIEWED_DEPENDENCIES.afterPackage || entry.afterLock!==REVIEWED_DEPENDENCIES.afterLock
+      || entry.platform!=='linux' || entry.arch!=='x64' || entry.node!=='20.19.6'
+      || !DIGEST.test(entry.treeSha256))throw new Error('Unreviewed private dependency manifest');
+  return entry;
+}
+export function requiredAcknowledgement(manifest: Json): string {
+  return 'SITREP-HOSTINGER'+(migrations(manifest).length?'-SCHEMA':'')+(dependencies(manifest)?'-DEPS':'');
+}
 export function assertAcknowledgement(manifest: Json,ack: string): void {
-  if(ack!==(migrations(manifest).length?'SITREP-HOSTINGER-SCHEMA':'SITREP-HOSTINGER'))throw new Error('Incorrect publication acknowledgement');
+  if(ack!==requiredAcknowledgement(manifest))throw new Error('Incorrect publication acknowledgement');
+}
+export function assertRuntimePlatform(manifest: Json,node=process.versions.node,platform: string=process.platform,arch: string=process.arch,openssl=process.versions.openssl): void {
+  const entry=dependencies(manifest);
+  if(entry && (node!==entry.node || platform!==entry.platform || arch!==entry.arch || !openssl.startsWith('3.')))throw new Error('Private dependencies require the reviewed Node/Linux/OpenSSL runtime');
+}
+export function assertDependencyTransition(before: Json,after: Json,manifest: Json): void {
+  const entry=dependencies(manifest);
+  if(!entry) {
+    if(before.package!==after.package || before.lock!==after.lock)throw new Error('Separate dependency/schema review required: package.json/package-lock.json');
+    return;
+  }
+  if(before.package!==entry.beforePackage || before.lock!==entry.beforeLock
+      || after.package!==entry.afterPackage || after.lock!==entry.afterLock)throw new Error('Unreviewed dependency transition');
+}
+// Include executable owner bits: extraction may restrict group/other permissions,
+// but cannot remove an executable or promote a data file without invalidating the seal.
+export function dependencyDigest(root: string): string {
+  if(fs.lstatSync(root).isSymbolicLink() || !fs.statSync(root).isDirectory())throw new Error('Private dependency root must be a directory');
+  const files=inventory(root);
+  if(!Object.keys(files).length)throw new Error('Empty private dependency tree');
+  return digest(JSON.stringify(Object.keys(files).sort().map(name=>{
+    const info=fs.lstatSync(path.join(root,name));
+    if(info.nlink!==1 || (info.mode&0o6000))throw new Error('Unsafe dependency file identity');
+    return [name,files[name],Boolean(info.mode&0o100)];
+  })));
+}
+// npm's internal file links (notably .bin) are materialized inside the archive.
+// External, dangling, directory links and special files never enter the payload.
+export function copyDependencies(source: string,destination: string): void {
+  if(fs.lstatSync(source).isSymbolicLink())throw new Error('Dependency source must not be a link');
+  const root=fs.realpathSync(source);
+  if(fs.existsSync(destination))throw new Error('Preserve existing private dependency tree');
+  function copy(folder: string,target: string): void {
+    fs.mkdirSync(target,{mode:0o755});
+    for(const name of fs.readdirSync(folder).sort()) {
+      const file=path.join(folder,name),out=path.join(target,name),info=fs.lstatSync(file);
+      if(/[\r\n\0]/.test(name) || name==='.git' || name.startsWith('.env'))throw new Error('Unsafe dependency file');
+      if(info.isDirectory())copy(file,out);
+      else {
+        const resolved=fs.realpathSync(file),relative=path.relative(root,resolved),actual=fs.statSync(resolved);
+        if(relative==='..' || relative.startsWith('..'+path.sep) || path.isAbsolute(relative)
+            || !actual.isFile() || (actual.mode&0o6000))throw new Error('Dependency link escapes or targets a non-file');
+        fs.copyFileSync(resolved,out,fs.constants.COPYFILE_EXCL);fs.chmodSync(out,actual.mode&0o100?0o755:0o644);
+      }
+    }
+  }
+  copy(root,destination);dependencyDigest(destination);
+}
+export function assertPrivateDependencies(backend: string,manifest: Json): void {
+  const entry=dependencies(manifest),root=path.join(backend,'runtime-dependencies');
+  if(!entry) {
+    if(fs.existsSync(root))throw new Error('Undeclared private dependencies');
+    return;
+  }
+  if(fs.existsSync(path.join(backend,'runtime-prisma')))throw new Error('Ambiguous candidate dependency trees');
+  if(dependencyDigest(root)!==entry.treeSha256)throw new Error('Private dependency tree hash mismatch');
+  if(hash(path.join(backend,'package.json'))!==entry.afterPackage || hash(path.join(backend,'package-lock.json'))!==entry.afterLock)throw new Error('Candidate dependency hashes differ');
+  assertPrivatePrisma(backend,hash(path.join(backend,'prisma/schema.prisma')));
 }
 export function compatible(candidate: string, current: string, manifest: Json={databaseMigrations:false}): void {
-  for (const file of ['package.json','package-lock.json']) {
-    if (hash(path.join(candidate,file))!==hash(path.join(current,file))) throw new Error(`Separate dependency/schema review required: ${file}`);
-  }
+  assertDependencyTransition({package:hash(path.join(current,'package.json')),lock:hash(path.join(current,'package-lock.json'))},
+    {package:hash(path.join(candidate,'package.json')),lock:hash(path.join(candidate,'package-lock.json'))},manifest);
+  assertPrivateDependencies(candidate,manifest);
   const before=hash(path.join(current,'prisma/schema.prisma')), after=hash(path.join(candidate,'prisma/schema.prisma'));
   const list=migrations(manifest);
   if(!list.length) {
@@ -125,10 +211,13 @@ export function compatible(candidate: string, current: string, manifest: Json={d
   assertPrivatePrisma(candidate,after);
 }
 export function assertPrivatePrisma(backend: string,schema: string): void {
-  const root=path.join(backend,'runtime-prisma');inventory(root);
-  if(hash(path.join(root,'generated/schema.prisma'))!==schema)throw new Error('Generated Prisma schema differs from candidate');
-  for(const file of ['client/package.json','client/index.js','generated/index.js','generated/default.js',
-    'generated/libquery_engine-debian-openssl-3.0.x.so.node'])if(!fs.statSync(path.join(root,file)).isFile())throw new Error('Candidate Prisma client incomplete');
+  const complete=fs.existsSync(path.join(backend,'runtime-dependencies'));
+  const root=path.join(backend,complete?'runtime-dependencies/node_modules':'runtime-prisma');inventory(root);
+  const client=complete?'@prisma/client':'client',generated=complete?'.prisma/client':'generated';
+  const generatedSchema=hash(path.join(root,generated,'schema.prisma'));
+  if(generatedSchema!==schema && !(schema===REVIEWED_MIGRATION.afterSchema && generatedSchema===REVIEWED_MIGRATION.generatedSchema))throw new Error('Generated Prisma schema differs from candidate');
+  for(const file of [client+'/package.json',client+'/index.js',generated+'/index.js',generated+'/default.js',
+    generated+'/libquery_engine-debian-openssl-3.0.x.so.node'])if(!fs.statSync(path.join(root,file)).isFile())throw new Error('Candidate Prisma client incomplete');
 }
 // Read-only catalog queries; never select application rows.
 const DB_ARGS=['exec','directus-admin-database-1','psql','-X','-w','-U','umsa_restore_admin_20261027','-d','trazabilidad_rrpp','-A','-t','-v','ON_ERROR_STOP=1'];
@@ -1575,7 +1664,13 @@ function chmodTree(root: string): void {
   }
 }
 const RUNTIME_LINKS=['node_modules','data','uploads'];
-export function nativeLinks(backend: string,currentBackend: string,privatePrisma=false): void {
+export function nativeLinks(backend: string,currentBackend: string,privatePrisma=false,privateDependencies=false): void {
+  if(privateDependencies) {
+    dependencyDigest(path.join(backend,'runtime-dependencies'));
+    fs.symlinkSync(path.join(backend,'runtime-dependencies/node_modules'),path.join(backend,'node_modules'),'dir');
+    for(const name of ['data','uploads'])fs.symlinkSync(fs.realpathSync(path.join(currentBackend,name)),path.join(backend,name),'dir');
+    return;
+  }
   for(const name of privatePrisma?['data','uploads']:RUNTIME_LINKS)fs.symlinkSync(fs.realpathSync(path.join(currentBackend,name)),path.join(backend,name),'dir');
   if(!privatePrisma)return;
   const modules=path.join(backend,'node_modules'),active=path.join(currentBackend,'node_modules');
@@ -1625,12 +1720,13 @@ function preparedPaths(ready: Json,root: string,bundle: string): Json {
 }
 function sealedManifest(archive: string,manifestFile: string,extracted: string,commit: string,bundle: string): Json {
   if(!fs.lstatSync(archive).isFile() || fs.lstatSync(archive).isSymbolicLink() || hash(archive)!==bundle)throw new Error('Reviewed bundle changed after preparation');
-  const sealed=run('tar',['-xOzf',archive,'./.sitrep-release.json']);
+  const sealed=run('tar',['-xOzf',archive,'./.sitrep-release.json'],64*1024**2);
   if(fs.readFileSync(manifestFile,'utf8').trim()!==sealed
       || fs.readFileSync(path.join(extracted,'.sitrep-release.json'),'utf8').trim()!==sealed)throw new Error('Sealed release manifest changed');
   const manifest=JSON.parse(sealed);
   if(![2,3].includes(manifest.format) || manifest.commit!==commit)throw new Error('Unsupported sealed release manifest');
-  migrations(manifest);
+  migrations(manifest);dependencies(manifest);
+  assertPrivateDependencies(path.join(extracted,'backend'),manifest);
   const files=inventory(extracted);delete files['.sitrep-release.json'];
   if(fileMapHash(files)!==fileMapHash(manifest.files))throw new Error('Reviewed source payload changed after preparation');
   return manifest;
@@ -1657,13 +1753,13 @@ export function assertPrepared(ready: Json,root: string,bundle: string,beforePro
     else if(name.startsWith('frontend/'))expectedFrontend[name.slice(9)]=entry;
     else throw new Error('Unexpected release payload scope');
   }
-  if(migrations(manifest).length) {
+  if(migrations(manifest).length && !dependencies(manifest)) {
     for(const [name,entry] of Object.entries(manifest.files)) {
       if(name.startsWith('backend/runtime-prisma/client/'))expectedBackend['node_modules/@prisma/client/'+name.slice('backend/runtime-prisma/client/'.length)]=entry;
       if(name.startsWith('backend/runtime-prisma/generated/'))expectedBackend['node_modules/.prisma/client/'+name.slice('backend/runtime-prisma/generated/'.length)]=entry;
     }
-    compatible(ready.backend,ready.before.backend,manifest);
   }
+  compatible(ready.backend,ready.before.backend,manifest);
   const normalized=loopbackIndex(fs.readFileSync(path.join(locations.extracted,'backend/dist/index.js'),'utf8'));
   expectedBackend['dist/index.js']={sha256:digest(normalized),bytes:Buffer.byteLength(normalized)};
   const expectedRollback: Json=Object.assign(Object.create(null),expectedFrontend,inventory(ready.before.frontend));
@@ -1672,9 +1768,12 @@ export function assertPrepared(ready: Json,root: string,bundle: string,beforePro
   if(fileMapHash(inventory(ready.backend,runtimeLinks(ready.backend)))!==fileMapHash(expectedBackend)
       || fileMapHash(inventory(ready.frontend))!==fileMapHash(expectedFrontend)
       || fileMapHash(inventory(ready.rollback))!==fileMapHash(expectedRollback))throw new Error('Prepared payload differs from the reviewed bundle and baseline');
-  const expectedLinks=migrations(manifest).length?['data','uploads',...fs.readdirSync(path.join(ready.before.backend,'node_modules')).filter(name=>!['@prisma','.prisma'].includes(name)).map(name=>'node_modules/'+name),...fs.readdirSync(path.join(ready.before.backend,'node_modules/@prisma')).filter(name=>name!=='client').map(name=>'node_modules/@prisma/'+name)]:RUNTIME_LINKS;
+  const expectedLinks=migrations(manifest).length && !dependencies(manifest)?['data','uploads',...fs.readdirSync(path.join(ready.before.backend,'node_modules')).filter(name=>!['@prisma','.prisma'].includes(name)).map(name=>'node_modules/'+name),...fs.readdirSync(path.join(ready.before.backend,'node_modules/@prisma')).filter(name=>name!=='client').map(name=>'node_modules/@prisma/'+name)]:RUNTIME_LINKS;
   if(JSON.stringify(runtimeLinks(ready.backend).sort())!==JSON.stringify(expectedLinks.sort()))throw new Error('Prepared dependency overlay changed');
-  for(const name of expectedLinks)if(fs.readlinkSync(path.join(ready.backend,name))!==fs.realpathSync(path.join(ready.before.backend,name)))throw new Error('Prepared runtime link target changed');
+  for(const name of expectedLinks) {
+    const target=dependencies(manifest) && name==='node_modules'?path.join(ready.backend,'runtime-dependencies/node_modules'):fs.realpathSync(path.join(ready.before.backend,name));
+    if(fs.readlinkSync(path.join(ready.backend,name))!==target)throw new Error('Prepared runtime link target changed');
+  }
   if(fs.readFileSync(path.join(root,'candidate.conf'),'utf8')!==proxyFor(beforeProxy,ready.before.frontend,ready.frontend)
       || fs.readFileSync(path.join(root,'rollback.conf'),'utf8')!==proxyFor(beforeProxy,ready.before.frontend,ready.rollback))throw new Error('Prepared proxy differs from the reviewed root-only change');
 }
@@ -1717,7 +1816,8 @@ function stage(commit: string,expected: string,bundle: string,id: string): Json 
   if (hash(archive)!==bundle) throw new Error('Transport digest mismatch');
   const manifest=read(path.join(incoming,'release.json'));
   if (![2,3].includes(manifest.format) || manifest.commit!==commit) throw new Error('Unexpected release manifest');
-  safeArchiveEntries(run('tar',['-tzf',archive]).split('\n'),run('tar',['-tvzf',archive]).split('\n'));
+  assertRuntimePlatform(manifest);
+  inspectArchive(archive);
   directory(ROOT,0o755); directory(path.join(ROOT,'staged')); directory(path.join(ROOT,'releases'),0o755);
   const root=path.join(ROOT,'staged',`${commit}-${bundle}`);
   if (fs.existsSync(root)) throw new Error('Preserve existing staged release');
@@ -1727,11 +1827,12 @@ function stage(commit: string,expected: string,bundle: string,id: string): Json 
   compatible(path.join(extracted,'backend'),before.backend,manifest);
   const database=migrations(manifest).length ? migrationState() : null;
   const stat=fs.statfsSync(ROOT); const sourceBytes=Object.values(inventory(before.frontend)).reduce((n:any,item:any)=>n+item.bytes,0);
-  if (Number(stat.bavail)*Number(stat.bsize)<3*1024**3+3*Number(sourceBytes)+2*fs.statSync(archive).size) throw new Error('Insufficient release/backup capacity');
+  const candidateBytes=Object.entries(manifest.files).filter(([name])=>name.startsWith('backend/')).reduce((total,[_name,item])=>total+Number((item as Json).bytes),0);
+  if (Number(stat.bavail)*Number(stat.bsize)<3*1024**3+3*Number(sourceBytes)+2*candidateBytes+2*fs.statSync(archive).size) throw new Error('Insufficient release/backup capacity');
   const destination=path.join(ROOT,'releases',`${commit}-${id}`);directory(destination,0o755);
   const backend=path.join(destination,'backend');fs.cpSync(path.join(extracted,'backend'),backend,{recursive:true});
   fs.writeFileSync(path.join(backend,'dist/index.js'),loopbackIndex(fs.readFileSync(path.join(backend,'dist/index.js'),'utf8')));
-  nativeLinks(backend,before.backend,Boolean(database));
+  nativeLinks(backend,before.backend,Boolean(database),Boolean(dependencies(manifest)));
   const frontend=path.join(destination,'frontend');fs.cpSync(before.frontend,frontend,{recursive:true});fs.cpSync(path.join(extracted,'frontend'),frontend,{recursive:true});
   const rollback=path.join(destination,'rollback-frontend');fs.cpSync(frontend,rollback,{recursive:true});fs.cpSync(before.frontend,rollback,{recursive:true});
   fs.writeFileSync(path.join(rollback,'release.json'),rollbackRelease(before));
@@ -1744,7 +1845,7 @@ function stage(commit: string,expected: string,bundle: string,id: string): Json 
   ready.artifacts=capturePrepared(ready,root);
   assertPrepared(ready,root,bundle,original);
   save(path.join(root,'ready.json'),ready);
-  return {preparedCommit:commit,bundleSha256:bundle,expectedActiveRevision:expected,activation:false,dependenciesUnchanged:true,schemaAndDependenciesUnchanged:!database,databaseMigrations:manifest.databaseMigrations,database,requiredAcknowledgement:database?'SITREP-HOSTINGER-SCHEMA':'SITREP-HOSTINGER'};
+  return {preparedCommit:commit,bundleSha256:bundle,expectedActiveRevision:expected,activation:false,dependenciesUnchanged:!dependencies(manifest),dependencies:dependencies(manifest),schemaAndDependenciesUnchanged:!database&&!dependencies(manifest),databaseMigrations:manifest.databaseMigrations,database,requiredAcknowledgement:requiredAcknowledgement(manifest)};
 }
 function backup(root: string,before: Json): void {
   directory(root);const file=path.join(root,'database.dump');const fd=fs.openSync(file,'wx',0o600);
@@ -1778,7 +1879,7 @@ async function publish(commit: string,expected: string,bundle: string,id: string
   const root=path.join(ROOT,'staged',`${commit}-${bundle}`);const ready=read(path.join(root,'ready.json'));
   if (ready.commit!==commit || ready.bundle!==bundle || ready.controller!==hash(fileURLToPath(import.meta.url)) || ready.before.revision!==expected) throw new Error('Reviewed preparation/controller changed');
   const manifest=read(path.join(root,'package/.sitrep-release.json'));
-  assertAcknowledgement(manifest,ack);
+  assertAcknowledgement(manifest,ack);assertRuntimePlatform(manifest);
   const list=migrations(manifest);
   sameCurrent(ready.before,current());
   const originalProxy=fs.readFileSync(PROXY);const beforeProxy=originalProxy.toString();
@@ -1814,7 +1915,7 @@ async function publish(commit: string,expected: string,bundle: string,id: string
     const state={revision:commit,backend:ready.backend,frontend:ready.frontend,codeDigest:codeDigest(ready.backend),
       frontendDigest:digest(JSON.stringify(inventory(ready.frontend))),proxyHash:hash(PROXY),bundle};
     save(path.join(ROOT,'state.json'),state);
-    save(path.join(backupRoot,'publication.complete.json'),{commit,bundle,...migrationOutcome(migrationAttempted,databaseMigrated,list,backupRoot),environmentPreserved:true});
+    save(path.join(backupRoot,'publication.complete.json'),{commit,bundle,...migrationOutcome(migrationAttempted,databaseMigrated,list,backupRoot),environmentPreserved:true,dependencies:dependencies(manifest)});
   },async()=>{
     // Record database outcome even if code rollback itself subsequently fails.
     save(path.join(backupRoot,'rollback.json'),{applicationCodeRestored:false,...migrationOutcome(migrationAttempted,databaseMigrated,list,backupRoot)});

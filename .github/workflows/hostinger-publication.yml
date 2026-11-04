@@ -25,6 +25,10 @@ on:
         type: string
         default: ''
         description: Prepare only; explicitly enter 20261103160000_inspection_management_role for the reviewed additive schema change
+      dependency_update:
+        type: string
+        default: ''
+        description: Prepare only; runtime-20261104 selects the exact reviewed private dependency transition from PR 44
       bundle_sha256:
         type: string
         default: ''
@@ -32,7 +36,7 @@ on:
       acknowledgement:
         type: string
         default: ''
-        description: Enter SITREP-HOSTINGER-SCHEMA for a migration bundle, otherwise SITREP-HOSTINGER; only after reviewing its receipt
+        description: Use the exact requiredAcknowledgement in the receipt; schema plus private dependencies requires SITREP-HOSTINGER-SCHEMA-DEPS
 permissions:
   contents: read
 concurrency:
@@ -75,6 +79,7 @@ jobs:
       RELEASE_COMMIT: ${{ inputs.release_commit }}
       EXPECTED_ACTIVE: ${{ inputs.expected_active_revision }}
       REVIEWED_BUNDLE: ${{ inputs.bundle_sha256 }}
+      DEPENDENCY_UPDATE: ${{ inputs.dependency_update }}
       DATABASE_MIGRATIONS: ${{ inputs.database_migrations }}
       ACKNOWLEDGEMENT: ${{ inputs.acknowledgement }}
     steps:
@@ -88,17 +93,18 @@ jobs:
           [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish ]]
           [[ "$EXPECTED_ACTIVE" =~ ^[0-9a-f]{40}$ ]]
           if [[ "$OPERATION" == preflight ]]; then
-            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" && -z "$DATABASE_MIGRATIONS" ]]
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
           else
             [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           fi
           if [[ "$OPERATION" == publish ]]; then
-            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER || "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-SCHEMA ]]
-            [[ "$REVIEWED_BUNDLE" =~ ^[0-9a-f]{64}$ && -z "$DATABASE_MIGRATIONS" ]]
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER || "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-SCHEMA || "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-DEPS || "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-SCHEMA-DEPS ]]
+            [[ "$REVIEWED_BUNDLE" =~ ^[0-9a-f]{64}$ && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
           fi
           if [[ "$OPERATION" == prepare ]]; then
             [[ -z "$ACKNOWLEDGEMENT" && -z "$REVIEWED_BUNDLE" ]]
             [[ -z "$DATABASE_MIGRATIONS" || "$DATABASE_MIGRATIONS" == 20261103160000_inspection_management_role ]]
+            [[ -z "$DEPENDENCY_UPDATE" || "$DEPENDENCY_UPDATE" == runtime-20261104 ]]
           fi
       - uses: actions/checkout@v6
         if: inputs.operation == 'prepare'
@@ -145,6 +151,19 @@ jobs:
           npm test -- --maxWorkers=1
           npm run build
           npx vite build --config vite.config.app.ts
+      - name: Prune candidate-only dependencies after tests, never on the server
+        if: inputs.operation == 'prepare' && inputs.dependency_update != ''
+        run: |
+          set -euo pipefail
+          cd candidate/backend
+          before=$(sha256sum package.json package-lock.json)
+          cp -R node_modules/.prisma "$RUNNER_TEMP/candidate-prisma"
+          npm prune --omit=dev --ignore-scripts
+          # Preserve any pruned copy and restore only the generated client tested above.
+          if [[ -e node_modules/.prisma ]]; then mv node_modules/.prisma "$RUNNER_TEMP/pruned-prisma-retained"; fi
+          cp -R "$RUNNER_TEMP/candidate-prisma" node_modules/.prisma
+          [[ "$before" = "$(sha256sum package.json package-lock.json)" ]]
+          npm ls --omit=dev --all > "$RUNNER_TEMP/runtime-dependency-tree.txt"
       - uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
@@ -158,11 +177,38 @@ jobs:
           JS
           node --check "$RUNNER_TEMP/publisher.mjs"
           if [[ "$OPERATION" == prepare ]]; then
-            node --experimental-strip-types publisher/scripts/cicd/hostinger/package.ts "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/bundle" "$RELEASE_COMMIT" "$DATABASE_MIGRATIONS"
+            node --experimental-strip-types publisher/scripts/cicd/hostinger/package.ts "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/bundle" "$RELEASE_COMMIT" "$DATABASE_MIGRATIONS" "$DEPENDENCY_UPDATE"
             echo "BUNDLE_SHA=$(sha256sum "$RUNNER_TEMP/bundle/release.tar.gz" | cut -d ' ' -f1)" >> "$GITHUB_ENV"
           elif [[ "$OPERATION" == publish ]]; then
             echo "BUNDLE_SHA=$REVIEWED_BUNDLE" >> "$GITHUB_ENV"
           fi
+      - uses: actions/setup-node@v6
+        if: inputs.operation == 'prepare' && inputs.dependency_update != ''
+        with:
+          node-version: '20.19.6'
+      - name: Smoke sealed candidate modules without database, SMTP or push
+        if: inputs.operation == 'prepare' && inputs.dependency_update != ''
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {createRequire} from 'node:module';
+          if(process.version!=='v20.19.6' || process.platform!=='linux' || process.arch!=='x64')throw new Error('Unexpected runtime toolchain');
+          const backend=process.env.RUNNER_TEMP+'/bundle/tree/backend';
+          const root=backend+'/runtime-dependencies';
+          const require=createRequire(root+'/runtime-smoke.cjs');
+          const pkg=JSON.parse(fs.readFileSync(backend+'/package.json','utf8'));
+          for(const name of Object.keys(pkg.dependencies)) {
+            if(!fs.realpathSync(require.resolve(name)).startsWith(root+path.sep))throw new Error('Dependency escaped candidate');
+            require(name);
+          }
+          const {Prisma}=require('@prisma/client');
+          if(!Prisma.dmmf.datamodel.models.some(m=>m.name==='InspectionStaffRole'))throw new Error('Wrong generated Prisma client');
+          await require('sharp')({create:{width:1,height:1,channels:3,background:'#ffffff'}}).png().toBuffer();
+          const mail=await require('nodemailer').createTransport({streamTransport:true,buffer:true}).sendMail({from:'fixture@example.invalid',to:'fixture@example.invalid',subject:'Offline runtime check',text:'Not sent'});
+          if(!Buffer.isBuffer(mail.message))throw new Error('Offline mail rendering failed');
+          console.log('Private runtime smoke passed: all direct imports, Prisma model, native image, offline mail');
+          JS
       - uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.HOSTINGER_MIGRATION_KEY }}
