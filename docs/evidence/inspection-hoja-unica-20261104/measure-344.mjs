@@ -39,7 +39,11 @@ const probe = () => {
     firstFieldTop: field ? Math.round(field.getBoundingClientRect().top) : null,
     mapTop: map ? Math.round(map.getBoundingClientRect().top) : null,
     crosshair: Boolean(document.querySelector('[data-testid="map-crosshair"]')),
-    markButton: buttons.some((el) => /aquí$/.test((el.textContent || '').trim())),
+    markButton: buttons.some((el) => /aquí$|^Estoy acá/.test((el.textContent || '').trim())),
+    radiusChips: document.querySelectorAll('[role=group][aria-label="Radio del predio"] button').length,
+    stickyBar: Boolean(document.querySelector('[data-sheet-bar]')) && getComputedStyle(document.querySelector('[data-sheet-bar]')).position === 'sticky',
+    // Campos que el inspector ve sin abrir ningún desplegable (sin los botones de respuesta de controles).
+    fieldsVisible: [...(sheet || document).querySelectorAll('input:not([type=hidden]):not([type=file]),textarea,select')].filter(visible).length,
     status: document.querySelector('[data-testid="inspection-field-status"]')?.textContent.trim() || null,
     contentHeight: region.scrollHeight,
     scrollTop: Math.round(region.scrollTop),

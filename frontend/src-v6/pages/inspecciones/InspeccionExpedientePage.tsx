@@ -45,6 +45,7 @@ import { InspectionTimeline } from './InspectionTimeline';
 import { InspectionExchangePanel } from './InspectionExchangePanel';
 import { InspectionWorkspace, type InspectionWorkspaceStep } from './InspectionWorkspace';
 import { InspectionFieldSheet, type InspectionFieldBlock } from './InspectionFieldSheet';
+import { InspectionClosingQuestions } from './InspectionClosingQuestions';
 import { revealInspectionAnchor, preserveInspectionAnchor } from './inspectionScroll';
 import { InspectionOrganizationPanel } from './InspectionOrganizationPanel';
 import { InspectionVerificationBlock } from './InspectionVerificationBlock';
@@ -515,6 +516,17 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const autosaveDirty = sheet && draftReady && currentFingerprint !== serverFingerprint;
   const autosaveBlocked = !isOnline || !canWriteDraft() || Boolean(staleDraft) || dictating || recording || syncingEvidence || savingDraft || changingStage || leavingDraft;
   useEffect(() => { if (isOnline) autosaveLatchRef.current = ''; }, [isOnline]);
+  // Sheet: the declared address fills the place and the legal domicile once, so the inspector types neither.
+  const prefilledRef = useRef('');
+  useEffect(() => {
+    if (!sheet || !draftReady || !inspection || !canWriteDraft() || prefilledRef.current === inspection.id) return;
+    prefilledRef.current = inspection.id;
+    const declaredActor = inspectionActor(inspection);
+    const options = declaredActor ? inspectionLocationSuggestions(declaredActor, inspection.comparaciones) : [];
+    if (!ubicacion.trim() && options[0]) setUbicacion(options[0].value);
+    if (!datosActa.domicilioLegal && declaredActor?.domicilio) setDatosActa((current) => ({ ...current, domicilioLegal: declaredActor.domicilio }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet, draftReady, inspection?.id]);
   // The home «Hoy» list resumes from here; the sheet has no steps, so the entry names the form itself.
   useEffect(() => { if (sheet && currentUser?.id && inspection?.id) saveInspectionResume(currentUser.id, inspection.id, '#resumen', 'Formulario de campo', owner); }, [sheet, currentUser?.id, inspection?.id, owner]);
   useEffect(() => {
@@ -879,17 +891,23 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const sheetAction = sheet && canWriteDraft() && inspection.estado === 'EN_CAMPO' ? <><FieldReadinessPanel requiresComparison={Boolean(inspection.tipoActor)} state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /><Button aria-label="Enviar a revisión" size="lg" className="min-h-14 w-full" leftIcon={<Send size={18} />} isLoading={transitionMutation.isPending} disabled={sendBlocked} onClick={() => void transition('EN_REVISION')}>Enviar a revisión</Button><p className="text-xs text-neutral-600">Cierra el trabajo de campo con lo guardado. No aprueba la inspección ni avisa al inspeccionado.</p></> : undefined;
   // One page in the order of the visit. Anchors keep the ids the readiness list links to.
   const fieldBlocks: InspectionFieldBlock[] = [
-    { id: 'resumen', title: 'Dónde estoy y con quién', content: <>
+    { id: 'resumen', title: 'Estoy acá', content: <>
       <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="lugar" />
-      <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
-      <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="visita" />
-      <label className="block text-sm font-medium">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-1 min-h-11 w-full rounded-lg border border-neutral-300 bg-white p-3 text-base text-neutral-900 disabled:bg-neutral-50" /></label>
-      <p className="text-sm text-neutral-600">Inspector: {inspection.inspector.nombre} {inspection.inspector.apellido || ''}{actor?.cuit ? ` · CUIT del inspeccionado ${actor.cuit}` : ''}</p>
+      <label className="block text-base font-semibold text-neutral-900">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-1 min-h-12 w-full rounded-lg border border-neutral-400 bg-white p-3 text-base font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
+      <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="atencion" />
+      <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Más datos de la persona y del lugar</summary><div className="space-y-5 pb-4">
+        <InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="atencion-mas" />
+        <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
+        <p className="text-sm text-neutral-600">Inspector: {inspection.inspector.nombre} {inspection.inspector.apellido || ''}{actor?.cuit ? ` · CUIT del inspeccionado ${actor.cuit}` : ''}</p>
+      </div></details>
     </> },
-    { id: 'acta', title: 'Qué encontré', content: <>{observationEditor}<div id="evidencias">{evidence}</div><InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="constatacion" /></> },
-    { id: 'checklist', title: 'Controles', content: <>{checklist}{inspection.tipoActor && <div id="declaracion"><InspectionComparisonPanel embedded flat inspectionId={inspection.id} comparisons={orderedComparisons} declaredDocuments={inspection.declaradoSnapshot?.documents} editable={canEdit} onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} /></div>}<InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="medidas" /></> },
-    { id: 'firma', title: 'Declaración y firma', content: <>
-      <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Constancias y datos complementarios</summary><InspectionDocumentsPanel actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></details>
+    { id: 'acta', title: 'Qué encontré', content: <>{observationEditor}<div id="evidencias">{evidence}</div>
+      <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Más detalle del lugar <span className="font-normal text-neutral-600">· actividad, instalaciones, entorno</span></summary><div className="pb-4"><InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="constatacion" /></div></details>
+    </> },
+    { id: 'checklist', title: 'Controles', content: <>{checklist}{inspection.tipoActor && <div id="declaracion"><InspectionComparisonPanel embedded flat inspectionId={inspection.id} comparisons={orderedComparisons} declaredDocuments={inspection.declaradoSnapshot?.documents} editable={canEdit} onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} /></div>}<InspectionFieldModel value={datosActa} onChange={setDatosActa} disabled={!canEdit} section="medidas" compact responsableDefault={actor?.razonSocial || ''} /></> },
+    { id: 'firma', title: 'Cerrar la visita', content: <>
+      <InspectionClosingQuestions value={datosActa} onChange={setDatosActa} disabled={!canEdit} />
+      <details className="rounded-lg border border-neutral-200 px-4"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Datos administrativos del acta <span className="font-normal text-neutral-600">· opcional</span></summary><InspectionDocumentsPanel omitClosing actorType={environmentalInspection ? null : inspection.tipoActor} section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></details>
       <InspectionSignaturePanel inspectionId={inspection.id} saved={signatureReady} editable={Boolean(canEdit && isOnline)} />
       <InspectionActAccessPanel inspection={inspection} />
     </> },

@@ -461,7 +461,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     const planned = renderPage(inspectionFixture({ estado: 'PLANIFICADA' }), true);
     expect(await screen.findByRole('button', { name: 'Iniciar visita' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Enviar a revisión' })).toBeNull();
-    for (const title of ['Dónde estoy y con quién', 'Qué encontré', 'Controles', 'Declaración y firma']) expect(screen.getByRole('heading', { level: 2, name: title })).toBeVisible();
+    for (const title of ['Estoy acá', 'Qué encontré', 'Controles', 'Cerrar la visita']) expect(screen.getByRole('heading', { level: 2, name: title })).toBeVisible();
     expect(screen.queryByText('Expediente y seguimiento')).toBeNull();
     planned.unmount();
     renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true);

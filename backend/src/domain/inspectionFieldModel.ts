@@ -21,6 +21,8 @@ export const inspectionLocationSchema = z.object({
   registradaAt: z.string().datetime(), zoom: z.number().int().min(2).max(19).optional(),
   // Optional approximate drawing; older acts without it stay valid.
   perimetro: z.array(mapPointSchema).min(3).max(40).optional(),
+  // Premises drawn as a circle around the point; perimetro then holds that circle's vertices.
+  radioMetros: z.number().min(10).max(5000).optional(),
   referencias: z.array(mapPointSchema.extend({ id: z.string().min(1).max(100), tipo: z.enum(MAP_REFERENCE_TYPES), etiqueta: z.string().trim().max(160).optional() }).strict()).max(20).optional(),
 }).strict().superRefine((value, ctx) => {
   for (const [path, points] of [['perimetro', value.perimetro || []], ['referencias', value.referencias || []]] as const)

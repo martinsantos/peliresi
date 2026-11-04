@@ -56,7 +56,7 @@ export interface InspectionFieldLocation {
   latitud: number; longitud: number;
   origen: 'GPS' | 'MAPA' | 'MANUAL'; precisionMetros?: number;
   registradaAt: string; zoom?: number; mapaImagen?: string; mapaZoom?: number;
-  perimetro?: MapPoint[]; referencias?: MapReference[];
+  perimetro?: MapPoint[]; referencias?: MapReference[]; radioMetros?: number;
 }
 export interface InspectionActData {
   modeloCampo?: 2;

@@ -39,9 +39,15 @@ export const referenceName = (r: Pick<MapReference, 'tipo' | 'etiqueta'>) => r.e
 
 /** Plain-language lines for the act; numbering matches the saved map image.
  * PDF standard fonts lack «≈»: write «aprox.» instead. */
-export function inspectionMapSummary(location: MapPoint & { perimetro?: MapPoint[]; referencias?: MapReference[] }): string[] {
+/** A circle of `radius` metres around `center`, as polygon vertices (clockwise from north). */
+export function circlePolygon(center: MapPoint, radius: number, vertices = 24): MapPoint[] {
+  const latRad = center.latitud * Math.PI / 180;
+  return Array.from({ length: vertices }, (_, i) => { const a = 2 * Math.PI * i / vertices; return { latitud: center.latitud + (radius * Math.cos(a)) / 111320, longitud: center.longitud + (radius * Math.sin(a)) / (111320 * Math.cos(latRad)) }; });
+}
+export function inspectionMapSummary(location: MapPoint & { perimetro?: MapPoint[]; referencias?: MapReference[]; radioMetros?: number }): string[] {
   const lines: string[] = [];
-  if (location.perimetro && location.perimetro.length >= 3) lines.push(`Sector observado, trazado aproximado por el inspector: ${location.perimetro.length} vértices · superficie aprox. ${area(areaSquareMeters(location.perimetro))} · perímetro aprox. ${meters(perimeterMeters(location.perimetro))}. No delimita el predio inscripto.`);
+  if (location.radioMetros && location.perimetro && location.perimetro.length >= 3) lines.push(`Predio aproximado indicado por el inspector: radio de ${meters(location.radioMetros)} alrededor del punto · superficie aprox. ${area(areaSquareMeters(location.perimetro))}.`);
+  else if (location.perimetro && location.perimetro.length >= 3) lines.push(`Sector observado, trazado aproximado por el inspector: ${location.perimetro.length} vértices · superficie aprox. ${area(areaSquareMeters(location.perimetro))} · perímetro aprox. ${meters(perimeterMeters(location.perimetro))}. No delimita el predio inscripto.`);
   if (location.referencias?.length) {
     lines.push('Referencias del entorno (distancia aproximada en línea recta desde el punto inspeccionado):');
     location.referencias.forEach((r, i) => lines.push(`${i + 1}. ${MAP_REFERENCE_LABELS[r.tipo]}${r.etiqueta?.trim() ? ` — ${r.etiqueta.trim()}` : ''} · ${meters(distanceMeters(location, r))}`));

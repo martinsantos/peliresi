@@ -731,3 +731,12 @@
 @media (prefers-reduced-motion: no-preference) {
   .agenda-row-enter { animation: agenda-row-enter 600ms ease-out; }
 }
+
+/* Field sheet (inspector, phone first): what can be filled in looks like it can be filled in. */
+.inspection-field-sheet input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.inspection-field-sheet textarea,
+.inspection-field-sheet select { border-color: #737373; background-color: #fff; }
+.inspection-field-sheet input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+.inspection-field-sheet textarea:focus,
+.inspection-field-sheet select:focus { border-color: #0d8a4f; box-shadow: 0 0 0 3px rgba(13, 138, 79, 0.18); outline: none; }
+.inspection-field-sheet label { color: #171717; }
