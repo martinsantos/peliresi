@@ -52,17 +52,48 @@ Lo que el publicador **rechaza**, por diseño:
 - Un manifiesto con migraciones: `package.ts` escribe `databaseMigrations:false` y `publisher.ts` sólo acepta ese valor.
 - Un `release_commit` que no esté en `main` o no descienda de `c8402190`.
 
-## 4. El bloqueo real de esta rama
+## 4. El bloqueo de esta rama y la decisión tomada
 
-La rama cambia el esquema (tabla `inspection_staff_roles`). Con el publicador tal como está, `prepare` construye pero `publish` se niega. No hay forma «rápida» que no sea romper una de las guardas, y las guardas existen para proteger lo que está subido.
+La rama cambia el esquema (tabla `inspection_staff_roles`). Con el publicador tal como está, `prepare` construye pero el paso de preparación en Hostinger se niega (`compatible()` en `stage()`), y además `stage()` exige `databaseMigrations:false`.
 
-Caminos posibles, a decidir por el dueño antes de seguir:
+**Decisión del dueño, 04/11/2026: camino A, extender el publicador con revisión.** Se publica todo, incluido el rol de jefatura. Los caminos descartados se dejan al final de esta sección sólo como registro.
 
-**A. Extender el publicador con revisión (recomendado).** Un PR separado contra `main` que toque sólo `scripts/cicd/hostinger/publisher.ts`, `package.ts` y `publisher.test.ts` para admitir un release con exactamente una migración declarada, con estos requisitos mínimos: copia de seguridad de la base antes de aplicar; aplicación de la migración con `prisma migrate deploy` desde el bundle preparado (nunca `migrate dev` ni `db push`); comprobación de que `_prisma_migrations` registró `20261103160000_inspection_management_role`; acuse explícito distinto para releases con migración; y rollback documentado que explique que la tabla queda creada (es aditiva: no borra ni altera datos existentes). Ese PR lo revisa el dueño y dispara el job `verify-publisher`. Recién después, pasos 5 a 8.
+### 4.1 Qué tiene que hacer el cambio al publicador
 
-**B. Publicar sin la tabla.** Preparar un commit de release que revierta la migración y el modelo `InspectionStaffRole` y lo que lo usa (`inspectionManagementRole.service.ts`, `inspectionManagementRole.controller.ts`, la gestión de jefatura en `InspeccionesPageV2.tsx`). Deja afuera el rol de jefatura y los avisos a jefatura del acta, pero el esquema vuelve a ser idéntico al de producción y el publicador acepta. Hay que verificar que las pruebas y los tipos pasen sin esos archivos.
+Un PR **separado, contra `main`**, que toque sólo `scripts/cicd/hostinger/publisher.ts`, `scripts/cicd/hostinger/package.ts`, `scripts/cicd/hostinger/publisher.test.ts` y, si hace falta una entrada nueva, `.github/workflows/hostinger-publication.yml`. Ese PR dispara el job `verify-publisher` (pruebas del publicador y compilación con Node 20.19.6) y lo revisa el dueño antes de fusionarlo. Nada de esto va dentro del PR #41.
 
-**C. Aplicar la migración a mano en Hostinger y editar el runtime.** No hacerlo: `current()` compara el digest del código y el esquema del runtime con `state.json` y fallaría con «Concurrent managed file change» o «Initial deployed code differs». Sólo serviría rompiendo las guardas.
+Lo que el publicador hace hoy y hay que respetar (leído en `main`, `publisher.ts`):
+
+- `publish()` ya toma una copia de la base con `pg_dump -Fc` dentro del contenedor `directus-admin-database-1` (usuario `umsa_restore_admin_20261027`), valida el archivo con `pg_restore --file=/dev/null` y la guarda en `/srv/umsa-sitrep-publisher/backups/<run>/database.dump` **antes** de tocar el servicio. Esa copia es el punto de partida obligatorio de cualquier migración.
+- El backend candidato **no tiene `node_modules` propio**: `nativeLinks()` enlaza `node_modules`, `data` y `uploads` al backend activo. El cliente de Prisma generado vive en ese `node_modules` compartido y fue generado para el esquema actual, sin el modelo `InspectionStaffRole`.
+- `prisma` (la CLI) está en `devDependencies` de `backend/package.json`; `@prisma/client` en `dependencies`. No está garantizado que la CLI exista en el `node_modules` de producción.
+- El rollback restaura el override de systemd y el proxy, y deja escrito `databaseRestored:false`. No restaura la base.
+
+Especificación mínima del cambio:
+
+1. **Manifiesto declarado.** `package.ts` acepta una lista explícita de migraciones (por argumento, nunca por descubrimiento automático) y escribe en `release.json` `databaseMigrations: [{ name, sha256 }]` más `schemaSha256` del `prisma/schema.prisma` empaquetado. Para este release, la lista tiene un único elemento: `20261103160000_inspection_management_role`. Copiar también el archivo `prisma/migrations/<name>/migration.sql` al paquete.
+2. **Compatibilidad acotada.** `compatible()` sigue exigiendo `package.json` y `package-lock.json` idénticos. Para `schema.prisma` acepta la diferencia sólo si el manifiesto declara migraciones, el hash del esquema coincide con `schemaSha256` y cada `migration.sql` coincide con su `sha256`. Cualquier otra diferencia sigue fallando con el mensaje actual.
+3. **Acuse distinto.** El workflow exige `acknowledgement=SITREP-HOSTINGER-SCHEMA` cuando el manifiesto trae migraciones, y sigue exigiendo `SITREP-HOSTINGER` cuando no. Un acuse que no corresponde detiene el run.
+4. **Preparación sin efectos.** En `stage()` (operación `prepare`), sólo lectura sobre la base: verificar que la migración **no** esté aplicada (tabla `inspection_staff_roles` inexistente; y, si existe `_prisma_migrations`, que no tenga esa fila). Registrar en `ready.json` si la base usa `_prisma_migrations` o no. No aplicar nada en `prepare`.
+5. **Cliente de Prisma propio del candidato.** Generar el cliente para el esquema nuevo **dentro de la carpeta del release**, nunca en el `node_modules` compartido, porque regenerarlo ahí rompería el backend activo y el rollback. Opciones a evaluar en el PR: generar en CI (`prepare` del workflow ya corre `npm ci` y `npm run build`) y empaquetar el directorio generado del cliente; o dar al candidato un `node_modules` propio instalado con `npm ci --omit=dev` desde el mismo `package-lock.json`. La prueba del publicador tiene que demostrar que el backend activo no cambia mientras se prepara.
+6. **Orden en `publish()`.** Copia de la base (ya existente) → verificar de nuevo que la migración no esté aplicada → aplicar el `migration.sql` en una sola transacción (`docker exec -i directus-admin-database-1 psql -v ON_ERROR_STOP=1 --single-transaction -U <usuario de migración> -d trazabilidad_rrpp < migration.sql`) → si la base usa `_prisma_migrations`, insertar la fila de la migración con el `checksum` que calcula Prisma (SHA-256 del contenido del archivo), `finished_at` y `applied_steps_count=1`, en la misma transacción → reiniciar el servicio con el backend nuevo → `waitBackend()` → proxy. Escribir `databaseMigrated:true` y la lista aplicada en `publication.complete.json`.
+7. **Rollback.** La migración es aditiva: crea una tabla vacía con claves foráneas a `usuarios` y no modifica datos existentes. El código anterior (`8fb6277e`) no la usa. Por eso el rollback del código **no borra la tabla**; deja escrito `databaseMigrationKept:true` con el nombre de la migración y la ruta de la copia de la base. Si el dueño pide volver la base atrás, se hace a mano desde esa copia, nunca automáticamente.
+8. **Pruebas del publicador** (`publisher.test.ts`): manifiesto con migración aceptado sólo con hashes coincidentes; esquema distinto sin migración declarada rechazado; acuse equivocado rechazado; migración ya aplicada rechazada en `prepare`; orden copia → migración → reinicio; rollback que conserva la tabla y registra la copia.
+
+Antes de escribir el PR, la IA que lo haga confirma en sólo lectura (operación `preflight` o una consulta acordada con el dueño) si la base de Hostinger usa `_prisma_migrations` y qué usuario de PostgreSQL tiene permiso de `CREATE TABLE` en `trazabilidad_rrpp`. No lo inventa.
+
+### 4.2 Orden completo
+
+1. PR del publicador contra `main` (4.1) → `verify-publisher` en verde → revisión y OK del dueño → fusión.
+2. Fusión del PR #41 (sección 5). No hay conflicto con el paso anterior: #41 no toca `scripts/cicd/hostinger/`.
+3. `preflight` (sección 6).
+4. `prepare` con el commit fusionado (sección 7). El recibo debe decir que trae la migración `20261103160000_inspection_management_role`.
+5. `publish` con `acknowledgement=SITREP-HOSTINGER-SCHEMA` (sección 8).
+
+### 4.3 Caminos descartados (registro)
+
+- **B. Publicar sin la tabla**, revirtiendo la migración, el modelo `InspectionStaffRole` y la gestión de jefatura. Descartado por el dueño: se perdía el rol de jefatura.
+- **C. Aplicar la migración a mano en Hostinger y editar el runtime.** Prohibido: `current()` compara el código y el esquema del runtime con `state.json` y fallaría con «Concurrent managed file change» o «Initial deployed code differs»; sólo serviría rompiendo las guardas.
 
 ## 5. Fusionar el PR #41 (no publica nada)
 
@@ -84,17 +115,17 @@ Desde GitHub → Actions → «SITREP reviewed Hostinger publication» → Run w
 
 ## 7. Prepare
 
-Sólo después de resolver el paso 4 (camino A o B) y con el SHA del dueño: `operation=prepare`, `release_commit=<SHA de 40 caracteres del merge en main>`, `expected_active_revision=<el del preflight>`. Guardar el recibo del run y el `BUNDLE_SHA`. Entregárselo al dueño para revisión: el publicador exige que alguien lea ese recibo antes de publicar.
+Sólo después de fusionar el PR del publicador (4.1) y el #41, y con el SHA del dueño: `operation=prepare`, `release_commit=<SHA de 40 caracteres del merge en main>`, `expected_active_revision=<el del preflight>`. Guardar el recibo del run y el `BUNDLE_SHA`. Entregárselo al dueño para revisión: el publicador exige que alguien lea ese recibo antes de publicar.
 
 ## 8. Publish y comprobaciones
 
-`operation=publish` con `bundle_sha256=<BUNDLE_SHA>` y `acknowledgement=SITREP-HOSTINGER`. Luego, sólo lectura:
+`operation=publish` con `bundle_sha256=<BUNDLE_SHA>` y `acknowledgement=SITREP-HOSTINGER-SCHEMA` (el acuse para releases con migración que agrega el PR del publicador). Luego, además de lo de abajo, confirmar en sólo lectura que `inspection_staff_roles` existe y está vacía. Luego, sólo lectura:
 
 - `https://sitrep.ultimamilla.com.ar/release.json` debe contener el `release_commit`.
 - `https://sitrep.ultimamilla.com.ar/api/health` responde `ok` con `db: connected`.
 - Con la cuenta de un inspector real: abrir una inspección **en campo** debe mostrar la hoja única («1. Estoy acá» … «4. Cerrar la visita», barra fija arriba); una en revisión o cerrada muestra el expediente anterior. No crear datos de prueba en producción.
 - Flags: `INSPECTION_FIELD_MODEL_ENABLED` no se activa. Sin ella, `GET/POST /api/inspecciones/:id/accesos-acta` y `/correos-acta` responden 404 y el panel «Copia y presentaciones del inspeccionado» al pie del bloque 4 va a mostrar un error de carga; la gestión de jefatura no aparece. El build de `prepare` no define `VITE_INSPECTION_FIELD_MODEL_ENABLED`, así que el frontend tampoco la muestra. Si el dueño quiere esas funciones, es una decisión aparte sobre los archivos de entorno de Hostinger (`/srv/umsa-migration/clean-sitrep-backend.environment`, `sitrep-live.environment`), nunca en el mismo release.
-- Si algo falla, el publicador ya hizo rollback del código. La base no vuelve sola: ahí entra la copia de seguridad del paso 2.4.
+- Si algo falla, el publicador ya hizo rollback del código y conserva la tabla nueva, vacía. La base no vuelve sola: la copia está en `/srv/umsa-sitrep-publisher/backups/<run>/database.dump`; restaurarla sólo con orden del dueño.
 
 ## 9. Qué queda fuera de este runbook
 
