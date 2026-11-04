@@ -1,0 +1,173 @@
+{
+  "antes": {
+    "label": "antes",
+    "viewport": "344x760, app PWA, cuenta artificial inspector",
+    "at": "2026-11-04T01:19:05.847Z",
+    "pages": {
+      "inicio": {
+        "headerBottom": 186,
+        "firstActionTop": 198,
+        "firstItemTop": null,
+        "buttons": 7,
+        "labels": [
+          "Inspecciones",
+          "Solicitudes",
+          "0Manifiestos",
+          "0En tránsito",
+          "0Borradores",
+          "0Tratados",
+          "Conexión y dispositivo"
+        ],
+        "paragraphs": 1,
+        "contentHeight": 577,
+        "viewportHeight": 760
+      },
+      "inspecciones": {
+        "headerBottom": null,
+        "firstActionTop": 139,
+        "firstItemTop": 579,
+        "buttons": 21,
+        "labels": [
+          "Administración de inspectores",
+          "Denuncia / hallazgo",
+          "Nueva inspección",
+          "Expedientes",
+          "Agenda",
+          "Antecedentes",
+          "Continuar mi inspección en campo",
+          "Todas",
+          "Preparación y visita 2",
+          "Seguimiento 1",
+          "Derivaciones 0",
+          "Cerradas 0",
+          "Filtros de inspecciones",
+          "Abrir expediente GRP-2026-00001",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente GRP-2026-00002",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente QA-CAMPO-0001",
+          "Abrir ficha de Establecimiento artificia",
+          "Anterior",
+          "Siguiente"
+        ],
+        "paragraphs": 15,
+        "contentHeight": 1362,
+        "viewportHeight": 760
+      },
+      "inspecciones-con-apertura": {
+        "headerBottom": null,
+        "firstActionTop": 139,
+        "firstItemTop": 719,
+        "buttons": 22,
+        "labels": [
+          "Administración de inspectores",
+          "Denuncia / hallazgo",
+          "Nueva inspección",
+          "Continuar apertura",
+          "Expedientes",
+          "Agenda",
+          "Antecedentes",
+          "Continuar mi inspección en campo",
+          "Todas",
+          "Preparación y visita 2",
+          "Seguimiento 1",
+          "Derivaciones 0",
+          "Cerradas 0",
+          "Filtros de inspecciones",
+          "Abrir expediente GRP-2026-00001",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente GRP-2026-00002",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente QA-CAMPO-0001",
+          "Abrir ficha de Establecimiento artificia",
+          "Anterior",
+          "Siguiente"
+        ],
+        "paragraphs": 16,
+        "contentHeight": 1502,
+        "viewportHeight": 760
+      }
+    }
+  },
+  "despues": {
+    "label": "despues",
+    "viewport": "344x760, app PWA, cuenta artificial inspector",
+    "at": "2026-11-04T01:28:16.070Z",
+    "pages": {
+      "inicio": {
+        "headerBottom": 186,
+        "firstActionTop": 140,
+        "firstItemTop": 236,
+        "buttons": 3,
+        "labels": [
+          "Inspecciones",
+          "Abrir expediente GRP-2026-00001",
+          "Abrir expediente GRP-2026-00002"
+        ],
+        "paragraphs": 8,
+        "contentHeight": 577,
+        "viewportHeight": 760
+      },
+      "inspecciones": {
+        "headerBottom": null,
+        "firstActionTop": 138,
+        "firstItemTop": 411,
+        "buttons": 19,
+        "labels": [
+          "Nueva inspección",
+          "Más acciones",
+          "Expedientes",
+          "Agenda",
+          "Antecedentes",
+          "Todas",
+          "Preparación y visita 2",
+          "Seguimiento 1",
+          "Derivaciones 0",
+          "Cerradas 0",
+          "Filtros de inspecciones",
+          "Abrir expediente GRP-2026-00001",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente GRP-2026-00002",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente QA-CAMPO-0001",
+          "Abrir ficha de Establecimiento artificia",
+          "Anterior",
+          "Siguiente"
+        ],
+        "paragraphs": 14,
+        "contentHeight": 1194,
+        "viewportHeight": 760
+      },
+      "inspecciones-con-apertura": {
+        "headerBottom": null,
+        "firstActionTop": 138,
+        "firstItemTop": 411,
+        "buttons": 19,
+        "labels": [
+          "Continuar apertura",
+          "Más acciones",
+          "Expedientes",
+          "Agenda",
+          "Antecedentes",
+          "Todas",
+          "Preparación y visita 2",
+          "Seguimiento 1",
+          "Derivaciones 0",
+          "Cerradas 0",
+          "Filtros de inspecciones",
+          "Abrir expediente GRP-2026-00001",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente GRP-2026-00002",
+          "Abrir ficha de Establecimiento artificia",
+          "Abrir expediente QA-CAMPO-0001",
+          "Abrir ficha de Establecimiento artificia",
+          "Anterior",
+          "Siguiente"
+        ],
+        "paragraphs": 14,
+        "contentHeight": 1194,
+        "viewportHeight": 760
+      }
+    }
+  }
+}
