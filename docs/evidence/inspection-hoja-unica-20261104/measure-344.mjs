@@ -74,25 +74,28 @@ try {
   await page.screenshot({ path: join(outDir, 'capturas', 'hoja-344-controles.jpg'), type: 'jpeg', quality: 80 });
   // Un control que cumple pasa a «No cumple» (se abre el hallazgo debajo) y vuelve a «Cumple»: el dato queda como estaba.
   // Playwright desplaza la tarjeta a la vista antes de tocar; la medición toma el scroll después de ese desplazamiento.
-  const card = page.locator('[id^="control-"][data-result="CUMPLE"]').first();
-  if (await card.count() > 0) {
+  // La tarjeta se fija por id: un selector por resultado cambiaría de tarjeta al responder.
+  const firstCompliant = page.locator('[id^="control-"][data-result="CUMPLE"]').first();
+  const id = await firstCompliant.count() > 0 ? await firstCompliant.evaluate((el) => el.id) : null;
+  const card = id ? page.locator('#' + id) : null;
+  if (card) {
     await card.scrollIntoViewIfNeeded(); await page.waitForTimeout(400);
-    const id = await card.evaluate((el) => el.id);
     const settled = await page.evaluate(() => Math.round(document.querySelector('[data-inspection-page-scroll]').scrollTop));
     await card.locator('button', { hasText: 'No cumple' }).click({ force: true });
     await page.waitForTimeout(600);
     const after = await page.evaluate(() => Math.round(document.querySelector('[data-inspection-page-scroll]').scrollTop));
     results.pages.app344.answerJump = { card: id, scrollBeforeTap: settled, scrollAfterTap: after, delta: after - settled };
     await page.screenshot({ path: join(outDir, 'capturas', 'hoja-344-control-respondido.jpg'), type: 'jpeg', quality: 80 });
-    await card.locator('button', { hasText: 'Cumple' }).first().click({ force: true });
+    await card.locator('button', { hasText: /^Cumple$/ }).click({ force: true });
     await page.waitForTimeout(600);
     results.pages.app344.answerJump.scrollAfterRestore = await page.evaluate(() => Math.round(document.querySelector('[data-inspection-page-scroll]').scrollTop));
     await page.waitForTimeout(2500);
   }
   results.pages.app344.scrollAtChecklist = before;
-  await page.evaluate(() => { const r = document.querySelector('[data-inspection-page-scroll]'); if (r) r.scrollTop = 0; });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: join(outDir, 'capturas', 'hoja-344-completa.jpg'), type: 'jpeg', quality: 70, fullPage: true }).catch(() => {});
+  // Pie de la hoja: estado de guardado, pendientes y el único botón de etapa.
+  await page.evaluate(() => { const r = document.querySelector('[data-inspection-page-scroll]'); if (r) r.scrollTop = r.scrollHeight; });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(outDir, 'capturas', 'hoja-344-pie.jpg'), type: 'jpeg', quality: 80 });
   await phone.close();
   // Escritorio: web a 1365 px.
   const desktop = await browser.newContext({ viewport: { width: 1365, height: 900 }, locale: 'es-AR', timezoneId: 'America/Argentina/Mendoza' });

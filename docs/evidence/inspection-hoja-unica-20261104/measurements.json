@@ -1,0 +1,62 @@
+{
+  "at": "2026-11-04T10:18:51.805Z",
+  "caseId": "cmw1372qv000kl0b983xbgc40",
+  "pages": {
+    "app344": {
+      "sheet": true,
+      "tabs": 0,
+      "accordions": 9,
+      "blocks": [
+        "1.Dónde estoy y con quién",
+        "2.Qué encontré",
+        "3.Controles",
+        "Contraste con lo declarado",
+        "4.Declaración y firma"
+      ],
+      "saveButtons": 0,
+      "stageButtons": [
+        "Enviar a revisión"
+      ],
+      "firstFieldTop": 1101,
+      "mapTop": 420,
+      "crosshair": true,
+      "markButton": true,
+      "status": "Guardado 07:18",
+      "contentHeight": 10416,
+      "scrollTop": 0,
+      "viewportHeight": 760,
+      "answerJump": {
+        "card": "control-cmw1372qv000tl0b92x603san",
+        "scrollBeforeTap": 4499,
+        "scrollAfterTap": 4499,
+        "delta": 0,
+        "scrollAfterRestore": 4499
+      },
+      "scrollAtChecklist": 4499
+    },
+    "web1365": {
+      "sheet": true,
+      "tabs": 0,
+      "accordions": 9,
+      "blocks": [
+        "1.Dónde estoy y con quién",
+        "2.Qué encontré",
+        "3.Controles",
+        "Contraste con lo declarado",
+        "4.Declaración y firma"
+      ],
+      "saveButtons": 0,
+      "stageButtons": [
+        "Enviar a revisión"
+      ],
+      "firstFieldTop": 1070,
+      "mapTop": 431,
+      "crosshair": true,
+      "markButton": true,
+      "status": "Guardado 07:18",
+      "contentHeight": 9131,
+      "scrollTop": 0,
+      "viewportHeight": 900
+    }
+  }
+}
