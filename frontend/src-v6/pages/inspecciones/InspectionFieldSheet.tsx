@@ -31,7 +31,7 @@ export function InspectionFieldSheet({ blocks, start, status, action }: { blocks
   }, [blocks.length]);
   const jump = (id: string) => { setOpen(false); document.getElementById(id)?.scrollIntoView?.({ block: 'start' }); };
   return <div ref={root} data-testid="inspection-field-sheet" className="inspection-field-sheet mx-auto w-full max-w-3xl min-w-0 [--inspection-anchor-offset:56px]">
-    <nav data-sheet-bar aria-label="Dónde estoy en el formulario" className="sticky top-0 z-20 -mx-3 mb-3 border-b border-neutral-300 bg-white/95 px-3 backdrop-blur sm:mx-0 sm:rounded-b-lg">
+    <nav data-sheet-bar aria-label="Dónde estoy en el formulario" className="sticky top-0 z-20 -mx-3 mb-3 border-b border-neutral-300 bg-white px-3 sm:mx-0 sm:rounded-b-lg">
       <button type="button" aria-expanded={open} aria-controls="field-sheet-blocks" onClick={() => setOpen(value => !value)} className="flex min-h-12 w-full items-center justify-between gap-3 text-left">
         <span className="min-w-0 truncate text-sm font-bold text-neutral-900"><span className="text-primary-800">{current + 1}</span> · {blocks[current]?.title}</span>
         <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-neutral-600">{current + 1} de {blocks.length}<ChevronDown size={16} aria-hidden="true" className={open ? 'rotate-180' : ''} /></span>
