@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ before: vi.fn(), update: vi.fn(), audit: vi.fn(), activity: vi.fn(), lock: vi.fn(), transaction: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { $transaction: mock.transaction } }));
 vi.mock('../../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
@@ -6,7 +6,8 @@ import { updateGenerador, updateOperador, updateTransportista } from '../../cont
 
 describe('actor data and its exact history share one transaction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    vi.stubEnv('ENTERPRISE_ENABLED', 'true');
     mock.before.mockResolvedValue({ id: 'actor', domicilio: 'Anterior' });
     mock.update.mockResolvedValue({ id: 'actor', domicilio: 'Nuevo' });
     mock.audit.mockResolvedValue({ id: 'audit' });
@@ -14,6 +15,7 @@ describe('actor data and its exact history share one transaction', () => {
     const delegate = { findUnique: mock.before, update: mock.update };
     mock.transaction.mockImplementation(callback => callback({ $queryRaw: mock.lock, generador: delegate, operador: delegate, transportista: delegate, empresaActividad: { findUnique: mock.activity }, auditoria: { create: mock.audit } }));
   });
+  afterEach(() => vi.unstubAllEnvs());
   for (const [kind, handler] of [['GENERADOR', updateGenerador], ['OPERADOR', updateOperador], ['TRANSPORTISTA', updateTransportista]] as const) {
     it(`${kind}: records previous/new address and actual author before acknowledging`, async () => {
       const response = { json: vi.fn() }, next = vi.fn();
@@ -30,14 +32,32 @@ describe('actor data and its exact history share one transaction', () => {
       expect(next).toHaveBeenCalledWith(failure); expect(response.json).not.toHaveBeenCalled();
     });
   }
-  it('propagates a company notification lookup failure without acknowledging an unaudited edit', async () => {
+  it.each([
+    ['GENERADOR', updateGenerador],
+    ['OPERADOR', updateOperador],
+    ['TRANSPORTISTA', updateTransportista],
+  ] as const)('%s: propagates a company notification lookup failure without acknowledging an unaudited edit', async (_kind, handler) => {
     const failure = new Error('company lookup unavailable');
     mock.activity.mockRejectedValueOnce(failure);
     const response = { json: vi.fn() }, next = vi.fn();
-    await updateGenerador({ params: { id: 'actor' }, body: { domicilio: 'Nuevo' }, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
+    await handler({ params: { id: 'actor' }, body: { domicilio: 'Nuevo' }, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
     expect(next).toHaveBeenCalledWith(failure);
     expect(response.json).not.toHaveBeenCalled();
     expect(mock.audit).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['GENERADOR', updateGenerador],
+    ['OPERADOR', updateOperador],
+    ['TRANSPORTISTA', updateTransportista],
+  ] as const)('%s: still audits the edit when company notices are disabled', async (_kind, handler) => {
+    vi.stubEnv('ENTERPRISE_ENABLED', 'false');
+    const response = { json: vi.fn() }, next = vi.fn();
+    await handler({ params: { id: 'actor' }, body: { domicilio: 'Nuevo' }, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mock.activity).not.toHaveBeenCalled();
+    expect(mock.audit).toHaveBeenCalledOnce();
+    expect(response.json).toHaveBeenCalledOnce();
+    expect(mock.audit.mock.invocationCallOrder[0]).toBeLessThan(response.json.mock.invocationCallOrder[0]);
   });
   it('an administrative type change updates the exact runtime mode as part of the audited transaction', async () => {
     mock.before.mockResolvedValue({ id: 'actor', tipoOperador: 'FIJO', modalidades: ['FIJO'] });
