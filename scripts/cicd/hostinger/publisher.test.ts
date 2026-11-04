@@ -462,6 +462,19 @@ test('workflow prunes only candidate modules and requires sealed runtime smoke b
   assert.match(workflow,/streamTransport:true/);assert.match(workflow,/Private runtime smoke passed/);
   assert.match(workflow,/SITREP-HOSTINGER-SCHEMA-DEPS/);
 });
+test('prepare installs PDF inspection tools before tests without installing on Hostinger',()=>{
+  const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
+  const start=workflow.indexOf('      - name: Install PDF verification tools');
+  const end=workflow.indexOf('      - name: Build and test only');
+  assert.ok(start>=0 && end>start);
+  const step=workflow.slice(start,end);
+  assert.match(step,/if: inputs.operation == 'prepare'/);
+  assert.match(step,/set -euo pipefail/);
+  assert.match(step,/sudo apt-get install -y --no-install-recommends poppler-utils/);
+  for(const tool of ['pdftotext','pdfinfo','pdftoppm'])assert.ok(step.includes('command -v '+tool));
+  assert.ok(end<workflow.indexOf('webfactory/ssh-agent'));
+  assert.equal(workflow.slice(workflow.indexOf('webfactory/ssh-agent')).includes('apt-get'),false);
+});
 
 const DEPENDENCY_BEFORE_PACKAGE=gunzipSync(Buffer.from('H4sIAAAAAAAC/4VWXW8jJxR9z68Y+WGzKy34O05cVUqrVatKG6nq7lu3kTBc2yQzMAHGsRPlvxcYBvDYaZ/s4Rzu57nA60VRDASpYLAsBkaRF7LiJWeEIaXqGq0IfQTBBp8dbQdKcykcc4xHeNSuMtBU8doE5Nd2R1ETRYpvXBuoSMGg+J7Zdt9/geaskbr4E0q+UVJL3dqrCPeGmN075ILBHj8EqHWkLfpqP73vnaMKyaCSotCKhh2m3WEpq4aXzCenaYHqwv5IseYb7AFr2u778KFwJgoExY+BhbUp1vpnBU8NV/Dxcq0vP/201pjW3w6CfrwkWoPRl58vfYjd16sC2tgC7WBpVANvn34MomFPDNEPawW2OPCVUxAa7ixedhm6HA1RpkuqOC2CpRjQnrHj7l+hGpEjy2di6DbhRxiVtolkA8fbC4QiENhstaxsW4jxVFHvi1pxbVsZVgtX+sTdgIAz5LicmBogtAP5DFvm0C1nXbNK5IKLzX/RUa0ka6gTHur4mQkniaUrNVdnDLQAciREQRm+5pQ4U5kF58T2kghdS8uwndHvhXLMQgpICbpvqq0GkwretZNR3jEi6/+zkRiZCWvhLYxrbccTBOWQDdJtMEBLDsKL636Or8KIuymi6lCbB+/zfoJneNohVFZW0Lo7GO7H+BpPEqi6Ldf4KnZGGhC7ln2Fp3jcAWC2EDZc4XHmHvbeh0dmeDJJ7gOCnMpQySveBn+NF2n3FsoK2vUFHqd1N/vPsDLSHlgevbGnWoy96iIfJ29VUxpQsQjRkusBoiqUYJZXzp9NhJdh2401F/Ot2foxBDzC40XyXXMh2/qM8vo8KWqthTLPU1h6S1QdzEzneBbXn8lmAwo9aCZpKKvtRB9uOMoLPLdViC5tfVDdaH+e3E9tYosOeZEsZjvP9bX7cl5i5lCDHp4oKcoiEOgWQHEZ0nG9nvcZJ5Jb4FNOprzxoof20+3HcFYZfRdHYpikjgdYdK2ajFwI5+Akmamr+fgMJZPOlS3WeNbj9CXUx3uS6edwTiGjEyPvCMWGk8QUqCd6Sbba+2bY3TRodx2tpNTJnksdwp2MUlFzVaTHRxHv/lTFfIbsFQHGHNpd03yS2/Pu9KALB2o3fDfJns/PX+Fh1yTNa7hpT9NpAVRJ+mhLZ9xYsBBqdhDtS713q1tjar0cDikTWNuE7ZhgK/ahw9HI1WOa/8dm85IG7xEOz1IxV7y/4yUan1ydKxWeXbEOx68vN8CbNYnnnQ1YvhDn5B/vhDRmK70cv/z+2y/FXcA9VrYPGgfe/fG9XXO9Vpzl58BKEQpOR/bGjK9J2+xYs5VkB2RfSLrVvddBlBmvEWGsk6DtUHZqPmh0IFXpAHtBpXVBhOTsduqAqTtPb2L2Uhvamrq20zGJbhrBOOW3C4dYD5kMnjz7+HrqvE5yvfRHq03/iG1ljMYDv/7m+njxdvEvPvO7O5ALAAA=','base64')).toString();
 
