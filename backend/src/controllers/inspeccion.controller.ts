@@ -2,6 +2,7 @@ import { validateInspectionMap } from '../services/inspectionMap.service';
 import { inspectionCurrentSignatures } from '../domain/inspectionSignature';
 import { createInspectionAgendaNotices, recordInspectionScheduleChange, INSPECTION_AGENDA_LABELS, type InspectionAgendaEvent } from '../services/inspectionAgendaNotice.service';
 import fs from 'fs';
+import { createHash } from 'node:crypto';
 import { inspectionFieldExtensions } from '../domain/inspectionFieldModel';
 import { intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
@@ -965,6 +966,16 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
   } catch (error) { next(error); }
 }
 
+function assertCaptureReceipt(
+  existing: { descripcion: string | null; transcripcion: string | null; anuladaAt: Date | null },
+  sent: { descripcion?: string | null; transcripcion?: string | null },
+) {
+  if (existing.anuladaAt) throw new AppError('La evidencia anterior fue anulada. La captura sigue pendiente en este dispositivo.', 409);
+  if ((sent.descripcion && sent.descripcion !== existing.descripcion) || (sent.transcripcion && sent.transcripcion !== existing.transcripcion)) {
+    throw new AppError('Esta foto ya está incorporada con otro texto. La nueva descripción sigue en este dispositivo. Revisá ambas notas antes de resolver el pendiente.', 409);
+  }
+}
+
 export async function subirEvidencia(req: AuthRequest, res: Response, next: NextFunction) {
   let storedKey: string | null = null;
   try {
@@ -1007,6 +1018,11 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
         if ((itemId && retried.itemId !== itemId) || (comparacionId && retried.comparacionId !== comparacionId) || (eventoId && retried.eventoId !== eventoId)) {
           throw new AppError('La captura ya fue vinculada a otro punto del expediente', 409);
         }
+        if (retried.sha256 !== createHash('sha256').update(req.file.buffer).digest('hex') ||
+            (metadata.clienteSha256 && retried.sha256 !== metadata.clienteSha256.toLowerCase())) {
+          throw new AppError('La captura recibida antes tiene otro contenido. El archivo local sigue pendiente.', 409);
+        }
+        assertCaptureReceipt(retried, metadata);
         return res.json({ success: true, data: retried, message: 'La captura ya estaba sincronizada' });
       }
     }
@@ -1031,6 +1047,8 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       await removeInspectionEvidence(stored.storageKey);
       storedKey = null;
       if (itemId && !duplicate.itemId && !duplicate.comparacionId && !duplicate.eventoId) {
+        // An unlabelled image may acquire a caption, but never overwrite a prior note.
+        assertCaptureReceipt({ ...duplicate, descripcion: duplicate.descripcion || metadata.descripcion || null }, metadata);
         const linked = await prisma.$transaction(async (tx) => {
           await reserveFieldMutation(tx, req.params.id, inspection.version);
           const updated = await tx.evidenciaInspeccion.update({
@@ -1056,6 +1074,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       if ((itemId && duplicate.itemId !== itemId) || (comparacionId && duplicate.comparacionId !== comparacionId) || (eventoId && duplicate.eventoId !== eventoId)) {
         throw new AppError('La misma evidencia ya está vinculada a otro punto del expediente', 409);
       }
+      assertCaptureReceipt(duplicate, metadata);
       return res.json({ success: true, data: duplicate, message: 'La evidencia ya estaba incorporada' });
     }
     const evidence = await prisma.$transaction(async (tx) => {

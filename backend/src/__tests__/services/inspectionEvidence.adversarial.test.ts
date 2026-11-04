@@ -79,4 +79,28 @@ describe('inspection evidence hostile storage boundaries', () => {
     expect(files.filter((entry) => String(entry).endsWith('.evidence'))).toEqual([]);
     expect(files.filter((entry) => /\.(png|jpg|webp)$/i.test(String(entry)))).toEqual([]);
   });
+  it.each(['', '/missing-sitrep-qa-scanner', 'node -e process.exit(2)'])(
+    'reports scanner unavailability without accepting or blaming the capture: %s', async (command) => {
+      process.env.FILE_SCAN_MODE = 'required';
+      process.env.CLAMAV_SCAN_CMD = command;
+      const service = await import('../../services/inspectionEvidence.service');
+      await expect(service.persistInspectionEvidence(upload(PNG_1PX), 'inspection-1'))
+        .rejects.toMatchObject({ statusCode: 503, code: 'INSPECTION_SCAN_UNAVAILABLE' });
+      const files = await fs.promises.readdir(uploadsDir, { recursive: true });
+      expect(files.filter((entry) => /\.(evidence|png)$/.test(String(entry)))).toEqual([]);
+      // A scanner recovery permits the exact same bytes; no new photo is needed.
+      process.env.CLAMAV_SCAN_CMD = 'true';
+      const saved = await service.persistInspectionEvidence(upload(PNG_1PX), 'inspection-1');
+      expect(await fs.promises.readFile(service.resolveInspectionEvidence(saved.storageKey))).toEqual(PNG_1PX);
+    },
+  );
+
+  it('keeps a positive scanner detection terminal, without publishing the file', async () => {
+    process.env.FILE_SCAN_MODE = 'required';
+    process.env.CLAMAV_SCAN_CMD = 'false';
+    const service = await import('../../services/inspectionEvidence.service');
+    await expect(service.persistInspectionEvidence(upload(PNG_1PX), 'inspection-1'))
+      .rejects.toMatchObject({ statusCode: 400, code: 'INSPECTION_SCAN_REJECTED' });
+  });
+
 });

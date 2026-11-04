@@ -26,6 +26,7 @@ export interface PendingInspectionEvidence {
   createdAt: string;
   attempts: number;
   lastError?: string;
+  failureCode?: string;
   failureKind?: 'retryable' | 'terminal';
   nextRetryAt?: string;
   uploaded?: boolean;
@@ -75,12 +76,21 @@ export async function validateInspectionEvidence(file: Blob, fields: PendingInsp
 }
 
 export function inspectionEvidenceFailure(entry: PendingInspectionEvidence, error: unknown): PendingInspectionEvidence {
-  const response = (error as { response?: { status?: number; data?: { message?: string } } } | null)?.response;
+  const response = (error as { response?: { status?: number; data?: { message?: string; code?: string } } } | null)?.response;
   const status = response?.status;
   const terminal = error instanceof InspectionEvidenceValidationError || (status !== undefined && status >= 400 && status < 500 && ![408, 425, 429].includes(status));
   const message = response?.data?.message;
   const lastError = typeof message === 'string' && message.trim() ? message : error instanceof Error ? error.message : 'No se pudo sincronizar la evidencia.';
-  return { ...entry, failureKind: terminal ? 'terminal' : 'retryable', lastError, nextRetryAt: new Date(Date.now() + 30_000 * 2 ** Math.min(entry.attempts, 6)).toISOString() };
+  const failureCode = ['INSPECTION_SCAN_UNAVAILABLE', 'INSPECTION_SCAN_REJECTED'].includes(response?.data?.code || '') ? response?.data?.code : undefined;
+  return { ...entry, failureCode, failureKind: terminal ? 'terminal' : 'retryable', lastError, nextRetryAt: new Date(Date.now() + 30_000 * 2 ** Math.min(entry.attempts, 6)).toISOString() };
+}
+
+/** Old clients stored a generic 400 for every scanner failure. Keep its bytes and
+ * retry only on explicit action; the updated server must issue a fresh verdict. */
+export function pendingEvidenceScanState(entry: PendingInspectionEvidence): 'unavailable' | 'legacy' | null {
+  if (entry.failureCode === 'INSPECTION_SCAN_UNAVAILABLE') return 'unavailable';
+  if (!entry.failureCode && entry.lastError === 'La evidencia no supero el escaneo antivirus') return 'legacy';
+  return null;
 }
 
 function randomId(): string {
@@ -202,7 +212,7 @@ export function syncPendingInspectionEvidence(options: SyncOptions): Promise<Ins
           if (options.isActive?.() === false) break;
           await options.upload(entry);
           uploaded = true;
-          await updatePendingInspectionEvidence({ ...attempted, uploaded: true, lastError: undefined, failureKind: undefined });
+          await updatePendingInspectionEvidence({ ...attempted, uploaded: true, lastError: undefined, failureKind: undefined, failureCode: undefined });
         }
         await removePendingInspectionEvidence(entry.id);
         result.synchronized += 1;

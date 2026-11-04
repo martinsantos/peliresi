@@ -67,4 +67,17 @@ describe('pending inspection evidence recovery controls', () => {
     expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(url);
     expect(screen.getByRole('img')).toHaveAttribute('src', url);
   });
+  it.each(['legacy', 'unavailable'])('explains %s scanning failure without suggesting a new photo', async (kind) => {
+    const capture = { ...evidence, lastError: kind === 'legacy' ? 'La evidencia no supero el escaneo antivirus' : 'El servicio antivirus no está disponible.', failureCode: kind === 'unavailable' ? 'INSPECTION_SCAN_UNAVAILABLE' : undefined };
+    render(<PendingEvidenceThumbnail evidence={capture} actions={actions} />);
+    expect(screen.getByText('Verificación de seguridad pendiente')).toBeVisible();
+    expect(screen.getByText(/La foto y su descripción siguen guardadas/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Corregir archivo' })).not.toBeInTheDocument();
+    expect(screen.getByText('Falta señalización.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar carga' }));
+    await waitFor(() => expect(actions.onRetry).toHaveBeenCalledWith('pending-1'));
+    expect(actions.onDiscard).not.toHaveBeenCalled();
+    expect(actions.onReplace).not.toHaveBeenCalled();
+  });
+
 });

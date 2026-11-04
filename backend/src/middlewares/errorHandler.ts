@@ -94,7 +94,7 @@ export const errorHandler = (
     success: false,
     status: statusCode,
     message,
-    code: responseCode ?? (err instanceof AppError && ['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'SUPPORT_ACTION_NOT_APPLIED'].includes(String(err.code)) ? err.code : undefined),
+    code: responseCode ?? (err instanceof AppError && ['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'SUPPORT_ACTION_NOT_APPLIED', 'INSPECTION_SCAN_UNAVAILABLE', 'INSPECTION_SCAN_REJECTED'].includes(String(err.code)) ? err.code : undefined),
     retryAfterSeconds,
     details: process.env.NODE_ENV === 'development' ? details : undefined,
     fieldErrors: statusCode === 400 && err instanceof AppError ? err.fieldErrors : undefined,
