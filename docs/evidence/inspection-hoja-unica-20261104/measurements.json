@@ -1,16 +1,15 @@
 {
-  "at": "2026-11-04T10:18:51.805Z",
+  "at": "2026-11-04T10:28:37.005Z",
   "caseId": "cmw1372qv000kl0b983xbgc40",
   "pages": {
     "app344": {
       "sheet": true,
       "tabs": 0,
-      "accordions": 9,
+      "accordions": 1,
       "blocks": [
         "1.Dónde estoy y con quién",
         "2.Qué encontré",
         "3.Controles",
-        "Contraste con lo declarado",
         "4.Declaración y firma"
       ],
       "saveButtons": 0,
@@ -22,9 +21,26 @@
       "crosshair": true,
       "markButton": true,
       "status": "Guardado 07:18",
-      "contentHeight": 10416,
+      "contentHeight": 12999,
       "scrollTop": 0,
       "viewportHeight": 760,
+      "mapLock": {
+        "beforeTap": {
+          "dragClass": false,
+          "touchAction": "pan-y",
+          "hint": true
+        },
+        "afterTap": {
+          "dragClass": true,
+          "touchAction": "none",
+          "hint": false
+        },
+        "afterPageScroll": {
+          "dragClass": false,
+          "touchAction": "pan-y",
+          "hint": true
+        }
+      },
       "answerJump": {
         "card": "control-cmw1372qv000tl0b92x603san",
         "scrollBeforeTap": 4499,
@@ -37,12 +53,11 @@
     "web1365": {
       "sheet": true,
       "tabs": 0,
-      "accordions": 9,
+      "accordions": 1,
       "blocks": [
         "1.Dónde estoy y con quién",
         "2.Qué encontré",
         "3.Controles",
-        "Contraste con lo declarado",
         "4.Declaración y firma"
       ],
       "saveButtons": 0,
@@ -54,7 +69,7 @@
       "crosshair": true,
       "markButton": true,
       "status": "Guardado 07:18",
-      "contentHeight": 9131,
+      "contentHeight": 11468,
       "scrollTop": 0,
       "viewportHeight": 900
     }

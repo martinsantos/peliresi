@@ -19,7 +19,7 @@ Una sola página, un solo scroll, en el orden de la visita. Nada se desplaza sol
 
 1. **Dónde estoy y con quién** — mapa (punto por GPS o con la cruz), dirección, motivo, persona que atiende, correo para el acta, número de acta.
 2. **Qué encontré** — texto con dictado, fotos y archivos ahí mismo, actividad y entorno observados.
-3. **Controles** — lista plana; la observación y la foto aparecen al marcar No cumple o al tocar «Agregar observación o foto»; nada se cierra solo. Debajo, la comparación con lo declarado (si hay inspeccionado identificado) y los requerimientos con plazo.
+3. **Controles** — lista plana; la observación y la foto aparecen al marcar No cumple o al tocar «Agregar observación o foto»; nada se cierra solo. Debajo, la comparación con lo declarado (si hay inspeccionado identificado) también como lista plana: todos los grupos abiertos, el detalle de cada dato aparece por su contenido (difiere, no verificado, valor o hallazgo anotado) o al tocar «Anotar lo encontrado», sin «Ocultar detalle» ni «Siguiente pendiente». Al final, los requerimientos con plazo.
 4. **Declaración y firma** — constancias del acta (desplegable), lectura y firma, copia para el inspeccionado.
 5. **Un solo botón** — «Iniciar visita» antes de empezar (arriba, al llegar) o «Enviar a revisión» al final, con la lista de pendientes encima. Nunca los dos.
 
@@ -43,7 +43,7 @@ Laboratorio remoto (contenedor `sitrep-inspection-20261103`, 1 CPU, 2 GiB, sin s
 - Backend sin cambios en este paso; su arnés no se volvió a correr.
 - Compilación completa del preview (`rebuild-all.sh`): backend, web y app con código 0, pico de memoria 1,44 GB.
 
-Commits: `81f23f5f` (hoja única, mapa, pruebas), `71b91d13` (aviso del mapa y título duplicado).
+Commits: `81f23f5f` (hoja única, mapa, pruebas), `71b91d13` (aviso del mapa y título duplicado), `56c89bf1` (contraste con lo declarado como lista plana, Volver espera el guardado, entrada de reanudación «Formulario de campo»; `InspectionComparisonPanel.test.tsx` suma el caso plano: 47/47 en los tres archivos de página).
 
 ## Mediciones en el preview
 
@@ -53,12 +53,13 @@ Script: [measure-344.mjs](evidence/inspection-hoja-unica-20261104/measure-344.mj
 |---|---|---|---|
 | Pestañas de pasos | 4 | 0 | 0 |
 | Tarjetas «Expediente y seguimiento» | 5 | 0 (un enlace «Expediente completo») | 0 |
-| Acordeones en el formulario | 3 en Constatar + 1 por control | 0 en controles · 9 dentro de «Contraste con lo declarado» (grupos y «Ver detalle») | 9, los mismos |
+| Acordeones en el formulario | 3 en Constatar + 1 por control + grupos del contraste | 0 (queda sólo el botón del índice «Ir a un dato declarado», que abre una lista de búsqueda) | 0 |
 | Botones Guardar / Continuar | 2 (barra de 81 px) | 0 | 0 |
 | Botones de etapa visibles | 1 | 1 («Enviar a revisión», al pie) | 1 |
 | Mapa: borde superior | paso 1, bajo el mapa 536 px el primer campo | 420 px (primera pantalla), cruz fija y «Marcar el punto aquí» | 431 px |
 | Al marcar «No cumple» en un control: desplazamiento de la página | saltaba | 0 px (scroll 4499 → 4499), y 0 px al volver a «Cumple» | — |
-| Alto total de la hoja | — | 10 416 px (unas 14 pantallas) | 9 131 px |
+| Alto total de la hoja | — | 12 999 px (unas 17 pantallas; el contraste con lo declarado ya no esconde filas en grupos cerrados) | 11 468 px |
+| Mapa en el teléfono: bloqueo táctil | — | arranca bloqueado (`touch-action: pan-y`, aviso visible) · un toque lo activa (`leaflet-touch-drag`) · un scroll de la página lo vuelve a bloquear | sin bloqueo |
 
 Nota sobre la medición: una primera versión del script elegía «la primera tarjeta que cumple» por resultado, y al responder cambiaba de tarjeta; eso dio un falso salto de 574 px y dejó cuatro controles artificiales modificados (GEN-01, GEN-02, SEG-01 y GEN-03). Se corrigió el script (tarjeta fijada por id) y se restauraron los cuatro por la API de ítems; HAB-02 quedó en «No cumple» porque ya lo estaba. Sólo datos artificiales.
 
@@ -67,6 +68,8 @@ Capturas: `hoja-344-arriba.jpg` (bloque 1 con el mapa y la cruz), `hoja-344-cont
 ## Límites y pendientes
 
 - La barra lateral de administración en la web de escritorio no se tocó: pertenece al trabajo de Inicio y lista por rol de la sesión paralela.
-- La comparación con lo declarado conserva sus grupos desplegables dentro del bloque Controles; ya no escribe el scroll de la página, pero sigue siendo un acordeón por grupo. Próximo paso si molesta en campo.
+- Los enlaces de la lista de pendientes («1 controles obligatorios pendientes») llevan al comienzo del bloque, no a la tarjeta pendiente; con 11 controles el inspector la busca. Próximo paso: que el enlace apunte a la primera tarjeta pendiente.
+- Las descripciones de foto se deshabilitan mientras se guarda el borrador (cada 1,5 s tras un cambio); escribir allí durante un guardado puede perder teclas. Baja frecuencia; pendiente.
+- Cada vértice nuevo dispara, 2,5 s después, la descarga de unas 12 teselas y la preparación de la imagen del acta, más el guardado automático. En campo con señal débil conviene observarlo.
 - Los dos archivos de prueba que ya fallaban antes (`InspectionInlineSave.test.tsx`, «Guardar y salir de la inspección»; `InspectionWorkspace.keyboard.test.tsx`, barra fija) ahora contradicen el diseño aprobado. Siguen fuera del arnés. Decisión pendiente: actualizarlos o retirarlos.
 - Android físico sigue pendiente de dispositivo; el bloqueo táctil del mapa se probó con emulación táctil de Chromium, no con un teléfono.
