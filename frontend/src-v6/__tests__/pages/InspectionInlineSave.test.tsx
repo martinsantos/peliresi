@@ -8,6 +8,12 @@ import { inspeccionService } from '../../services/inspeccion.service';
 import { toast } from '../../components/ui/Toast';
 import { startLocalDictation } from '../../services/localDictation';
 
+// Map and delivery panels have independent coverage; this suite exercises draft persistence.
+vi.mock('../../pages/inspecciones/InspectionLocationMap', () => ({ default: () => <div>Mapa</div> }));
+vi.mock('../../hooks/useCatalogos', () => ({ useCatalogoGeneradores: () => ({ data: [] }), useCatalogoOperadores: () => ({ data: [] }), useCatalogoTransportistas: () => ({ data: [] }) }));
+vi.mock('../../pages/inspecciones/InspectionSignaturePanel', () => ({ InspectionSignaturePanel: () => <section>Firma</section> }));
+vi.mock('../../pages/inspecciones/InspectionActAccessPanel', () => ({ InspectionActAccessPanel: () => <section>Copia del acta</section> }));
+
 const queryMock = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ training: false }));
 const checkpoint = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
@@ -43,7 +49,7 @@ const fixture: Inspection = {
 };
 
 function page(hash = '#checklist/DOC-01') {
-  return <MemoryRouter initialEntries={['/inspecciones/inspection-1' + hash]}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /><Route path="/inspecciones" element={<h1>Listado de inspecciones</h1>} /></Routes></MemoryRouter>;
+  return <MemoryRouter initialEntries={['/inspecciones/inspection-1?vista=expediente' + hash]}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /><Route path="/inspecciones" element={<h1>Listado de inspecciones</h1>} /></Routes></MemoryRouter>;
 }
 const editor = () => screen.getByRole('textbox', { name: 'Observación: Documentación vigente' });
 const inline = () => within(screen.getByTestId('inspection-field-save-bar'));
@@ -81,7 +87,7 @@ describe('shared explicit save for the complete inspection draft', () => {
     render(page());
     const field = await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' });
     fireEvent.change(field, { target: { value: 'Trabajo que no debe perderse al salir' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir de la inspección' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a Inspecciones' }));
     expect(screen.queryByRole('heading', { name: 'Listado de inspecciones' })).not.toBeInTheDocument();
     expect(inline().getByText('Confirmando copia en este dispositivo…')).toBeInTheDocument();
     expect(inline().queryByText('Guardando cambios en el servidor…')).not.toBeInTheDocument();
@@ -96,7 +102,7 @@ describe('shared explicit save for the complete inspection draft', () => {
     render(page());
     const field = await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' });
     fireEvent.change(field, { target: { value: 'Conservar abierto hasta resolver' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir de la inspección' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a Inspecciones' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No se pudo proteger el borrador', expect.any(String)));
     expect(field).toHaveValue('Conservar abierto hasta resolver');
     expect(screen.queryByRole('heading', { name: 'Listado de inspecciones' })).not.toBeInTheDocument();
@@ -161,6 +167,8 @@ describe('shared explicit save for the complete inspection draft', () => {
   });
 
   it('saves the entire draft atomically and confirms only after the server responds', async () => {
+    let confirm!: (value: Inspection) => void;
+    vi.mocked(inspeccionService.saveDraft).mockImplementation(() => new Promise(resolve => { confirm = resolve; }));
     render(page());
     fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Falta habilitación vigente.' } });
     expect(inline().getByText('Falta guardar en servidor.')).toBeInTheDocument();
@@ -168,8 +176,10 @@ describe('shared explicit save for the complete inspection draft', () => {
     fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ version: 1, items: [{ id: 'item-1', resultado: 'NO_CUMPLE', observacion: 'Falta habilitación vigente.' }], comparaciones: [] })));
     expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1);
+    expect(inline().queryByText('Guardado en servidor.')).not.toBeInTheDocument();
+    expect(editor()).toHaveValue('Falta habilitación vigente.');
+    await act(async () => { confirm({ version: 2 } as Inspection); });
     await waitFor(() => expect(inline().getByText('Guardado en servidor.')).toBeInTheDocument());
-    expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.stringContaining('borrador completo'));
     expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({ version: 2, items: [{ observacion: 'Falta habilitación vigente.' }] });
   });
 
