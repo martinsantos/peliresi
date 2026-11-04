@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "rootDir": "scripts",
+    "outDir": "dist-lint"
+  },
+  "include": ["scripts/lint-baseline.ts", "scripts/lint-baseline-core.ts"]
+}
