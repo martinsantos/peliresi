@@ -21,7 +21,7 @@ Antes → después en píxeles, sobre `b0eaa71b` y `102775f1`. Nota: en Controle
 
 Lo que no cambió: la barra de la app (65 px) y la fila volver/descargas, número, estado y establecimiento (≈180 px) son del marco general, no del formulario; están en el diagnóstico de abajo.
 
-## Qué cambió en el formulario (commits `9349f055`, `5044d0a6`, `102775f1`)
+## Qué cambió en el formulario (commits `9349f055`, `5044d0a6`, `102775f1`, `3db8edc1`)
 
 Nada se eliminó del modelo de datos ni de las reglas; sólo se reubicó, se acortó o se mostró a demanda.
 
@@ -30,8 +30,8 @@ Nada se eliminó del modelo de datos ni de las reglas; sólo se reubicó, se aco
 - «Copias de versiones anteriores» (recuperación en el dispositivo) dejó de ser una barra al pie de cada paso; vive en «Expediente y seguimiento», sin su propio desplegable dentro del desplegable.
 
 **Acortado**
-- Título del paso en una línea («Paso 2 de 4 · Registrar lo que encontraste»); la frase explicativa sólo en pantallas anchas. Las pestañas ya dicen dónde se está.
-- Barra de guardado en una sola fila: estado en una línea («Sin guardar en SITREP» / «Guardado en SITREP»), «Guardar» como ícono junto al botón principal «Guardar y continuar». En pantallas anchas conserva su texto.
+- Rótulo «Paso N de 4» y título en un solo bloque compacto (en Visita entran en una línea; en los demás pasos el título ocupa dos); la frase explicativa sólo en pantallas anchas. Las pestañas ya dicen dónde se está.
+- Barra de guardado: en teléfonos, una línea fina de estado («Sin guardar» / «Guardado» / «Guardando…») y debajo una sola fila con «Guardar» como ícono y el botón principal «Guardar y continuar» a todo el ancho. Se probó primero con el estado al lado de los botones (61 px) pero el texto se partía; la versión final mide 81 px. En pantallas anchas todo va en una fila con los textos completos.
 - Nota del mapa: una línea que conserva el límite legal («no delimita el predio ni define por sí solo una restricción ambiental») y el aviso de funcionamiento sin conexión.
 - Finalizar: el aviso «cierra el trabajo de campo; no aprueba ni notifica» aparece una vez, en el bloque de cambio de etapa, en lugar de dos.
 
@@ -46,6 +46,10 @@ Nada se eliminó del modelo de datos ni de las reglas; sólo se reubicó, se aco
 **Etiquetas**
 - La tarea del acta dice «Sin registrar» o «Con registro» en vez de «Registro de campo».
 
+## Regresión propia detectada y corregida
+
+Al mover «Copias de versiones anteriores» a «Expediente y seguimiento», esa tarea quedó sin barra de guardado (la barra sólo acompaña a los pasos editables). Quien revisaba una copia quedaba en una pantalla sin «Guardar», aunque el texto del panel lo mencionaba. Corregido en `3db8edc1`: al revisar un texto se vuelve al paso Hechos (acta) y al recuperar un archivo, a Evidencias, donde está la barra; el texto del panel lo dice. «Asignación y programación» tiene su propio botón de confirmación y no depende de la barra.
+
 ## Lo que se dejó deliberadamente sin tocar (decisión de diseño pendiente)
 
 **Constatar sigue siendo la parte confusa.** Tres acordeones apilados con tres vocabularios distintos (hechos / controles / comparar con lo declarado), y dentro de «Controles» once tarjetas, cada una con sus respuestas, observación, dictado, fotos y dos enlaces de navegación (índice / siguiente pendiente). Aplanarlo es una decisión de producto, no una limpieza. Dos opciones concretas:
@@ -58,12 +62,12 @@ Recomiendo la opción 1 para campo. Requiere rehacer el componente de controles 
 ## Pruebas
 
 - Tipos frontend y backend aprobados. Suites del arnés: frontend 108, backend 363.
-- **Fallas preexistentes, no causadas por este cambio y no corregidas:** `InspectionInlineSave.test.tsx` (3) e `InspectionWorkspace.keyboard.test.tsx` (2) ya fallaban sobre `b0eaa71b` (comprobado ejecutándolas contra el código previo). Esperan un botón «Guardar y salir de la inspección» y una barra `sticky` que el código actual no tiene. No forman parte del arnés del laboratorio, por eso no aparecieron antes. Decidir si se actualizan o se retiran.
+- **Fallas preexistentes, no causadas por este cambio y no corregidas:** `InspectionInlineSave.test.tsx` (3) e `InspectionWorkspace.keyboard.test.tsx` (2) ya fallaban sobre `b0eaa71b` (comprobado ejecutándolas contra el código previo). Esperan un botón «Guardar y salir de la inspección» y una barra `sticky` que el código actual no tiene. No forman parte del arnés del laboratorio (`qa-p0.mjs`) y siguen deliberadamente excluidas de él, por eso no aparecieron antes; la decisión de actualizarlas o retirarlas es del usuario.
 - `InspectionRestart.test.tsx`: se ajustó una consulta para buscar el enlace «Copias de versiones anteriores» por rol, porque ahora el título de la tarea repite ese texto.
 
 ## Diagnóstico: por qué el SITREP resulta confuso
 
-Lo observado en el preview, con la cuenta artificial de inspector a 344 px, en tres pantallas: Inicio, lista de Inspecciones y el formulario.
+Lo observado en el preview con la cuenta artificial de inspector en tres pantallas: el formulario a 344 px, y el Inicio y la lista de Inspecciones leídos como texto (sus capturas `diagnostico-*.jpg` son de un ancho mayor, ~800 px; el apilamiento de elementos que se describe no depende del ancho).
 
 **Síntomas**
 - **Cuatro capas de cabecera antes del contenido.** Barra de la app (título, rol, ayuda, campana), fila de volver/descargas, número y estado, pestañas, y encima «Paso N de 4», título y explicación. En el formulario, 536 px de 760 antes del primer campo.
@@ -87,3 +91,7 @@ Lo observado en el preview, con la cuenta artificial de inspector a 344 px, en t
 5. Revisión del texto defensivo pantalla por pantalla: conservar lo que tiene valor legal (en una línea), quitar lo demás y llevarlo al manual.
 
 Ninguno de estos puntos se tocó en esta tanda: el código cambiado es sólo del formulario de inspección.
+
+## Laboratorio
+
+Las copias locales de `rebuild-all.sh` y `backend-cycle.sh` (en `../lab/`) apuntaban todavía al contenedor anterior; al resubirlas detuvieron la API una vez sin compilar. Ya apuntan a `sitrep-inspection-20261103`. `rebuild-all.sh` ahora aborta si cualquier etapa (backend, web o app) termina con código distinto de cero y muestra el error del log, en lugar de reiniciar la API y el relay con un build viejo. Se agregó después de que un error de sintaxis pasó inadvertido en una compilación.
