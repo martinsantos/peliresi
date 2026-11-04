@@ -10,6 +10,7 @@ async function main(): Promise<void> {
   const engine = new ESLint({ cwd });
   // Same source coverage as `eslint .`; no files or rules are suppressed here.
   const results = await engine.lintFiles(['.']);
+  if (!results.length) throw new Error('ESLint did not inspect any files');
   const current: CurrentFile[] = [];
   for (const result of results) {
     const path = relative(cwd, result.filePath).split(sep).join('/');
@@ -29,8 +30,9 @@ async function main(): Promise<void> {
   const errors = results.filter(result => result.errorCount > 0);
   if (errors.length) process.stderr.write(await (await engine.loadFormatter('stylish')).format(errors));
   for (const message of debt.unaccepted) process.stderr.write(message + '\n');
-  process.stdout.write(`Lint: ${debt.errors} errors; ${debt.warnings} existing warnings; ${debt.unaccepted.length} unaccepted warning groups. Baseline ${baseline.sourceRevision}.\n`);
-  if (debt.errors || debt.unaccepted.length) process.exitCode = 1;
+  for (const message of debt.stale) process.stderr.write(message + '\n');
+  process.stdout.write(`Lint: ${debt.errors} errors; ${debt.warnings} existing warnings; ${debt.unaccepted.length} unaccepted warning groups; ${debt.stale.length} obsolete allowance groups. Baseline ${baseline.sourceRevision}.\n`);
+  if (debt.errors || debt.unaccepted.length || debt.stale.length) process.exitCode = 1;
 }
 
 main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });

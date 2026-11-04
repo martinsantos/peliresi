@@ -4,20 +4,26 @@ export interface BaselineWarning { ruleId: string; messageSha256: string; count:
 export interface BaselineFile { path: string; sourceSha256: string; warnings: BaselineWarning[] }
 export interface LintBaseline { version: 1; sourceRevision: string; warningCount: number; files: BaselineFile[] }
 export interface CurrentFile extends BaselineFile { errors: number }
-export interface DebtResult { errors: number; warnings: number; unaccepted: string[]; remaining: BaselineFile[] }
+export interface DebtResult { errors: number; warnings: number; unaccepted: string[]; stale: string[]; remaining: BaselineFile[] }
 
 export const sha256 = (value: string | Uint8Array): string => createHash('sha256').update(value).digest('hex');
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const hash = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const relativePath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && !value.startsWith('/') && !value.includes('\\') && !value.includes(':') && !value.split('/').some(part => part === '..' || part === '.' || part === '');
+export const criticalPath = (path: string): boolean => path.startsWith('src-v6/pages/inspecciones/') || [
+  'src-v6/services/inspeccion.service.ts',
+  'src-v6/services/inspectionOfflineEvidence.ts',
+  'src-v6/types/inspection.ts',
+].includes(path);
 
 /** The baseline is reviewed input, never written or expanded by the lint command. */
 export function parseBaseline(value: unknown): LintBaseline {
-  if (!isRecord(value) || value.version !== 1 || typeof value.sourceRevision !== 'string' || !/^[a-f0-9]{40}$/.test(value.sourceRevision) || !Number.isInteger(value.warningCount) || !Array.isArray(value.files)) throw new Error('Invalid lint baseline header');
+  if (!isRecord(value) || value.version !== 1 || typeof value.sourceRevision !== 'string' || !/^[a-f0-9]{40}$/.test(value.sourceRevision) || typeof value.warningCount !== 'number' || !Number.isSafeInteger(value.warningCount) || value.warningCount < 0 || !Array.isArray(value.files)) throw new Error('Invalid lint baseline header');
   const seen = new Set<string>();
   let count = 0;
   const files: BaselineFile[] = value.files.map((entry: unknown) => {
     if (!isRecord(entry) || !relativePath(entry.path) || !hash(entry.sourceSha256) || !Array.isArray(entry.warnings) || seen.has(entry.path)) throw new Error('Invalid or duplicate lint baseline file');
+    if (criticalPath(entry.path)) throw new Error('Critical inspection files cannot have accepted lint debt');
     seen.add(entry.path);
     const rules = new Set<string>();
     const warnings: BaselineWarning[] = entry.warnings.map((warning: unknown) => {
@@ -30,7 +36,7 @@ export function parseBaseline(value: unknown): LintBaseline {
     if (!warnings.length) throw new Error('Empty lint baseline file');
     return { path: entry.path, sourceSha256: entry.sourceSha256, warnings };
   });
-  if (count !== value.warningCount) throw new Error('Lint baseline count does not match its entries');
+  if (!Number.isSafeInteger(count) || count !== value.warningCount) throw new Error('Lint baseline count does not match its entries');
   return { version: 1, sourceRevision: value.sourceRevision, warningCount: count, files };
 }
 
@@ -38,12 +44,26 @@ export function parseBaseline(value: unknown): LintBaseline {
  * exact reviewed warning messages and multiplicity. Error severity is never accepted. */
 export function compareDebt(baseline: LintBaseline, current: CurrentFile[]): DebtResult {
   const known = new Map(baseline.files.map(file => [file.path, file]));
-  const result: DebtResult = { errors: 0, warnings: 0, unaccepted: [], remaining: [] };
+  const result: DebtResult = { errors: 0, warnings: 0, unaccepted: [], stale: [], remaining: [] };
+  const observed = new Map(current.map(file => [file.path, file]));
+  // Removed warnings must be removed from the reviewed allowance too. Otherwise
+  // restoring an old file could silently restore debt that was already fixed.
+  for (const previous of baseline.files) {
+    const present = new Map((observed.get(previous.path)?.warnings || []).map(warning => [warning.ruleId + ':' + warning.messageSha256, warning.count]));
+    for (const warning of previous.warnings) {
+      const count = present.get(warning.ruleId + ':' + warning.messageSha256) || 0;
+      if (count < warning.count) result.stale.push(`${previous.path}: remove ${warning.count - count} obsolete allowance(s) for ${warning.ruleId}; verify deleted or excluded files before updating the baseline`);
+    }
+  }
   for (const file of current) {
     result.errors += file.errors;
     const count = file.warnings.reduce((sum, warning) => sum + warning.count, 0);
     result.warnings += count;
     if (!count) continue;
+    if (criticalPath(file.path)) {
+      result.unaccepted.push(`${file.path}: critical inspection files require zero warnings`);
+      continue;
+    }
     result.remaining.push({ path: file.path, sourceSha256: file.sourceSha256, warnings: file.warnings });
     const previous = known.get(file.path);
     if (!previous || previous.sourceSha256 !== file.sourceSha256) {
