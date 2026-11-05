@@ -7,9 +7,9 @@ import { Button } from './ui/ButtonV2';
 import { ROLE_GUIDANCE, presentationRole } from '../utils/roleGuidance';
 import type { UserRole } from '../contexts/AuthContext';
 const icons = { actors: Users, manifest: FileText, approve: CheckCircle2, trip: Truck, notice: Bell, certificate: Award, help: LifeBuoy };
-interface Props { rol: UserRole; esInspector?: boolean; userId: string | number; onDismiss: () => void }
-export default function OnboardingWizard({ rol, esInspector = false, userId, onDismiss }: Props) {
-  const role = presentationRole(rol, esInspector);
+interface Props { rol: UserRole; esInspector?: boolean; esJefeInspecciones?: boolean; userId: string | number; onDismiss: () => void }
+export default function OnboardingWizard({ rol, esInspector = false, esJefeInspecciones = false, userId, onDismiss }: Props) {
+  const role = presentationRole(rol, esInspector, esJefeInspecciones);
   const steps = ROLE_GUIDANCE[role] || ROLE_GUIDANCE.AUDITOR;
   const [current, setCurrent] = useState(0);
   const step = steps[Math.min(current, steps.length - 1)], Icon = icons[step.icon];

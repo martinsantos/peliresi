@@ -19,6 +19,12 @@ export const ROLE_GUIDANCE: Record<string, GuideStep[]> = {
     { icon: 'notice', title: 'Recibir, pesar y documentar hallazgos', desc: 'Registrá el peso recibido y el tratamiento. Si la carga difiere, documentá el hallazgo dentro de la adenda y seguí la revisión de las partes.' },
     { icon: 'certificate', title: 'Firmá y liberá cada certificación', desc: 'Emití parciales por lo tratado. La final requiere cierre y adendas resueltas. Cerrar el tratamiento no emite la final: vos revisás, firmás y publicás; las partes reciben el aviso.' },
   ],
+  ADMIN_INSPECCIONES: [
+    { icon: 'notice', title: 'Tu trabajo en Jefatura de inspecciones', desc: 'Los avisos te llevan a los antecedentes de eventuales, hallazgos en adendas y relevos externos. Son información para evaluar; no acreditan una infracción.' },
+    { icon: 'approve', title: 'Evaluá y decidí con contexto', desc: 'Registrá el motivo de evaluación. Podés abrir una inspección o vincular el antecedente a un expediente existente, conservando su origen y evidencia.' },
+    { icon: 'actors', title: 'Asigná y programá la visita', desc: 'Elegí inspector y fecha. Sin fecha, la apertura queda en Borrador. Con fecha, la visita aparece en Agenda; el inspector recibe un aviso de asignación.' },
+    { icon: 'help', title: 'Seguí el expediente', desc: 'Revisá requerimientos, respuestas, plazos y decisiones desde Inspecciones. Los actores responden sólo al requerimiento que reciben en Avisos.' },
+  ],
   INSPECTOR: [
     { icon: 'manifest', title: 'Tu trabajo como inspector', desc: 'En Inspecciones encontrás tus visitas asignadas y los expedientes que podés continuar.' },
     { icon: 'notice', title: 'Las asignaciones llegan a la campana', desc: 'Cada aviso abre el expediente asignado. No se envía correo ni push por esta asignación.' },
@@ -43,4 +49,7 @@ for (const [role, actors] of Object.entries({ ADMIN_GENERADOR: 'generadores', AD
     { icon: 'notice', title: 'Pendientes y seguimiento', desc: 'La agenda y la campana te llevan al caso. Consultá su estado actual antes de decidir; leer un aviso no completa el trámite.' },
   ];
 }
-export function presentationRole(role: string, inspector = false) { return inspector && !role.startsWith('ADMIN') ? 'INSPECTOR' : role; }
+export function presentationRole(role: string, inspector = false, chief = false) {
+  if (chief) return 'ADMIN_INSPECCIONES';
+  return inspector && !role.startsWith('ADMIN') ? 'INSPECTOR' : role;
+}

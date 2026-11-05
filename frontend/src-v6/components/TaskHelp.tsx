@@ -2,10 +2,10 @@ import { BookOpen, LifeBuoy, Compass } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/ButtonV2';
 import { contextualGuidance } from '../utils/contextualGuidance';
-export function TaskHelp({ open, onClose, onReport, onWelcome, path, role, inspector, needsHelp }: {
-  open: boolean; onClose: () => void; onReport: () => void; onWelcome: () => void; path: string; role: string; inspector?: boolean; needsHelp: boolean;
+export function TaskHelp({ open, onClose, onReport, onWelcome, path, role, inspector, chief, needsHelp }: {
+  open: boolean; onClose: () => void; onReport: () => void; onWelcome: () => void; path: string; role: string; inspector?: boolean; chief?: boolean; needsHelp: boolean;
 }) {
-  const guide = contextualGuidance(path, role, inspector);
+  const guide = contextualGuidance(path, role, inspector, chief);
   return <Modal isOpen={open} onClose={onClose} title={guide.title} description="Ayuda para esta pantalla" size="sm">
     {needsHelp && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Hay campos por corregir. Revisá el mensaje junto a cada campo; tus datos siguen en el formulario.</p>}
     <ol className="space-y-4">{guide.steps.map((step, i) => <li key={step} className="flex gap-3 text-sm leading-relaxed text-neutral-700"><span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-50 font-semibold text-primary-800">{i + 1}</span><span>{step}</span></li>)}</ol>

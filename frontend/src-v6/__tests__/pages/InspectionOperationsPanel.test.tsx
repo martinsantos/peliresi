@@ -26,7 +26,7 @@ describe('inspection operations across surfaces', () => {
     render(<MemoryRouter initialEntries={['/mobile/centro-control']}><InspectionOperationsPanel /></MemoryRouter>);
     expect(screen.getByText('Responsable por identificar')).toBeVisible();
     expect(screen.getByRole('link', { name: /IRP-2026-00001/ })).toHaveAttribute('href', '/mobile/inspecciones/case1');
-    expect(screen.getByText(/1 sin responsable/)).toBeVisible();
+    expect(screen.getByText(/1 sin actor vinculado/)).toBeVisible();
   });
   it('applies an explicit scheduled-date basis for reports', () => {
     render(<MemoryRouter><InspectionOperationsPanel mode="report" desde="2026-09-01" hasta="2026-09-30" /></MemoryRouter>);
