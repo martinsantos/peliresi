@@ -66,7 +66,7 @@ export const authService = {
     await api.post('/auth/change-password', req);
   },
 
-  async register(userData: any): Promise<{ message: string }> {
+  async register(userData: unknown): Promise<{ message: string }> {
     const { data } = await api.post<{ success: true; message: string }>('/auth/register', userData);
     return { message: data.message };
   },
