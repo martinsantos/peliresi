@@ -97,8 +97,8 @@ function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; m
         <HelpCircle size={inline ? 20 : 24} aria-hidden="true" />{!mobile && !inline && <span className="hidden text-sm font-semibold sm:inline">{capturing ? 'Capturando…' : needsHelp ? 'Ayuda para completar' : 'Ayuda'}</span>}
       </button>
     </div>}
-    <TaskHelp open={help} onClose={() => setHelp(false)} onReport={() => { setHelp(false); void report(); }} onWelcome={() => { setHelp(false); setWelcome(true); }} path={location.pathname} role={currentUser?.rol || 'AUDITOR'} inspector={currentUser?.esInspector} needsHelp={needsHelp} />
-    {welcome && currentUser && <OnboardingWizard key={currentUser.rol} rol={currentUser.rol} esInspector={currentUser.esInspector} userId={owner} onDismiss={() => setWelcome(false)} />}
+    <TaskHelp open={help} onClose={() => setHelp(false)} onReport={() => { setHelp(false); void report(); }} onWelcome={() => { setHelp(false); setWelcome(true); }} path={location.pathname} role={currentUser?.rol || 'AUDITOR'} inspector={currentUser?.esInspector} chief={currentUser?.esJefeInspecciones} needsHelp={needsHelp} />
+    {welcome && currentUser && <OnboardingWizard key={currentUser.rol} rol={currentUser.rol} esInspector={currentUser.esInspector} esJefeInspecciones={currentUser.esJefeInspecciones} userId={owner} onDismiss={() => setWelcome(false)} />}
     <SupportReportDialog open={open} onClose={() => { setOpen(false); setScreenshot(undefined); }}
       onSubmitted={() => { if (inline) toast.success('Reporte enviado a soporte'); else setSent(true); }} screenshot={screenshot} captureError={captureError} context={context} returnToTask />
   </>;

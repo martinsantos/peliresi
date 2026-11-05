@@ -87,6 +87,22 @@ describe('Public registration collects declarations, never calculates a tax for 
     expect(requests.put).not.toHaveBeenCalled();
     expect(requests.post).not.toHaveBeenCalled();
   });
+  it.each(['', '/app'])('preserves a licence reading between fleet and documents and retries with the licence profile (%s)', async prefix => {
+    const analysis = {version:1,duplicado:false,lectura:'NO_DISPONIBLE',texto:'',motor:null,alcance:'Licencia',aviso:'Lectura ocupada. Tu archivo sigue seleccionado.'};
+    requests.preview.mockResolvedValue({persistido:false,campos:{},analisis:analysis});
+    await openReview('transportista', prefix);
+    fireEvent.click(screen.getByRole('button',{name:'Paso 3 de 5: Flota y choferes'}));
+    await act(async()=>{fireEvent.change(screen.getByLabelText('Archivo de licencia del chofer 1'),{target:{files:[new File(['QA'],'licencia.png',{type:'image/png'})]}});});
+    expect(requests.preview).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button',{name:'Paso 4 de 5: Documentos'}));
+    const row=screen.getByText('licencia.png').closest('[data-testid]')!;
+    expect(row).toHaveTextContent('Lectura ocupada');
+    await act(async()=>{fireEvent.click(within(row as HTMLElement).getByRole('button',{name:'Reintentar lectura'}));});
+    expect(requests.preview).toHaveBeenCalledTimes(2);
+    expect(requests.preview.mock.calls[1][1]).toBe('LICENCIA');
+    expect(requests.preview.mock.calls[1][0]).toBe(requests.preview.mock.calls[0][0]);
+    expect(requests.uploadDocumento).not.toHaveBeenCalled();
+  });
   it.each(['', '/app'])('announces repeated reads, preserves prior evidence on retry failure, and clears it for replacement (%s)', async prefix => {
     requests.getRequirements.mockResolvedValue({documentos:[{tipo:'FACTURA_ELECTRICA',nombre:'Factura eléctrica',required:false}],maxBytes:10485760});
     const partial = {version:1,lectura:'LEIDO',texto:'LECTURA ORIGINAL QA',documentKind:'FACTURA_ELECTRICA',electricidad:{version:1,distribuidora:'EDESTE',nombreDistribuidora:'EDESTE',campos:{categoriaTarifaria:'T2',consumoKwh:'420'},conflictos:[],evidencias:[],aviso:''}};

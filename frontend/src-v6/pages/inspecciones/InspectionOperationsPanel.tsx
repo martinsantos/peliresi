@@ -74,7 +74,7 @@ export function InspectionOperationsPanel({ mode = 'agenda', desde, hasta, embed
     {!rangeError && query.isLoading && <p className="mt-4 text-sm">Cargando inspecciones…</p>}
     {!rangeError && query.isError && <p role="alert" className="mt-4 text-sm">No se pudo actualizar. {data ? 'Se muestran los últimos datos recibidos.' : 'No significa que no existan inspecciones.'} <button type="button" className="min-h-11 underline" onClick={() => void query.refetch()}>Reintentar</button></p>}
     {data && <>
-      <p className={`mt-3 text-sm ${mode === 'monitor' ? 'text-slate-200' : 'text-neutral-700'}`}><strong>{data.total}</strong> legajos{mode !== 'report' ? ' activos' : ''} · {data.summary.sinResponsable} sin responsable · {data.summary.sinUbicacion} sin coordenadas</p>
+      <p className={`mt-3 text-sm ${mode === 'monitor' ? 'text-slate-200' : 'text-neutral-700'}`}><strong>{data.total}</strong> legajos{mode !== 'report' ? ' activos' : ''} · {data.summary.sinResponsable} sin actor vinculado · {data.summary.sinUbicacion} sin coordenadas</p>
       <div className="mt-3 divide-y divide-neutral-200">{data.items.length === 0 ? <p className="py-4 text-sm">No hay inspecciones para este alcance y período.</p> : data.items.map((row) => <Link state={returnState} key={row.id} to={`${prefix}/inspecciones/${row.id}`} className="block min-h-16 rounded-lg py-3 !text-inherit !no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
         <div className="flex flex-wrap justify-between gap-1 text-sm font-semibold"><span>{row.numero}</span><span>{INSPECTION_STATE_LABELS[row.estado]}</span></div>
         <p className="mt-1 text-sm font-medium">{operationSubject(row)}</p>

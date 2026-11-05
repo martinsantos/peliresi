@@ -84,3 +84,13 @@ it.each(['','/app','/mobile'])('identifies actor creation, edition and renewal w
   expect(workspaceSectionPath(`${prefix}/admin/actores/${kind}/nuevo`)).toBe(`/admin/actores/${kind}/nuevo`);
  }
 });
+
+it.each(['', '/app', '/mobile'])('chief identity follows inspection tasks on %s without changing actor identity', prefix => {
+ const chief = {rol:'GENERADOR',esJefeInspecciones:true};
+ for(const route of ['/dashboard','/inspecciones','/inspecciones/qa','/notificaciones']) {
+  expect(inspectionContextLabel(chief,prefix+route)).toBe('Jefatura de inspecciones');
+  expect(inspectionContextLabel({...chief,esJefeInspecciones:false},prefix+route)).toBeNull();
+ }
+ expect(inspectionContextLabel(chief,prefix+'/manifiestos')).toBeNull();
+ expect(inspectionContextLabel({...chief,esInspector:true},prefix+'/inspecciones')).toBe('Jefatura de inspecciones');
+});

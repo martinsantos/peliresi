@@ -10,7 +10,7 @@ vi.mock('node:fs', async importOriginal => {
 });
 vi.mock('node:child_process', () => ({ execFile: mock.exec }));
 vi.mock('sharp', () => ({ default: mock.image }));
-import { describeDocument, readReceipt, receiptDuplicate, retainReceiptDigest, receiptNotice } from '../../services/documentAnalysis.service';
+import { mergeLicenseRead, describeDocument, readReceipt, receiptDuplicate, retainReceiptDigest, receiptNotice } from '../../services/documentAnalysis.service';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -261,5 +261,32 @@ describe('receipt reuse is serialized, persistent and private', () => {
   it('returns an actor receipt notice to their own profile, not a restricted admin ficha', async () => {
     const db = tx(); await receiptNotice(db as never, 'owner', { actorTipo: 'transportista', actorId: 'own-actor' });
     expect(JSON.parse(db.notificacion.create.mock.calls[0][0].data.datos)).toMatchObject({ ruta: '/mi-perfil', actorId: 'own-actor' });
+  });
+});
+
+
+describe('OCR operational failures are actionable without leaking internals', () => {
+  it.each(['ENOENT', 127])('identifies missing runtime tools (%s) instead of blaming the document', async code => {
+    mock.exec.mockImplementation((_command, _args, _options, callback) => callback(Object.assign(new Error('/private/internal/file'), { code }), '', ''));
+    const result = await readReceipt({ path: '/virtual/invoice.jpg', mimeType: 'image/jpeg' }, 'FACTURA_ELECTRICA');
+    expect(result.lectura).toBe('NO_DISPONIBLE');
+    expect(result.aviso).toContain('No es un problema de tu archivo');
+    expect(result.aviso).not.toContain('/private');
+  });
+  it('distinguishes a timeout from an unreadable image', async () => {
+    mock.exec.mockImplementation((_command, _args, _options, callback) => callback(Object.assign(new Error('terminated'), { killed: true }), '', ''));
+    expect((await readReceipt({ path: '/virtual/file.jpg', mimeType: 'image/jpeg' })).aviso).toContain('excedió el tiempo');
+  });
+});
+
+describe('licence retry evidence', () => {
+  const old = { version: 1 as const, duplicado: false, lectura: 'LEIDO' as const, motor: 'TESSERACT' as const, texto: 'DNI 90000000', alcance: 'QA', aviso: null };
+  it('preserves useful text when the same original cannot be read again', () => {
+    const result = mergeLicenseRead(old, { ...old, lectura: 'NO_DISPONIBLE', texto: '', aviso: 'Servicio ocupado' });
+    expect(result.texto).toBe(old.texto); expect(result.lectura).toBe('LEIDO'); expect(result.aviso).toContain('Se conserva'); expect(result.documentKind).toBe('LICENCIA');
+  });
+  it('accepts a successful new reading and does not invent one without previous evidence', () => {
+    expect(mergeLicenseRead(old, { ...old, texto: 'DNI 90000001' }).texto).toBe('DNI 90000001');
+    expect(mergeLicenseRead(null, { ...old, lectura: 'NO_DISPONIBLE', texto: '' }).lectura).toBe('NO_DISPONIBLE');
   });
 });

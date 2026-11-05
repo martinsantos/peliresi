@@ -15,7 +15,10 @@ export function DocumentAnalysis({ analysis, onRetry, retrying = false, kind: re
   const kind = analysis.documentKind === 'FACTURA_ELECTRICA' ? 'electricity' : requestedKind;
   const retryAvailable = analysis.lectura !== 'LEIDO' || kind === 'electricity' && electricityReadingNeedsReview(analysis);
   return <div className="mt-3 space-y-2 text-sm leading-6">
-    {analysis.electricidad && <ElectricityEvidence reading={analysis.electricidad} />}
+    {retryAvailable && onRetry && <button type="button" disabled={retrying} onClick={onRetry} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-primary-900 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-60">
+      <RefreshCw size={16} aria-hidden="true" className={retrying ? 'animate-spin motion-reduce:animate-none' : undefined} />{retrying ? `Leyendo ${kind === 'receipt' ? 'recibo' : kind === 'license' ? 'licencia' : 'documento'}…` : 'Reintentar lectura'}
+    </button>}
+    {analysis.lectura === 'LEIDO' && analysis.electricidad && <ElectricityEvidence reading={analysis.electricidad} />}
     {kind === 'electricity' && analysis.aviso && analysis.lectura === 'LEIDO' && <p role="status" className="text-neutral-700">{analysis.aviso}</p>}
     {analysis.pago?.coincidencia && <p role="alert" className="rounded-lg border border-error-300 bg-error-50 p-3 text-error-900"><strong>Pago vinculado a otro trámite.</strong> La identidad coincide con un pago reservado. Una foto distinta no habilita un nuevo uso.</p>}
     {analysis.duplicado && <div role="alert" className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
@@ -29,9 +32,7 @@ export function DocumentAnalysis({ analysis, onRetry, retrying = false, kind: re
         <p className="mb-2 text-neutral-700">{kind === 'receipt' ? 'Lectura automática para revisar; no valida el pago.' : 'Lectura automática para revisar; no certifica la vigencia del documento.'} {analysis.alcance}</p>
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-base text-neutral-900">{analysis.texto}</pre>
       </div>
-    </details> : <p role="status" className="text-neutral-700">{analysis.aviso || (persisted ? 'No se encontró texto legible. El archivo quedó guardado para revisión manual.' : 'No se encontró texto legible. Podés reintentar o completar los datos manualmente; no se guardó un archivo en el servidor.')}</p>}
-    {retryAvailable && onRetry && <button type="button" disabled={retrying} onClick={onRetry} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-primary-900 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-60">
-      <RefreshCw size={16} aria-hidden="true" className={retrying ? 'animate-spin motion-reduce:animate-none' : undefined} />{retrying ? `Leyendo ${kind === 'receipt' ? 'recibo' : kind === 'license' ? 'licencia' : 'documento'}…` : 'Reintentar lectura'}
-    </button>}
+    </details> : <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">{analysis.aviso || (persisted ? 'No se encontró texto legible. El archivo quedó guardado para revisión manual.' : 'No se encontró texto legible. Podés reintentar o completar los datos manualmente; no se guardó un archivo en el servidor.')}</p>}
+
   </div>;
 }

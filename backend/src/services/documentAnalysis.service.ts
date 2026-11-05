@@ -69,6 +69,15 @@ export function mergeElectricityRead(previous: unknown, next: ReceiptAnalysis): 
   return { ...reading, documentKind: 'FACTURA_ELECTRICA', electricidad: electricityReading(reading.texto) };
 }
 
+/** Retry the same hash-verified licence without discarding an earlier useful reading. */
+export function mergeLicenseRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis & { campos: ReturnType<typeof licenseFields> } {
+  const old = previous && typeof previous === 'object' && !Array.isArray(previous) ? previous as Partial<ReceiptAnalysis> : undefined;
+  const keep = old?.version === 1 && old.lectura === 'LEIDO' && typeof old.texto === 'string' && old.texto.trim()
+    && (next.lectura !== 'LEIDO' || !next.texto.trim());
+  const reading = keep ? { ...mergeReceiptRead(old, next), aviso: `${next.aviso || 'No se obtuvieron nuevos datos.'} Se conserva la lectura anterior.` } : next;
+  return { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) };
+}
+
 /** The original file is never normalized, rewritten, or treated as proof of payment. */
 export function describeDocument(file: { path: string; mimetype: string }) {
   const bytes = fs.readFileSync(file.path);
@@ -224,11 +233,17 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
       ...(partialPdfText ? { alcance: 'Texto del PDF y OCR de su primera página. Los valores contradictorios requieren revisión.' } : {}) };
   } catch (error) {
     // A busy/missing/failed OCR never means success and never discards the file.
-    const busy = (error as { code?: number })?.code === 75;
+    const failure = error as { code?: number | string; killed?: boolean; message?: string; stderr?: string };
+    const busy = failure.code === 75;
+    const unavailable = failure.code === 'ENOENT' || failure.code === 127
+      || /Error opening data file|Failed loading language|Could not initialize tesseract/i.test(failure.stderr || '');
+    const timeout = failure.killed || failure.message === 'OCR_DEADLINE';
     if (partialPdfText) return { ...result, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: partialPdfText,
       aviso: 'Lectura parcial del PDF. El OCR complementario no estuvo disponible; podés reintentar sin reemplazar el original.' };
     return { ...result, lectura: 'NO_DISPONIBLE', aviso: busy
       ? 'La lectura automática está ocupada. El archivo se conserva para revisión manual.'
+      : unavailable ? 'El servicio de lectura automática no está disponible en el servidor. No es un problema de tu archivo; se conserva para revisión manual.'
+      : timeout ? 'La lectura automática excedió el tiempo disponible. El archivo se conserva; podés reintentar sin volver a adjuntarlo.'
       : 'No se pudo leer automáticamente. El archivo se conserva para revisión manual.' };
   } finally {
     receiptInFlight = false;

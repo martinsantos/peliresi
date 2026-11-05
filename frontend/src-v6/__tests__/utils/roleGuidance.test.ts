@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
 import { ROLE_GUIDANCE, presentationRole } from '../../utils/roleGuidance';
 import { contextualGuidance } from '../../utils/contextualGuidance';
-it('covers eight roles and inspector without actor instructions for auditor',()=>{
- expect(Object.keys(ROLE_GUIDANCE)).toHaveLength(9);
+it('covers administrative roles, chief and inspector without actor instructions for auditor',()=>{
+ expect(Object.keys(ROLE_GUIDANCE)).toHaveLength(10);
  expect(presentationRole('GENERADOR',true)).toBe('INSPECTOR');expect(presentationRole('ADMIN',true)).toBe('ADMIN');
  expect(ROLE_GUIDANCE.AUDITOR[0].desc).toContain('no crea');
  expect(ROLE_GUIDANCE.OPERADOR.map(s=>s.desc).join(' ')).toContain('no emite la final');
@@ -40,4 +40,20 @@ it.each(['', '/app', '/mobile'])('requester help stays scoped to the actual task
  expect(changes.steps.join(' ')).toContain('por cuenta y actividad');
  expect(changes.steps.join(' ')).toContain('sin duplicarla');
  expect(changes.steps.join(' ')).not.toContain('Adjuntá');
+});
+
+it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'])('chief guidance requires explicit assignment for %s', role => {
+ expect(presentationRole(role, false, true)).toBe('ADMIN_INSPECCIONES');
+ expect(presentationRole(role, true, true)).toBe('ADMIN_INSPECCIONES');
+ expect(presentationRole(role, false, false)).toBe(role);
+ expect(ROLE_GUIDANCE.ADMIN_INSPECCIONES[0].desc).toContain('no acreditan una infracción');
+});
+
+it.each(['', '/app', '/mobile'])('chief help distinguishes organizing inspections from responding as actor on %s', prefix => {
+ const help=contextualGuidance(prefix+'/inspecciones','GENERADOR',false,true);
+ expect(help.title).toBe('Organizar y seguir inspecciones');
+ expect(help.manual).toBe('psip-flujo-inspecciones');
+ expect(help.steps.join(' ')).toContain('Elegí inspector y fecha');
+ expect(contextualGuidance(prefix+'/requerimientos/qa','GENERADOR',false,true).title).toBe('Responder el requerimiento');
+ expect(contextualGuidance(prefix+'/inspecciones','GENERADOR',false,false).title).toBe('Responder el requerimiento');
 });

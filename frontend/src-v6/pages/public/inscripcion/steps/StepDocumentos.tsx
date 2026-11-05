@@ -97,6 +97,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const pendingFile = adjuntos[doc.tipo];
           const uploaded = uploadedDocs[doc.tipo];
           const state = uploadStates[doc.tipo];
+          const analysis = reviewMode ? previewAnalyses[doc.tipo] : pendingFile ? undefined : uploaded?.analisis;
+          const readingNotice = analysis && analysis.lectura !== 'LEIDO' ? undefined : readingFeedback[doc.tipo];
           const attached = uploaded || pendingFile;
           const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading' || state === 'downloading';
           const rejected = uploaded?.estado === 'RECHAZADO';
@@ -134,13 +136,13 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 </Button>
               )}
               </div>
-              <p role="status" aria-live="polite" aria-atomic="true" className={readingFeedback[doc.tipo] && !isBusy && !uploadErrors[doc.tipo] ? "mt-2 text-sm leading-6 text-primary-900" : "sr-only"}>{!isBusy && !uploadErrors[doc.tipo] ? readingFeedback[doc.tipo] : null}</p>
+              <p role="status" aria-live="polite" aria-atomic="true" className={readingNotice && !isBusy && !uploadErrors[doc.tipo] ? "mt-2 text-sm leading-6 text-neutral-700" : "sr-only"}>{!isBusy && !uploadErrors[doc.tipo] ? readingNotice : null}</p>
               {rejected && <p className="mt-2 text-sm text-error-800" role="alert">Documento rechazado: {uploaded.observaciones || 'Reemplazalo para corregir la solicitud antes de enviarla.'}</p>}
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
               {doc.tipo === 'COMPROBANTE_PAGO' && !attached && <p className="mt-2 text-sm leading-6 text-neutral-700">Caja de banco o transferencia. El OCR no acredita el pago.</p>}
               {doc.tipo === 'FACTURA_ELECTRICA' && !attached && <p className="mt-2 text-sm leading-6 text-neutral-700">{doc.required ? 'Adjuntá la factura completa y legible del establecimiento.' : 'Si elegís adjuntarla, usá una factura completa y legible del establecimiento.'} Se leerán distribuidora, tarifa, período, kWh y potencia si figuran. No modifica la potencia instalada que declaraste.</p>}
-              <DocumentAnalysis analysis={reviewMode ? previewAnalyses[doc.tipo] : pendingFile ? undefined : uploaded?.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} persisted={!reviewMode && !pendingFile} retrying={isBusy} onRetry={(uploaded && !pendingFile || reviewMode && pendingFile) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
+              <DocumentAnalysis analysis={analysis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} persisted={!reviewMode && !pendingFile} retrying={isBusy} onRetry={(uploaded && !pendingFile || reviewMode && pendingFile) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );
         })}

@@ -1,8 +1,15 @@
 import { actorWorkspaceRoute } from './actorWorkspace';
 export type ContextGuide = { title: string; steps: string[]; manual: string };
-export function contextualGuidance(path: string, role: string, inspector = false): ContextGuide {
+export function contextualGuidance(path: string, role: string, inspector = false, chief = false): ContextGuide {
   path = path.replace(/^\/(?:app|mobile)(?=\/|$)/, '');
   const operator = role === 'OPERADOR', transport = role === 'TRANSPORTISTA', admin = role.startsWith('ADMIN');
+  if (chief && /^\/(?:inspecciones(?:\/|$)|dashboard\/?$)/.test(path)) return {
+    title: 'Organizar y seguir inspecciones', manual: 'psip-flujo-inspecciones', steps: [
+      'En Antecedentes revisá eventuales, hallazgos en adendas y relevos externos. Registrá el motivo y decidí si abrís o vinculás una inspección; el antecedente no acredita una infracción.',
+      'Elegí inspector y fecha para programar la visita. En Agenda verificá quién está asignado y abrí el expediente correspondiente.',
+      'Seguí requerimientos, respuestas y plazos. Confirmá cada decisión y verificá su guardado; leer el aviso no resuelve el caso.',
+    ],
+  };
   const actor = actorWorkspaceRoute(path);
   if (actor) {
     const manage = role === 'ADMIN' || role === `ADMIN_${actor.role}`;

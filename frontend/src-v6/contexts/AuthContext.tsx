@@ -539,7 +539,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {showOnboarding && currentUser && !isRestricted && (
         <OnboardingWizard
           rol={currentUser.rol}
-          esInspector={currentUser.esInspector}
+          esInspector={currentUser.esInspector} esJefeInspecciones={currentUser.esJefeInspecciones}
           userId={currentUser.id}
           onDismiss={dismissOnboarding}
         />

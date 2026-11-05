@@ -10,7 +10,7 @@ export function electricityReadingNeedsReview(analysis: ReceiptAnalysis): boolea
 /** Describes the returned reading, never document approval or payment settlement. */
 export function documentReadingOutcome(analysis?: ReceiptAnalysis | null): string {
   if (!analysis || analysis.version !== 1 || analysis.lectura === 'NO_DISPONIBLE') {
-    return 'No se pudo completar la lectura automática. Podés reintentar o revisar el original.';
+    return analysis?.aviso || 'No se pudo completar la lectura automática. Podés reintentar o revisar el original.';
   }
   if (analysis.lectura === 'SIN_TEXTO' || !analysis.texto.trim()) {
     return 'Lectura terminada sin texto legible. Revisá el original o adjuntá una copia más clara.';
@@ -20,4 +20,12 @@ export function documentReadingOutcome(analysis?: ReceiptAnalysis | null): strin
   }
   if (analysis.aviso) return 'Lectura terminada con observaciones. Revisá el aviso y el original.';
   return 'Lectura terminada. Revisá los datos extraídos; el documento no se aprobó con esta lectura.';
+}
+
+/** A failed retry of the SAME selected file must not discard useful evidence. */
+export function retainDocumentReading(previous: ReceiptAnalysis | undefined, next: ReceiptAnalysis): ReceiptAnalysis {
+  if (previous?.lectura === 'LEIDO' && previous.texto.trim() && next.lectura !== 'LEIDO') {
+    return { ...previous, aviso: `${next.aviso || 'No se pudo completar la nueva lectura.'} Se conserva la lectura anterior.` };
+  }
+  return next;
 }

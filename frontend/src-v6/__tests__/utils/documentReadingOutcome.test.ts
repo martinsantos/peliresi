@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { documentReadingOutcome } from '../../utils/documentReadingOutcome';
+import { documentReadingOutcome, retainDocumentReading } from '../../utils/documentReadingOutcome';
 import type { ReceiptAnalysis } from '../../types/documentAnalysis';
 
 const read: ReceiptAnalysis = {version:1,lectura:'LEIDO',texto:'QA',duplicado:false,motor:'PDF_TEXT',alcance:'Prueba',aviso:null};
@@ -16,4 +16,12 @@ describe('reading completion is not administrative approval', () => {
   it('does not hide a complementary reading failure behind retained text', () => {
     expect(documentReadingOutcome({...read,aviso:'No se pudo completar el segundo intento.'})).toContain('con observaciones');
   });
+});
+
+
+it('retains useful evidence when the same-file retry returns an unavailable engine', () => {
+  const previous = { version: 1 as const, duplicado: false, lectura: 'LEIDO' as const, texto: 'Tarifa T2', motor: 'TESSERACT' as const, alcance: 'Imagen', aviso: null };
+  const failure = { ...previous, lectura: 'NO_DISPONIBLE' as const, texto: '', aviso: 'Servicio ocupado.' };
+  expect(retainDocumentReading(previous, failure)).toMatchObject({ texto: 'Tarifa T2', lectura: 'LEIDO', aviso: expect.stringContaining('Se conserva la lectura anterior') });
+  expect(retainDocumentReading(undefined, failure)).toBe(failure);
 });
