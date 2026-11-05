@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mock = vi.hoisted(() => ({ find: vi.fn(), lock: vi.fn(), create: vi.fn(), update: vi.fn(), activate: vi.fn(), notify: vi.fn(), link: vi.fn(), transaction: vi.fn() }));
+const mock = vi.hoisted(() => ({ find: vi.fn(), lock: vi.fn(), create: vi.fn(), update: vi.fn(), activate: vi.fn(), notify: vi.fn(), link: vi.fn(), documents: vi.fn(), transaction: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   solicitudInscripcion: { findUnique: mock.find }, $transaction: mock.transaction,
   notificacion: { create: mock.notify },
@@ -12,6 +12,7 @@ vi.mock('fs', async original => { const actual = await original<typeof import('f
 
 vi.mock('../../services/companyRegistration.service', () => ({ linkApprovedRegistration: mock.link }));
 
+import { getSolicitudRequirements } from '../../services/solicitudRequirements.service';
 import { aprobarSolicitud } from '../../controllers/solicitud.controller';
 
 const identity = { id: 'owner', email: 'qa@night-qa.invalid', nombre: 'QA responsable', cuit: '30-70987654-3' };
@@ -33,10 +34,11 @@ beforeEach(() => {
   vi.stubEnv('ENTERPRISE_ENABLED', 'true');
   vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
   vi.clearAllMocks(); mock.find.mockResolvedValue(draft()); mock.lock.mockResolvedValue([]);
+  mock.documents.mockImplementation(async (query) => query.select?.tipo ? [...new Set(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].flatMap(role => getSolicitudRequirements(role).filter(item => item.required).map(item => item.tipo)))].map(tipo => ({ tipo, estado: 'APROBADO' })) : []);
   mock.create.mockResolvedValue({ id: 'new-actor' }); mock.update.mockImplementation(async ({ data }) => ({ ...draft(), ...data }));
   mock.transaction.mockImplementation(callback => callback({ $queryRaw: mock.lock,
     solicitudInscripcion: { findUnique: mock.find, update: mock.update },
-    documentoSolicitud: { findMany: vi.fn().mockResolvedValue([]) },
+    documentoSolicitud: { findMany: mock.documents },
     generador: { create: mock.create }, operador: { create: mock.create }, transportista: { create: mock.create },
     usuario: { update: mock.activate, findUniqueOrThrow: vi.fn().mockResolvedValue({ ...identity, activo: false, rol: 'GENERADOR' }) }, notificacion: { create: mock.notify },
   }));
@@ -124,5 +126,27 @@ describe('approved registration preserves declarations, not invented fiscal auth
   it('keeps approved in-situ type and runtime modality aligned without inventing another mode', async () => {
     mock.find.mockResolvedValue({ ...draft('OPERADOR'), datosActor: JSON.stringify({ ...declared, tipoOperador: 'IN_SITU' }) });
     await approve('ADMIN_OPERADOR'); expect(mock.create.mock.calls[0][0].data).toMatchObject({ tipoOperador: 'IN_SITU', modalidades: ['IN_SITU'] });
+  });
+});
+
+
+describe('approval rechecks required documents after submission', () => {
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('blocks rejected required documents for %s before actor or notice creation', async role => {
+    mock.find.mockResolvedValue(draft(role));
+    mock.documents.mockResolvedValue(getSolicitudRequirements(role).filter(item => item.required).map(item => ({ tipo: item.tipo, estado: item.tipo === 'CERTIFICADO_HABILITACION' ? 'RECHAZADO' : 'APROBADO' })));
+    const result = await approve();
+    expect(result.error).toMatchObject({ statusCode: 409 });
+    expect(result.error.message).toContain(role === 'TRANSPORTISTA' ? 'Habilitacion de Transporte' : 'Certificado de Habilitacion');
+    expect(mock.create).not.toHaveBeenCalled(); expect(mock.activate).not.toHaveBeenCalled(); expect(mock.notify).not.toHaveBeenCalled();
+  });
+  it('blocks a missing required document', async () => {
+    mock.documents.mockResolvedValue([]);
+    expect((await approve()).error).toMatchObject({ statusCode: 409 });
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+  it.each(['PENDIENTE', 'RECHAZADO'])('does not turn optional electricity into a blocker (%s)', async estado => {
+    mock.documents.mockImplementation(async query => query.select?.tipo ? [...getSolicitudRequirements('GENERADOR').filter(item => item.required).map(item => ({tipo: item.tipo, estado: 'APROBADO'})), {tipo: 'FACTURA_ELECTRICA', estado}] : []);
+    expect((await approve()).error).toBeUndefined();
+    expect(mock.create).toHaveBeenCalledTimes(1);
   });
 });

@@ -939,6 +939,19 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       const datosActor = JSON.parse(jsonObject(current.datosActor));
       if (datosActor.cuit && normalizeCuit(String(datosActor.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT declarado no coincide con el de la cuenta solicitante', 400);
       const declared = registrationActorFields(solicitud.tipoActor, datosActor);
+      // Recheck under the same application lock used by document review.
+      // A required document can be rejected after the application was submitted.
+      const documents = await tx.documentoSolicitud.findMany({
+        where: { solicitudId: id }, select: { tipo: true, estado: true },
+      });
+      const missingTypes = getMissingRequiredDocumentTypes(
+        solicitud.tipoActor,
+        documents.filter(document => document.estado !== 'RECHAZADO').map(document => document.tipo),
+      );
+      if (missingTypes.length > 0) {
+        const names = new Map(getSolicitudRequirements(solicitud.tipoActor).map(item => [item.tipo, item.nombre]));
+        throw new AppError(`No se puede aprobar: faltan documentos obligatorios válidos: ${missingTypes.map(type => names.get(type) || type).join(', ')}. Observá la solicitud para que el solicitante los corrija.`, 409);
+      }
       await applySolicitudPayments(tx, id, solicitud.usuario.cuit || '', req.user!.id);
       const contact = typeof datosActor.emailContacto === 'string' && datosActor.emailContacto.trim()
         ? datosActor.emailContacto.trim() : solicitud.usuario.email;
