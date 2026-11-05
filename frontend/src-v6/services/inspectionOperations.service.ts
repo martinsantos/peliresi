@@ -5,6 +5,7 @@ export type InspectionOperation = {
   id: string; numero: string; tipoActor: InspectionActorType | null; estado: InspectionState;
   inspectorId: string; inspector: { id: string; nombre: string; apellido?: string | null };
   generador?: { id: string; razonSocial: string } | null; transportista?: { id: string; razonSocial: string } | null; operador?: { id: string; razonSocial: string } | null;
+  antecedentes?: { actorNombre: string; actorId: string | null }[];
   ubicacion?: string | null; latitud?: number | null; longitud?: number | null;
   fechaProgramada?: string | null; iniciadaAt?: string | null; cerradaCampoAt?: string | null;
   updatedAt: string; createdAt: string; version: number;
@@ -14,10 +15,10 @@ export type InspectionOperationsResult = {
   items: InspectionOperation[]; total: number; page: number; limit: number; totalPages: number; updatedAt: string;
   summary: { byState: Partial<Record<InspectionState, number>>; sinUbicacion: number; sinResponsable: number };
 };
-export type InspectorOption = { id: string; nombre: string; apellido?: string | null; rol: string; esInspector: boolean };
+export type InspectorOption = { id: string; nombre: string; apellido?: string | null; rol: string; esInspector: boolean; esJefeInspecciones?: boolean };
 export type InspectionCandidate = { id: string; tipoActor: InspectionActorType; razonSocial: string; domicilio: string; fuente: string; distanciaMetros: number; activo: boolean };
-export const canUseInspectionOperations = (user?: { rol?: string; esInspector?: boolean } | null) => Boolean(user?.esInspector || user?.rol === 'ADMIN' || user?.rol?.startsWith('ADMIN_'));
-export const operationSubject = (row: InspectionOperation) => row.generador?.razonSocial || row.transportista?.razonSocial || row.operador?.razonSocial || 'Responsable por identificar';
+export const canUseInspectionOperations = (user?: { rol?: string; esInspector?: boolean; esJefeInspecciones?: boolean } | null) => Boolean(user?.esJefeInspecciones || user?.esInspector || user?.rol === 'ADMIN' || user?.rol?.startsWith('ADMIN_'));
+export const operationSubject = (row: InspectionOperation) => row.generador?.razonSocial || row.transportista?.razonSocial || row.operador?.razonSocial || (row.antecedentes?.[0]?.actorNombre ? `${row.antecedentes[0].actorNombre} · Declarado sin alta` : 'Responsable por identificar');
 export const hasInspectionCoordinates = (row: Pick<InspectionOperation, 'latitud' | 'longitud'>) => typeof row.latitud === 'number' && Number.isFinite(row.latitud) && Math.abs(row.latitud) <= 90 && typeof row.longitud === 'number' && Number.isFinite(row.longitud) && Math.abs(row.longitud) <= 180;
 
 export const inspectionOperationsService = {

@@ -32,8 +32,8 @@ export function wasteDifferences(declared: ObservedWaste[], observed: ObservedWa
   return differences;
 }
 
-export function intakeScope(user: { id?: string; rol?: string; esInspector?: boolean }): Prisma.AntecedenteFiscalizacionWhereInput {
-  if (user.rol === 'ADMIN') return {};
+export function intakeScope(user: { id?: string; rol?: string; esInspector?: boolean; esJefeInspecciones?: boolean }): Prisma.AntecedenteFiscalizacionWhereInput {
+  if (user.rol === 'ADMIN' || user.esJefeInspecciones) return {};
   const type = /^ADMIN_(GENERADOR|TRANSPORTISTA|OPERADOR)$/.exec(user.rol || '')?.[1];
   if (type) return { tipoActor: type as 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' };
   return user.esInspector && user.id ? { inspeccion: { inspectorId: user.id } } : { id: { in: [] } };

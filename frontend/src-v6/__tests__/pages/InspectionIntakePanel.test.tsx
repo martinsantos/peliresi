@@ -3,10 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { InspectionIntakePanel } from '../../pages/inspecciones/InspectionIntakePanel';
-const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), list: vi.fn() }));
+const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), list: vi.fn(), user: { id: 'qa-chief', rol: 'GENERADOR', esJefeInspecciones: true } }));
 vi.mock('../../services/api', () => ({ api: mock }));
 vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: { list: mock.list } }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-admin', rol: 'ADMIN' } }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mock.user }) }));
 const row = { id: 'a'.repeat(64), origen: 'PARTICIPANTE_EVENTUAL', origenId: 'qa-record', referencia: 'BI-qa-record', tipoActor: 'GENERADOR', actorId: null,
   actorNombre: 'Externo artificial', motivos: ['PARTICIPANTE_SIN_ALTA', 'IDENTIDAD_INCOMPLETA'], estado: 'PENDIENTE', version: 0,
   huellaEvidencia: 'b'.repeat(64), createdAt: '2026-10-20T18:00:00Z', evidencia: { motivo: 'Declaración eventual', participante: { nombre: 'Externo artificial' } }, eventos: [] };
@@ -16,7 +16,7 @@ function view(online = true) {
   render(<QueryClientProvider client={client}><MemoryRouter><InspectionIntakePanel online={online} mobile={false} onCreate={onCreate} /></MemoryRouter></QueryClientProvider>);
   return Object.assign(onCreate, { client });
 }
-beforeEach(() => { vi.clearAllMocks(); mock.get.mockResolvedValue({ data: { data: { items: [row], total: 1, puedeEvaluar: true } } }); mock.list.mockResolvedValue({ items: [], total: 0 }); });
+beforeEach(() => { vi.clearAllMocks(); mock.get.mockResolvedValue({ data: { data: { items: [row], total: 1, puedeEvaluar: true, puedeAbrirExterno: true } } }); mock.list.mockResolvedValue({ items: [], total: 0 }); });
 afterEach(cleanup);
 it('shows scoped evidence, missing identity and explicit administration action, without opening automatically', async () => {
   const onCreate = view();
@@ -65,7 +65,7 @@ it('does not silently apply a draft reason to a newer server version', async () 
   await waitFor(() => expect(mock.get).toHaveBeenCalledTimes(2));
   fireEvent.click(await screen.findByRole('button', { name: /BI-qa-record/ }));
   fireEvent.change(screen.getByLabelText('Motivo de evaluación'), { target: { value: 'Mi evaluación todavía no enviada' } });
-  mock.get.mockResolvedValue({ data: { data: { items: [{ ...row, estado: 'EN_EVALUACION', version: 1 }], total: 1, puedeEvaluar: true } } });
+  mock.get.mockResolvedValue({ data: { data: { items: [{ ...row, estado: 'EN_EVALUACION', version: 1 }], total: 1, puedeEvaluar: true, puedeAbrirExterno: true } } });
   await act(() => client.invalidateQueries({ queryKey: ['inspection-intakes'] }));
   await screen.findByRole('alert');
   expect(screen.getByRole('button', { name: 'Tomar en evaluación' })).toBeDisabled();
@@ -73,4 +73,12 @@ it('does not silently apply a draft reason to a newer server version', async () 
   expect(mock.post).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Usar versión actual' }));
   expect(screen.getByRole('button', { name: 'Tomar en evaluación' })).toBeEnabled();
+});
+
+it('does not offer opening an external participant without the server capability', async () => {
+  mock.get.mockResolvedValue({ data: { data: { items: [row], total: 1, puedeEvaluar: true, puedeAbrirExterno: false } } });
+  view(); fireEvent.click(await screen.findByRole('button', { name: /BI-qa-record/ }));
+  expect(screen.queryByRole('button', { name: 'Abrir inspección' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Tomar en evaluación' })).toBeDisabled();
+  expect(screen.getByText(/jefe de inspecciones o el administrador general/)).toBeVisible();
 });

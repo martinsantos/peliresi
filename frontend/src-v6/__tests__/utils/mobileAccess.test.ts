@@ -102,3 +102,12 @@ describe('canAccessMobilePath', () => {
     expect(canAccessMobilePath(user('ADMIN'), '/admin/actores/transportistas/t-1/editar')).toBe(true);
   });
 });
+
+describe('inspection chief access is independent of the base role', () => {
+  it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'] as const)('permits inspection routes for a designated %s, without opening administration', rol => {
+    const chief = { ...user(rol), esJefeInspecciones: true };
+    for (const path of ['/inspecciones','/app/inspecciones','/mobile/inspecciones/case','/inspecciones?vista=antecedentes']) expect(canAccessMobilePath(chief,path)).toBe(true);
+    for (const path of ['/admin/usuarios','/admin/actores','/switch-user']) expect(canAccessMobilePath(chief,path)).toBe(false);
+    expect(canAccessMobilePath({...chief, esJefeInspecciones:false}, '/inspecciones')).toBe(false);
+  });
+});

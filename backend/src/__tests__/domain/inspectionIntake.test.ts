@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isInspectionAdministrator, isInspectionGeneralManager } from '../../domain/inspectionOperations';
 import { findingAtDestination, intakeDecisionSchema, intakeScope, wasteDifferences } from '../../domain/inspectionIntake';
 const waste = (corriente: string, cantidad: number, unidad = 'kg') => ({ corriente, cantidad, unidad });
 describe('operator finding within the addendum', () => {
@@ -39,5 +40,20 @@ describe('inspection intake remains a scoped evaluation, not an automatic sancti
     const command = { id: '00000000-0000-4000-8000-000000000001', version: 0, accion: 'DESCARTADA', motivo: 'Pesaje documentado' };
     expect(intakeDecisionSchema.safeParse(command).success).toBe(true);
     for (const extra of [{ motivo: '' }, { version: -1 }, { accion: 'VINCULADA' }, { inspeccionId: 'fake' }, { evidencia: {} }]) expect(intakeDecisionSchema.safeParse({ ...command, ...extra }).success).toBe(false);
+  });
+});
+
+describe('explicit inspection management capability', () => {
+  it.each(['GENERADOR', 'OPERADOR', 'TRANSPORTISTA', 'ADMIN_OPERADOR'])('chief with base role %s sees all intakes and can organize externals', rol => {
+    const chief = { id: 'chief', rol, esJefeInspecciones: true };
+    expect(intakeScope(chief)).toEqual({});
+    expect(isInspectionAdministrator(chief)).toBe(true);
+    expect(isInspectionGeneralManager(chief)).toBe(true);
+  });
+  it('does not grant general authority to sector admins or ordinary inspectors', () => {
+    expect(isInspectionGeneralManager({ rol: 'ADMIN_GENERADOR' })).toBe(false);
+    expect(isInspectionAdministrator({ rol: 'GENERADOR' })).toBe(false);
+    expect(intakeScope({ id: 'chief', rol: 'GENERADOR', esJefeInspecciones: false })).toEqual({ id: { in: [] } });
+    expect(intakeScope({ rol: 'ADMIN_OPERADOR', esJefeInspecciones: false })).toEqual({ tipoActor: 'OPERADOR' });
   });
 });

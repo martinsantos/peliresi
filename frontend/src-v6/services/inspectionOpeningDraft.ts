@@ -3,7 +3,7 @@ import { INSPECTION_TYPES } from '../types/inspection';
 import type { inspeccionService } from './inspeccion.service';
 
 export type InspectionOpeningInput = Parameters<typeof inspeccionService.create>[0] & { clienteId: string };
-export type InspectionOpeningSource = { id: string; referencia: string; actorNombre: string; tipoActor: InspectionActorType; actorId: string | null };
+export type InspectionOpeningSource = { id: string; referencia: string; actorNombre: string; tipoActor: InspectionActorType; actorId: string | null; identificacion?: string; domicilio?: string };
 export type InspectionOpeningValues = {
   type: InspectionActorType; actorId: string; withoutActor: boolean; inspectionType: InspectionType;
   description: string; assignedInspector: string; numeroActa: string; ubicacion: string; fechaProgramada: string;
@@ -39,6 +39,7 @@ export function validInspectionOpeningDraft(value: unknown, owner: string): valu
   if (!actor(v.type) || typeof v.withoutActor !== 'boolean' || typeof v.inspectionType !== 'string' || !Object.hasOwn(INSPECTION_TYPES, v.inspectionType)) return false;
   if (!['actorId', 'description', 'assignedInspector', 'numeroActa', 'ubicacion', 'fechaProgramada'].every(key => text(v[key]))) return false;
   if (v.source !== null && (!record(v.source) || !text(v.source.id) || !text(v.source.referencia) || !text(v.source.actorNombre)
+    || (v.source.identificacion !== undefined && !text(v.source.identificacion)) || (v.source.domicilio !== undefined && !text(v.source.domicilio))
     || !actor(v.source.tipoActor) || !(v.source.actorId === null || text(v.source.actorId)))) return false;
   if (value.command === undefined) return true;
   const c = value.command;

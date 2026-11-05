@@ -4,6 +4,8 @@ import { createInspectionAgendaNotices, recordInspectionScheduleChange, INSPECTI
 import fs from 'fs';
 import { createHash } from 'node:crypto';
 import { inspectionFieldExtensions } from '../domain/inspectionFieldModel';
+import { hasInspectionManagementRole } from '../services/inspectionManagementRole.service';
+import { isInspectionGeneralManager } from '../domain/inspectionOperations';
 import { intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import type { NextFunction, Request, Response } from 'express';
@@ -532,8 +534,9 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
     const inspectorId = input.inspectorId || req.user.id;
     if (!isAuthorizedAdmin(req.user) && inspectorId !== req.user.id) throw new AppError('Un inspector solo puede asignarse inspecciones a si mismo', 403);
     const inspector = await prisma.usuario.findUnique({ where: { id: inspectorId }, select: { id: true, activo: true, esInspector: true, rol: true } });
-    if (!inspector?.activo || !isInspectionStaff(inspector)) throw new AppError('El usuario seleccionado no tiene perfil inspector activo', 400);
-    if (String(inspector.rol).startsWith('ADMIN_') && (!scopeType || !input.tipoActor || !isSectorReviewer(inspector, scopeType))) throw new AppError('El inspector seleccionado pertenece a otro ámbito; un legajo sin responsable requiere inspector o jefatura general', 400);
+    const assignee = inspector ? { ...inspector, esJefeInspecciones: inspector.id === req.user.id ? req.user.esJefeInspecciones : await hasInspectionManagementRole(inspector.id) } : null;
+    if (!assignee?.activo || !isInspectionStaff(assignee)) throw new AppError('El usuario seleccionado no tiene perfil inspector activo', 400);
+    if (!isInspectionGeneralManager(assignee) && String(assignee.rol).startsWith('ADMIN_') && (!scopeType || !input.tipoActor || !isSectorReviewer(assignee, scopeType))) throw new AppError('El inspector seleccionado pertenece a otro ámbito; un legajo sin responsable requiere inspector o jefatura general', 400);
     const clienteId = input.clienteId ? `${req.user.id}:${input.clienteId}` : null;
     const huellaCreacion = hashCanonicalPayload({ ...input, inspectorId });
 
@@ -555,7 +558,7 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
         if (!['PENDIENTE', 'EN_EVALUACION'].includes(antecedent.estado)) throw new AppError('El antecedente ya fue resuelto; actualizá la cola', 409);
         assertIntakeInspection(antecedent, { tipoActor: input.tipoActor || null, generadorId: input.tipoActor === 'GENERADOR' ? input.actorId || null : null,
           transportistaId: input.tipoActor === 'TRANSPORTISTA' ? input.actorId || null : null, operadorId: input.tipoActor === 'OPERADOR' ? input.actorId || null : null });
-        if (!input.tipoActor && req.user.rol !== 'ADMIN') throw new AppError('Un externo sin responsable vinculado requiere jefatura general', 403);
+        if (!input.tipoActor && !isInspectionGeneralManager(req.user)) throw new AppError('Un externo sin responsable vinculado requiere jefatura general', 403);
         if (!input.tipoActor && inspectionType !== 'ESPONTANEA') throw new AppError('Un externo sin identidad se abre como hallazgo espontáneo', 400);
       }
       const snapshot = input.tipoActor && input.actorId ? await buildDeclaredInspectionSnapshot(tx, input.tipoActor, input.actorId) : null;

@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import type { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
-import { INSPECTION_ADMIN_ROLES, isInspectionStaff } from '../domain/inspectionOperations';
+import { isInspectionAdministrator, isInspectionGeneralManager, isInspectionStaff } from '../domain/inspectionOperations';
 import { intakeDecisionSchema, intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import { canAccessInspection } from './inspeccion.controller';
@@ -29,13 +29,13 @@ export async function listInspectionIntakes(req: AuthRequest, res: Response, nex
     res.setHeader('Cache-Control', 'private, no-store');
     res.json({ success: true, data: { items: items.map(item => ({ ...item,
       inspeccion: item.inspeccion && canAccessInspection(req.user, item.inspeccion) ? item.inspeccion : null,
-    })), total, page, puedeEvaluar: INSPECTION_ADMIN_ROLES.has(req.user.rol) && !req.user.impersonatedBy } });
+    })), total, page, puedeEvaluar: isInspectionAdministrator(req.user) && !req.user.impersonatedBy, puedeAbrirExterno: isInspectionGeneralManager(req.user) && !req.user.impersonatedBy } });
   } catch (error) { next(error); }
 }
 
 export async function decideInspectionIntake(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!INSPECTION_ADMIN_ROLES.has(req.user.rol) || req.user.impersonatedBy) throw new AppError('Evalúa la administración competente desde su propia sesión', 403);
+    if (!isInspectionAdministrator(req.user) || req.user.impersonatedBy) throw new AppError('Evalúa la administración competente desde su propia sesión', 403);
     const command = intakeDecisionSchema.parse(req.body);
     const row = await prisma.$transaction(async tx => {
       const current = await tx.antecedenteFiscalizacion.findFirst({ where: { AND: [{ id: req.params.antecedenteId }, intakeScope(req.user)] } });
