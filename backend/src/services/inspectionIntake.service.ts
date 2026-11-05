@@ -1,3 +1,4 @@
+import { inspectionManagementRecipientIds } from './inspectionManagementRole.service';
 import { createHash } from 'node:crypto';
 import type { Prisma, AntecedenteFiscalizacion, TipoActorInspeccion } from '@prisma/client';
 import { AppError } from '../middlewares/errorHandler';
@@ -18,10 +19,13 @@ export async function recordInspectionIntake(tx: Prisma.TransactionClient, input
     ...input, id, claveOrigen, actorId: input.actorId || null, huellaEvidencia, eventos: [],
   }] });
   if (!inserted.count) return;
-  const recipients = await tx.usuario.findMany({ where: { activo: true, rol: { in: ['ADMIN', `ADMIN_${input.tipoActor}` as 'ADMIN_OPERADOR'] }, id: { not: input.creadoPorId } }, select: { id: true } });
+  const managementIds = await inspectionManagementRecipientIds(tx);
+  const recipients = await tx.usuario.findMany({ where: { activo: true, id: { not: input.creadoPorId },
+    OR: [{ rol: { in: ['ADMIN', `ADMIN_${input.tipoActor}` as 'ADMIN_OPERADOR'] } }, { id: { in: managementIds } }],
+  }, select: { id: true } });
   await tx.notificacion.createMany({ skipDuplicates: true, data: recipients.map(user => ({
     id: digest(`antecedente:${id}:${user.id}`), usuarioId: user.id, tipo: 'INFO_GENERAL',
-    titulo: 'Nuevo antecedente para evaluar en PSIP', mensaje: `${input.referencia} · ${input.actorNombre}. Administración debe evaluar el antecedente; no acredita una infracción.`,
+    titulo: 'Nuevo antecedente para evaluar en PSIP', mensaje: `${input.referencia} · ${input.actorNombre}. Jefatura de inspecciones o administración competente debe evaluar el antecedente; no acredita una infracción.`,
     datos: JSON.stringify({ tipo: 'antecedente_fiscalizacion', version: 1, correoVersion: 1, antecedenteId: id, url: '/inspecciones?vista=antecedentes' }),
   })) });
 }

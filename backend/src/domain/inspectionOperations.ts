@@ -2,6 +2,8 @@ import { EstadoInspeccion, TipoActorInspeccion, type Prisma } from '@prisma/clie
 import { z } from 'zod';
 
 export const INSPECTION_ADMIN_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']);
+export const isInspectionAdministrator = (user: { rol?: string; esJefeInspecciones?: boolean } | null | undefined): boolean => Boolean(user?.esJefeInspecciones) || INSPECTION_ADMIN_ROLES.has(String(user?.rol));
+export const isInspectionGeneralManager = (user: { rol?: string; esJefeInspecciones?: boolean } | null | undefined): boolean => user?.rol === 'ADMIN' || user?.esJefeInspecciones === true;
 export const INSPECTION_TERMINAL_STATES: EstadoInspeccion[] = ['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'];
 export const isInspectionStaff = (user: any): boolean => Boolean(user?.esJefeInspecciones || user?.esInspector) || INSPECTION_ADMIN_ROLES.has(String(user?.rol));
 

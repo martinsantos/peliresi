@@ -40,7 +40,7 @@ export function canAccessMobilePath(user: User, pathname: string): boolean {
   if (path === '/actores') return user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
 
   if (path === '/inspecciones' || path.startsWith('/inspecciones/')) {
-    return user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
+    return user.esJefeInspecciones === true || user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
   }
 
   const actor = actorDetailFromPath(path);

@@ -1,3 +1,4 @@
+import { hasInspectionManagementRole, inspectionManagementRecipientIds } from '../services/inspectionManagementRole.service';
 import { createInspectionAgendaNotices, inspectionScheduleChange } from '../services/inspectionAgendaNotice.service';
 import type { NextFunction, Response } from 'express';
 import { EstadoInspeccion, Prisma, TipoActorInspeccion } from '@prisma/client';
@@ -5,7 +6,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import type { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
-import { INSPECTION_ADMIN_ROLES, INSPECTION_TERMINAL_STATES, inspectionPeriod, inspectionScopeForUser, isInspectionStaff, inspectionTypeOf } from '../domain/inspectionOperations';
+import { isInspectionAdministrator, INSPECTION_TERMINAL_STATES, inspectionPeriod, inspectionScopeForUser, isInspectionStaff, inspectionTypeOf } from '../domain/inspectionOperations';
 import { canAccessInspection, CHECKLIST_BY_ACTOR } from './inspeccion.controller';
 import { buildDeclaredInspectionSnapshot } from '../services/inspectionDeclaredSnapshot.service';
 
@@ -45,6 +46,7 @@ export async function operacionesInspecciones(req: AuthRequest, res: Response, n
         select: { id: true, numero: true, estado: true, tipoActor: true, inspectorId: true, fechaProgramada: true, iniciadaAt: true,
           cerradaCampoAt: true, ubicacion: true, latitud: true, longitud: true, updatedAt: true, createdAt: true, version: true,
           inspector: { select: { id: true, nombre: true, apellido: true } },
+          antecedentes: { take: 1, orderBy: { createdAt: 'asc' }, select: { actorNombre: true, actorId: true } },
           generador: { select: { id: true, razonSocial: true } }, transportista: { select: { id: true, razonSocial: true } }, operador: { select: { id: true, razonSocial: true } },
         },
       }),
@@ -64,12 +66,13 @@ export async function operacionesInspecciones(req: AuthRequest, res: Response, n
 export async function listarInspectores(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     assertStaff(req);
-    const admin = INSPECTION_ADMIN_ROLES.has(req.user.rol);
+    const admin = isInspectionAdministrator(req.user);
+    const managementIds = admin ? await inspectionManagementRecipientIds() : [];
     const items = await prisma.usuario.findMany({
-      where: { activo: true, ...(admin ? { OR: [{ esInspector: true }, { rol: 'ADMIN' }, ...((req.user.rol === 'ADMIN' || req.user.esJefeInspecciones) ? [{ rol: { in: ['ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] as const } }] : [{ rol: req.user.rol }])] } : { id: req.user.id }) },
+      where: { activo: true, ...(admin ? { OR: [{ id: { in: managementIds } }, { esInspector: true }, { rol: 'ADMIN' }, ...((req.user.rol === 'ADMIN' || req.user.esJefeInspecciones) ? [{ rol: { in: ['ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] as const } }] : [{ rol: req.user.rol }])] } : { id: req.user.id }) },
       select: { id: true, nombre: true, apellido: true, rol: true, esInspector: true }, orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     });
-    res.json({ success: true, data: items });
+    res.json({ success: true, data: items.map(item => ({ ...item, esJefeInspecciones: managementIds.includes(item.id) })) });
   } catch (error) { next(error); }
 }
 
@@ -121,12 +124,13 @@ export async function organizarInspeccion(req: AuthRequest, res: Response, next:
     if (!current) throw new AppError('Inspección no encontrada', 404);
     if (!canAccessInspection(req.user, current)) throw new AppError('No autorizado', 403);
     if (!['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(current.estado)) throw new AppError('El cierre de campo debe preservarse; no admite estos cambios', 409);
-    if ((input.inspectorId || input.fechaProgramada !== undefined) && !INSPECTION_ADMIN_ROLES.has(req.user.rol)) throw new AppError('La asignación y agenda corresponden a la jefatura', 403);
+    if ((input.inspectorId || input.fechaProgramada !== undefined) && !isInspectionAdministrator(req.user)) throw new AppError('La asignación y agenda corresponden a la jefatura', 403);
     if (input.actorId && (current.tipoActor || current.generadorId || current.transportistaId || current.operadorId)) throw new AppError('El legajo ya tiene un sujeto vinculado', 409);
     const inspectionType = inspectionTypeOf(current);
     if (input.tipoActor && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(inspectionType) && input.tipoActor !== inspectionType) throw new AppError('El sujeto debe corresponder al tipo de inspección del legajo', 400);
     if (input.inspectorId) {
-      const assignee = await prisma.usuario.findUnique({ where: { id: input.inspectorId } });
+      const selected = await prisma.usuario.findUnique({ where: { id: input.inspectorId } });
+      const assignee = selected ? { ...selected, esJefeInspecciones: await hasInspectionManagementRole(selected.id) } : null;
       if (!assignee?.activo || !isInspectionStaff(assignee) || !canAccessInspection(assignee, { inspectorId: assignee.id, tipoActor: input.tipoActor || current.tipoActor })) throw new AppError('Inspector no habilitado para este ámbito', 400);
     }
     await prisma.$transaction(async (tx) => {

@@ -138,7 +138,7 @@ const InspeccionesPageV2: React.FC = () => {
       </DropdownMenu>
     </PageToolbar>
     {managementAllowed && <Modal isOpen={managementOpen} onClose={() => setManagementOpen(false)} title="Administración de inspectores"><InspectionManagementPanel embedded /></Modal>}
-    {currentUser?.id && <InspectionOpening key={openingOwner} userId={String(currentUser.id)} owner={openingOwner} role={currentUser.rol} isAdmin={Boolean(isAdmin)} mobile={mobile} online={isOnline}
+    {currentUser?.id && <InspectionOpening key={openingOwner} userId={String(currentUser.id)} owner={openingOwner} role={currentUser.rol} isAdmin={Boolean(isAdmin || currentUser.esJefeInspecciones)} mobile={mobile} online={isOnline}
       initialType={initialType} initialActor={initialActor} returnState={returnState} open={showCreate} source={sourceIntake} banner={false} onStateChange={setOpening}
       onOpen={() => { setSourceIntake(null); setShowCreate(true); }} onClose={() => setShowCreate(false)} />}
     {!showCreate && opening.error && <p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900">{opening.error}</p>}

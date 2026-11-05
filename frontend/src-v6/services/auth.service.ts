@@ -15,7 +15,7 @@ export const authService = {
     const { data } = await api.post<{ success: true; data: { user: Usuario; tokens: { accessToken: string; refreshToken: string }; restricted?: boolean; solicitudId?: string | null } }>('/auth/login', credentials);
     const { tokens, user, restricted, solicitudId } = data.data;
     await setTokensDurably(tokens.accessToken, tokens.refreshToken);
-    const profile = (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true') && user.activo && !restricted
+    const profile = (import.meta.env.VITE_INSPECTION_FIELD_MODEL_ENABLED === 'true'||import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true') && user.activo && !restricted
       ? await this.getMe() : user;
     return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: profile, restricted, solicitudId };
   },
