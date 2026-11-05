@@ -125,3 +125,17 @@ describe('electricity retry can improve a partial read without hiding evidence',
     expect(saved.analisis.electricidad.conflictos).toContain('categoriaTarifaria');
   });
 });
+
+describe('saved licence retry', () => {
+  it('keeps licence text on OCR failure without modifying the document or its approval', async () => {
+    m.find.mockResolvedValue({ ...draft, tipoActor: 'TRANSPORTISTA' });
+    m.old.mockResolvedValue({ ...old, tipo: 'LICENCIA_CHOFER_chofer1', analisis: { ...complete, texto: 'DNI 90000000' } });
+    m.read.mockResolvedValue({ ...complete, lectura: 'NO_DISPONIBLE', texto: '', aviso: 'Servicio ocupado' });
+    const { error, saved } = await invoke(analizarDocumentoSolicitud);
+    expect(error).toBeUndefined();
+    expect(saved.analisis).toMatchObject({ lectura: 'LEIDO', texto: 'DNI 90000000', documentKind: 'LICENCIA' });
+    expect(saved.analisis.aviso).toContain('Se conserva');
+    expect(m.update.mock.calls[0][0].data.estado).toBeUndefined();
+    expect(m.unlink).not.toHaveBeenCalled(); expect(m.notice).not.toHaveBeenCalled();
+  });
+});

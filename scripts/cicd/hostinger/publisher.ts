@@ -47,6 +47,17 @@ function run(command: string, args: string[], maxBuffer=1024**2): string {
   try { return execFileSync(command, args, { encoding:'utf8', timeout:120000, maxBuffer, stdio:['ignore','pipe','pipe'] }).trim(); }
   catch { throw new Error(`Required operation failed: ${command} ${args[0] || ''}; preserve private release evidence`); }
 }
+/** Read-only host prerequisite: builds alone cannot prove native OCR is usable. */
+export function assertNativeDocumentTools(execute: (command: string, args: string[]) => string = (command, args) => execFileSync(command, args, { encoding: 'utf8', timeout: 5000, maxBuffer: 65536, stdio: ['ignore', 'pipe', 'pipe'] })): void {
+  for (const [command, args] of [['flock', ['--version']], ['pdftotext', ['-v']], ['pdftoppm', ['-v']], ['tesseract', ['--version']]] as const) {
+    try { execute(command, [...args]); }
+    catch { throw new Error(`Native document reading prerequisite unavailable: ${command}`); }
+  }
+  let languages: string;
+  try { languages = execute('tesseract', ['--list-langs']); }
+  catch { throw new Error('Native document reading language check failed'); }
+  if (!/^spa\s*$/m.test(languages)) throw new Error('Native document reading requires the Spanish language model (spa)');
+}
 function ordinary(file: string): void {
   const info = fs.lstatSync(file);
   if (!info.isFile() || info.isSymbolicLink() || info.uid !== 0 || info.nlink!==1) throw new Error('Unexpected managed file identity');
@@ -1811,6 +1822,7 @@ export async function checkPublic(frontend: string, revision: string): Promise<v
   }
 }
 function stage(commit: string,expected: string,bundle: string,id: string): Json {
+  assertNativeDocumentTools();
   const before=current(); if (before.revision!==expected) throw new Error('Unexpected active revision');
   const incoming=path.join(ROOT,'incoming',id); const archive=path.join(incoming,'release.tar.gz');
   if (hash(archive)!==bundle) throw new Error('Transport digest mismatch');
@@ -1876,6 +1888,7 @@ async function waitBackend(): Promise<void> {
   throw new Error('SITREP backend did not become healthy');
 }
 async function publish(commit: string,expected: string,bundle: string,id: string,ack: string): Promise<Json> {
+  assertNativeDocumentTools();
   const root=path.join(ROOT,'staged',`${commit}-${bundle}`);const ready=read(path.join(root,'ready.json'));
   if (ready.commit!==commit || ready.bundle!==bundle || ready.controller!==hash(fileURLToPath(import.meta.url)) || ready.before.revision!==expected) throw new Error('Reviewed preparation/controller changed');
   const manifest=read(path.join(root,'package/.sitrep-release.json'));
@@ -1997,7 +2010,8 @@ async function main(): Promise<void> {
     const state=current();
     if(state.revision!==commit)throw new Error('Unexpected active runtime revision');
     await waitBackend();
-    console.log(JSON.stringify({readOnly:true,activeRevision:state.revision,components:state.components,verifiedRuntimeCodeAndLoopbackBinding:true,
+    assertNativeDocumentTools();
+    console.log(JSON.stringify({nativeDocumentTools:true,readOnly:true,activeRevision:state.revision,components:state.components,verifiedRuntimeCodeAndLoopbackBinding:true,
       verifiedStaticPackages:true,databaseAndUploadsContractVerified:true,health:'ok',applicationStarted:false,candidateSelected:false}));
     return;
   }

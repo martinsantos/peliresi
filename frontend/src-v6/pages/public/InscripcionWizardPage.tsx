@@ -1,4 +1,4 @@
-import { documentReadingOutcome } from '../../utils/documentReadingOutcome';
+import { documentReadingOutcome, retainDocumentReading } from '../../utils/documentReadingOutcome';
 /**
  * SITREP v6 - Inscripcion Wizard (Public)
  * ========================================
@@ -489,7 +489,7 @@ const InscripcionWizardContent: React.FC = () => {
     setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
     if (isReviewMode) {
       uploadsInFlight.current.add(tipo); setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
-      try { const result = await previewDocument(file, tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(result.analisis) })); }
+      try { const result = await previewDocument(file, tipo.startsWith('LICENCIA_CHOFER_') ? 'LICENCIA' : tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: retainDocumentReading(adjuntos[tipo] === file ? previous[tipo] : undefined, result.analisis) })); setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(result.analisis) })); }
       catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo leer el archivo de prueba. Los datos siguen en el navegador.') })); }
       finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
       return;
@@ -523,7 +523,14 @@ const InscripcionWizardContent: React.FC = () => {
       setAdjuntos(previous => ({ ...previous, [type]: file }));
       setMissingLocalFiles(previous => previous.filter(item => item !== type));
       uploadsInFlight.current.add(type); setUploadStates(previous => ({ ...previous, [type]: 'reading' }));
-      try { return await previewDocument(file, 'LICENCIA'); }
+      setPreviewAnalyses(previous => Object.fromEntries(Object.entries(previous).filter(([key]) => key !== type)));
+      setReadingFeedback(previous => ({ ...previous, [type]: undefined }));
+      try {
+        const result = await previewDocument(file, 'LICENCIA');
+        setPreviewAnalyses(previous => ({ ...previous, [type]: result.analisis }));
+        setReadingFeedback(previous => ({ ...previous, [type]: documentReadingOutcome(result.analisis) }));
+        return result;
+      }
       finally { uploadsInFlight.current.delete(type); setUploadStates(previous => ({ ...previous, [type]: undefined })); }
     }
     if (!await persistDraft(step)) throw new Error('Guardá primero los datos del chofer; la licencia no se perdió.');

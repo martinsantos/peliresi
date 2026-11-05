@@ -7,7 +7,7 @@ import * as os from 'node:os';
 import {gunzipSync} from 'node:zlib';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
-import { compatible,proxyFor,safeArchiveEntries,inventory,activateWithRollback,loopbackIndex,
+import { assertNativeDocumentTools, compatible,proxyFor,safeArchiveEntries,inventory,activateWithRollback,loopbackIndex,
   digest,codeDigest,capturePrepared,assertPrepared,withPrepared,inspectionFeatureEnvironment,assertInspectionDeliveryClosed,assertInspectionFlagsPreserved,
   REVIEWED_REVISION,REVIEWED_BACKEND_REVISION,REVIEWED_FILES,REVIEWED_MIGRATION,
   assertReviewedHashes,migrations,assertAcknowledgement,assertMigrationPending,migrationTransaction,
@@ -528,7 +528,7 @@ test('prepare scopes the fixture API to frontend tests and preserves the product
 });
 test('prepare installs PDF inspection tools before tests without installing on Hostinger',()=>{
   const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
-  const start=workflow.indexOf('      - name: Install PDF verification tools');
+  const start=workflow.indexOf('      - name: Install native document reading tools');
   const end=workflow.indexOf('      - name: Build and test only');
   assert.ok(start>=0 && end>start);
   const step=workflow.slice(start,end);
@@ -536,6 +536,8 @@ test('prepare installs PDF inspection tools before tests without installing on H
   assert.match(step,/set -euo pipefail/);
   assert.match(step,/sudo apt-get install -y --no-install-recommends poppler-utils/);
   for(const tool of ['pdftotext','pdfinfo','pdftoppm'])assert.ok(step.includes('command -v '+tool));
+  assert.ok(step.includes('tesseract-ocr tesseract-ocr-spa'));
+  assert.ok(workflow.includes('node dist/scripts/checkDocumentRuntime.js'));
   assert.ok(end<workflow.indexOf('webfactory/ssh-agent'));
   assert.equal(workflow.slice(workflow.indexOf('webfactory/ssh-agent')).includes('apt-get'),false);
 });
@@ -575,4 +577,19 @@ test('complete runtime manifests larger than 1 MiB remain inspectable and sealed
   inspectArchive(path.join(incoming,'release.tar.gz'));
   let admitted=false;withPrepared(f.ready,f.root,f.bundle,f.original,()=>{admitted=true;});
   assert.equal(admitted,true);
+});
+
+
+test('native OCR prerequisites fail closed before preparing or publishing', () => {
+  const success = (_command: string, args: string[]) => args.includes('--list-langs') ? 'eng\nspa\nosd\n' : 'version';
+  assert.doesNotThrow(() => assertNativeDocumentTools(success));
+  for (const absent of ['flock', 'pdftotext', 'pdftoppm', 'tesseract']) {
+    assert.throws(() => assertNativeDocumentTools((command, args) => { if (command === absent) throw new Error('ENOENT'); return success(command,args); }), /prerequisite unavailable/);
+  }
+  assert.throws(() => assertNativeDocumentTools((_command,args) => args.includes('--list-langs') ? 'eng\nspare\n' : 'version'), /Spanish language model/);
+  const source = fs.readFileSync(new URL('./publisher.ts',import.meta.url),'utf8');
+  for(const name of ['function stage(', 'async function publish(']) {
+    const body=source.slice(source.indexOf(name));
+    assert.ok(body.indexOf('assertNativeDocumentTools();') < body.indexOf('current()'));
+  }
 });

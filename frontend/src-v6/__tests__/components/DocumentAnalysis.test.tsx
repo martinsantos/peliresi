@@ -103,3 +103,15 @@ describe('incomplete electricity evidence remains actionable', () => {
     } else expect(screen.getByText(/Revisá Ruta y Folio/)).toHaveTextContent('el número de factura no los reemplaza');
   });
 });
+
+
+describe('failed invoice extraction does not resemble a successful reading', () => {
+  it('keeps retry visible without an empty seven-field panel', () => {
+    const retry = vi.fn();
+    render(<DocumentAnalysis kind="electricity" persisted={false} onRetry={retry} analysis={{ ...analysis, lectura: 'NO_DISPONIBLE', texto: '', aviso: 'El servicio no está disponible. Tu formulario sigue intacto.', electricidad: { version: 1, distribuidora: null, nombreDistribuidora: null, campos: {}, conflictos: [], evidencias: [], aviso: 'Revisar original' } }} />);
+    expect(screen.queryByText('No leído')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Tu formulario sigue intacto');
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura' }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+});

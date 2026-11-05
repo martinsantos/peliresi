@@ -17,7 +17,7 @@ import { generateTokens } from './auth.controller';
 import { registrationActorFields } from '../domain/registrationActorData';
 import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
 import { licenseFields } from '../domain/licenseReading';
-import { describeDocument, readReceipt, mergeReceiptRead, mergeElectricityRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { describeDocument, readReceipt, mergeReceiptRead, mergeElectricityRead, mergeLicenseRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 import { electricityReading } from '../domain/electricityReading';
 import { applySolicitudPayments, confirmPayment, notePaymentDecision, paymentAnalysis, requirePaymentIdentity, retainPaymentAllocation, solicitudPaymentScope } from '../services/paymentIdentity.service';
 import {
@@ -555,7 +555,7 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
         throw new AppError('El adjunto cambió durante la lectura. Actualizá la solicitud para continuar.', 409);
       }
       if (original.tipo === 'COMPROBANTE_PAGO') reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
-      let analisis = license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
+      let analisis = license ? mergeLicenseRead(current.analisis, reading)
         : electric ? mergeElectricityRead(current.analisis, reading)
         : mergeReceiptRead(current.analisis, reading);
       if (original.tipo === 'COMPROBANTE_PAGO' && analisis.pago?.revision !== 'CONFIRMADO') analisis = await paymentAnalysis(tx, analisis, solicitudPaymentScope(id));
