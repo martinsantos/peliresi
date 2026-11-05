@@ -12,9 +12,7 @@ import type { SupportCreate } from '../types/support';
 import { SupportReportDialog } from './SupportReportDialog';
 import { toast } from './ui/Toast';
 
-const mobileBubbleBottom = (aboveTrip: boolean) => aboveTrip ? 164 : 88;
-/** Bottom padding a mobile scroll area needs so its last content can scroll clear of the floating button. */
-export const mobileSupportClearance = (aboveTrip: boolean) => `calc(${mobileBubbleBottom(aboveTrip) + 48 + 16}px + env(safe-area-inset-bottom, 0px))`;
+import { mobileBubbleBottom } from '../utils/supportLayout';
 
 export function SupportBubble({ mobile = false, aboveTrip = false, hidden = false, inline = false }: { mobile?: boolean; aboveTrip?: boolean; hidden?: boolean; inline?: boolean }) {
   const { currentUser } = useAuth();

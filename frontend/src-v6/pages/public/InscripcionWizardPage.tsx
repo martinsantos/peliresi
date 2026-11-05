@@ -12,7 +12,7 @@ import { documentReadingOutcome, retainDocumentReading } from '../../utils/docum
  * Step UI is delegated to components in ./inscripcion/steps/.
  */
 
-import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Check,
@@ -90,7 +90,7 @@ const InscripcionWizardContent: React.FC = () => {
   const isReviewMode = searchParams.get('modo') === 'revision';
   const selectedApplication = searchParams.get('solicitud');
   const recoveryDestination = `/inscripcion/${tipo}` + (selectedApplication ? '?solicitud=' + encodeURIComponent(selectedApplication) : '');
-  const reviewFixture = isReviewMode ? getReviewFixture(tipoActor) : null;
+  const reviewFixture = useMemo(() => isReviewMode ? getReviewFixture(tipoActor) : null, [isReviewMode, tipoActor]);
   const steps = isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA;
   const totalSteps = steps.length;
   const [trialInitial] = useState(() => isReviewMode ? readTrialDraft(tipoActor) : null);
@@ -152,6 +152,7 @@ const InscripcionWizardContent: React.FC = () => {
   const [regError, setRegError] = useState<string | null>(null);
   const draftScope = `public:${tipoActor}:${solicitudId || ''}`;
   const ownership = useInspectionDraftOwnership(`registration:${owner}:${draftScope}`, Boolean(owner && solicitudId && !isReviewMode && !submitSuccess));
+  const { canWrite: canWriteDraft, status: ownershipStatus } = ownership;
   const vehicles = fleetRows(form.vehiculosJson, EMPTY_VEHICLE);
   const drivers = fleetRows(form.choferesJson, EMPTY_DRIVER);
   const licenseRequirements = drivers.map((driver, index) => ({ tipo: licenseDocumentType(driver.key), nombre: `Licencia del chofer ${index + 1} · ${driver.nombre || 'sin nombre'}`, required: false }));
@@ -170,7 +171,7 @@ const InscripcionWizardContent: React.FC = () => {
     serverExtraFields.current = {}; setPhase(isReviewMode ? 2 : 1);
     setReg(reviewFixture?.reg || { nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
     setFormContext(context);
-  }, [isReviewMode, tipoActor, formContext, totalSteps]);
+  }, [isReviewMode, tipoActor, formContext, totalSteps, reviewFixture?.form, reviewFixture?.reg]);
 
   // A committed navigation starts at its heading, not at the previous page's
   // footer. Typing, validation errors and asynchronous requirements do not move
@@ -322,12 +323,12 @@ const InscripcionWizardContent: React.FC = () => {
   // Persist the CURRENT step, not just a completed navigation. Only the account
   // validated by the server can read it back; passwords and file bytes never enter it.
   useEffect(() => {
-    if (isReviewMode || submitSuccess || !owner || !solicitudId || localConflict || !ownership.canWrite()) return;
+    if (isReviewMode || submitSuccess || !owner || !solicitudId || localConflict || !canWriteDraft()) return;
     if (registrationSessionOwner(getAccessToken()) !== owner) return;
     setLocalSaved(writeRegistrationDraft(owner, draftScope, {
       form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])],
     }));
-  }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
+  }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, canWriteDraft, ownershipStatus, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
 
   const clearVisibleAccount = useCallback(() => {
       setForm({}); setAdjuntos({}); setUploadedDocs({}); setReadingFeedback({}); setOwner(null);
@@ -366,7 +367,7 @@ const InscripcionWizardContent: React.FC = () => {
       pendingFilesNotice.current?.focus();
       pendingFilesNotice.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
     }
-  }, [attempted, step, docStepNumber]);
+  }, [attempted, step, docStepNumber, missingLocalFiles.length]);
 
   const getStepErrors = (s: number): string[] => {
     if (isReviewMode) return [];
@@ -400,9 +401,9 @@ const InscripcionWizardContent: React.FC = () => {
 
   const assertDraftSession = useCallback(() => {
     if (!owner || registrationSessionOwner(getAccessToken()) !== owner) throw new Error('La sesión cambió o venció. Iniciá sesión con tu cuenta para recuperar el borrador.');
-    if (!ownership.canWrite()) throw new Error('Este borrador está abierto en otra pestaña o no se pudo proteger su edición. Cerrá la otra pestaña y reintentá.');
+    if (!canWriteDraft()) throw new Error('Este borrador está abierto en otra pestaña o no se pudo proteger su edición. Cerrá la otra pestaña y reintentá.');
     if (localConflict) throw new Error('Elegí qué versión conservar antes de guardar.');
-  }, [owner, ownership.canWrite, localConflict]);
+  }, [owner, canWriteDraft, localConflict]);
   const persistDraft = async (target: number): Promise<boolean> => {
     if (isReviewMode) return persistTrial(target);
     if (saveInFlight.current || submitInFlight.current) return false;
@@ -443,10 +444,10 @@ const InscripcionWizardContent: React.FC = () => {
   // A rejected/conflicting save stops automatic retries and keeps the visible form.
   const persistCurrent = useRef(persistDraft); persistCurrent.current = persistDraft;
   useEffect(() => {
-    if (isReviewMode || submitSuccess || !solicitudId || !owner || !dirty || saving || submitting || localConflict || saveError || !ownership.canWrite()) return;
+    if (isReviewMode || submitSuccess || !solicitudId || !owner || !dirty || saving || submitting || localConflict || saveError || !canWriteDraft()) return;
     const timer = setTimeout(() => { if (!uploadsInFlight.current.size) void persistCurrent.current(step); }, 1000);
     return () => clearTimeout(timer);
-  }, [isReviewMode, submitSuccess, solicitudId, owner, dirty, form, step, saving, submitting, localConflict, saveError, ownership.status, uploadStates]);
+  }, [isReviewMode, submitSuccess, solicitudId, owner, dirty, form, step, saving, submitting, localConflict, saveError, ownershipStatus, canWriteDraft, uploadStates]);
 
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;

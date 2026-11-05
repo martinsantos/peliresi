@@ -40,3 +40,9 @@ Después: verificar versiones/modelo español y ejecutar el smoke nativo con doc
 ## Límites y siguientes controles
 
 No declarar todas las altas validadas de extremo a extremo: esta tanda cubre lectura/documentos, recuperación y contratos con pruebas automáticas; no se completó una nueva inscripción real ni una aprobación administrativa en navegador. Faltan una ronda completa de alta persistida por rol en QA, muestras representativas de cada proveedor y calidad de imagen y Android físico. El JPG original de la captura del usuario no fue adjuntado; se verificaron archivos artificiales, no esa factura exacta. AFIP, habilitación y seguros conservan su circuito documental; no se promete extracción especializada de campos que no existe en el contrato actual.
+
+## Cierre de CI después de integrar el PR #59
+
+CI detectó nueve advertencias existentes en archivos modificados. Se corrigieron sin silenciar reglas: separación de componentes y estado de autenticación, helper de disposición de ayuda, tipado del error de login y dependencias completas de hooks de recuperación. Se mantuvieron los imports públicos mediante módulos TypeScript sin JSX. Se quitaron nueve permisos obsoletos del registro de deuda (1905 → 1896). TypeScript y lint focalizado cero advertencias; 171 pruebas de autenticación, ayuda y recuperación de altas aprobadas. El corte original 5a1a511e no se publica con CI fallido.
+
+Con autorización del dueño se restauraron en Hostinger los ejecutables nativos y el idioma español desde paquetes oficiales; el preflight oficial confirmó la revisión activa 65322ad3. No se cambiaron datos, flags ni entornos de correo/push. Se continúa por el publicador con el commit que incorpora la corrección de CI.
