@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from '../utils/api-error';
+import { AuthContext, DEMO_CREDENTIALS, type AuthContextType, type User, type UserRole } from './authState';
 import { toast } from '../components/ui/Toast';
 import { clearPreparedInvitations } from '../services/preparedCompanyInvitations';
 /**
@@ -6,7 +8,7 @@ import { clearPreparedInvitations } from '../services/preparedCompanyInvitations
  * Contexto de autenticacion contra API real
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,74 +19,6 @@ import { registrationDraftHint, restrictedSessionHint } from '../services/regist
 import { clearOfflineSession, isOfflineNetworkError, readOfflineSession, saveOfflineSession } from '../services/offlineSession';
 import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
-
-// ========================================
-// TYPES
-// ========================================
-export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
-
-export interface User {
-  preferenciaEnlaces?: import('../utils/linkPreference').LinkPreference;
-  empresaContexto?:import('../services/companyContext').CompanyContext;
-  contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
-  empresaContextoError?:string;
-  actividadContextoError?:string;
-  actividades?: UserRole[];
-  training?: boolean;
-  id: number | string;
-  nombre: string;
-  email: string;
-  rol: UserRole;
-  sector: string;
-  avatar: string;
-  telefono: string;
-  ubicacion: string;
-  permisos: string[];
-  actorId?: string;
-  esInspector?: boolean;
-  esJefeInspecciones?: boolean;
-}
-
-export interface AuthContextType {
-  currentUser: User | null;
-  users: User[];
-  switchUser: (userId: number) => Promise<void>;
-  getUsersByRole: (role: UserRole) => User[];
-  isAdmin: boolean;
-  isGenerador: boolean;
-  isTransportista: boolean;
-  isOperador: boolean;
-  isAdminTransportista: boolean;
-  isAdminGenerador: boolean;
-  isAdminOperador: boolean;
-  isAnyAdmin: boolean;
-  canAccess: (permission: string) => boolean;
-  login: (email: string, password: string, options?: { deferWelcome?: boolean }) => Promise<User>;
-  logout: (options?: { reason: 'expired' }) => Promise<void>;
-  signOutRedirectPending: boolean;
-  finishSignOutRedirect: () => void;
-  isRestricted: boolean;
-  solicitudId: string | null;
-  isDemo: boolean;
-  isLoading: boolean;
-  authError: string | null;
-  showOnboarding: boolean;
-  dismissOnboarding: () => void;
-}
-
-// ========================================
-// DEMO CREDENTIALS - for quick-switch buttons
-// Must match actual seeded users in backend/prisma/seed.ts
-// ========================================
-export const DEMO_CREDENTIALS: Record<number, { email: string; password: string; nombre: string; rol: UserRole; sector: string }> =
-  import.meta.env.VITE_DEMO_MODE === 'true'
-    ? {
-        1:  { email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123', nombre: 'Administrador DGFA',          rol: 'ADMIN',         sector: 'DGFA' },
-        5:  { email: 'quimica.mendoza@industria.com',       password: 'gen123',   nombre: 'Roberto Gómez',               rol: 'GENERADOR',     sector: 'Química Mendoza S.A.' },
-        13: { email: 'transportes.andes@logistica.com',     password: 'trans123', nombre: 'Pedro Martínez',              rol: 'TRANSPORTISTA', sector: 'Transportes Andes S.R.L.' },
-        19: { email: 'tratamiento.residuos@planta.com',     password: 'op123',    nombre: 'Miguel Fernández',            rol: 'OPERADOR',      sector: 'Tratamiento de Residuos Mendoza S.A.' },
-      }
-    : {};
 
 // ========================================
 // HELPERS
@@ -130,7 +64,7 @@ function apiUserToUser(u: Usuario): User {
 // ========================================
 // CONTEXT
 // ========================================
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 
 // ========================================
 // SESSION TIMEOUT GUARD
@@ -386,11 +320,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Deferring does not mark the introduction as completed.
       setShowOnboarding(!options?.deferWelcome && !response.restricted && response.user.activo && (isFirstSession || isPostReset));
       return user;
-    } catch (err: any) {
+    } catch (err: unknown) {
       validatedToken.current = null;
       clearTokens();
       clearOfflineSession();
-      const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';
+      const message = getApiErrorMessage(err, 'Credenciales incorrectas o API no disponible.');
       setAuthError(message);
       throw err;
     } finally {
@@ -548,16 +482,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
-// ========================================
-// HOOK
-// ========================================
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export default AuthContext;
