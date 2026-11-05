@@ -35,7 +35,8 @@ it('recognizes a committed review from history after final certification without
   mock.post.mockRejectedValueOnce(new Error('response lost')); view();
   fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Revisión guardada' } });
   fireEvent.click(screen.getByRole('button', { name: 'Observar' }));
-  await screen.findByRole('button', { name: 'Comprobar envío' });
+  await screen.findByRole('alert');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar envío' })).toBeEnabled());
   const posted = mock.post.mock.calls[0][1];
   const confirmed = { ...record, version: 1, puedeResolver: false,
     revisiones: [{ ...posted, autorId: 'qa-user', fecha: '2026-10-30' }] };
@@ -51,7 +52,9 @@ it('retains an uncertain command when a retry receives a conflict', async () => 
   mock.post.mockRejectedValueOnce(new Error('response lost')).mockRejectedValueOnce({ response: { status: 409, data: { message: 'La revisión cambió' } } });
   view(); fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Decisión pendiente' } });
   fireEvent.click(screen.getByRole('button', { name: 'Observar' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Comprobar envío' }));
+  await screen.findByRole('alert');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar envío' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
   await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2));
   expect(mock.post.mock.calls[1]).toEqual(mock.post.mock.calls[0]);
   expect(screen.getByRole('button', { name: 'Comprobar envío' })).toBeEnabled();
@@ -62,7 +65,7 @@ function view(client = new QueryClient({ defaultOptions: { queries: { retry: fal
     <MemoryRouter initialEntries={['/manifiestos/qa-id/adendas']}><Routes><Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} /></Routes></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { localStorage.clear();sessionStorage.clear();mock.role='OPERADOR';mock.training = false; vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true');
+beforeEach(() => { localStorage.clear();sessionStorage.clear();mock.role='OPERADOR';mock.training = false; vi.clearAllMocks(); mock.get.mockReset(); mock.post.mockReset(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true');
   Object.defineProperty(navigator,'locks',{configurable:true,value:{request:async (name:string,_options:unknown,callback:(lock:unknown)=>Promise<void>)=>callback({name})}});
   mock.get.mockResolvedValue({ data: { data } }); });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
