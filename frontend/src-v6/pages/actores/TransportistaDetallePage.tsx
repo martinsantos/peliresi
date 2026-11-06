@@ -8,7 +8,7 @@ import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable'
  * CRUD: Agregar vehículos y conductores (ADMIN only)
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import type { Transportista, Vehiculo, Chofer } from '../../types/models';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -115,10 +115,21 @@ const TransportistaDetallePage: React.FC = () => {
     conductores: apiTransportista.choferes || [] as Chofer[],
   } : null;
 
-  const rawFlota: Vehiculo[] = transportista ? transportista.flota : [];
-  const rawChoferes: Chofer[] = transportista ? transportista.conductores : [];
+  const vehiculos = apiTransportista?.vehiculos;
+  const choferes = apiTransportista?.choferes;
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   const sortedFlota = useMemo(() => {
+    const rawFlota: Vehiculo[] = vehiculos ?? [];
     if (!flotaSort) return rawFlota;
     return [...rawFlota].sort((a: Vehiculo, b: Vehiculo) => {
       const dir = flotaSort.direction === 'asc' ? 1 : -1;
@@ -129,9 +140,10 @@ const TransportistaDetallePage: React.FC = () => {
         default: return 0;
       }
     });
-  }, [rawFlota, flotaSort]);
+  }, [vehiculos, flotaSort]);
 
   const sortedChoferes = useMemo(() => {
+    const rawChoferes: Chofer[] = choferes ?? [];
     if (!choferSort) return rawChoferes;
     return [...rawChoferes].sort((a: Chofer, b: Chofer) => {
       const dir = choferSort.direction === 'asc' ? 1 : -1;
@@ -141,7 +153,7 @@ const TransportistaDetallePage: React.FC = () => {
         default: return 0;
       }
     });
-  }, [rawChoferes, choferSort]);
+  }, [choferes, choferSort]);
 
   const toggleFlotaSort = (key: string) => setFlotaSort(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
@@ -328,13 +340,13 @@ const TransportistaDetallePage: React.FC = () => {
   if (!transportista) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} backLabel={backLabel} />;
 
   const habVencimiento = transportista.vencimientoHab !== '-' ? new Date(transportista.vencimientoHab) : null;
-  const diasHastaVencimiento = habVencimiento ? Math.ceil((habVencimiento.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+  const diasHastaVencimiento = habVencimiento ? Math.ceil((habVencimiento.getTime() - now) / (1000 * 60 * 60 * 24)) : null;
   const habProximaVencer = diasHastaVencimiento !== null && diasHastaVencimiento <= 90 && diasHastaVencimiento > 0;
 
   // Vencimiento habilitación DPA
   const vtoHab = transportista.vencimientoHabilitacion;
   const diasVtoHab = vtoHab
-    ? Math.ceil((vtoHab.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    ? Math.ceil((vtoHab.getTime() - now) / (1000 * 60 * 60 * 24))
     : null;
   const vtoStatus: 'vencida' | 'pronto' | 'vigente' | null = vtoHab
     ? (diasVtoHab! <= 0 ? 'vencida' : diasVtoHab! <= 30 ? 'pronto' : 'vigente')

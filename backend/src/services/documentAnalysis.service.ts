@@ -49,7 +49,8 @@ export function mergeOriginalRead(previous: unknown, next: ReceiptAnalysis): Rec
     ? previous as Partial<ReceiptAnalysis> : undefined;
   const old = candidate?.version === 1 && candidate.lectura === 'LEIDO'
     && typeof candidate.texto === 'string' && candidate.texto.trim() ? candidate : undefined;
-  let reading = next;
+  let reading = candidate?.version === 1 && candidate.duplicado === true
+    ? { ...next, duplicado: true } : next;
   if (old) {
     const keepPrevious = (aviso: string): ReceiptAnalysis => ({
       version: 1, duplicado: old.duplicado === true || next.duplicado, lectura: 'LEIDO',

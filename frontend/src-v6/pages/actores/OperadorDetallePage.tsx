@@ -150,9 +150,10 @@ const OperadorDetallePage: React.FC = () => {
   };
 
   // Parse tecnologías from CSV into structured list
+  const tecnologia = enriched?.tecnologia;
   const tecnologiasParsed = useMemo(() =>
-    enriched ? parseTecnologias(enriched.tecnologia) : [],
-    [enriched]
+    tecnologia ? parseTecnologias(tecnologia) : [],
+    [tecnologia]
   );
 
   const actorNavigation = useActorNavigation();

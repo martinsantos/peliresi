@@ -40,7 +40,7 @@ import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import api from '../../services/api';
-import type { Rol } from '../../types/models';
+import type { Rol, Usuario } from '../../types/models';
 import { useDebounce } from '../../hooks/useDebounce';
 import { getApiErrorMessage } from '../../utils/api-error';
 
@@ -78,7 +78,7 @@ const rolConfig = {
 };
 
 /** Convert API Usuario to the local shape used in the UI */
-function apiUserToLocal(u: any): UsuarioLocal {
+function apiUserToLocal(u: Usuario & { lastLoginAt?: string | null; manifiestosCount?: number | null }): UsuarioLocal {
   const initials = u.nombre && typeof u.nombre === 'string'
     ? u.nombre.split(' ').map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase()
     : String(u.email || '').slice(0, 2).toUpperCase();
@@ -299,7 +299,7 @@ const UsuariosPage: React.FC = () => {
           setModalEditar(false);
           toast.success('Usuario actualizado', editEmail.trim().toLowerCase() !== usuarioSeleccionado.email.toLowerCase() ? 'El cambio de correo queda pendiente de confirmación en la nueva dirección.' : 'Los datos se guardaron correctamente');
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
           setEditError(getApiErrorMessage(err, 'No se pudo actualizar el usuario. Conservamos los datos para que puedas volver a intentar.'));
         },
       }
@@ -420,12 +420,12 @@ const UsuariosPage: React.FC = () => {
               variant="ghost"
               size="sm"
               className="p-2 text-amber-600 hover:bg-amber-50"
-              onClick={async (e: any) => {
+              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
                 e.stopPropagation();
                 try {
                   await impersonateUser(row.id);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.message || 'No se pudo acceder como este usuario');
+                } catch (err: unknown) {
+                  toast.error(getApiErrorMessage(err, 'No se pudo acceder como este usuario'));
                 }
               }}
               title="Acceso Comodín — ver como este usuario"
@@ -437,7 +437,7 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className={`p-2 ${row.estado === 'activo' ? 'text-amber-500' : 'text-emerald-600'}`}
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               cambiarEstado(row.id, row.estado === 'activo' ? 'inactivo' : 'activo');
             }}
@@ -450,7 +450,7 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className="p-2"
-            onClick={(e: any) => { e.stopPropagation(); verUsuario(row); }}
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); verUsuario(row); }}
             title="Ver detalle"
           >
             <MoreHorizontal size={16} />
@@ -460,7 +460,7 @@ const UsuariosPage: React.FC = () => {
             size="sm"
             className="p-2 text-error-500"
             aria-label={`Eliminar a ${row.nombre}`}
-            onClick={(e: any) => { e.stopPropagation(); setUsuarioSeleccionado(row); setDeleteError(''); setModalEliminar(true); }}
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); setUsuarioSeleccionado(row); setDeleteError(''); setModalEliminar(true); }}
           >
             <Trash2 size={16} />
           </Button>
@@ -874,8 +874,8 @@ const UsuariosPage: React.FC = () => {
                   toast.success('Rol actualizado', `${usuarioSeleccionado.nombre} ahora es ${label}`);
                   setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol('');
                   window.location.reload();
-                } catch (err: any) {
-                  toast.error('Error', err?.response?.data?.message || 'Clave incorrecta o error de red');
+                } catch (err: unknown) {
+                  toast.error('Error', getApiErrorMessage(err, 'Clave incorrecta o error de red'));
                 } finally { setPromoverLoading(false); }
               }}
             >

@@ -11,8 +11,8 @@ import { useAdmissionContext } from '../../hooks/useAdmissionContext';
 import { ACTOR_NAMES, APPLICATION_STATES, applicantName, applicationReturn, applicationDeclarationsReadable } from '../../utils/admissionReview';
 import { ApplicationDeclarationSummary } from '../../components/registration/ApplicationDeclarationSummary';
 import {
-  ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle, Eye,
-  Send, Download, MessageSquare, User, File, Clock,
+  ArrowLeft, CheckCircle, XCircle, AlertTriangle,
+  Send, Download, MessageSquare, User, File,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { QueryContent } from '../../components/ui/QueryContent';

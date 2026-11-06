@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '../../utils/api-error';
 import { ActorActivityControl } from '../../components/ActorActivityControl';
 import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
@@ -58,7 +59,7 @@ function CrudModal({ title, children, onClose }: { title: string; children: Reac
 
 // ===== Pago TEF Form =====
 function PagoForm({ initial, onSave, onCancel, isPending }: {
-  initial?: Partial<PagoTEF>; onSave: (data: any) => void; onCancel: () => void; isPending: boolean;
+  initial?: Partial<PagoTEF>; onSave: (data: Partial<PagoTEF>) => void; onCancel: () => void; isPending: boolean;
 }) {
   const [f, setF] = useState({
     anio: initial?.anio || new Date().getFullYear(),
@@ -72,7 +73,7 @@ function PagoForm({ initial, onSave, onCancel, isPending }: {
     gedoNotificacion: initial?.gedoNotificacion || '',
     gedoResolucion: initial?.gedoResolucion || '',
   });
-  const up = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
+  const up = <K extends keyof typeof f,>(k: K, v: (typeof f)[K]) => setF(p => ({ ...p, [k]: v }));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
@@ -105,7 +106,7 @@ function PagoForm({ initial, onSave, onCancel, isPending }: {
 
 // ===== DDJJ Form =====
 function DDJJForm({ initial, onSave, onCancel, isPending }: {
-  initial?: Partial<DeclaracionJurada>; onSave: (data: any) => void; onCancel: () => void; isPending: boolean;
+  initial?: Partial<DeclaracionJurada>; onSave: (data: Partial<DeclaracionJurada>) => void; onCancel: () => void; isPending: boolean;
 }) {
   const [f, setF] = useState({
     anio: initial?.anio || new Date().getFullYear(),
@@ -114,7 +115,7 @@ function DDJJForm({ initial, onSave, onCancel, isPending }: {
     fechaPresentacion: initial?.fechaPresentacion ? String(initial.fechaPresentacion).split('T')[0] : '',
     observaciones: initial?.observaciones || '',
   });
-  const up = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
+  const up = <K extends keyof typeof f,>(k: K, v: (typeof f)[K]) => setF(p => ({ ...p, [k]: v }));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
@@ -227,7 +228,7 @@ const GeneradorDetallePage: React.FC = () => {
   const habilitado = lastPago?.habilitado;
 
   // Pago handlers
-  const handleSavePago = async (data: any) => {
+  const handleSavePago = async (data: Partial<PagoTEF>) => {
     if (!canEdit) return;
     try {
       if (pagoModal.editing) {
@@ -238,8 +239,8 @@ const GeneradorDetallePage: React.FC = () => {
         toast.success('Pago registrado');
       }
       setPagoModal({ open: false });
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
+    } catch (err) {
+      toast.error('Error', getApiErrorMessage(err, 'No se pudo guardar'));
     }
   };
 
@@ -253,7 +254,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   // DDJJ handlers
-  const handleSaveDDJJ = async (data: any) => {
+  const handleSaveDDJJ = async (data: Partial<DeclaracionJurada>) => {
     if (!canEdit) return;
     try {
       if (ddjjModal.editing) {
@@ -264,8 +265,8 @@ const GeneradorDetallePage: React.FC = () => {
         toast.success('DDJJ registrada');
       }
       setDdjjModal({ open: false });
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
+    } catch (err) {
+      toast.error('Error', getApiErrorMessage(err, 'No se pudo guardar'));
     }
   };
 
@@ -284,8 +285,8 @@ const GeneradorDetallePage: React.FC = () => {
     try {
       await uploadDoc.mutateAsync({ generadorId: id!, file, tipo, anio });
       toast.success('Documento subido');
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo subir');
+    } catch (err) {
+      toast.error('Error', getApiErrorMessage(err, 'No se pudo subir'));
     }
   };
 

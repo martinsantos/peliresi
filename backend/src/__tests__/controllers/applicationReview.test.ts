@@ -142,5 +142,5 @@ it.each([null,[],{estado:'OTRO',sha256:null},{estado:'PENDIENTE',sha256:'broken'
 
 it('own application summaries expose document observations without internal paths or another user scope',async()=>{
  expect((await call(getMisSolicitudes,'GENERADOR',{},'owner')).error).toBeUndefined();
- expect(m.list).toHaveBeenCalledWith(expect.objectContaining({where:{usuarioId:'owner'},include:expect.objectContaining({documentos:{select:{id:true,tipo:true,nombre:true,estado:true,observaciones:true,createdAt:true}}})}));
+ expect(m.list).toHaveBeenCalledWith(expect.objectContaining({where:{usuarioId:'owner'},include:expect.objectContaining({documentos:{orderBy:[{createdAt:'asc'},{id:'asc'}],select:{id:true,tipo:true,nombre:true,estado:true,observaciones:true,createdAt:true}}})}));
 });

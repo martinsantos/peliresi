@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sourceRevision": "5729352c4ac483564321b4b0f481f797fe0ed226",
-  "warningCount": 1896,
+  "warningCount": 1870,
   "files": [
     {
       "path": "cloud-qa/actor-directory-http.ts",
@@ -4243,17 +4243,6 @@
       ]
     },
     {
-      "path": "src-v6/pages/actores/OperadorDetallePage.tsx",
-      "sourceSha256": "80ca6815ac5f6c2ab5e77b0c715c6c3cbbe7c66ec97ba32d330a22a668dc3e09",
-      "warnings": [
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "e785c54b811cdf209c41e5ff8b7da77b37b497e3d84b5f131d7c5253442c6aa6",
-          "count": 1
-        }
-      ]
-    },
-    {
       "path": "src-v6/pages/actores/OperadoresPage.tsx",
       "sourceSha256": "ad1cebd674e775acc81ea82c347006d4c9f6aa8a3535d119b1895fc2f054cf6e",
       "warnings": [
@@ -4280,32 +4269,6 @@
         {
           "ruleId": "react-hooks/static-components",
           "messageSha256": "6c83a5c94dc214deff4b6427e8c966668623363236d42f518e569d5b500bb253",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "path": "src-v6/pages/actores/TransportistaDetallePage.tsx",
-      "sourceSha256": "8b5250c1f3bb5da995d61b6fa7b098120dfcdfcd78cc5b7ff4ed2c06eedd3dc7",
-      "warnings": [
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "40b1ddf1ecf51e209ed745ccf32365e6e19fbc33334ba8bc12bbf50436aed62f",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "6c05f498976d38c7665650ee02016c4ac2e7100d876cb85bc811b847bfc43935",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/purity",
-          "messageSha256": "4597dc9899879d028bc883cd8839a65b939a6c0a5920a7c6ecac26a492790fdf",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/purity",
-          "messageSha256": "fe328aefd429b74e43fe2b21966b0df67d956ec63b9bd31264afac15c26b301e",
           "count": 1
         }
       ]
@@ -4525,17 +4488,6 @@
       ]
     },
     {
-      "path": "src-v6/pages/admin/GeneradorDetallePage.tsx",
-      "sourceSha256": "3dbbf1d2b39d687725f6fae0d2d4f98dde61968aa86cdb12abebd5d7f523d4d8",
-      "warnings": [
-        {
-          "ruleId": "@typescript-eslint/no-explicit-any",
-          "messageSha256": "8c56c082496e76ac6d1f2146a9f1bee93feaea007a3566d298f1f4f025a4eece",
-          "count": 9
-        }
-      ]
-    },
-    {
       "path": "src-v6/pages/admin/NuevoGeneradorPage.tsx",
       "sourceSha256": "22434a24c7d0bc74668a2b38c80f6aafc56d69d7dca691603c53d583d6bca723",
       "warnings": [
@@ -4644,27 +4596,6 @@
       ]
     },
     {
-      "path": "src-v6/pages/admin/SolicitudDetallePage.tsx",
-      "sourceSha256": "47e5c6be654e74b91712439636a140a4c78dc95c6180c28e4642c360232954aa",
-      "warnings": [
-        {
-          "ruleId": "@typescript-eslint/no-unused-vars",
-          "messageSha256": "a6ea191d3bba7004c977a70c3db68c909d6997c93082bb8943f57e3a458d1fc7",
-          "count": 1
-        },
-        {
-          "ruleId": "@typescript-eslint/no-unused-vars",
-          "messageSha256": "ab09036f3588e974b2dd2c4113fd64e29e7369c08f60ecb40e2780715661a10a",
-          "count": 1
-        },
-        {
-          "ruleId": "@typescript-eslint/no-unused-vars",
-          "messageSha256": "ff36861b90d6a85407ade6109e759907b05225b723b0fd1146d280ddea46040c",
-          "count": 1
-        }
-      ]
-    },
-    {
       "path": "src-v6/pages/alertas/AlertasPage.tsx",
       "sourceSha256": "91fea30ce8763bf161cb15ed4f41d0b7c3efe46733da55e34d86c4b1f0295ff0",
       "warnings": [
@@ -4709,17 +4640,6 @@
         {
           "ruleId": "@typescript-eslint/no-explicit-any",
           "messageSha256": "8c56c082496e76ac6d1f2146a9f1bee93feaea007a3566d298f1f4f025a4eece",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "path": "src-v6/pages/auth/VerificarEmailPage.tsx",
-      "sourceSha256": "75b8d39064f02126fece3c91dcd477984e1e791fec838efac40b3e39d2add8d0",
-      "warnings": [
-        {
-          "ruleId": "react-hooks/set-state-in-effect",
-          "messageSha256": "52e58f4225b3802af971a9a91dbd90b4caf5d61bf96b38291f214f5b1f01ef33",
           "count": 1
         }
       ]
@@ -5696,17 +5616,6 @@
           "ruleId": "react-hooks/exhaustive-deps",
           "messageSha256": "b546cb149e3fa3433e40cc29c083d4a6ac1578457eaccc6c8124795567941c1e",
           "count": 1
-        }
-      ]
-    },
-    {
-      "path": "src-v6/pages/usuarios/UsuariosPage.tsx",
-      "sourceSha256": "2589dfba6854e366aad5a21dfdd6146c40827f64c5219ffb5d2894b96513ffe9",
-      "warnings": [
-        {
-          "ruleId": "@typescript-eslint/no-explicit-any",
-          "messageSha256": "8c56c082496e76ac6d1f2146a9f1bee93feaea007a3566d298f1f4f025a4eece",
-          "count": 8
         }
       ]
     },
