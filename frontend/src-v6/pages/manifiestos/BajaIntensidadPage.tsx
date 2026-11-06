@@ -1,6 +1,6 @@
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, getAccessToken } from '../../services/api';
@@ -100,12 +100,14 @@ function EventualEditingNotice({ status, retry }: { status: InspectionDraftOwner
 }
 export default function BajaIntensidadPage() {
   const { currentUser } = useAuth();
-  const [params] = useSearchParams();
   const owner = currentUser ? eventualDraftScope(inspectionWorkspaceOwner(currentUser), currentUser.id, getAccessToken()) : '';
-  const shared = useRef({ owner, cleanupWarning:false, confirmedCreate:null as string | null });
-  if (shared.current.owner !== owner) shared.current = { owner, cleanupWarning:false, confirmedCreate:null };
   if (!owner) return <p role="status" className="p-4">Ingresá nuevamente para recuperar tu actividad y sus borradores.</p>;
-  return <BajaIntensidadWorkspace key={JSON.stringify([owner,params.get('registro')])} shared={shared.current} />;
+  return <EventualSession key={owner} />;
+}
+function EventualSession() {
+  const [params] = useSearchParams();
+  const [shared] = useState(() => ({ cleanupWarning: false, confirmedCreate: null as string | null }));
+  return <BajaIntensidadWorkspace key={params.get('registro') ?? 'lista'} shared={shared} />;
 }
 function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; confirmedCreate:string | null } }) {
   const { currentUser } = useAuth();
@@ -135,14 +137,14 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   const draft = useRecoverableForm(draftKey, emptyEventualDraft(), validEventualDraft,
     { retainExpired: retainEventualDraft, rejectUnreadable: true, canWrite: createOwnership.canWrite });
   createSync.current = draft.synchronize;
-  const readSubmission = () => { try { return { pending: readEventualSubmission(draftKey), error: false }; } catch { return { pending: null, error: true }; } };
+  const readSubmission = useCallback(() => { try { return { pending: readEventualSubmission(draftKey), error: false }; } catch { return { pending: null, error: true }; } }, [draftKey]);
   const [submission, setSubmission] = useState(readSubmission);
   useEffect(() => {
     const refresh = () => setSubmission(readSubmission());
     const receive = (event: StorageEvent) => { if (event.key === eventualSubmissionKey(draftKey)) refresh(); };
     window.addEventListener('storage', receive); window.addEventListener('focus', refresh);
     return () => { window.removeEventListener('storage', receive); window.removeEventListener('focus', refresh); };
-  }, [draftKey]);
+  }, [draftKey, readSubmission]);
   const [discardDraft, setDiscardDraft] = useState(false);
   const [discardAction, setDiscardAction] = useState(false);
   const actionKey = 'sitrep:eventual-action:v1:' + eventualDraftScope(owner, currentUser!.id, getAccessToken()) + ':' + (id || 'lista');
@@ -151,7 +153,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   const actionDraft = useRecoverableForm(actionKey, emptyEventualActionDraft(), validEventualActionDraft,
     { retainExpired: () => true, rejectUnreadable:true, canWrite: actionOwnership.canWrite });
   actionSync.current = actionDraft.synchronize;
-  const readAction = () => { try { return { pending:readEventualActionSubmission(actionKey), error:false }; } catch { return { pending:null, error:true }; } };
+  const readAction = useCallback(() => { try { return { pending:readEventualActionSubmission(actionKey), error:false }; } catch { return { pending:null, error:true }; } }, [actionKey]);
   const [actionSubmission, setActionSubmission] = useState(readAction);
   const [autoCheckFailed, setAutoCheckFailed] = useState(false);
   const [confirmedAction, setConfirmedAction] = useState<string | null>(null);
@@ -160,7 +162,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
     const receive = (event:StorageEvent) => { if (event.key === eventualActionSubmissionKey(actionKey)) refresh(); };
     window.addEventListener('storage',receive); window.addEventListener('focus',refresh);
     return () => { window.removeEventListener('storage',receive); window.removeEventListener('focus',refresh); };
-  },[actionKey]);
+  }, [actionKey, readAction]);
   const { nota, residuos:wastes, diferencia:difference } = actionDraft.value;
   const draftVersion = actionDraft.value.version ?? undefined;
   const setNota = (change:React.SetStateAction<string>) => actionDraft.update(v => ({ ...v, nota:typeof change === 'function' ? change(v.nota) : change }));
@@ -179,7 +181,7 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
   useEffect(() => {
     setRecovered(shared.cleanupWarning ? 'La operación se guardó. Conservamos las copias locales que no pudimos limpiar; revisalas antes de enviar otra operación.' : '');
     shared.cleanupWarning = false;
-  }, []);
+  }, [shared]);
   const finishAction = (sent:PendingEventualAction, recoveredFromHistory = false) => {
     setConfirmedAction(sent.id);
     const saved=actionDraft.update(current => {
@@ -320,17 +322,21 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
     } finally { lock.current = false; if (alive.current) setBusy(false); }
   }
   const entry = query.isError ? undefined : query.data?.registro;
+  const reconcileCommittedAction = useEffectEvent((sent: PendingEventualAction) => {
+    if (!alive.current || !actionOwnership.canWrite()) return;
+    try {
+      const stored = readEventualActionSubmission(actionKey);
+      if (stored ? stored.id === sent.id : actionDraft.value.pending?.id === sent.id) finishAction(sent, true);
+    } catch {
+      setActionSubmission(readAction());
+    }
+  });
   useEffect(() => {
     const sent=actionSubmission.pending || actionDraft.value.pending;
-    if (busy || autoCheckFailed || !entry || !sent || !entry.eventos.some(event => event.id === sent.id) || !navigator.locks?.request || !actionOwnership.canWrite()) return;
+    if (busy || autoCheckFailed || !entry || !sent || !entry.eventos.some(event => event.id === sent.id) || !navigator.locks?.request || actionOwnership.status !== 'owned') return;
     let cancelled=false;
     void navigator.locks.request('sitrep:eventual-submit:' + actionKey,{mode:'exclusive',ifAvailable:true},async grant => {
-      if (!grant || cancelled || !alive.current || !actionOwnership.canWrite()) return;
-      try {
-        const stored=readEventualActionSubmission(actionKey);
-        if ((!stored && actionDraft.value.pending?.id === sent.id) || stored?.id === sent.id) finishAction(sent,true);
-      }
-      catch { if (alive.current) setActionSubmission(readAction()); }
+      if (grant && !cancelled) reconcileCommittedAction(sent);
     }).catch(() => { if (alive.current) { setAutoCheckFailed(true); setError('No pudimos comprobar la acción en este navegador.'); } });
     return () => { cancelled=true; };
   },[entry,busy,autoCheckFailed,actionSubmission.pending,actionDraft.value.pending,actionKey,actionOwnership.status]);
@@ -465,11 +471,13 @@ function BajaIntensidadWorkspace({ shared }: { shared:{ cleanupWarning:boolean; 
         <Button type="button" variant="outline" disabled={actionOwnership.status !== 'owned'} onClick={() => { actionDraft.update(actionDraft.value); setActionSubmission(readAction()); }}>Reintentar guardado</Button>
       </div>}
       {pendingAction && <div role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900 space-y-2">
-        <p>{pendingAction.id === confirmedAction ? 'La acción ya fue confirmada. Revisá las copias locales antes de continuar.'
-          : 'La acción podría haberse registrado. Comprobá el mismo envío antes de continuar.'}</p>
-        {actionSubmission.pending && actionSubmission.pending.id !== actionDraft.value.pending?.id && <p className="break-words">Nota de la acción a comprobar: {actionSubmission.pending.body.nota}</p>}
-        <Button type="button" disabled={actionOwnership.status !== 'owned' || busy || actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)}
-          onClick={() => void send(endpoint + '/' + entry.id + '/eventos',{},false,true)}>Comprobar acción</Button>
+        {busy ? <p>Enviando la acción…</p> : <>
+          <p>{pendingAction.id === confirmedAction ? 'La acción ya fue confirmada. Revisá las copias locales antes de continuar.'
+            : 'La acción podría haberse registrado. Comprobá el mismo envío antes de continuar.'}</p>
+          {actionSubmission.pending && actionSubmission.pending.id !== actionDraft.value.pending?.id && <p className="break-words">Nota de la acción a comprobar: {actionSubmission.pending.body.nota}</p>}
+          <Button type="button" disabled={actionOwnership.status !== 'owned' || actionDraft.error || actionSubmission.error || (actionDraft.conflict && !actionSubmission.pending)}
+            onClick={() => void send(endpoint + '/' + entry.id + '/eventos',{},false,true)}>Comprobar acción</Button>
+        </>}
       </div>}
       {!pendingAction && (actionDraft.saved || actionDraft.restored) && (!!nota || difference) && <div role="status" className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">
         Borrador de acción guardado en este dispositivo; todavía no enviado.
