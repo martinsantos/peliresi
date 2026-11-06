@@ -1,8 +1,14 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+type FixtureDocument = { id: string; tipo: string; nombre: string; estado: string; size: number; sha256?: string | null };
+type FixtureApplication = {
+  id: string; estado: string; tipoActor: string; datosActor: string; documentos: FixtureDocument[];
+  usuario: { nombre: string; email: string }; createdAt: string; updatedAt: string;
+  datosResiduos?: string; datosRegulatorio?: string; observaciones?: string; motivoRechazo?: string;
+};
 const state = vi.hoisted(() => ({
-  owner: 'admin:one', role: 'ADMIN', detail: {} as any, messages: {} as any,
+  owner: 'admin:one', role: 'ADMIN', detail: {} as ReturnType<typeof query<FixtureApplication>>, messages: {} as ReturnType<typeof query<unknown[]>>,
   send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(), read: vi.fn(), tef: vi.fn(), scroll: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: state.owner, rol: state.role } }) }));
@@ -15,11 +21,11 @@ vi.mock('../../hooks/useSolicitudes', () => ({
 }));
 vi.mock('../../components/AdministrativeTEF', () => ({ AdministrativeTEF: (props: unknown) => { state.tef(props); return null; } }));
 vi.mock('../../components/registration/RegistrationFleetSummary', () => ({ RegistrationFleetSummary: () => null }));
-vi.mock('../../components/registration/RegistrationReviewEditor', () => ({ RegistrationReviewEditor: ({ onClose, onConfirmed, onSaved }: any) => <button onClick={async () => { onClose(); onConfirmed(); await onSaved().catch(() => {}); }}>Simular corrección confirmada</button> }));
+vi.mock('../../components/registration/RegistrationReviewEditor', () => ({ RegistrationReviewEditor: ({ onClose, onConfirmed, onSaved }: { onClose(): void; onConfirmed(): void; onSaved(): Promise<void> }) => <button onClick={async () => { onClose(); onConfirmed(); await onSaved().catch(() => {}); }}>Simular corrección confirmada</button> }));
 vi.mock('../../services/solicitud.service', () => ({ solicitudService: { analizarDocumento: state.read } }));
 vi.mock('../../components/PaymentIdentityReview', () => ({ PaymentIdentityReview: () => <input aria-label="Identidad del pago" defaultValue="" /> }));
 import SolicitudDetallePage from '../../pages/admin/SolicitudDetallePage';
-const query = (data: unknown) => ({ data, isPending: false, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) });
+const query = <T,>(data: T) => ({ data, isPending: false, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) });
 function tree(prefix = '', search = '') { return <MemoryRouter basename={prefix || '/'} initialEntries={[prefix + '/admin/solicitudes/s1' + search]}><Routes><Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} /></Routes></MemoryRouter>; }
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks();
@@ -86,7 +92,7 @@ it('rechecks declaration readability if it changes while approval is open',async
  const confirm=screen.getByRole('button',{name:'Confirmar aprobación',exact:true});
  expect(confirm).toBeDisabled(); fireEvent.click(confirm); expect(state.approve).not.toHaveBeenCalled();
 });
-it.each(['','/app'])('keeps the reading action and progress visible while the original is being analysed (%s)', async prefix => {
+it.each([['', false], ['/app', false], ['', true], ['/app', true]] as const)('keeps the reading action and progress visible (%s, feedback below viewport: %s)', async (prefix, belowViewport) => {
  state.detail.data.documentos=[{id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'qa'}];
  let finish!:()=>void; state.read.mockReturnValue(new Promise<void>(resolve=>{finish=resolve;}));
  render(tree(prefix));
@@ -95,11 +101,15 @@ it.each(['','/app'])('keeps the reading action and progress visible while the or
  expect(pending).toBeDisabled(); fireEvent.click(pending);
  expect(state.read).toHaveBeenCalledOnce(); expect(state.read).toHaveBeenCalledWith('s1','invoice');
  expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();
- await act(async()=>{finish();});
+ const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+   new DOMRect(0, belowViewport ? window.innerHeight + 20 : 20, 300, 44)
+ );
+ try { await act(async()=>{finish();}); } finally { bounds.mockRestore(); }
  expect(screen.getByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.')).toBeVisible();
  const feedback = within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.');
  expect(feedback).toHaveAttribute('role', 'status');
- expect(state.scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
+ if (belowViewport) expect(state.scroll).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
+ else expect(state.scroll).not.toHaveBeenCalled();
  expect(feedback).toHaveTextContent('No se pudo completar la lectura automática');
  expect(feedback).toHaveFocus();
  expect(screen.getAllByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.')).toHaveLength(1);
