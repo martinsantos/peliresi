@@ -1,3 +1,4 @@
+import { eventualOrigins } from './inspectionEventualOrigin';
 import { z } from 'zod';
 import { hashCanonicalPayload } from '../services/inspectionDocumentIntegrity.service';
 
@@ -11,7 +12,9 @@ export function inspectionSignatureSnapshot(i: any): any {
     storageKey: e.storageKey,
   })).sort((a: any, b: any) => a.id.localeCompare(b.id));
   const subject = (a: any) => a ? { id: a.id, razonSocial: a.razonSocial, cuit: a.cuit, domicilio: a.domicilio, telefono: a.telefono, email: a.email } : null;
+  const origins = eventualOrigins(i);
   return JSON.parse(JSON.stringify({
+    ...(origins.length ? { origenesEventuales: origins } : {}),
     id: i.id, numero: i.numero, numeroActa: i.numeroActa, tipoActor: i.tipoActor,
     inspectorId: i.inspectorId, inspector: { id: i.inspector?.id, nombre: i.inspector?.nombre, apellido: i.inspector?.apellido },
     generadorId: i.generadorId, transportistaId: i.transportistaId, operadorId: i.operadorId,

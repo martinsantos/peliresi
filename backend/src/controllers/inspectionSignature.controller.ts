@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import type { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
-import { canAccessInspection, inspectionInclude } from './inspeccion.controller';
+import { canAccessInspection, inspectionActInclude } from './inspeccion.controller';
 import { inspectionSignatureHash, inspectionSignatureSnapshot, inspectionCurrentSignatures, signatureFieldErrors } from '../domain/inspectionSignature';
 import { prepareManifiestoSignature } from '../domain/manifiestoSignature';
 import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.service';
@@ -18,10 +18,33 @@ const signatureSchema = z.object({
   imagen: z.string().max(175000), lecturaConfirmada: z.literal(true),
 }).strict();
 async function readInspection(req: AuthRequest) {
-  const i = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
+  const i = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionActInclude });
   if (!i) throw new AppError('Inspección no encontrada', 404);
   if (!canAccessInspection(req.user, i)) throw new AppError('No autorizado para preparar o capturar esta acta', 403);
   return i;
+}
+export async function readInspectionEventual(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const inspection = await prisma.inspeccion.findUnique({
+      where: { id: req.params.id },
+      select: { numero: true, inspectorId: true, tipoActor: true, antecedentes: {
+        where: { origen: 'PARTICIPANTE_EVENTUAL', origenId: req.params.eventualId },
+        select: { referencia: true, tipoActor: true, actorNombre: true },
+        orderBy: { claveOrigen: 'asc' },
+      } },
+    });
+    if (!inspection || !canAccessInspection(req.user, inspection) || !inspection.antecedentes.length) {
+      throw new AppError('Eventual no disponible para esta inspección', 404);
+    }
+    const eventual = await prisma.registroManifiestoExcepcional.findUnique({
+      where: { id: req.params.eventualId }, select: { etapa: true },
+    });
+    if (!eventual) throw new AppError('Eventual de origen no encontrado', 404);
+    res.json({ success: true, data: {
+      numero: inspection.numero, referencia: inspection.antecedentes[0].referencia,
+      etapa: eventual.etapa, partes: inspection.antecedentes.map(({ tipoActor, actorNombre }) => ({ tipoActor, actorNombre })),
+    } });
+  } catch (e) { next(e); }
 }
 export async function previewInspectionSignature(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -43,7 +66,7 @@ export async function signInspectionAct(req: AuthRequest, res: Response, next: N
       }
       const reserved = await tx.inspeccion.updateMany({ where: { id: initial.id, version: input.version, estado: { in: ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'] } }, data: { version: { increment: 1 }, ...(input.tipo === 'INSPECCIONADO' ? { datosActa: { ...((initial.datosActa || {}) as Record<string, unknown>), firmaIntervinienteEstado: 'FIRMADA', firmaIntervinienteDetalle: `Firma manuscrita registrada de ${input.nombre}; lectura y recepción, sin conformidad con los hallazgos.` } as Prisma.InputJsonValue } : {}) } });
       if (reserved.count !== 1) throw new AppError('El acta cambió. Revisá la versión actual antes de volver a firmar.', 409);
-      const current = await tx.inspeccion.findUniqueOrThrow({ where: { id: initial.id }, include: inspectionInclude });
+      const current = await tx.inspeccion.findUniqueOrThrow({ where: { id: initial.id }, include: inspectionActInclude });
       if (!canAccessInspection(req.user, current)) throw new AppError('La asignación del expediente cambió.', 403);
       if (inspectionSignatureHash(current) !== input.contenidoSha256) throw new AppError('Cambió el contenido presentado para la firma. Volvé a revisarlo.', 409);
       const pending = signatureFieldErrors(current); if (pending.length) throw new AppError(pending.join(' '), 400);
@@ -57,7 +80,7 @@ export async function signInspectionAct(req: AuthRequest, res: Response, next: N
 }
 export async function downloadSignedInspectionAct(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const i = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
+    const i = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionActInclude });
     if (!i) throw new AppError('Inspección no encontrada', 404);
     const party = exchangePartyForUser(req.user, i);
     if (!canAccessInspection(req.user, i) && party !== 'INSPECCIONADO') throw new AppError('No autorizado para esta copia', 403);

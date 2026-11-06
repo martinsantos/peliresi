@@ -1,7 +1,7 @@
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 const m=vi.hoisted(()=>({read:vi.fn(),access:vi.fn(),previous:vi.fn(),reserve:vi.fn(),current:vi.fn(),create:vi.fn(),prepare:vi.fn(),tx:vi.fn()}));
 vi.mock('../../lib/prisma',()=>({default:{inspeccion:{findUnique:m.read},$transaction:m.tx}}));
-vi.mock('../../controllers/inspeccion.controller',()=>({canAccessInspection:m.access,inspectionInclude:{}}));
+vi.mock('../../controllers/inspeccion.controller',()=>({canAccessInspection:m.access,inspectionActInclude:{}}));
 vi.mock('../../domain/manifiestoSignature',()=>({prepareManifiestoSignature:m.prepare}));
 vi.mock('../../services/inspectionFieldActPdf.service',()=>({streamInspectionActPdf:vi.fn()}));
 vi.mock('../../services/inspectionEvidence.service',()=>({resolveInspectionEvidence:vi.fn()}));

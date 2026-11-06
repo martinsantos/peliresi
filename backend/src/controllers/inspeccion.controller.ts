@@ -1,4 +1,5 @@
 import { validateInspectionMap } from '../services/inspectionMap.service';
+import { inspectionEventualOrigins } from '../domain/inspectionEventualOrigin';
 import { inspectionCurrentSignatures } from '../domain/inspectionSignature';
 import { createInspectionAgendaNotices, recordInspectionScheduleChange, INSPECTION_AGENDA_LABELS, type InspectionAgendaEvent } from '../services/inspectionAgendaNotice.service';
 import fs from 'fs';
@@ -1187,10 +1188,12 @@ export async function anularEvidencia(req: AuthRequest, res: Response, next: Nex
   } catch (error) { next(error); }
 }
 
+export const inspectionActInclude = { ...inspectionInclude, antecedentes: inspectionEventualOrigins };
+
 export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     assertInspectionStaff(req);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionActInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanAccess(req, inspection);
     await streamInspectionActPdf(res, { ...inspection, firmasCapturadas: inspectionCurrentSignatures(inspection) }, resolveInspectionEvidence);
