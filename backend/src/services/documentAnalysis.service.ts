@@ -20,7 +20,8 @@ export type ReceiptAnalysis = {
   texto: string;
   alcance: string;
   aviso: string | null;
-  documentKind?: 'LICENCIA' | 'FACTURA_ELECTRICA';
+  documentKind?: 'LICENCIA' | 'FACTURA_ELECTRICA' | 'ARCA';
+  arca?: { cuit: string | null; razonSocial: string | null };
   electricidad?: ElectricityReading;
   pago?: { propuesta?: PaymentProposal; revision: 'PENDIENTE' | 'CONFIRMADO'; coincidencia: boolean;
     registroId?: string; identidad?: PaymentIdentity; sha256?: string };
@@ -43,7 +44,7 @@ export function mergeReceiptRead(previous: unknown, next: ReceiptAnalysis): Rece
 /* Re-read the same original while preserving earlier evidence and conflicts.
  * The caller verifies the hash inside its transaction. Payment logic is separate.
  */
-export function mergeElectricityRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis {
+export function mergeOriginalRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis {
   const candidate = previous && typeof previous === 'object' && !Array.isArray(previous)
     ? previous as Partial<ReceiptAnalysis> : undefined;
   const old = candidate?.version === 1 && candidate.lectura === 'LEIDO'
@@ -66,6 +67,12 @@ export function mergeElectricityRead(previous: unknown, next: ReceiptAnalysis): 
           alcance: old.texto === next.texto ? next.alcance : 'Lecturas conservadas del mismo original. Los valores contradictorios requieren revisión.' };
     }
   }
+  if (candidate?.pago?.revision === 'CONFIRMADO') return { ...reading, pago: candidate.pago };
+  return reading;
+}
+
+export function mergeElectricityRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis {
+  const reading = mergeOriginalRead(previous, next);
   return { ...reading, documentKind: 'FACTURA_ELECTRICA', electricidad: electricityReading(reading.texto) };
 }
 

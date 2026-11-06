@@ -30,7 +30,7 @@ describe('registered mailbox is the recovery authorization boundary', () => {
   it('does not replace credentials from public identity data, even with a legacy proposed email/password', async () => {
     const c = context(claim); await claimAccount(c.req, c.res, c.next);
     expect(c.next).not.toHaveBeenCalled();
-    const data = mocks.update.mock.calls[0][0].data;
+    const data = mocks.updateMany.mock.calls[0][0].data;
     expect(Object.keys(data).sort()).toEqual(['passwordResetExpires', 'passwordResetToken']);
     expect(mocks.hash).not.toHaveBeenCalled(); expect(mocks.verifyEmail).not.toHaveBeenCalled();
     expect(mocks.resetEmail).toHaveBeenCalledWith(user.email, user.nombre, expect.any(String));
@@ -54,13 +54,13 @@ describe('registered mailbox is the recovery authorization boundary', () => {
     const error = new Error('queue unavailable'); mocks.resetEmail.mockRejectedValue(error);
     const c = context(claim); await claimAccount(c.req, c.res, c.next);
     expect(c.next).toHaveBeenCalledWith(error);
-    expect(Object.keys(mocks.update.mock.calls[0][0].data).sort()).toEqual(['passwordResetExpires', 'passwordResetToken']);
+    expect(Object.keys(mocks.updateMany.mock.calls[0][0].data).sort()).toEqual(['passwordResetExpires', 'passwordResetToken']);
   });
   it.each([false, true])('preserves activation/verification flags and never issues a session, active=%s', async active => {
     mocks.findFirst.mockResolvedValue({ ...user, activo: active, emailVerified: active });
     const c = context(claim); await claimAccount(c.req, c.res, c.next);
-    expect(mocks.update.mock.calls[0][0].data).not.toHaveProperty('activo');
-    expect(mocks.update.mock.calls[0][0].data).not.toHaveProperty('emailVerified');
+    expect(mocks.updateMany.mock.calls[0][0].data).not.toHaveProperty('activo');
+    expect(mocks.updateMany.mock.calls[0][0].data).not.toHaveProperty('emailVerified');
     expect(c.json.mock.calls[0][0]).not.toHaveProperty('data');
   });
   it('returns identical public answers for mismatched and matched records without disclosing the stored mailbox', async () => {

@@ -1,10 +1,11 @@
+import { RegistrationOcrFields, registrationOcrFields, type ReadingKind } from './RegistrationOcrFields';
 import { AlertTriangle, ChevronDown, FileSearch, RefreshCw } from 'lucide-react';
 import type { ReceiptAnalysis } from '../types/documentAnalysis';
 import { electricityReadingNeedsReview } from '../utils/documentReadingOutcome';
 import { ElectricityEvidence } from './ElectricityEvidence';
 
 /** Reading a receipt is not confirming its amount, issuer, or payment. */
-export function DocumentAnalysis({ analysis, onRetry, retrying = false, kind: requestedKind = 'receipt', persisted = true }: { analysis?: ReceiptAnalysis | null; onRetry?: () => void; retrying?: boolean; kind?: 'receipt' | 'license' | 'document' | 'electricity'; persisted?: boolean }) {
+export function DocumentAnalysis({ analysis, onRetry, retrying = false, kind: requestedKind = 'receipt', persisted = true }: { analysis?: ReceiptAnalysis | null; onRetry?: () => void; retrying?: boolean; kind?: ReadingKind; persisted?: boolean }) {
   if (!analysis || analysis.version !== 1) {
     if (!onRetry || requestedKind === 'document') return null;
     return <div className="mt-3 space-y-2 text-sm leading-6">
@@ -12,9 +13,13 @@ export function DocumentAnalysis({ analysis, onRetry, retrying = false, kind: re
       <button type="button" disabled={retrying} onClick={onRetry} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 font-semibold text-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-60"><RefreshCw size={16} aria-hidden="true" className={retrying ? 'animate-spin motion-reduce:animate-none' : undefined} />{retrying ? 'Leyendo documento…' : 'Leer documento'}</button>
     </div>;
   }
-  const kind = analysis.documentKind === 'FACTURA_ELECTRICA' ? 'electricity' : requestedKind;
-  const retryAvailable = analysis.lectura !== 'LEIDO' || kind === 'electricity' && electricityReadingNeedsReview(analysis);
+  const kind = analysis.documentKind === 'FACTURA_ELECTRICA' ? 'electricity' : analysis.documentKind === 'ARCA' ? 'arca' : requestedKind;
+  const fields = registrationOcrFields(kind, analysis);
+  const missing = fields.filter(([, value]) => !value).map(([label]) => label);
+  const retryAvailable = missing.length > 0 || analysis.lectura !== 'LEIDO' || kind === 'electricity' && electricityReadingNeedsReview(analysis);
   return <div className="mt-3 space-y-2 text-sm leading-6">
+    {(kind === 'receipt' || kind === 'arca') && <RegistrationOcrFields kind={kind} fields={fields} />}
+    {missing.length > 0 && <p role="status" className="text-sm font-medium text-amber-900">Falta leer: {missing.join(', ')}.</p>}
     {retryAvailable && onRetry && <button type="button" disabled={retrying} onClick={onRetry} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-primary-900 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-60">
       <RefreshCw size={16} aria-hidden="true" className={retrying ? 'animate-spin motion-reduce:animate-none' : undefined} />{retrying ? `Leyendo ${kind === 'receipt' ? 'recibo' : kind === 'license' ? 'licencia' : 'documento'}…` : 'Reintentar lectura'}
     </button>}

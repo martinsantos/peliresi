@@ -30,7 +30,7 @@ describe('reading the original in an application', () => {
     expect(row.querySelector('[aria-label="obligatorio"]')).toBeInTheDocument();
     expect(row).toHaveTextContent('Adjuntá la factura');
   });
-  it.each(['COMPROBANTE_PAGO','FACTURA_ELECTRICA','LICENCIA_CHOFER_QA'])('reads supported saved %s without replacing it', tipo => {
+  it.each(['COMPROBANTE_PAGO','FACTURA_ELECTRICA','LICENCIA_CHOFER_QA','CONSTANCIA_AFIP'])('reads supported saved %s without replacing it', tipo => {
     const data=props(tipo); render(<StepDocumentos {...data} />);
     fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));
     expect(data.onRetryReading).toHaveBeenCalledWith(tipo);
@@ -44,7 +44,7 @@ describe('reading the original in an application', () => {
     expect(screen.queryByText(/El original sigue guardado/)).toBeNull();
   });
   it('does not offer an unsupported document to the reading endpoint', () => {
-    render(<StepDocumentos {...props('CONSTANCIA_AFIP')} />);
+    render(<StepDocumentos {...props('MEMORIA_TECNICA')} />);
     expect(screen.queryByRole('button',{name:'Leer documento',exact:true})).toBeNull();
   });
   it('keeps trial selection explicit instead of claiming the file is stored', () => {

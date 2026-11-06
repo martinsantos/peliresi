@@ -297,7 +297,7 @@ const UsuariosPage: React.FC = () => {
       {
         onSuccess: () => {
           setModalEditar(false);
-          toast.success('Usuario actualizado', 'Los datos se guardaron correctamente');
+          toast.success('Usuario actualizado', editEmail.trim().toLowerCase() !== usuarioSeleccionado.email.toLowerCase() ? 'El cambio de correo queda pendiente de confirmación en la nueva dirección.' : 'Los datos se guardaron correctamente');
         },
         onError: (err: any) => {
           setEditError(getApiErrorMessage(err, 'No se pudo actualizar el usuario. Conservamos los datos para que puedas volver a intentar.'));

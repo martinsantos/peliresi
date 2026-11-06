@@ -1,3 +1,4 @@
+import { ActorActivityControl } from '../../components/ActorActivityControl';
 import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 import { formatActorCalendarDate, formatActorEventDate } from '../../utils/actorCalendarDate';
@@ -361,6 +362,7 @@ const GeneradorDetallePage: React.FC = () => {
       </section>}
 
       {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
+      {canEdit && id && typeof apiGenerador?.activo === 'boolean' && <ActorActivityControl registry="generadores" id={id} active={apiGenerador.activo} />}
       <div hidden={detailTabs.activeTab === 'fiscal'}><ActorCertificates type="GENERADOR" actorId={id || ''} /></div>
 
       {/* 5 Tabs */}

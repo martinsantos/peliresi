@@ -1,3 +1,4 @@
+import { requestMailboxProof } from '../services/mailboxProof.service';
 import { Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -259,9 +260,17 @@ export const updateUsuario = async (req: AuthRequest, res: Response, next: NextF
     const usuario = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${id} FOR UPDATE`;
     const before = await tx.usuario.findUniqueOrThrow({ where: { id } });
+    const { email, ...changes } = parsed.data;
+    const destination = email?.trim().toLowerCase();
+    const changing = destination && destination !== before.email.toLowerCase();
+    if (changing) {
+      const used = await tx.usuario.findFirst({ where: { email: { equals: destination, mode: 'insensitive' }, id: { not: id } }, select: { id: true } });
+      if (used) throw new AppError('Ese correo ya pertenece a otra cuenta.', 409);
+      await requestMailboxProof(tx, before, destination, 'change');
+    }
     const updated = await tx.usuario.update({
       where: { id },
-      data: { ...parsed.data, ...(parsed.data.activo !== undefined ? { motivoInactividad: parsed.data.activo ? null : 'SUSPENDIDA' } : {}) },
+      data: { ...changes, ...(changing ? { emailVerified: before.emailVerified } : {}), ...(parsed.data.activo !== undefined ? { motivoInactividad: parsed.data.activo ? null : 'SUSPENDIDA' } : {}) },
       select: {
         id: true,
         email: true,

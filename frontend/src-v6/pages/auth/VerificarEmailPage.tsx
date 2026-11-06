@@ -13,12 +13,18 @@ const VerificarEmailPage: React.FC = () => {
   const [verified, setVerified] = useState<{ verifiedUserId?: string; nextPath?: string }>({});
   const request = useRef<{ token: string; promise: ReturnType<typeof authService.verifyEmail> } | null>(null);
   const token = params.get('token');
+  const [confirmed, setConfirmed] = useState('');
+  const [email, setEmail] = useState('');
+  const [resending, setResending] = useState(false);
+  const [result, setResult] = useState('');
+  const requiresClick = Boolean(token?.startsWith('m.') && confirmed !== token);
   const owner = registrationSessionOwner(getAccessToken());
   const differentAccount = Boolean(owner && verified.verifiedUserId && owner !== verified.verifiedUserId);
   const nextPath = safeLocalRedirect(verified.nextPath, '/mi-solicitud');
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setMessage('Token inválido o faltante.'); return; }
+    if (requiresClick) return;
+    if (!token) { setStatus('error'); setMessage('Ingresá el correo de tu inscripción para solicitar un enlace.'); return; }
     let cancelled = false;
     setStatus('loading');
     // React StrictMode must not consume a one-time token twice.
@@ -27,7 +33,9 @@ const VerificarEmailPage: React.FC = () => {
       .then(r => { if (!cancelled) { setStatus('ok'); setMessage(r.message); setVerified(r); } })
       .catch(err => { if (!cancelled) { setStatus('error'); setMessage(err?.response?.data?.message || 'No pudimos verificar el enlace. Revisá la conexión o si ya fue utilizado.'); } });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, requiresClick]);
+
+  if (requiresClick) return <section className="w-full max-w-sm text-center"><h1 className="text-xl font-bold">Confirmar mi correo</h1><p className="my-4">Confirmá que querés usar esta dirección para tu cuenta de SITREP.</p><button type="button" className="rounded-lg bg-[#1B5E3C] px-6 py-3 text-white" onClick={() => setConfirmed(token!)}>Confirmar correo</button></section>;
 
   return (
     <div className="w-full max-w-sm text-center animate-fade-in-up">
@@ -57,8 +65,21 @@ const VerificarEmailPage: React.FC = () => {
           <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <XCircle size={32} className="text-red-500" />
           </div>
-          <h1 className="text-xl font-bold text-neutral-900 mb-2">Error de verificación</h1>
-          <p className="text-neutral-600 mb-6">{message} Tu borrador no fue eliminado.</p>
+          <h1 className="text-xl font-bold text-neutral-900 mb-2">{token ? 'Enlace de verificación' : 'Verificar mi correo'}</h1>
+          <p className="text-neutral-600 mb-6">{message} {token && 'Tu borrador se conserva.'}</p>
+          {token?.startsWith('m.') && <p className="mb-4">Si estabas cambiando el correo de una cuenta ya verificada, pedí a Administración que renueve el enlace de cambio.</p>}
+          <form className="mb-6 space-y-3" onSubmit={async event => {
+            event.preventDefault();
+            if (resending) return;
+            setResending(true);
+            try { setResult(await authService.resendVerification(email.trim())); }
+            catch { setResult('No pudimos procesar el pedido. Intentá de nuevo en un minuto.'); }
+            finally { setResending(false); }
+          }}>
+            <label className="block text-left">Correo de la inscripción<input required type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="block w-full rounded border p-3" /></label>
+            <button disabled={resending} className="min-h-11 underline">Solicitar otro enlace de inscripción</button>
+            <p role="status">{result}</p>
+          </form>
           <Link to="/login" state={{ from: '/mi-solicitud' }} className="inline-flex items-center gap-2 bg-[#1B5E3C] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#164D32] transition-colors">
             Ingresar a mi cuenta
           </Link>

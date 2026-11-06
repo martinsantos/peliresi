@@ -15,7 +15,7 @@ describe('solicitudRequirements', () => {
       'COMPROBANTE_PAGO',
     ]);
     first[0].nombre = 'mutated';
-    expect(getSolicitudRequirements('GENERADOR')[0].nombre).toBe('Constancia AFIP');
+    expect(getSolicitudRequirements('GENERADOR')[0].nombre).toBe('Constancia de inscripción ARCA (AFIP)');
     expect(SOLICITUD_DOCUMENT_MAX_BYTES).toBe(10 * 1024 * 1024);
   });
 

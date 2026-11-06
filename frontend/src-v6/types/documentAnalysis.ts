@@ -6,7 +6,8 @@ export interface ReceiptAnalysis {
   texto: string;
   alcance: string;
   aviso: string | null;
-  documentKind?: 'LICENCIA' | 'FACTURA_ELECTRICA';
+  documentKind?: 'LICENCIA' | 'FACTURA_ELECTRICA' | 'ARCA';
+  arca?: { cuit: string | null; razonSocial: string | null };
   electricidad?: ElectricityReading;
   pago?: { propuesta?: { campos: Partial<PaymentIdentity>; conflictos: string[] }; revision: 'PENDIENTE' | 'CONFIRMADO'; coincidencia: boolean;
     registroId?: string; identidad?: PaymentIdentity; sha256?: string };

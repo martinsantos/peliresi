@@ -17,8 +17,10 @@ import { generateTokens } from './auth.controller';
 import { registrationActorFields } from '../domain/registrationActorData';
 import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
 import { licenseFields } from '../domain/licenseReading';
-import { describeDocument, readReceipt, mergeReceiptRead, mergeElectricityRead, mergeLicenseRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { describeDocument, readReceipt, mergeOriginalRead, mergeReceiptRead, mergeElectricityRead, mergeLicenseRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 import { electricityReading } from '../domain/electricityReading';
+import { paymentProposal } from '../domain/paymentIdentity';
+import { arcaReading } from '../domain/arcaReading';
 import { applySolicitudPayments, confirmPayment, notePaymentDecision, paymentAnalysis, requirePaymentIdentity, retainPaymentAllocation, solicitudPaymentScope } from '../services/paymentIdentity.service';
 import {
   getMissingRequiredDocumentTypes,
@@ -235,7 +237,7 @@ export const getMisSolicitudes = async (req: AuthRequest, res: Response, next: N
       where: { usuarioId: req.user!.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        documentos: { select: { id: true, tipo: true, nombre: true, estado: true, observaciones: true, createdAt: true } },
+        documentos: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], select: { id: true, tipo: true, nombre: true, estado: true, observaciones: true, createdAt: true } },
         _count: { select: { mensajes: true } },
       },
     });
@@ -257,7 +259,7 @@ export const getSolicitud = async (req: AuthRequest, res: Response, next: NextFu
       where: { id },
       include: {
         usuario: { select: { id: true, email: true, nombre: true, cuit: true } },
-        documentos: true,
+        documentos: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
         mensajes: {
           orderBy: { createdAt: 'asc' },
         },
@@ -472,9 +474,9 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
     const description = describeDocument(req.file);
     const input = { path: req.file.path, mimeType: description.mimeType };
     const electric = tipo === 'FACTURA_ELECTRICA';
-    const reading = license ? await readReceipt(input, 'LICENCIA') : electric ? await readReceipt(input, 'FACTURA_ELECTRICA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
+    const reading = license ? await readReceipt(input, 'LICENCIA') : electric ? await readReceipt(input, 'FACTURA_ELECTRICA') : ['COMPROBANTE_PAGO', 'CONSTANCIA_AFIP'].includes(tipo) ? await readReceipt(input) : undefined;
     let analysis = reading && license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
-      : reading && electric ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading;
+      : reading && electric ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading && tipo === 'CONSTANCIA_AFIP' ? { ...reading, documentKind: 'ARCA' as const, arca: arcaReading(reading.texto) } : reading;
     let previous: Array<{ id: string; path: string; sha256: string | null; tipo: string; estado: string; analisis: unknown }> = [];
     const documento = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
@@ -542,7 +544,7 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
     if (!original || original.solicitudId !== id) throw new AppError('Documento no encontrado', 404);
     const license = isLicenseDocument(original.tipo) && solicitud.tipoActor === 'TRANSPORTISTA';
     const electric = original.tipo === 'FACTURA_ELECTRICA';
-    if (original.tipo !== 'COMPROBANTE_PAGO' && !license && !electric) throw new AppError('La lectura automática corresponde a comprobantes, facturas eléctricas o licencias de chofer', 400);
+    if (!['COMPROBANTE_PAGO', 'CONSTANCIA_AFIP'].includes(original.tipo) && !license && !electric) throw new AppError('La lectura automática corresponde a comprobantes, facturas eléctricas o licencias de chofer', 400);
     if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
     const description = describeDocument({ path: original.path, mimetype: original.mimeType });
     if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
@@ -557,8 +559,13 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
       if (original.tipo === 'COMPROBANTE_PAGO') reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
       let analisis = license ? mergeLicenseRead(current.analisis, reading)
         : electric ? mergeElectricityRead(current.analisis, reading)
-        : mergeReceiptRead(current.analisis, reading);
-      if (original.tipo === 'COMPROBANTE_PAGO' && analisis.pago?.revision !== 'CONFIRMADO') analisis = await paymentAnalysis(tx, analisis, solicitudPaymentScope(id));
+        : mergeOriginalRead(current.analisis, reading);
+      if (original.tipo === 'CONSTANCIA_AFIP') analisis = { ...analisis, documentKind: 'ARCA', arca: arcaReading(analisis.texto) };
+      if (original.tipo === 'COMPROBANTE_PAGO') {
+        analisis = analisis.pago?.revision === 'CONFIRMADO'
+          ? { ...analisis, pago: { ...analisis.pago, propuesta: paymentProposal(analisis.texto) } }
+          : await paymentAnalysis(tx, analisis, solicitudPaymentScope(id));
+      }
       const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
       if (original.tipo === 'COMPROBANTE_PAGO') await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
       if (analisis.duplicado && !(current.analisis as { duplicado?: boolean } | null)?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: docId });
@@ -1145,9 +1152,11 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
     const updated = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const application = await tx.solicitudInscripcion.findUnique({ where: { id } });
-      if (!application || !['EN_REVISION', 'OBSERVADA'].includes(application.estado)) throw new AppError('La solicitud cambió o ya está resuelta. Actualizá antes de revisar documentos.', 409);
+      const laterPayment = application?.estado === 'APROBADA' && documento.tipo === 'COMPROBANTE_PAGO' && documento.estado === 'PENDIENTE';
+      if (!application || (!laterPayment && !['EN_REVISION', 'OBSERVADA'].includes(application.estado))) throw new AppError('La solicitud cambió o ya está resuelta. Actualizá antes de revisar documentos.', 409);
       const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!current || current.solicitudId !== id) throw new AppError('El documento cambió durante la revisión.', 409);
+      if (laterPayment && current.estado !== 'PENDIENTE') throw new AppError('El pago ya fue revisado.', 409);
       if (expectedDocument && (current.estado !== expectedDocument.estado || (current.sha256 || null) !== expectedDocument.sha256)) {
         throw new AppError('El documento cambió durante la revisión. Actualizá y revisá el original antes de decidir.', 409);
       }
@@ -1157,7 +1166,12 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
         if (estado === 'APROBADO') await requirePaymentIdentity(tx, target, current.analisis);
         await notePaymentDecision(tx, target, current.analisis, estado, req.user!.id);
       }
-      return tx.documentoSolicitud.update({ where: { id: docId }, data: { estado, observaciones: observaciones === undefined ? undefined : observaciones.trim(), revisadoPor: req.user!.id, revisadoAt: new Date() } });
+      const reviewed = await tx.documentoSolicitud.update({ where: { id: docId }, data: { estado, observaciones: observaciones === undefined ? undefined : observaciones.trim(), revisadoPor: req.user!.id, revisadoAt: new Date() } });
+      if (laterPayment && estado === 'APROBADO') {
+        const owner = await tx.usuario.findUniqueOrThrow({ where: { id: solicitud.usuarioId }, select: { cuit: true } });
+        await applySolicitudPayments(tx, id, owner.cuit || '', req.user!.id);
+      }
+      return reviewed;
     });
 
     res.json({ success: true, data: { documento: updated } });
@@ -1178,11 +1192,11 @@ export const confirmarIdentidadPago = async (req: AuthRequest, res: Response, ne
       const current = await tx.solicitudInscripcion.findUniqueOrThrow({ where: { id } });
       const doc = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!doc || doc.solicitudId !== id || doc.tipo !== 'COMPROBANTE_PAGO' || !doc.sha256) throw new AppError('Comprobante no encontrado o sin huella. Reintentá la lectura del original.', 409);
-      if (!['EN_REVISION', 'OBSERVADA'].includes(current.estado) && doc.estado !== 'APROBADO') throw new AppError('El pago se identifica durante la revisión del alta. La conciliación histórica sólo identifica documentos ya aprobados; no cambia su decisión.', 409);
+      if (!['EN_REVISION', 'OBSERVADA'].includes(current.estado) && !(current.estado === 'APROBADA' && doc.estado === 'PENDIENTE') && doc.estado !== 'APROBADO') throw new AppError('El pago se identifica durante la revisión del alta. La conciliación histórica sólo identifica documentos ya aprobados; no cambia su decisión.', 409);
       if (req.body.expectedSha256 !== doc.sha256) throw new AppError('El documento cambió. Volvé a cargarlo antes de confirmar.', 409);
-      const pago = await confirmPayment(tx, { origen: 'SOLICITUD', documentoId: docId, ambito: solicitudPaymentScope(id), cuit: solicitud.usuario.cuit || '', sha256: doc.sha256, historico: doc.estado === 'APROBADO', aplicado: current.estado === 'APROBADA' }, req.body, req.user!.id);
+      const pago = await confirmPayment(tx, { origen: 'SOLICITUD', documentoId: docId, ambito: solicitudPaymentScope(id), cuit: solicitud.usuario.cuit || '', sha256: doc.sha256, historico: doc.estado === 'APROBADO', aplicado: current.estado === 'APROBADA' && doc.estado === 'APROBADO' }, req.body, req.user!.id);
       const analysis = doc.analisis && typeof doc.analisis === 'object' && !Array.isArray(doc.analisis) ? doc.analisis : {};
-      return tx.documentoSolicitud.update({ where: { id: docId }, data: { analisis: { ...analysis, pago } } });
+      return tx.documentoSolicitud.update({ where: { id: docId }, data: { analisis: { ...analysis, pago: { ...pago, propuesta: paymentProposal(typeof analysis.texto === 'string' ? analysis.texto : '') } } } });
     }, { timeout: 15_000 });
     res.json({ success: true, data: { documento } });
   } catch (error) { next(error); }

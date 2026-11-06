@@ -48,6 +48,8 @@ export function paymentProposal(text: string): PaymentProposal {
     ['cuit', /\bCUIT(?:\s+DEL\s+(?:OBLIGADO|CONTRIBUYENTE))?\s*[:#-]?\s*(\d{2}[ -]?\d{8}[ -]?\d)\b/g, value => value.replace(/\D/g, '')],
     ['codigoTasa', /\bCODIGO\s*(?:DE\s*)?TASA\s*[:#-]?\s*([A-Z0-9][A-Z0-9._/-]{0,29})/g, paymentIdentifier],
     ['fechaPago', /\bFECHA\s*(?:DE\s*)?PAGO\s*[:#-]?\s*(\d{4}-\d{2}-\d{2}|\d{2}[/-]\d{2}[/-]\d{4})\b/g, isoDate],
+    ['periodo', /\bPERIODO(?:[ \t]+FISCAL)?[ \t]*:[ \t]*([^\r\n:]{1,80})$/gm, value => value.trim()],
+    ['referenciaLiquidacion', /\bREFERENCIA[ \t]+(?:DE[ \t]+)?(?:LIQUIDACION|TRAMITE)[ \t]*:[ \t]*([A-Z0-9._/-]{1,60})\b/g, value => value],
     ['importe', /\bIMPORTE\s*(?:TOTAL|PAGADO)?\s*[:#-]?\s*\$?\s*(\d[\d.,]*)/g, decimalAmount],
   ];
   for (const [field, pattern, convert] of rules) {

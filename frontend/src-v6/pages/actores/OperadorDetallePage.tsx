@@ -1,3 +1,4 @@
+import { ActorActivityControl } from '../../components/ActorActivityControl';
 import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
@@ -214,6 +215,7 @@ const OperadorDetallePage: React.FC = () => {
       </div>
 
       {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
+      {canViewCatalog && id && typeof apiOperador?.activo === 'boolean' && <ActorActivityControl registry="operadores" id={id} active={apiOperador.activo} />}
       <ActorCertificates type="OPERADOR" actorId={id || ''} />
       <AdministrativeTEF actorType="OPERADOR" identity={operador.id} declaration={apiOperador}
         corrientesY={enriched?.corrientes || []}

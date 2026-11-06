@@ -1,3 +1,4 @@
+import { ActorActivityControl } from '../../components/ActorActivityControl';
 import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
@@ -374,6 +375,7 @@ const TransportistaDetallePage: React.FC = () => {
       </div>
 
       {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
+      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && id && typeof apiTransportista?.activo === 'boolean' && <ActorActivityControl registry="transportistas" id={id} active={apiTransportista.activo} />}
       <ActorCertificates type="TRANSPORTISTA" actorId={id || ''} />
 
       {detailTabs.activeTab === 'info' && <section aria-label="Resumen del transportista">

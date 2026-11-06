@@ -1,3 +1,4 @@
+import { mailboxProof, requestMailboxProof, proofIssuedAt } from '../services/mailboxProof.service';
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -153,22 +154,24 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
 
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-    const user = await prisma.usuario.findFirst({
-      where: { emailVerificationToken: hashedToken },
-    });
-
-    if (!user) throw new AppError('Token inválido o expirado', 400);
-
-    // Verificar expiración (24h desde creación — usamos updatedAt como proxy)
-    const hoursElapsed = (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60);
-    if (hoursElapsed > 24) {
-      throw new AppError('El enlace de verificación expiró. Contactá al administrador.', 400);
+    const stamped = /^m\.([a-zA-Z0-9_-]{1,100})\.[a-f0-9]{64}$/.exec(token);
+    const user = await prisma.usuario.findFirst({ where: stamped
+      ? { id: stamped[1] } : { emailVerificationToken: hashedToken } });
+    if (!user) throw new AppError('El enlace venció o ya fue utilizado.', 400);
+    const proof = stamped && mailboxProof(user.emailVerificationToken, hashedToken, user.email);
+    if (stamped ? !proof : Date.now() - user.createdAt.getTime() > 86400_000) {
+      throw new AppError('El enlace venció o ya fue utilizado.', 400);
     }
-
-    await prisma.usuario.update({
-      where: { id: user.id },
-      data: { emailVerified: true, emailVerificationToken: null },
+    const changing = proof && proof.purpose === 'change';
+    await prisma.$transaction(async tx => {
+      const consumed = await tx.usuario.updateMany({
+        where: { id: user.id, email: user.email, emailVerificationToken: user.emailVerificationToken },
+        data: { emailVerified: true, emailVerificationToken: null, ...(changing ? { email: proof.email, passwordResetToken: null, passwordResetExpires: null } : {}) },
+      });
+      if (consumed.count !== 1) throw new AppError('El enlace ya fue utilizado o reemplazado.', 400);
+      if (changing) await recordAccountMail(tx, user, 'emailChanged');
     });
+    if (changing) return res.json({ success: true, verifiedUserId: user.id, nextPath: '/login', message: 'Nuevo correo confirmado. Ya podés usarlo para ingresar.' });
 
     // Notificar al usuario que falta aprobación admin
     await emailService.sendRegistroPendienteEmail(user.email, user.nombre, user.rol);
@@ -231,6 +234,22 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
   } catch (error) {
     next(error);
   }
+};
+
+export const resendVerification = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const email = z.string().trim().email().parse(req.body.email);
+    await prisma.$transaction(async tx => {
+      const row = await tx.usuario.findFirst({ where: { email: { equals: email, mode: 'insensitive' } }, select: { id: true } });
+      if (!row) return;
+      await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${row.id} FOR UPDATE`;
+      const user = await tx.usuario.findUnique({ where: { id: row.id } });
+      if (!user || user.email.toLowerCase() !== email.toLowerCase() || user.emailVerified || user.emailVerificationToken?.startsWith('change:')) return;
+      if (Date.now() - proofIssuedAt(user.emailVerificationToken) < 60_000) return;
+      await requestMailboxProof(tx, user, user.email, 'verify');
+    });
+    res.json({ success: true, message: 'Si la cuenta tiene una verificación pendiente, se solicitó un nuevo enlace.' });
+  } catch (error) { next(error); }
 };
 
 // ── LOGIN ──────────────────────────────────────────────────────────
@@ -372,13 +391,16 @@ function canRecoverByEmail(email: string): boolean {
   return domain !== 'sitrep.local' && domain !== 'placeholder.com';
 }
 
-async function issuePasswordRecovery(user: { id: string; email: string; nombre: string }) {
+async function issuePasswordRecovery(user: { id: string; email: string; nombre: string; emailVerificationToken?: string | null }) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-  await prisma.usuario.update({
-    where: { id: user.id },
+  const proof = user.emailVerificationToken ?? null;
+  if (proof?.startsWith('change:') && Date.now() - proofIssuedAt(proof) < 86400_000) return;
+  const issued = await prisma.usuario.updateMany({
+    where: { id: user.id, email: user.email, emailVerificationToken: proof },
     data: { passwordResetToken: hashedToken, passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000) },
   });
+  if (issued.count !== 1) return;
   await emailService.sendPasswordResetEmail(user.email, user.nombre, rawToken);
 }
 
