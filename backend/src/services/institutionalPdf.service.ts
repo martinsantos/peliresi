@@ -1,8 +1,15 @@
 import PDFDocument from 'pdfkit';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { drawInstitutionalMasthead, drawInstitutionalRule, loadInspectionPdfBranding, type InspectionPdfBranding } from './inspectionPdfBranding.service';
 import { inspectionPdfLines, drawInspectionPdfBlocks } from './inspectionPdfLayout.service';
 import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { PRACTICE_PDF_NOTICE } from './syntheticPreviewPdf.service';
+
+// The build copies backend/assets to dist/assets; Vitest runs directly from src.
+const compiledFonts = path.resolve(__dirname, '../assets/fonts');
+const fonts = existsSync(compiledFonts) ? compiledFonts : path.resolve(__dirname, '../../assets/fonts');
+const regularFont = path.join(fonts, 'LiberationSans-Regular.ttf');
 
 export const PDF_STYLE = { green: '#1B5E3C', ink: '#172C24', muted: '#526359', line: '#DCE5DF', light: '#F3F7F4' };
 
@@ -60,9 +67,13 @@ export function documentHeader(doc: PDFKit.PDFDocument, title: string, reference
 }
 export async function institutionalPdf(title: string, reference: string, render: (layout: DocumentLayout) => void, date = new Date(), options: { notice?: string } = {}): Promise<Buffer> {
   const branding = await loadInspectionPdfBranding();
-  const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 62, left: 44, right: 44 },
+  const doc = new PDFDocument({ font: regularFont, size: 'A4', margins: { top: 110, bottom: 62, left: 44, right: 44 },
     pdfVersion: '1.5', tagged: true, lang: 'es-AR', displayTitle: true,
     info: { Title: title + ' · ' + reference, Author: 'SITREP · Mendoza', CreationDate: date } });
+  // Embed metrically compatible faces with a Unicode map so readers preserve spaces
+  // at kerned word boundaries (including “SIN VALIDEZ” in the practice notice).
+  doc.registerFont('Helvetica', regularFont);
+  doc.registerFont('Helvetica-Bold', path.join(fonts, 'LiberationSans-Bold.ttf'));
   const chunks: Buffer[] = [];
   const ready = new Promise<Buffer>((resolve, reject) => { doc.on('data', b => chunks.push(b)); doc.on('error', reject); doc.on('end', () => resolve(Buffer.concat(chunks))); });
   const structure = doc.struct('Document');

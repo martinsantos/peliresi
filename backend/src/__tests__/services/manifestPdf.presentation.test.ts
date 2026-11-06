@@ -128,3 +128,14 @@ it('distinguishes treated findings from findings declared not treated in the fin
  expect(pdf.text).toMatch(/Y12\s*·\s*adenda 1/i);
  expect(pdf.text).toMatch(/Adenda 1\s*·\s*versión 1/i);
 });
+
+it('embeds a Unicode map for every text face in the manifest', async () => {
+  const pdf = await renderManifestPdf(fixture());
+  const fontTable = execFileSync('pdffonts', ['-'], { input: pdf, encoding: 'utf8' });
+  const faces = fontTable.trim().split('\n').slice(2);
+  expect(faces.length).toBeGreaterThanOrEqual(2);
+  for (const face of faces) {
+    // pdffonts ends each row with embedded, subset, Unicode map and object ID.
+    expect(face).toMatch(/\byes\s+yes\s+yes\s+\d+\s+\d+$/);
+  }
+});
