@@ -497,10 +497,12 @@ test('inspection flag activation uses the reviewed workflow, explicit acknowledg
   assert.doesNotMatch(operation,/applyMigration\(|pg_dump|UPDATE |INSERT |DELETE /);
 });
 
-test('reviewed builds expose inspection management on both surfaces while external delivery stays disabled',()=>{
+test('reviewed web and app builds enable inspections and ordinary eventual manifests while external delivery stays disabled',()=>{
   const workflow=fs.readFileSync(new URL('../../../.github/workflows/hostinger-publication.yml',import.meta.url),'utf8');
   const block=workflow.slice(workflow.indexOf('      - name: Build and test only'),workflow.indexOf('      - name: Prune candidate-only'));
   assert.match(block,/VITE_INSPECTION_FIELD_MODEL_ENABLED: 'true'/);
+  const buildEnvironment = block.slice(block.indexOf('        env:'), block.indexOf('        run:'));
+  assert.match(buildEnvironment, /^          VITE_MANIFEST_EXCEPTIONAL_ENABLED: 'true'$/m);
   assert.match(block,/DISABLE_EMAILS: 'true'/);
   assert.match(block,/PUSH_MANIFEST_NOTICES_ENABLED: 'false'/);
   assert.match(block,/VITE_DEMO_LOGIN_ENABLED: 'false'/);
