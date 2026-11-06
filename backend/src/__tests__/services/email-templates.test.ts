@@ -4,7 +4,7 @@ import { mailLink, mailText, renderMail, renderDigest, type MailTemplateId } fro
 
 afterEach(() => vi.unstubAllEnvs());
 describe('mail template catalogue', () => {
-  it.each<MailTemplateId>(['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'])('%s has useful safe HTML, text and no interpolated subject', id => {
+  it.each<MailTemplateId>(['confirmMailbox', 'verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'])('%s has useful safe HTML, text and no interpolated subject', id => {
     const mail = renderMail(id, { name: '<img src=x onerror=bad>', role: '<admin>', message: '<script>bad()</script>\nCorregir domicilio', token: 'a"&b#c' });
     expect(mail.version).toBe('20261023.2');
     expect(mail.html).toContain('lang="es"');
@@ -23,9 +23,9 @@ describe('mail template catalogue', () => {
     expect(mail.html).toContain('&lt;admin&gt;');
     expect(mail.text).toContain('Corregir domicilio');
     expect(mail.subject).not.toContain('onerror');
-    if (id === 'verify' || id === 'reset') expect(mail.html).toContain('token=a%22%26b%23c');
+    if (id === 'confirmMailbox' || id === 'verify' || id === 'reset') expect(mail.html).toContain('token=a%22%26b%23c');
   });
-  it.each<MailTemplateId>(['verify', 'pending', 'newAccount', 'reset', 'application', 'observed', 'rejected', 'modification', 'modificationRejected'])('%s rejects missing required data', id => {
+  it.each<MailTemplateId>(['confirmMailbox', 'verify', 'pending', 'newAccount', 'reset', 'application', 'observed', 'rejected', 'modification', 'modificationRejected'])('%s rejects missing required data', id => {
     expect(() => renderMail(id, { name: 'QA' })).toThrow('MAIL_FIELDS_REQUIRED');
   });
   it('rejects absent name instead of rendering undefined', () => {

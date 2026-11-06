@@ -79,6 +79,11 @@ export const authService = {
     return { message: data.message, verifiedUserId: data.verifiedUserId, nextPath: data.nextPath };
   },
 
+  async resendVerification(email: string): Promise<string> {
+    const { data } = await axios.post('/auth/resend-verification', { email }, { baseURL: api.defaults.baseURL, timeout: api.defaults.timeout });
+    return data.message;
+  },
+
   async forgotPassword(payload: { email?: string; cuit?: string }): Promise<void> {
     await api.post('/auth/forgot-password', payload);
   },

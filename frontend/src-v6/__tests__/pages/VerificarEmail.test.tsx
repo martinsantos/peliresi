@@ -1,9 +1,9 @@
 import React, { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ verify: vi.fn(), token: vi.fn() }));
-vi.mock('../../services/auth.service', () => ({ authService: { verifyEmail: mocks.verify } }));
+const mocks = vi.hoisted(() => ({ verify: vi.fn(), resend: vi.fn(), token: vi.fn() }));
+vi.mock('../../services/auth.service', () => ({ authService: { verifyEmail: mocks.verify, resendVerification: mocks.resend } }));
 vi.mock('../../services/api', () => ({ getAccessToken: mocks.token }));
 import Page from '../../pages/auth/VerificarEmailPage';
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); localStorage.setItem('unrelated-draft', 'keep'); });
@@ -34,12 +34,30 @@ it('a different active account is not silently replaced or taken into the verifi
 });
 it('expired or failed verification preserves drafts', async () => {
   mocks.verify.mockRejectedValue({ response: { data: { message: 'Enlace expirado' } } }); show();
-  await screen.findByRole('heading', { name: 'Error de verificación' });
-  expect(screen.getByText(/Tu borrador no fue eliminado/)).toBeVisible();
+  await screen.findByRole('heading', { name: 'Enlace de verificación' });
+  expect(screen.getByText(/Tu borrador se conserva/)).toBeVisible();
   expect(localStorage.getItem('unrelated-draft')).toBe('keep');
 });
 it('missing proof never contacts verification', async () => {
   show('/verificar-email');
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Error de verificación' })).toBeVisible());
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Verificar mi correo' })).toBeVisible());
   expect(mocks.verify).not.toHaveBeenCalled();
+});
+
+it('requires an explicit confirmation before consuming a replacement mailbox proof', async () => {
+  mocks.verify.mockResolvedValue({ message: 'Nuevo correo confirmado.', nextPath: '/login' });
+  show('/verificar-email?token=m.fixture.proof');
+  expect(mocks.verify).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar correo' }));
+  await screen.findByRole('heading', { name: 'Email verificado' });
+  expect(mocks.verify).toHaveBeenCalledTimes(1);
+});
+it('can request a fresh registration link without clearing the draft', async () => {
+  mocks.resend.mockResolvedValue('Solicitud recibida');
+  show('/verificar-email');
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'prueba@example.invalid' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Solicitar otro enlace de inscripción' }));
+  await screen.findByText('Solicitud recibida');
+  expect(mocks.resend).toHaveBeenCalledWith('prueba@example.invalid');
+  expect(localStorage.getItem('unrelated-draft')).toBe('keep');
 });

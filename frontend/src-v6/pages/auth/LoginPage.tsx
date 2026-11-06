@@ -126,7 +126,8 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <Link to="/verificar-email" className="brand-link inline-flex min-h-11 items-center text-sm hover:underline">Verificar mi correo</Link>
           <Link to="/recuperar" className="brand-link inline-flex min-h-11 items-center text-sm hover:underline">
             ¿Olvidaste tu contraseña?
           </Link>

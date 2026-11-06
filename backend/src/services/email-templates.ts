@@ -45,10 +45,11 @@ export function mailAction(path: string, label: string): string {
   return `<p style="margin:24px 0 8px"><a data-mail-action="preferred" href="${preferred}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;line-height:24px">${escapeMail(label)}</a></p><p style="font-size:14px;margin:8px 0"><a data-mail-action="web" href="${web}" style="color:#1B5E3C;text-decoration:underline">Abrir en la web</a> · <a data-mail-action="app" href="${app}" style="color:#1B5E3C;text-decoration:underline">Abrir en la app</a></p><p style="font-size:12px;color:#526359">El botón respeta tu preferencia de cuenta después de ingresar. Sin una preferencia, elige la vista según el dispositivo. La app también funciona en el navegador; abrir una app instalada depende del dispositivo.</p>`;
 }
 
-export type MailTemplateId = 'verify' | 'pending' | 'approved' | 'newAccount' | 'reset' | 'application' | 'observed' | 'response' | 'rejected' | 'modification' | 'modificationApproved' | 'modificationRejected';
+export type MailTemplateId = 'confirmMailbox' | 'verify' | 'pending' | 'approved' | 'newAccount' | 'reset' | 'application' | 'observed' | 'response' | 'rejected' | 'modification' | 'modificationApproved' | 'modificationRejected';
 type Fields = { name: string; role?: string; message?: string; token?: string };
 type Spec = { title: string; body: string; action?: string; path?: string; required?: 'role' | 'message' | 'token' };
 const specs: Record<MailTemplateId, Spec> = {
+  confirmMailbox: { title: 'Confirmá el nuevo correo de tu cuenta', body: 'La administración solicitó vincular esta dirección a tu cuenta. Confirmala sólo si la reconocés. El enlace vence en 24 horas.', action: 'Confirmar nuevo correo', path: '/verificar-email', required: 'token' },
   verify: { title: 'Verificá tu cuenta', body: 'Confirmá tu dirección de correo para continuar. El enlace vence en 24 horas. Si no solicitaste el registro, ignorá este mensaje.', action: 'Verificar correo', path: '/verificar-email', required: 'token' },
   pending: { title: 'Cuenta pendiente de aprobación', body: 'Tu correo fue verificado. Podés ingresar para completar y seguir tu inscripción. Las funciones operativas se habilitan después de la aprobación.', action: 'Continuar mi inscripción', path: '/mi-solicitud', required: 'role' },
   approved: { title: 'Tu cuenta está activa', body: 'Ya podés ingresar a SITREP con tu cuenta.', action: 'Ingresar a SITREP', path: '/login' },

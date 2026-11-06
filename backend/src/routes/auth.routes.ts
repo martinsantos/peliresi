@@ -1,5 +1,6 @@
+import { rateLimit } from 'express-rate-limit';
 import { Router, Request, Response } from 'express';
-import { register, login, getProfile, updateLinkPreference, updateOwnProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
+import { register, login, getProfile, updateLinkPreference, updateOwnProfile, logout, refreshToken, changePassword, resendVerification, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -147,6 +148,7 @@ router.post('/refresh-token', refreshToken);
  *         description: Token invalido o expirado
  */
 router.get('/verify-email', verifyEmail);
+router.post('/resend-verification', rateLimit({ windowMs: 60_000, limit: 6, standardHeaders: 'draft-8', legacyHeaders: false }), resendVerification);
 
 /**
  * @openapi
