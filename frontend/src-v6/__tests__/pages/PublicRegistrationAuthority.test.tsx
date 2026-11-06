@@ -81,7 +81,7 @@ describe('Public registration collects declarations, never calculates a tax for 
     fireEvent.click(screen.getByText('PDF, JPG o PNG · hasta 10 MB'));
     expect(screen.getByText(/La prueba no consulta recibos de otros usuarios/)).toBeInTheDocument();
     await waitFor(() => expect(requests.preview).toHaveBeenCalledOnce());
-    expect(requests.preview.mock.calls[0][1]).toBe('DOCUMENTO');
+    expect(requests.preview.mock.calls[0][1]).toBe('COMPROBANTE_PAGO');
     await waitFor(() => expect(within(row).getByText('Ver texto leído del recibo')).toBeVisible());
     expect(requests.uploadDocumento).not.toHaveBeenCalled();
     expect(requests.put).not.toHaveBeenCalled();

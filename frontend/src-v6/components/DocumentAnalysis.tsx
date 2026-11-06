@@ -1,4 +1,5 @@
-import { RegistrationOcrFields, registrationOcrFields, type ReadingKind } from './RegistrationOcrFields';
+import { RegistrationOcrFields } from './RegistrationOcrFields';
+import { registrationOcrFields, type ReadingKind } from '../utils/registrationOcrFields';
 import { AlertTriangle, ChevronDown, FileSearch, RefreshCw } from 'lucide-react';
 import type { ReceiptAnalysis } from '../types/documentAnalysis';
 import { electricityReadingNeedsReview } from '../utils/documentReadingOutcome';

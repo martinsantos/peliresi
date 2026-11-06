@@ -10,7 +10,7 @@ import RegistroPage from '../../pages/auth/RegistroPage';
 import VerificarEmailPage from '../../pages/auth/VerificarEmailPage';
 import EmpresaInvitacionPage from '../../pages/empresas/EmpresaInvitacionPage';
 
-const service = vi.hoisted(() => ({ verifyEmail: vi.fn() }));
+const service = vi.hoisted(() => ({ verifyEmail: vi.fn(), resendVerification: vi.fn() }));
 vi.mock('../../services/auth.service', () => ({ authService: service }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ login: vi.fn() }) }));
 vi.mock('../../services/api', () => ({ getAccessToken: () => null, default: { get: vi.fn() } }));
@@ -77,7 +77,9 @@ describe('Public access names the task independently of the institutional panel'
   });
   it('identifies a missing verification link without issuing a request', async () => {
     open('/verificar-email', <VerificarEmailPage />);
-    await waitFor(() => expectTask('Error de verificación'));
+    await waitFor(() => expectTask('Verificar mi correo'));
+    expect(screen.getByRole('textbox', { name: 'Correo de la inscripción' })).toBeVisible();
+    expect(service.resendVerification).not.toHaveBeenCalled();
     expect(service.verifyEmail).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Ingresar a mi cuenta' })).toHaveAttribute('href', '/login');
   });

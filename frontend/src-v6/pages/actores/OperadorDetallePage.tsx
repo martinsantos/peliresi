@@ -9,7 +9,7 @@ import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
  * Integra datos de la API + enriquecimiento CSV (certificado, tipo, tecnología, corrientes)
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import type { Operador } from '../../types/models';
 import {
@@ -150,10 +150,8 @@ const OperadorDetallePage: React.FC = () => {
   };
 
   // Parse tecnologías from CSV into structured list
-  const tecnologiasParsed = useMemo(() =>
-    enriched ? parseTecnologias(enriched.tecnologia) : [],
-    [enriched]
-  );
+  const tecnologia = enriched?.tecnologia;
+  const tecnologiasParsed = tecnologia ? parseTecnologias(tecnologia) : [];
 
   const actorNavigation = useActorNavigation();
   const backPath = actorNavigation?.backPath || mp('/dashboard');
