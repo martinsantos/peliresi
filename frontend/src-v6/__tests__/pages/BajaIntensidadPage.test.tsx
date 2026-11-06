@@ -29,7 +29,7 @@ function view(detail = false, client = new QueryClient({ defaultOptions: { queri
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
   Object.defineProperty(navigator, 'locks', { configurable:true, value:{ request: async (name:string, _options:unknown, callback:(lock:unknown)=>Promise<void>) => callback({ name }) } });
-  vi.clearAllMocks(); mock.user = { id: 'qa-operator', rol: 'OPERADOR' }; vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED', 'true');
+  mock.get.mockReset(); mock.post.mockReset(); mock.user = { id: 'qa-operator', rol: 'OPERADOR' }; vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED', 'true');
   mock.get.mockResolvedValue({ data: { data: { registro: entry, registros: [], total: 0 } } });
 });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
@@ -265,9 +265,18 @@ it('pending conformity does not disable recording treatment, nor grant reviewer 
   expect(screen.queryByRole('button', { name: 'Aprobar post facto' })).not.toBeInTheDocument();
 });
 it('failed write retains note, same request id on retry, no false confirmation', async () => {
-  mock.post.mockRejectedValue(new Error('offline')); view(true); await screen.findByText('Operación: Recibido');
+  let loseResponse!: () => void;
+  mock.post.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+    loseResponse = () => reject(new Error('offline'));
+  })).mockRejectedValue(new Error('offline'));
+  view(true); await screen.findByText('Operación: Recibido');
   fireEvent.change(screen.getByLabelText('Nota de la acción'), { target: { value: 'Evidencia conservada' } });
   fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' }));
+  await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole('button', { name: 'Comprobar acción' })).toBeNull();
+  expect(screen.getByText('Enviando la acción…')).toBeVisible();
+  expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Evidencia conservada');
+  await act(async () => { loseResponse(); });
   await screen.findByText(/acción podría haberse registrado/i); expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Evidencia conservada');
   expect(screen.getByText('Operación: Recibido')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Comprobar acción' }));
@@ -333,7 +342,7 @@ it('an HTTP error is not presented as zero records', async () => {
 it('invalidates a fresh list after a write without discarding the returned detail', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } });
   const owner = inspectionWorkspaceOwner(mock.user as never);
-  const listKey = ['baja-intensidad', mock.user.id, owner, null, 1];
+  const listKey = ['baja-intensidad', mock.user.id, owner, null, 1, '', ''];
   client.setQueryData(listKey, { registros: [entry], total: 1 });
   const updated = { ...entry, version: 1, etapa: 'TRATADO' };
   mock.post.mockResolvedValue({ data: { data: { registro: updated } } });

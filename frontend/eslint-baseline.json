@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sourceRevision": "5729352c4ac483564321b4b0f481f797fe0ed226",
-  "warningCount": 1867,
+  "warningCount": 1860,
   "files": [
     {
       "path": "cloud-qa/actor-directory-http.ts",
@@ -4858,47 +4858,6 @@
         {
           "ruleId": "react-hooks/exhaustive-deps",
           "messageSha256": "019938a99bec2499819858280c80cd8500e77af76268bb441923a8a174c3ca51",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "path": "src-v6/pages/manifiestos/BajaIntensidadPage.tsx",
-      "sourceSha256": "4eb2064b38d21597520b88fb1410efb17a2d2b58c535a46ecb443caba2ea8445",
-      "warnings": [
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "019938a99bec2499819858280c80cd8500e77af76268bb441923a8a174c3ca51",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "25e604cb9ea693a66be137aebd3e26859ea685c42abda64cf4e7cef39f398568",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "70ac4f7f682a18838f2a02350ee93607827dc33c9469c037b30f5ef5d9608ca8",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/exhaustive-deps",
-          "messageSha256": "b7e7119a8c6ab063f8c078d7a901f18e1558c4d338c97081a27564a073674b56",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/refs",
-          "messageSha256": "2172db4cb5523bc6fef3030fea82f79c0be12ffac319440635646ebe4c639b35",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/refs",
-          "messageSha256": "32a73ed67dc3c848a9c1969b5380fbda79617f6ef9566c9ae88a44a62fc55649",
-          "count": 1
-        },
-        {
-          "ruleId": "react-hooks/refs",
-          "messageSha256": "9c094f5f8b7c6764b95561b65e3e0fae3fd2ad73ac48537efac3ecbdd9faba3b",
           "count": 1
         }
       ]
