@@ -149,6 +149,7 @@ jobs:
           VITE_PUBLIC_DEMO_MODE: 'false'
           VITE_DEMO_LOGIN_ENABLED: 'false'
           VITE_INSPECTION_FIELD_MODEL_ENABLED: 'true'
+          VITE_MANIFEST_EXCEPTIONAL_ENABLED: 'true'
         run: |
           set -euo pipefail
           cd candidate/backend
