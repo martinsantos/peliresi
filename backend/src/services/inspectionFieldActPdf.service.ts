@@ -1,3 +1,4 @@
+import { eventualOrigins } from '../domain/inspectionEventualOrigin';
 import { syntheticPreviewEnabled } from '../config/syntheticPreview';
 import { inspectionMeasureText } from '../domain/inspectionFieldModel';
 import { inspectionMapSummary, inspectionPointText } from '../domain/inspectionMapGeometry';
@@ -1016,7 +1017,9 @@ async function streamTypicalInspectionAct(res: Response, inspection: any, resolv
   };
   write(inspection.firmasCapturadas?.length ? 'Copia firmada de la versión revisada' : 'Acta en preparación', inspection.firmasCapturadas?.length ? 'La firma deja constancia de lectura y recepción. No implica conformidad con los hallazgos ni cierre del expediente.' : 'Sin firma capturada para esta copia. La descarga no cierra ni notifica el expediente.');
   write('Visita', [dateParts(inspection.iniciadaAt || inspection.createdAt).date,inspection.ubicacion].filter(Boolean).join(' · '));
-  write('Establecimiento', [actor.razonSocial,actor.cuit].filter(Boolean).join(' · ') || 'Lugar sin actor registrado vinculado');
+  const origins = eventualOrigins(inspection);
+  if (actor.razonSocial || !origins.length) write('Establecimiento', [actor.razonSocial, actor.cuit].filter(Boolean).join(' · ') || 'Lugar sin actor registrado vinculado');
+  for (const origin of origins) write('Parte externa declarada', [origin.actorNombre, origin.tipoActor.toLowerCase(), origin.referencia].join(' · '));
   write('Inspector interviniente', [inspection.inspector?.nombre,inspection.inspector?.apellido].filter(Boolean).join(' '));
   write('Persona que atiende', [act.atendidoPor,act.dniAtendido,act.cargoAtendido].filter(Boolean).join(' · '));
   write('Motivo', [act.motivoTipo,act.motivoInspeccion].filter(Boolean).join(' · '));

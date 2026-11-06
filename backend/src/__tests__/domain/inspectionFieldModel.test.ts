@@ -30,6 +30,20 @@ describe('acta de campo simplificada', () => {
     expect(inspectionCurrentSignatures(i)).toHaveLength(1);
     i.observaciones = 'Otra constatación'; expect(inspectionCurrentSignatures(i)).toHaveLength(0); expect(inspectionSignatureHash(snapshot)).toBe(hash);
   });
+  it('conserva los orígenes declarados al editar observaciones y al verificar la copia firmada', () => {
+    const origins = [
+      { origenId: 'ev1', referencia: 'BI-ev1', tipoActor: 'OPERADOR', actorNombre: 'Operador externo' },
+      { origenId: 'ev1', referencia: 'BI-ev1', tipoActor: 'GENERADOR', actorNombre: 'Generador externo' },
+    ];
+    const current = { ...fixture(), antecedentes: origins, observaciones: 'Sólo la constatación' };
+    const snapshot = inspectionSignatureSnapshot(current);
+    expect(snapshot.origenesEventuales).toEqual(origins);
+    expect(inspectionSignatureHash(snapshot)).toBe(inspectionSignatureHash(current));
+    expect(inspectionSignatureHash({ ...current, antecedentes: [] })).not.toBe(inspectionSignatureHash(snapshot));
+    const historical = inspectionSignatureSnapshot(fixture());
+    expect(historical).not.toHaveProperty('origenesEventuales');
+    expect(inspectionSignatureHash({ ...fixture(), antecedentes: [] })).toBe(inspectionSignatureHash(historical));
+  });
   it('los eventos, versión y respuesta posterior no alteran el contenido firmado', () => {
     const i = fixture(); expect(inspectionSignatureHash({ ...i, version: 45, eventos: [{ titulo: 'Respuesta' }], informeTecnico: { evaluacion: 'Nueva revisión' } })).toBe(inspectionSignatureHash(i));
   });

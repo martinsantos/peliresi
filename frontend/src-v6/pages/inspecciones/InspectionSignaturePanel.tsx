@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import type { InspectionActorType } from '../../types/inspection';
+import { INSPECTION_ACTOR_LABELS } from './inspectionPresentation';
 import api from '../../services/api';
 import type { Inspection } from '../../types/inspection';
 import { httpErrorStatus } from '../../utils/httpErrorStatus';
 interface SignaturePreview {
   version: number;
   contenidoSha256: string;
-  acta: Pick<Inspection, 'numero' | 'numeroActa' | 'generador' | 'transportista' | 'operador' | 'ubicacion' | 'observaciones' | 'datosActa' | 'items' | 'comparaciones' | 'evidencias'>;
+  acta: Pick<Inspection, 'numero' | 'numeroActa' | 'generador' | 'transportista' | 'operador' | 'ubicacion' | 'observaciones' | 'datosActa' | 'items' | 'comparaciones' | 'evidencias'> & { origenesEventuales?: { origenId: string; referencia: string; tipoActor: InspectionActorType; actorNombre: string }[] };
   pendientes: string[];
   firmas: Array<{ id: string; nombre: string }>;
   signed?: { id: string };
@@ -46,6 +49,8 @@ export function InspectionSignaturePanel({ inspectionId, saved, editable, blocke
     catch (e) { setError(inspectionErrorMessage(e, 'No se pudo descargar la copia.')); }
   };
   const signedId = preview?.signed?.id;
+  const origins = preview?.acta.origenesEventuales ?? [];
+  const registeredName = (preview?.acta.generador || preview?.acta.transportista || preview?.acta.operador)?.razonSocial;
   const fieldLocation = preview?.acta?.datosActa?.ubicacionCampo;
   const input = 'mt-1 min-h-11 w-full rounded-lg border border-neutral-300 p-3 text-base';
   return <section aria-label="Revisión y firma del acta" className="space-y-5">
@@ -56,7 +61,11 @@ export function InspectionSignaturePanel({ inspectionId, saved, editable, blocke
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-900">{error}</p>}
     {preview && <>
       <article aria-label="Acta presentada para firma" className="space-y-4 rounded-xl border border-neutral-300 bg-white p-4 sm:p-6">
-        <header><p className="font-bold text-green-900">SITREP · Acta de inspección</p><h4 className="text-xl font-bold">{preview.acta.numeroActa || preview.acta.numero}</h4><p className="text-sm">{(preview.acta.generador || preview.acta.transportista || preview.acta.operador)?.razonSocial || 'Lugar sin responsable identificado'}</p><p className="text-sm">{preview.acta.ubicacion}</p></header>
+        <header><p className="font-bold text-green-900">SITREP · Acta de inspección</p><h4 className="text-xl font-bold">{preview.acta.numeroActa || preview.acta.numero}</h4>{(registeredName || !origins.length) && <p className="text-sm">{registeredName || 'Lugar sin responsable identificado'}</p>}
+          {origins.map(origin => <div key={origin.origenId + origin.tipoActor} className="mt-2">
+            <p><strong>{origin.actorNombre}</strong> · {INSPECTION_ACTOR_LABELS[origin.tipoActor]} declarado fuera del padrón</p>
+            <Link className="inline-flex min-h-11 max-w-full items-center break-all text-sm font-semibold text-primary-800 underline" relative="path" to={`eventuales/${encodeURIComponent(origin.origenId)}`}>Ver eventual de origen · {origin.referencia}</Link>
+          </div>)}<p className="text-sm">{preview.acta.ubicacion}</p></header>
         <p className="whitespace-pre-wrap text-base leading-relaxed">{preview.acta.observaciones}</p>
         {Object.entries(preview.acta.datosActa || {}).filter(([k, v]) => v && typeof v !== 'object' && !['modeloCampo', 'solicitaCopia'].includes(k)).map(([k, v]) => <p key={k} className="whitespace-pre-wrap break-words text-sm"><strong>{fieldLabels[k] || k}: </strong>{fieldValue(v)}</p>)}
         {preview.acta.datosActa?.medidas?.map((m, i: number) => <div key={m.id} className="rounded-lg border p-3"><strong>Requerimiento {i + 1} · {fieldValue(m.finalidad)}</strong><p>{m.detalle}</p><p>Responsable: {m.responsable}</p><p>{m.dias ? `${m.dias} días ${m.tipoDias === 'HABILES' ? 'hábiles' : 'corridos'}` : 'Sin plazo consignado'}{m.inicio ? ` · Desde: ${m.inicio}` : ''}{m.vencimiento ? ` · Vence: ${new Date(m.vencimiento).toLocaleString('es-AR')}` : ''}</p></div>)}

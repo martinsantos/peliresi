@@ -12,6 +12,7 @@ import React, { Suspense } from 'react';
 import { PageLoader } from './components/ui/LoadingState';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+const InspectionEventualPage = React.lazy(() => import('./pages/inspecciones/InspectionEventualPage'));
 const RelevoGpsPage=React.lazy(()=>import('./pages/transporte/RelevoGpsPage'));
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
@@ -140,6 +141,7 @@ function AppMobile() {
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/inspecciones" element={<InspeccionesPage />} />
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
+            <Route path="/inspecciones/:id/eventuales/:eventualId" element={<InspectionEventualPage />} />
             <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
