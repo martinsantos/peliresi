@@ -49,7 +49,7 @@ describe('receipt feedback is readable evidence, never a payment certification',
   });
   it.each(['SIN_TEXTO', 'NO_DISPONIBLE'] as const)('does not claim successful reading for %s', lectura => {
     render(<DocumentAnalysis analysis={{ ...analysis, lectura, texto: '' }} />);
-    expect(screen.getByRole('status')).toHaveTextContent('revisión manual');
+    expect(screen.getByText(/quedó guardado para revisión manual/)).toHaveAttribute('role', 'status');
     expect(screen.queryByText('Ver texto leído del recibo')).toBeNull();
   });
   it('offers a retry of the saved receipt without requiring replacement or a second upload', () => {
@@ -60,7 +60,7 @@ describe('receipt feedback is readable evidence, never a payment certification',
   });
   it('can retry an invoice whose PDF layer was readable but did not identify the tariff', () => {
     const retry = vi.fn(); render(<DocumentAnalysis analysis={{ ...analysis, documentKind: 'FACTURA_ELECTRICA', aviso: 'Lectura parcial del PDF.', electricidad: { version: 1, distribuidora: 'EDEMSA', nombreDistribuidora: 'EDEMSA', campos: {}, conflictos: [], evidencias: [], aviso: 'No cambia la TEF.' } }} onRetry={retry} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Lectura parcial'); fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura', exact: true })); expect(retry).toHaveBeenCalledOnce();
+    expect(screen.getByText('Lectura parcial del PDF.')).toHaveAttribute('role', 'status'); expect(screen.getByText(/Falta leer:/)).toHaveTextContent('Categoría tarifaria, Consumo facturado'); fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura', exact: true })); expect(retry).toHaveBeenCalledOnce();
   });
   it('disables repeated retries while a read is in progress', () => {
     const retry = vi.fn();
@@ -110,7 +110,7 @@ describe('failed invoice extraction does not resemble a successful reading', () 
     const retry = vi.fn();
     render(<DocumentAnalysis kind="electricity" persisted={false} onRetry={retry} analysis={{ ...analysis, lectura: 'NO_DISPONIBLE', texto: '', aviso: 'El servicio no está disponible. Tu formulario sigue intacto.', electricidad: { version: 1, distribuidora: null, nombreDistribuidora: null, campos: {}, conflictos: [], evidencias: [], aviso: 'Revisar original' } }} />);
     expect(screen.queryByText('No leído')).toBeNull();
-    expect(screen.getByRole('status')).toHaveTextContent('Tu formulario sigue intacto');
+    expect(screen.getByText(/Tu formulario sigue intacto/)).toHaveAttribute('role', 'status');
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura' }));
     expect(retry).toHaveBeenCalledOnce();
   });

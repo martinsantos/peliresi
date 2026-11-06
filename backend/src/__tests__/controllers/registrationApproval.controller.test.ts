@@ -144,6 +144,15 @@ describe('approval rechecks required documents after submission', () => {
     expect((await approve()).error).toMatchObject({ statusCode: 409 });
     expect(mock.create).not.toHaveBeenCalled();
   });
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('allows approval with an unreviewed ATM receipt for %s', async role => {
+    mock.find.mockResolvedValue(draft(role));
+    const receipt = { tipo: 'COMPROBANTE_PAGO', estado: 'PENDIENTE' };
+    const required = getSolicitudRequirements(role).filter(item => item.required).map(item => ({ tipo: item.tipo, estado: 'APROBADO' }));
+    mock.documents.mockImplementation(async query => query.select?.tipo ? [...required, receipt] : [receipt]);
+    expect((await approve()).error).toBeUndefined();
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(receipt.estado).toBe('PENDIENTE');
+  });
   it.each(['PENDIENTE', 'RECHAZADO'])('does not turn optional electricity into a blocker (%s)', async estado => {
     mock.documents.mockImplementation(async query => query.select?.tipo ? [...getSolicitudRequirements('GENERADOR').filter(item => item.required).map(item => ({tipo: item.tipo, estado: 'APROBADO'})), {tipo: 'FACTURA_ELECTRICA', estado}] : []);
     expect((await approve()).error).toBeUndefined();

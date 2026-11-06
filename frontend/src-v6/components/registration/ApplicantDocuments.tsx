@@ -18,7 +18,6 @@ export function ApplicantDocuments({ applicationId, documents, fresh, onRetry, t
   const missingRef = useRef<HTMLParagraphElement>(null);
   const located = useRef<string | null>(null);
   const [error, setError] = useState<{ id: string; text: string } | null>(null);
-  const orderedDocuments = documents?.map((doc, index) => ({ doc, index })).sort((a, b) => Number(b.doc.estado === 'RECHAZADO') - Number(a.doc.estado === 'RECHAZADO') || a.index - b.index).map(({ doc }) => doc);
   const rejected = documents?.filter(doc => doc.estado === 'RECHAZADO').length || 0;
   const missingTarget = !!targetDocumentId && fresh && !!documents && !documents.some(doc => doc.id === targetDocumentId);
   useEffect(() => {
@@ -52,7 +51,7 @@ export function ApplicantDocuments({ applicationId, documents, fresh, onRetry, t
       {!fresh || !documents ? <div role="status" className="space-y-2 text-sm text-neutral-700"><p>Esperá a actualizar la solicitud para consultar la revisión de los documentos.</p><Button variant="outline" onClick={onRetry}>Actualizar documentos</Button></div>
         : <>{missingTarget && <p ref={missingRef} tabIndex={-1} role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-800">El documento indicado en el aviso no está disponible en esta solicitud.</p>}
         {documents.length === 0 ? <p className="text-sm text-neutral-600">Todavía no hay documentos guardados en esta solicitud.</p>
-        : <><p className="text-sm text-neutral-600">La revisión de cada archivo no reemplaza la decisión sobre tu inscripción.</p><ul className="divide-y divide-neutral-200">{orderedDocuments!.map(doc => <li key={doc.id}
+        : <><p className="text-sm text-neutral-600">La revisión de cada archivo no reemplaza la decisión sobre tu inscripción.</p><ul className="divide-y divide-neutral-200">{documents.map(doc => <li key={doc.id}
           ref={doc.id === targetDocumentId ? targetRef : undefined} tabIndex={doc.id === targetDocumentId ? -1 : undefined}
           aria-label={doc.id === targetDocumentId ? 'Documento del aviso: ' + doc.nombre : undefined}
           className={'space-y-2 py-3 first:pt-0 ' + (doc.id === targetDocumentId ? 'rounded-lg bg-primary-50 px-3 outline-none ring-1 ring-primary-300 focus-visible:ring-2' : '')}>

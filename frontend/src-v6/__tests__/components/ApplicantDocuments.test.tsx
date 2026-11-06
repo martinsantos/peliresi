@@ -33,8 +33,8 @@ it('blocks duplicate download commands while the first is pending',async()=>{
  const button=screen.getByRole('button',{name:'Descargar original Factura completa.png'});fireEvent.click(button);fireEvent.click(button);expect(download).toHaveBeenCalledOnce();expect(button).toBeDisabled();await act(async()=>finish());expect(button).toBeEnabled();
 });
 
-it('shows rejected originals first without changing the supplied document order',()=>{
- const reverse=[docs[1],docs[0]];render(<ApplicantDocuments applicationId="s" documents={reverse} fresh onRetry={()=>{}} />);open();expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Factura completa.png');expect(reverse[0].id).toBe('approved');
+it('preserves presentation order irrespective of the review decision',()=>{
+ const reverse=[docs[1],docs[0]];render(<ApplicantDocuments applicationId="s" documents={reverse} fresh onRetry={()=>{}} />);open();expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Constancia.pdf');expect(reverse[0].id).toBe('approved');
 });
 it('opens and focuses only the document identified by the notice',()=>{
  render(<ApplicantDocuments applicationId="s" documents={docs} fresh onRetry={()=>{}} targetDocumentId="approved" />);

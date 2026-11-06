@@ -490,7 +490,7 @@ const InscripcionWizardContent: React.FC = () => {
     setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
     if (isReviewMode) {
       uploadsInFlight.current.add(tipo); setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
-      try { const result = await previewDocument(file, tipo.startsWith('LICENCIA_CHOFER_') ? 'LICENCIA' : tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: retainDocumentReading(adjuntos[tipo] === file ? previous[tipo] : undefined, result.analisis) })); setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(result.analisis) })); }
+      try { const result = await previewDocument(file, tipo.startsWith('LICENCIA_CHOFER_') ? 'LICENCIA' : tipo === 'FACTURA_ELECTRICA' || tipo === 'CONSTANCIA_AFIP' || tipo === 'COMPROBANTE_PAGO' ? tipo : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: retainDocumentReading(adjuntos[tipo] === file ? previous[tipo] : undefined, result.analisis) })); setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(result.analisis) })); }
       catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo leer el archivo de prueba. Los datos siguen en el navegador.') })); }
       finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
       return;

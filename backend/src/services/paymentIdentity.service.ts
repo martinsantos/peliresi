@@ -92,7 +92,7 @@ export async function confirmPayment(tx: Prisma.TransactionClient, target: Payme
 export async function requirePaymentIdentity(tx: Prisma.TransactionClient, target: PaymentTarget, analysis: unknown) {
   const pago = object(object(analysis).pago);
   if (pago.revision !== 'CONFIRMADO' || pago.sha256 !== target.sha256 || typeof pago.registroId !== 'string') {
-    throw new AppError('Falta identificar y reservar este pago contra el ticket original. No se aprobó el documento ni el alta.', 409);
+    throw new AppError('Falta identificar y reservar este pago contra el ticket original. El documento sigue pendiente de aprobación.', 409);
   }
   const registro = await tx.registroPagoComprobante.findUnique({ where: { id: pago.registroId } });
   if (!registro || registro.ambito !== target.ambito || registro.cuit !== target.cuit.replace(/\D/g, '')) throw new AppError('El pago no está reservado para este trámite.', 409);
@@ -104,6 +104,7 @@ export async function requirePaymentIdentity(tx: Prisma.TransactionClient, targe
 export async function applySolicitudPayments(tx: Prisma.TransactionClient, solicitudId: string, cuit: string, usuarioId: string) {
   const documents = await tx.documentoSolicitud.findMany({ where: { solicitudId, tipo: 'COMPROBANTE_PAGO' } });
   for (const doc of documents) {
+    if (doc.estado === 'PENDIENTE') continue;
     if (doc.estado !== 'APROBADO' || !doc.sha256) throw new AppError('Revisá e identificá el comprobante de pago antes de aprobar el alta.', 409);
     const target: PaymentTarget = { origen: 'SOLICITUD', documentoId: doc.id, ambito: solicitudPaymentScope(solicitudId), cuit, sha256: doc.sha256 };
     const record = await requirePaymentIdentity(tx, target, doc.analisis);

@@ -158,7 +158,10 @@ const SolicitudReview: React.FC = () => {
     const target = feedbackRef.current;
     if (!feedback || !target) return;
     target.focus({ preventScroll: Boolean(feedback.documentId) });
-    if (feedback.documentId) target.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+    if (feedback.documentId) {
+      const bounds = target.getBoundingClientRect();
+      if (bounds.top < 0 || bounds.bottom > window.innerHeight) target.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+    }
   }, [feedback]);
 
   const detail = useSolicitud(id || ''), messages = useMensajesSolicitud(id || '');
@@ -184,6 +187,7 @@ const SolicitudReview: React.FC = () => {
   const canDecide = fresh && reviewer && solicitud?.estado === 'EN_REVISION' && !busy;
   const canApprove = canDecide && applicationDeclarationsReadable(solicitud);
   const canAct = fresh && reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud!.estado) && !busy;
+  const canReviewDocument = (doc: DocumentoSolicitud) => canAct || (fresh && reviewer && !busy && solicitud?.estado === 'APROBADA' && doc.tipo === 'COMPROBANTE_PAGO' && doc.estado === 'PENDIENTE');
   const canMessage = fresh && reviewer && !messages.isError && !messages.isPending && !messages.isFetching && !busy;
 
   const run = async <T,>(allowed: boolean, action: () => Promise<T>, confirmed: () => void, success: string | ((result: T) => string), documentId?: string) => {
@@ -193,7 +197,7 @@ const SolicitudReview: React.FC = () => {
     catch (error) { setFeedback({ error: true, documentId, text: getApiErrorMessage(error, 'No pudimos confirmar la acción. Tus textos se conservan; revisá el estado actualizado antes de reintentar.') }); }
     finally { await refetch(); running.current = false; setBusy(false); }
   };
-  const handleRetryReading = (docId: string) => run(canAct, async () => {
+  const handleRetryReading = (docId: string) => run(canAct || Boolean(solicitud?.documentos?.some(doc => doc.id === docId && canReviewDocument(doc))), async () => {
     setReadingReceipt(true);
     try { return await solicitudService.analizarDocumento(id!, docId); } finally { setReadingReceipt(false); }
   }, () => {}, document => documentReadingOutcome(document?.analisis), docId);
@@ -214,11 +218,11 @@ const SolicitudReview: React.FC = () => {
   const handleDocReview = (note: string, clear: () => void) => {
     if (!documentDecision) return;
     const { document, decision } = documentDecision;
-    return run(canAct && !documentChanged,
+    return run(canReviewDocument(document) && !documentChanged,
       () => revisarDocumento.mutateAsync({ solicitudId: id!, docId: document.id, estado: decision, observaciones: note,
         expectedDocument: { estado: document.estado, sha256: document.sha256 || null } }),
       () => { clear(); setDocumentDecision(null); },
-      decision === 'APROBADO' ? 'Documento aprobado. La solicitud mantiene su estado.' : solicitud?.estado === 'OBSERVADA' ? 'Documento rechazado. La solicitud sigue esperando la corrección del solicitante.' : 'Documento rechazado. Para pedir correcciones al solicitante, observá la solicitud.', document.id);
+      decision === 'APROBADO' ? 'Documento aprobado. La solicitud mantiene su estado.' : solicitud?.estado === 'OBSERVADA' ? 'Documento rechazado. La solicitud sigue esperando la corrección del solicitante.' : solicitud?.estado === 'APROBADA' ? 'Pago rechazado. La inscripción conserva su aprobación.' : 'Documento rechazado. Para pedir correcciones al solicitante, observá la solicitud.', document.id);
   };
 
   const feedbackPanel = feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={'rounded-lg border p-3 text-sm ' + (feedback.error ? 'border-error-200 bg-error-50 text-error-900' : 'border-primary-200 bg-primary-50 text-primary-900')}>{feedback.text}</p>;
@@ -336,7 +340,7 @@ const SolicitudReview: React.FC = () => {
               documentos.map((doc: DocumentoSolicitud) => {
                 const dCfg = DOC_ESTADO_CONFIG[doc.estado] || DOC_ESTADO_CONFIG.PENDIENTE;
                 return (
-                  <div key={doc.id} role="group" aria-label={'Documento: ' + doc.nombre}
+                  <div key={doc.id} data-document-id={doc.id} role="group" aria-label={'Documento: ' + doc.nombre}
                     ref={doc.id === linkedDocumentId ? linkedDocumentRef : undefined} tabIndex={doc.id === linkedDocumentId ? -1 : undefined}
                     className={'border rounded-xl p-3 space-y-2 ' + (doc.id === linkedDocumentId ? 'border-primary-300 bg-primary-50 outline-none focus-visible:ring-2 focus-visible:ring-primary-700' : 'border-neutral-200')}>
                     {doc.id === linkedDocumentId && <p className="text-sm font-semibold text-primary-800">Documento indicado en el aviso</p>}
@@ -367,8 +371,9 @@ const SolicitudReview: React.FC = () => {
                       </p>
                     )}
                     {!documentDecision && feedback?.documentId === doc.id && feedbackPanel}
-                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
-                    {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
+                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'CONSTANCIA_AFIP' ? 'arca' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || solicitud.estado === 'APROBADA' && doc.tipo === 'COMPROBANTE_PAGO' && doc.estado === 'PENDIENTE') && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA', 'CONSTANCIA_AFIP'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
+                    {doc.tipo === 'COMPROBANTE_PAGO' && doc.estado === 'PENDIENTE' && <p className="text-sm text-neutral-700">Pago pendiente de revisión. Podés aprobar la inscripción y revisar este comprobante después.</p>}
+                    {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || solicitud.estado === 'APROBADA' && doc.estado === 'PENDIENTE' || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
 
                     <div className="flex flex-wrap items-center gap-2">
                       <button
@@ -380,7 +385,7 @@ const SolicitudReview: React.FC = () => {
                       >
                         <Download size={13} />
                       </button>
-                      {doc.estado === 'PENDIENTE' && canAct && (
+                      {doc.estado === 'PENDIENTE' && canReviewDocument(doc) && (
                         <>
                           <button
                             onClick={() => { setFeedback(null); setDocumentDecision({ document: { ...doc }, decision: 'APROBADO' }); }}
@@ -516,7 +521,7 @@ const SolicitudReview: React.FC = () => {
       )}
 
       {documentDecision && <DocumentReviewDialog key={`${documentDecision.document.id}:${documentDecision.document.sha256}:${documentDecision.decision}`}
-        document={documentDecision.document} decision={documentDecision.decision} scope={scope} allowed={canAct} busy={busy} changed={documentChanged} observed={solicitud.estado === 'OBSERVADA'}
+        document={documentDecision.document} decision={documentDecision.decision} scope={scope} allowed={canReviewDocument(documentDecision.document)} busy={busy} changed={documentChanged} observed={solicitud.estado === 'OBSERVADA'}
         feedback={feedback?.documentId === documentDecision.document.id ? feedbackPanel : null} onClose={() => setDocumentDecision(null)} onConfirm={handleDocReview} />}
 
       {/* Confirm Aprobar Modal */}
