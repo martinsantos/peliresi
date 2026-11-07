@@ -1,12 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { inventory,digest,REVIEWED_MIGRATION,migrations,assertPrivatePrisma,REVIEWED_DEPENDENCIES,copyDependencies,dependencyDigest,assertPrivateDependencies } from './publisher.ts';
+import { inventory,digest,REVIEWED_MIGRATIONS,migrations,assertPrivatePrisma,REVIEWED_DEPENDENCIES,copyDependencies,dependencyDigest,assertPrivateDependencies } from './publisher.ts';
 
 const [source,output,commit,declaredMigrations,declaredDependencies]=process.argv.slice(2);
 if(!source || !output || !/^[a-f0-9]{40}$/.test(commit))throw new Error('Explicit source/output/commit required');
 const names=declaredMigrations?declaredMigrations.split(','):[];
-if(names.length && (names.length!==1 || names[0]!==REVIEWED_MIGRATION.name))throw new Error('Only the explicitly reviewed migration can be packaged');
+if(names.length && (names.length!==1 || !REVIEWED_MIGRATIONS.some(m=>m.name===names[0])))throw new Error('Only an explicitly reviewed migration can be packaged');
 if(declaredDependencies && declaredDependencies!==REVIEWED_DEPENDENCIES.id)throw new Error('Unreviewed dependency update');
 if(declaredDependencies && (process.platform!=='linux' || process.arch!=='x64'))throw new Error('Candidate runtime requires Linux x64 CI');
 if(fs.existsSync(output))throw new Error('Preserve existing package');
