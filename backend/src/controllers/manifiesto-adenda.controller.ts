@@ -202,7 +202,8 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
         const { decision } = await evaluateGeneratorCurrents(tx, { generadorId: manifest.generadorId, manifiestoId: manifest.id, corrientes: observed, lock: true });
         if (decision.estado === 'BLOQUEADA') throw new AppError(currentsDecisionMessage(decision, 'ADENDA') as string, 409);
         if (decision.estado === 'REQUIERE_EXCEPCION') {
-          if (!canGrantGeneratorException(req.user)) throw new AppError(currentsDecisionMessage(decision, 'ADENDA') as string, 403);
+          // 409, not 403: the addendum screen then releases the attempt so the counterpart can still observe or reject.
+          if (!canGrantGeneratorException(req.user)) throw new AppError(currentsDecisionMessage(decision, 'ADENDA') as string, 409);
           grant = decision.corrientes;
         }
       }

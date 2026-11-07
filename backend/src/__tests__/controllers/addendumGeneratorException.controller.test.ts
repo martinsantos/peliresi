@@ -44,7 +44,7 @@ describe('addendum approval with a Y outside the generator ficha', () => {
   it('a counterpart cannot grant the exception', async () => {
     m.evaluate.mockResolvedValue({ decision: { estado: 'REQUIERE_EXCEPCION', corrientes: ['Y34'] } });
     const { next } = await review();
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, message: expect.stringContaining('Sólo la autoridad de aplicación') }));
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409, message: expect.stringContaining('Sólo la autoridad de aplicación') }));
     expect(m.tx.adendaManifiesto.updateMany).not.toHaveBeenCalled();
     expect(m.grant).not.toHaveBeenCalled();
   });

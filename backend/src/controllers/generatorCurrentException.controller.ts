@@ -60,12 +60,14 @@ export async function generatorCurrentExceptions(req: AuthRequest, res: Response
     const generador = await prisma.generador.findUnique({ where: { id: req.params.id }, select: { id: true, corrientesControl: true } });
     if (!generador) throw new AppError('Generador no encontrado', 404);
     const ficha = generatorAuthorizedCurrents(generador.corrientesControl);
+    res.setHeader('Cache-Control', 'private, no-store');
+    // Switch off: never touch the new table (it may not exist yet before the authorized migration).
+    if (!generatorExceptionsEnabled()) { res.json({ success: true, data: { habilitado: false, fichaCorrientes: ficha, disponible: true, excepciones: [] } }); return; }
     const rows = await prisma.excepcionCorrienteGenerador.findMany({ where: { generadorId: generador.id }, orderBy: { createdAt: 'desc' }, take: 100 });
     const open = new Set(openExceptions(rows, ficha).map(r => r.id));
     const manifests = await prisma.manifiesto.findMany({ where: { id: { in: [...new Set(rows.map(r => r.manifiestoId))] } }, select: { id: true, numero: true } });
     const numbers = new Map(manifests.map(m => [m.id, m.numero]));
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.json({ success: true, data: { habilitado: generatorExceptionsEnabled(), fichaCorrientes: ficha, disponible: open.size === 0,
+    res.json({ success: true, data: { habilitado: true, fichaCorrientes: ficha, disponible: open.size === 0,
       excepciones: rows.map(r => ({ id: r.id, origen: r.origen, origenId: r.origenId, manifiestoId: r.manifiestoId, numero: numbers.get(r.manifiestoId) || null,
         corrientes: r.corrientes, motivo: r.motivo, otorgadaAt: r.createdAt, estado: open.has(r.id) ? 'ABIERTA' : 'CERRADA',
         cerradaAt: r.cerradaAt, cierre: r.cierre })) } });

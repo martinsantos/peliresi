@@ -49,7 +49,7 @@ Con la migración incompleta, **todas** las Y de los generadores importados pare
 
 - **Completar la ficha**, una sola vez: copiar al registro de cada generador las Y del archivo migrado. Sólo se completan registros vacíos, nunca se pisa una ficha editada después. Cada cambio queda trazado y es reversible. Se prueba primero en preview y en producción se corre sólo con autorización expresa sobre ese cambio de datos. Así quedan cubiertos 1.208 generadores.
 - Después, toda la plataforma (regla, pantalla, inspecciones y avisos) lee únicamente la ficha, y la pantalla deja de usar el archivo aparte.
-- Los 16 generadores que no tienen Y en la migración **no se bloquean**. Generan un antecedente «ficha sin corrientes verificables» para que la autoridad complete la ficha, igual que hoy hace el operador con `SIN_DATOS_VERIFICABLES`.
+- Los 16 generadores que no tienen Y en la migración **no se bloquean**. Cuando el operador registra un hallazgo en la recepción, se genera el antecedente «Ficha del generador sin corrientes» para que la autoridad complete la ficha, igual que hoy con `SIN_DATOS_VERIFICABLES` del operador. Al crear un manifiesto con la ficha vacía no se genera aviso.
 - Antes de activar el bloqueo en producción hace falta una consulta de sólo lectura que cuente cuántos generadores reales quedarían alcanzados. Requiere tu autorización.
 
 ## 4. Implementación propuesta, por etapas
@@ -124,7 +124,9 @@ La opción recomendada va primera en cada decisión.
 - Una excepción puede abarcar varias Y del mismo hecho. Queda abierta mientras alguna de ellas siga fuera de la ficha, y esa condición se evalúa en vivo, así que una ficha editada por cualquier vía se respeta.
 - La misma Y en el mismo manifiesto ya exceptuado es el mismo hecho, no una segunda vez. Una Y nueva en ese manifiesto sí cuenta como segunda vez.
 - Observar o rechazar una adenda nunca se bloquea. La recepción física nunca se bloquea.
-- Los generadores sin corrientes en la ficha no se bloquean: generan el antecedente `FICHA_GENERADOR_SIN_CORRIENTES`.
+- Si una contraparte intenta aprobar una adenda que requiere la autoridad, recibe 409 con el motivo. La pantalla de adendas muestra ese mensaje y libera el intento, así puede observar o rechazar. Verificado por lectura de código (`AdendasManifiestoPage`), no en el navegador.
+- El historial del generador no consulta la tabla nueva con el interruptor apagado, por si la migración todavía no se aplicó.
+- Los generadores sin corrientes en la ficha no se bloquean. Generan el antecedente `FICHA_GENERADOR_SIN_CORRIENTES` sólo con un hallazgo del operador en la recepción; al crear un manifiesto no se genera aviso.
 - Los avisos van **sólo a la campana**: ALTA para la excepción otorgada o cerrada, URGENTE para la reiteración y la creación rechazada. No se envían correos ni push, y las listas de salida existentes no se tocaron. Agregar correo o push es una decisión aparte.
 - Las sesiones de capacitación (CAP) nunca cuentan ni bloquean.
 - **Fuera de alcance:** los eventuales (`baja-intensidad`) no aplican esta regla hasta que se decida. El lado del operador (Y no habilitada en su ficha) sigue como estaba.
@@ -137,6 +139,7 @@ La opción recomendada va primera en cada decisión.
   - servicio: 9;
   - aprobación de adenda: 6;
   - antecedente: 4;
+  - cierre por renovación aprobada e historial con el interruptor apagado: 4;
   - suites existentes de adendas, propuestas, manifiestos, renovaciones, actores e inspecciones: sin cambios con el interruptor apagado.
 - **Frontend:**
   - tipado limpio;

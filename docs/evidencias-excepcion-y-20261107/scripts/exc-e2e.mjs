@@ -99,7 +99,7 @@ try {
   // 6. A rectification of the finding: the counterpart cannot grant; the authority can, using the single exception.
   const ad2 = randomUUID();
   expectStatus(await call(carrier, 'POST', `/api/manifiestos/${m1.id}/adendas`, { id: ad2, rectificaId: ad, motivo: 'Rectificación con la corriente observada', residuos: [{ corriente: A, cantidad: 5, unidad: 'kg' }, { corriente: U2, cantidad: 1, unidad: 'kg' }] }), 201, '6. rectificación con ' + U2);
-  expectStatus(await call(oper, 'POST', `/api/manifiestos/${m1.id}/adendas/${ad2}/revisiones`, { id: randomUUID(), version: 0, nota: 'Conforme como contraparte', decision: 'APROBADA' }), 403, '6. la contraparte intenta aprobar');
+  expectStatus(await call(oper, 'POST', `/api/manifiestos/${m1.id}/adendas/${ad2}/revisiones`, { id: randomUUID(), version: 0, nota: 'Conforme como contraparte', decision: 'APROBADA' }), 409, '6. la contraparte intenta aprobar');
   expectStatus(await call(sector, 'POST', `/api/manifiestos/${m1.id}/adendas/${ad2}/revisiones`, { id: randomUUID(), version: 0, nota: 'Excepción por hallazgo verificado', decision: 'APROBADA' }), 200, '6. la autoridad aprueba y otorga');
 
   // 7. Generator history, as seen by the generator itself.

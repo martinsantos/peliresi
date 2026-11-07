@@ -124,7 +124,7 @@
     },
     {
       "name": "6. la contraparte intenta aprobar",
-      "status": 403,
+      "status": 409,
       "message": "Y12 no figura en la ficha del generador. Sólo la autoridad de aplicación puede aprobar esta adenda, y al hacerlo otorga la única excepción disponible del generador."
     },
     {
@@ -147,6 +147,8 @@
         "MANIFIESTO:Y34:CERRADA",
         "ADENDA:Y12:CERRADA",
         "MANIFIESTO:Y34:CERRADA",
+        "ADENDA:Y12:CERRADA",
+        "MANIFIESTO:Y34:CERRADA",
         "MANIFIESTO:Y34:CERRADA",
         "MANIFIESTO:Y34:CERRADA",
         "ADENDA:Y12:CERRADA",
@@ -160,7 +162,7 @@
     },
     {
       "name": "8. avisos y antecedentes",
-      "avisos": 194,
+      "avisos": 228,
       "conCorreo": 0,
       "motivosAntecedenteAdenda": null
     }
