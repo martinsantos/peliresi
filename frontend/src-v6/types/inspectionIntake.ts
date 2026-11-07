@@ -17,6 +17,8 @@ export const INTAKE_REASON_LABELS: Record<string, string> = {
   CANTIDAD_DIFERENTE: 'Cantidad diferente', Y_OMITIDA: 'Y omitida en el manifiesto', NO_OBSERVADA: 'Corriente no observada', UNIDAD_DIFERENTE: 'Unidad diferente',
   Y_NO_CONSTA_EN_FICHA_OPERADOR: 'Y no registrada en la ficha del operador', ALCANCE_SIN_VERIFICAR: 'Alcance del operador sin verificar',
   PARTICIPANTE_SIN_ALTA: 'Participante sin alta', RELEVO_SIN_ALTA: 'Relevo sin alta', IDENTIDAD_INCOMPLETA: 'Identidad incompleta',
+  Y_NO_INSCRIPTA_GENERADOR: 'Y no inscripta en la ficha del generador', Y_NO_INSCRIPTA_REITERADA: 'Y no inscripta con excepción abierta',
+  FICHA_GENERADOR_SIN_CORRIENTES: 'Ficha del generador sin corrientes',
 };
 /** Mirrors the API rule: a declared external party joins the act only while the field stage is open. */
 export const EVENTUAL_LINK_STATES = ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'];

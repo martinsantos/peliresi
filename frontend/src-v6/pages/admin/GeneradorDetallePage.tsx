@@ -23,6 +23,7 @@ import {
   Building2, Award, BookOpen, Route, ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { GeneratorCurrentExceptionHistory } from '../../components/generators/GeneratorCurrentExceptionHistory';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
@@ -477,6 +478,7 @@ const GeneradorDetallePage: React.FC = () => {
               </div>
             </Card>
           )}
+          <div className="mt-4"><GeneratorCurrentExceptionHistory generadorId={g.id} linkTo={mp} /></div>
         </TabPanel>
 
         {/* ===== Tab 3: Situacion Fiscal (Pagos TEF) ===== */}

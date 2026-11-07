@@ -1,4 +1,5 @@
 import { ManifestProposalApprovals } from './ManifestProposalApprovals';
+import { GeneratorCurrentExceptionPanel } from './GeneratorCurrentExceptionPanel';
 /**
  * SITREP v6 - Manifiesto Actions
  * ===============================
@@ -134,6 +135,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
           {m.estado === 'APROBADO' && !m.aprobacionOperacion && !legacyBlocked && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">No se pudo verificar si están cumplidas las aprobaciones. Actualizá el manifiesto antes de continuar. {onRetryApprovalCheck && <button type="button" className="min-h-11 font-semibold underline" onClick={onRetryApprovalCheck}>Actualizar manifiesto</button>}</p>}
           {m.estado === 'APROBADO' && !proposalsVisible && !legacyBlocked && !inconsistentProposal && !originWithoutCarrier && m.aprobacionOperacion && m.aprobacionOperacion !== 'LISTA' && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">La operación todavía no está lista para iniciarse. Contactá a Ambiente para revisar las aprobaciones y la coordinación.</p>}
           {originWithoutCarrier && !legacyBlocked && !proposalsVisible && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Esta propuesta anterior no tiene transporte aprobador. Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.</p>}
+          {!inconsistentProposal && hasProposal && ['BORRADOR','PENDIENTE_APROBACION','APROBADO'].includes(m.estado || '') && <GeneratorCurrentExceptionPanel manifiestoId={manifiestoId} />}
           {!inconsistentProposal && hasProposal && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           {!pesajeUnavailable && !proposalExplainsRejection && ['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','CANCELADO','RECHAZADO'].includes(m.estado || '') && <div className="mb-4"><ManifestNextStep work={{estado:m.estado,modalidad:m.modalidad,pesajePendiente,tipoRechazo}} role={userRol}/></div>}
           {pesajeUnavailable && <div role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-semibold">Pesaje por comprobar</p><p>No pudimos comprobar el pesaje. Actualizá el manifiesto y, si el problema continúa, consultá a Ambiente.</p>{onRetryApprovalCheck && <button type="button" className="min-h-11 font-semibold underline" onClick={onRetryApprovalCheck}>Actualizar manifiesto</button>}</div>}
