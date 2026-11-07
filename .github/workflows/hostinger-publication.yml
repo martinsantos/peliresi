@@ -9,7 +9,7 @@ on:
     inputs:
       operation:
         type: choice
-        options: [preflight, prepare, publish, activate-inspection-field-model]
+        options: [preflight, prepare, publish, activate-inspection-field-model, backfill-generator-currents-dry, backfill-generator-currents-apply, activate-generator-current-exceptions]
         default: preflight
         description: Preflight only reads the current runtime; prepare stages; publish activates an exact reviewed bundle
       release_commit:
@@ -24,7 +24,7 @@ on:
       database_migrations:
         type: string
         default: ''
-        description: Prepare only; explicitly enter 20261103160000_inspection_management_role for the reviewed additive schema change
+        description: Prepare only; explicitly enter one reviewed additive migration (20261103160000_inspection_management_role or 20261107120000_generator_current_exceptions)
       dependency_update:
         type: string
         default: ''
@@ -90,13 +90,22 @@ jobs:
       - name: Require explicit immutable release identities
         run: |
           set -euo pipefail
-          [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish || "$OPERATION" == activate-inspection-field-model ]]
+          [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish || "$OPERATION" == activate-inspection-field-model || "$OPERATION" == backfill-generator-currents-dry || "$OPERATION" == backfill-generator-currents-apply || "$OPERATION" == activate-generator-current-exceptions ]]
           [[ "$EXPECTED_ACTIVE" =~ ^[0-9a-f]{40}$ ]]
           if [[ "$OPERATION" == preflight ]]; then
             [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
           elif [[ "$OPERATION" == activate-inspection-field-model ]]; then
             [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
             [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-INSPECTIONS ]]
+          elif [[ "$OPERATION" == backfill-generator-currents-dry ]]; then
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-BACKFILL-DRY ]]
+          elif [[ "$OPERATION" == backfill-generator-currents-apply ]]; then
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-BACKFILL-APPLY ]]
+          elif [[ "$OPERATION" == activate-generator-current-exceptions ]]; then
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$DATABASE_MIGRATIONS" && -z "$DEPENDENCY_UPDATE" ]]
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER-GENERATOR-EXCEPTIONS ]]
           else
             [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
           fi
@@ -106,7 +115,7 @@ jobs:
           fi
           if [[ "$OPERATION" == prepare ]]; then
             [[ -z "$ACKNOWLEDGEMENT" && -z "$REVIEWED_BUNDLE" ]]
-            [[ -z "$DATABASE_MIGRATIONS" || "$DATABASE_MIGRATIONS" == 20261103160000_inspection_management_role ]]
+            [[ -z "$DATABASE_MIGRATIONS" || "$DATABASE_MIGRATIONS" == 20261103160000_inspection_management_role || "$DATABASE_MIGRATIONS" == 20261107120000_generator_current_exceptions ]]
             [[ -z "$DEPENDENCY_UPDATE" || "$DEPENDENCY_UPDATE" == runtime-20261104 ]]
           fi
       - uses: actions/checkout@v6
@@ -241,7 +250,9 @@ jobs:
             ssh "${opts[@]}" "$target" "/usr/bin/node --input-type=module - preflight $EXPECTED_ACTIVE" < "$RUNNER_TEMP/publisher.mjs"
             exit 0
           fi
-          if [[ "$OPERATION" != activate-inspection-field-model ]]; then [[ "$BUNDLE_SHA" =~ ^[0-9a-f]{64}$ ]]; fi
+          host_operation=false
+          case "$OPERATION" in activate-inspection-field-model|backfill-generator-currents-dry|backfill-generator-currents-apply|activate-generator-current-exceptions) host_operation=true;; esac
+          if [[ "$host_operation" != true ]]; then [[ "$BUNDLE_SHA" =~ ^[0-9a-f]{64}$ ]]; fi
           root=/srv/umsa-sitrep-publisher
           incoming="$root/incoming/$id"
           ssh "${opts[@]}" "$target" "test \"\$(hostname)\" = srv2101069.hstgr.cloud && test \"\$(cat /srv/umsa-migration/.target)\" = 179.198.115.115 && test -f /srv/umsa-migration/production.active && test ! -L $root && test ! -e $incoming && install -d -m 0755 $root $root/releases && install -d -m 0700 $root/incoming $root/staged $root/backups $incoming"
@@ -249,7 +260,7 @@ jobs:
           local_hash=$(sha256sum "$RUNNER_TEMP/publisher.mjs" | cut -d ' ' -f1)
           remote_hash=$(ssh "${opts[@]}" "$target" "sha256sum $incoming/publisher.mjs" | cut -d ' ' -f1)
           [[ "$local_hash" = "$remote_hash" ]]
-          if [[ "$OPERATION" == activate-inspection-field-model ]]; then
+          if [[ "$host_operation" == true ]]; then
             ssh "${opts[@]}" "$target" "flock --nonblock /run/lock/umsa-sitrep-publisher.lock /usr/bin/node $incoming/publisher.mjs $OPERATION $EXPECTED_ACTIVE $id $ACKNOWLEDGEMENT"
             exit 0
           fi

@@ -18,7 +18,26 @@ export const REVIEWED_MIGRATION = Object.freeze({
   afterSchema:'b0ae0578e12dc55ef6b5102f8e6c213f432308574c5ee7d887da117a7bbb9e61',
   // Prisma 5.22 formats its generated schema; verified by isolated regeneration.
   generatedSchema:'bd7a751422dfbd8169e56902dbc88e5157f303574ee75798306b35107fd664b6',
+  table:'inspection_staff_roles', references:'usuarios',
 });
+// Reviewed 2026-11-07: additive table for the generator current-stream exception rule.
+// beforeSchema is the schema already active after the migration above.
+export const GENERATOR_EXCEPTIONS_MIGRATION = Object.freeze({
+  name:'20261107120000_generator_current_exceptions',
+  sha256:'2ae90db0777609c650c3d849cf572436b457ca40a3bae03a138da3f5fb0b5786',
+  beforeSchema:'b0ae0578e12dc55ef6b5102f8e6c213f432308574c5ee7d887da117a7bbb9e61',
+  afterSchema:'f3cf4fe93caeadbd62591c0c3c7fdea471dcf9a1d67b29a6880cc44456d1f24c',
+  // Prisma 5.22 formatted output, verified by isolated regeneration (main regenerates to bd7a7514).
+  generatedSchema:'ad9cd031a6e1e5cad894aba5ee72981516dd492e1678fa9f7e4111581503a385',
+  table:'excepciones_corriente_generador', references:'generadores',
+});
+export const REVIEWED_MIGRATIONS = Object.freeze([REVIEWED_MIGRATION, GENERATOR_EXCEPTIONS_MIGRATION]);
+export type ReviewedMigration = typeof REVIEWED_MIGRATION | typeof GENERATOR_EXCEPTIONS_MIGRATION;
+export function reviewedMigration(name: unknown): ReviewedMigration {
+  const found=REVIEWED_MIGRATIONS.find(m=>m.name===name);
+  if(!found)throw new Error('Unreviewed database migration');
+  return found;
+}
 // Explicit exception for the reviewed security updates in PR #44. Unknown lockfiles
 // still require a new publisher review; no installation ever runs on the live host.
 export const REVIEWED_DEPENDENCIES = Object.freeze({
@@ -126,9 +145,9 @@ export function inspectArchive(archive: string): void {
 export function migrations(manifest: Json): Json[] {
   if (manifest.databaseMigrations===false) return [];
   const list=manifest.databaseMigrations;
-  if (manifest.format!==3 || !Array.isArray(list) || list.length!==1
-      || list[0]?.name!==REVIEWED_MIGRATION.name || list[0]?.sha256!==REVIEWED_MIGRATION.sha256
-      || manifest.schemaSha256!==REVIEWED_MIGRATION.afterSchema) throw new Error('Unreviewed database migration');
+  if (manifest.format!==3 || !Array.isArray(list) || list.length!==1) throw new Error('Unreviewed database migration');
+  const reviewed=REVIEWED_MIGRATIONS.find(m=>m.name===list[0]?.name);
+  if (!reviewed || list[0]?.sha256!==reviewed.sha256 || manifest.schemaSha256!==reviewed.afterSchema) throw new Error('Unreviewed database migration');
   return list;
 }
 export function dependencies(manifest: Json): Json | null {
@@ -216,7 +235,8 @@ export function compatible(candidate: string, current: string, manifest: Json={d
     if(manifest.schemaSha256 && manifest.schemaSha256!==after)throw new Error('Schema hash mismatch');
     return;
   }
-  if(before!==REVIEWED_MIGRATION.beforeSchema || after!==REVIEWED_MIGRATION.afterSchema
+  const reviewed=reviewedMigration(list[0].name);
+  if(before!==reviewed.beforeSchema || after!==reviewed.afterSchema
       || after!==manifest.schemaSha256)throw new Error('Separate dependency/schema review required: prisma/schema.prisma');
   for(const migration of list)if(hash(path.join(candidate,'prisma/migrations',migration.name,'migration.sql'))!==migration.sha256)throw new Error('Migration hash mismatch');
   assertPrivatePrisma(candidate,after);
@@ -226,7 +246,7 @@ export function assertPrivatePrisma(backend: string,schema: string): void {
   const root=path.join(backend,complete?'runtime-dependencies/node_modules':'runtime-prisma');inventory(root);
   const client=complete?'@prisma/client':'client',generated=complete?'.prisma/client':'generated';
   const generatedSchema=hash(path.join(root,generated,'schema.prisma'));
-  if(generatedSchema!==schema && !(schema===REVIEWED_MIGRATION.afterSchema && generatedSchema===REVIEWED_MIGRATION.generatedSchema))throw new Error('Generated Prisma schema differs from candidate');
+  if(generatedSchema!==schema && !REVIEWED_MIGRATIONS.some(m=>schema===m.afterSchema && generatedSchema===m.generatedSchema))throw new Error('Generated Prisma schema differs from candidate');
   for(const file of [client+'/package.json',client+'/index.js',generated+'/index.js',generated+'/default.js',
     generated+'/libquery_engine-debian-openssl-3.0.x.so.node'])if(!fs.statSync(path.join(root,file)).isFile())throw new Error('Candidate Prisma client incomplete');
 }
@@ -236,37 +256,37 @@ export function assertMigrationPending(state: Json): void {
   if(typeof state.usesPrismaMigrations!=='boolean' || state.tableExists!==false || state.migrationExists!==false
       || state.canCreate!==true || state.canReference!==true || state.canRecordMigration!==true)throw new Error('Migration already present or insufficient database privileges');
 }
-function migrationState(): Json {
+function migrationState(reviewed: ReviewedMigration=REVIEWED_MIGRATION): Json {
   const state=JSON.parse(run('docker',[...DB_ARGS,'-c',`SELECT json_build_object(
     'usesPrismaMigrations',to_regclass('public._prisma_migrations') IS NOT NULL,
-    'tableExists',to_regclass('public.inspection_staff_roles') IS NOT NULL,
+    'tableExists',to_regclass('public.${reviewed.table}') IS NOT NULL,
     'canCreate',has_schema_privilege(current_user,'public','CREATE'),
-    'canReference',has_table_privilege(current_user,'public.usuarios','REFERENCES'))::text;`]));
+    'canReference',has_table_privilege(current_user,'public.${reviewed.references}','REFERENCES'))::text;`]));
   state.migrationExists=state.usesPrismaMigrations
-    ? run('docker',[...DB_ARGS,'-c',`SELECT EXISTS(SELECT 1 FROM public._prisma_migrations WHERE migration_name='${REVIEWED_MIGRATION.name}');`])!=='f' : false;
+    ? run('docker',[...DB_ARGS,'-c',`SELECT EXISTS(SELECT 1 FROM public._prisma_migrations WHERE migration_name='${reviewed.name}');`])!=='f' : false;
   state.canRecordMigration=!state.usesPrismaMigrations || run('docker',[...DB_ARGS,'-c',"SELECT has_table_privilege(current_user,'public._prisma_migrations','INSERT');"])==='t';
   assertMigrationPending(state);return state;
 }
-export function migrationTransaction(sql: string,usesPrismaMigrations: boolean): string {
-  if(digest(sql)!==REVIEWED_MIGRATION.sha256)throw new Error('Migration hash mismatch');
-  const history=usesPrismaMigrations ? `IF EXISTS(SELECT 1 FROM public._prisma_migrations WHERE migration_name='${REVIEWED_MIGRATION.name}') THEN RAISE EXCEPTION 'Migration already recorded'; END IF;` : '';
+export function migrationTransaction(sql: string,usesPrismaMigrations: boolean,reviewed: ReviewedMigration=REVIEWED_MIGRATION): string {
+  if(digest(sql)!==reviewed.sha256)throw new Error('Migration hash mismatch');
+  const history=usesPrismaMigrations ? `IF EXISTS(SELECT 1 FROM public._prisma_migrations WHERE migration_name='${reviewed.name}') THEN RAISE EXCEPTION 'Migration already recorded'; END IF;` : '';
   return `SET LOCAL search_path TO public;
 SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '60s';
 DO $$ BEGIN
- IF to_regclass('public.inspection_staff_roles') IS NOT NULL THEN RAISE EXCEPTION 'Table already exists'; END IF;
+ IF to_regclass('public.${reviewed.table}') IS NOT NULL THEN RAISE EXCEPTION 'Table already exists'; END IF;
  IF (to_regclass('public._prisma_migrations') IS NOT NULL) <> ${usesPrismaMigrations} THEN RAISE EXCEPTION 'Migration history changed'; END IF;
  ${history}
 END $$;
 ${sql}
-${usesPrismaMigrations ? `INSERT INTO public._prisma_migrations (id,checksum,finished_at,migration_name,started_at,applied_steps_count) VALUES ('${crypto.randomUUID()}','${REVIEWED_MIGRATION.sha256}',CURRENT_TIMESTAMP,'${REVIEWED_MIGRATION.name}',CURRENT_TIMESTAMP,1);` : ''}
+${usesPrismaMigrations ? `INSERT INTO public._prisma_migrations (id,checksum,finished_at,migration_name,started_at,applied_steps_count) VALUES ('${crypto.randomUUID()}','${reviewed.sha256}',CURRENT_TIMESTAMP,'${reviewed.name}',CURRENT_TIMESTAMP,1);` : ''}
 `;
 }
-function applyMigration(backend: string,state: Json): void {
-  const sql=fs.readFileSync(path.join(backend,'prisma/migrations',REVIEWED_MIGRATION.name,'migration.sql'),'utf8');
+function applyMigration(backend: string,state: Json,reviewed: ReviewedMigration=REVIEWED_MIGRATION): void {
+  const sql=fs.readFileSync(path.join(backend,'prisma/migrations',reviewed.name,'migration.sql'),'utf8');
   const result=spawnSync('docker',['exec','-i','directus-admin-database-1','psql','-X','-w','-U','umsa_restore_admin_20261027',
     '-d','trazabilidad_rrpp','-v','ON_ERROR_STOP=1','--single-transaction'],
-    {input:migrationTransaction(sql,state.usesPrismaMigrations),encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:90000});
+    {input:migrationTransaction(sql,state.usesPrismaMigrations,reviewed),encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:90000});
   if(result.status!==0)throw new Error('Migration did not confirm commit; retain backup and inspect metadata before retry');
 }
 // Used by publication and failure-injection tests: no migration or restart before a validated backup.
@@ -1837,7 +1857,8 @@ function stage(commit: string,expected: string,bundle: string,id: string): Json 
   run('tar',['-xzf',archive,'-C',extracted,'--no-same-owner','--no-same-permissions']);
   sealedManifest(archive,path.join(incoming,'release.json'),extracted,commit,bundle);
   compatible(path.join(extracted,'backend'),before.backend,manifest);
-  const database=migrations(manifest).length ? migrationState() : null;
+  const declared=migrations(manifest);
+  const database=declared.length ? migrationState(reviewedMigration(declared[0].name)) : null;
   const stat=fs.statfsSync(ROOT); const sourceBytes=Object.values(inventory(before.frontend)).reduce((n:any,item:any)=>n+item.bytes,0);
   const candidateBytes=Object.entries(manifest.files).filter(([name])=>name.startsWith('backend/')).reduce((total,[_name,item])=>total+Number((item as Json).bytes),0);
   if (Number(stat.bavail)*Number(stat.bsize)<3*1024**3+3*Number(sourceBytes)+2*candidateBytes+2*fs.statSync(archive).size) throw new Error('Insufficient release/backup capacity');
@@ -1905,10 +1926,11 @@ async function publish(commit: string,expected: string,bundle: string,id: string
     sameCurrent(ready.before,current());
     assertPrepared(ready,root,bundle,beforeProxy);
     if(list.length) {
-      const state=migrationState();
+      const reviewed=reviewedMigration(list[0].name);
+      const state=migrationState(reviewed);
       if(JSON.stringify(state)!==JSON.stringify(ready.database))throw new Error('Migration metadata changed since prepare');
       migrationAttempted=true;
-      applyMigration(ready.backend,state);databaseMigrated=true;
+      applyMigration(ready.backend,state,reviewed);databaseMigrated=true;
       save(path.join(backupRoot,'migration.complete.json'),migrationOutcome(true,true,list,backupRoot));
     }
   },async()=>{
@@ -1946,11 +1968,16 @@ async function publish(commit: string,expected: string,bundle: string,id: string
   });
   return {publishedCommit:commit,...migrationOutcome(migrationAttempted,databaseMigrated,list,backupRoot),environmentPreserved:true,uploadsPreserved:true,backupRecorded:true};
 }
+export function featureEnvironment(original: string,key: string): string {
+  if(!/^[A-Z][A-Z0-9_]*_ENABLED$/.test(key))throw new Error('Unexpected feature flag name');
+  const matches=[...original.matchAll(new RegExp(`^${key}=(.*)$`,'gm'))];
+  if(matches.length>1 || (matches.length && !/^(?:true|false|"true"|"false")$/.test(matches[0][1])))throw new Error('Ambiguous feature configuration');
+  if(matches.length)return original.replace(new RegExp(`^${key}=.*$`,'m'),`${key}="true"`);
+  return original+(original.endsWith('\n')?'':'\n')+`${key}="true"\n`;
+}
 export function inspectionFeatureEnvironment(original: string): string {
-  const matches=[...original.matchAll(/^INSPECTION_FIELD_MODEL_ENABLED=(.*)$/gm)];
-  if(matches.length>1 || (matches.length && !/^(?:true|false|"true"|"false")$/.test(matches[0][1])))throw new Error('Ambiguous inspection feature configuration');
-  if(matches.length)return original.replace(/^INSPECTION_FIELD_MODEL_ENABLED=.*$/m,'INSPECTION_FIELD_MODEL_ENABLED="true"');
-  return original+(original.endsWith('\n')?'':'\n')+'INSPECTION_FIELD_MODEL_ENABLED="true"\n';
+  try { return featureEnvironment(original,'INSPECTION_FIELD_MODEL_ENABLED'); }
+  catch { throw new Error('Ambiguous inspection feature configuration'); }
 }
 function inspectionRuntimeFlags(): Json {
   const pid=environment().pid;
@@ -1967,10 +1994,13 @@ export function assertInspectionDeliveryClosed(flags: Json): void {
       || !Number.isFinite(Date.parse(flags.TRAINING_DIRECT_LOGIN_UNTIL)) || Date.parse(flags.TRAINING_DIRECT_LOGIN_UNTIL)>Date.now()
       || flags.INSPECTION_ACT_MAIL_ENABLED==='true')throw new Error('Inspection activation requires CAP closed and external delivery disabled');
 }
-export function assertInspectionFlagsPreserved(before: Json,after: Json): void {
+export function assertFeatureFlagsPreserved(before: Json,after: Json,feature: string): void {
   assertInspectionDeliveryClosed(after);
-  if(after.INSPECTION_FIELD_MODEL_ENABLED!=='true')throw new Error('Inspection feature was not activated');
-  for(const key of new Set([...Object.keys(before),...Object.keys(after)]))if(key!=='INSPECTION_FIELD_MODEL_ENABLED' && before[key]!==after[key])throw new Error('Unrelated feature configuration changed');
+  if(after[feature]!=='true')throw new Error('Feature was not activated');
+  for(const key of new Set([...Object.keys(before),...Object.keys(after)]))if(key!==feature && before[key]!==after[key])throw new Error('Unrelated feature configuration changed');
+}
+export function assertInspectionFlagsPreserved(before: Json,after: Json): void {
+  assertFeatureFlagsPreserved(before,after,'INSPECTION_FIELD_MODEL_ENABLED');
 }
 async function activateInspectionFieldModel(expected: string,id: string): Promise<Json> {
   const before=current();if(before.revision!==expected)throw new Error('Unexpected active revision');
@@ -1999,11 +2029,89 @@ async function activateInspectionFieldModel(expected: string,id: string): Promis
   });
   return {activeRevision:expected,feature:'INSPECTION_FIELD_MODEL_ENABLED',enabled:true,backup:root,capClosed:true,emailsDisabled:true,pushDisabled:true,businessDataModified:false};
 }
+
+// Generator current-stream exception rule (decided 2026-11-07). Order enforced here:
+// reviewed SCHEMA publication -> ficha backfill (dry run, then apply) -> flag activation.
+export const GENERATOR_EXCEPTIONS_FLAG='GENERATOR_Y_EXCEPTIONS_ENABLED';
+export const BACKFILL_AUDIT_ACTION='COMPLETAR_CORRIENTES_MIGRADAS';
+const BACKFILL_SCRIPT='dist/scripts/backfillGeneratorCurrents.js';
+/** Only counts may leave the host: the script prints a single JSON object of integers and a mode. */
+export function backfillSummary(output: string,mode: 'dry'|'apply'): Json {
+  const lines=output.trim().split('\n');
+  const summary=JSON.parse(lines[lines.length-1]);
+  const allowed=['modo','total','yaConFicha','aCompletar','sinDatosMigrados','completados'];
+  if(!summary || summary.modo!==mode || Object.keys(summary).some(key=>!allowed.includes(key))
+      || allowed.slice(1).some(key=>!Number.isInteger(summary[key]) || summary[key]<0))throw new Error('Unexpected backfill output');
+  if(mode==='dry' && summary.completados!==0)throw new Error('Dry run reported writes');
+  return summary;
+}
+function serviceEnvironment(): Record<string,string> {
+  const pid=environment().pid;const values: Record<string,string>={};
+  for(const item of fs.readFileSync(`/proc/${pid}/environ`,'utf8').split('\0')){const at=item.indexOf('=');if(at>0)values[item.slice(0,at)]=item.slice(at+1);}
+  return values;
+}
+function generatorExceptionsTable(): boolean {
+  return run('docker',[...DB_ARGS,'-c',`SELECT to_regclass('public.${GENERATOR_EXCEPTIONS_MIGRATION.table}') IS NOT NULL;`])==='t';
+}
+async function backfillGeneratorCurrents(expected: string,id: string,mode: 'dry'|'apply'): Promise<Json> {
+  const before=current();if(before.revision!==expected)throw new Error('Unexpected active revision');
+  if(!generatorExceptionsTable())throw new Error('Generator exception schema is not installed');
+  const script=path.join(before.backend,BACKFILL_SCRIPT);ordinary(script);
+  const root=path.join(ROOT,'backups',id);directory(root);
+  // Same process environment as the running service; nothing is printed except counts.
+  const result=spawnSync('/usr/bin/node',[script,...(mode==='apply'?['--apply']:[])],
+    {cwd:before.backend,env:serviceEnvironment(),encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:600000,maxBuffer:1024**2});
+  if(result.status!==0)throw new Error('Backfill did not complete; ficha changes are per-row and audited');
+  const summary=backfillSummary(result.stdout,mode);
+  save(path.join(root,`generator-backfill.${mode}.json`),{revision:expected,...summary});
+  sameCurrent(before,current());
+  return {activeRevision:expected,operation:`backfill-generator-currents-${mode}`,...summary,businessDataModified:mode==='apply' && summary.completados>0,backup:root};
+}
+async function activateGeneratorCurrentExceptions(expected: string,id: string): Promise<Json> {
+  const before=current();if(before.revision!==expected)throw new Error('Unexpected active revision');
+  const flags=inspectionRuntimeFlags();assertInspectionDeliveryClosed(flags);
+  if(!generatorExceptionsTable())throw new Error('Generator exception schema is not installed');
+  const backfilled=run('docker',[...DB_ARGS,'-c',`SELECT count(*) FROM public.auditorias WHERE accion='${BACKFILL_AUDIT_ACTION}';`]);
+  if(!/^[1-9][0-9]*$/.test(backfilled))throw new Error('Complete the generator ficha backfill before activating the rule');
+  const target=ENVIRONMENT[1];ordinary(target);
+  const original=fs.readFileSync(target,'utf8'),replacement=featureEnvironment(original,GENERATOR_EXCEPTIONS_FLAG);
+  const root=path.join(ROOT,'backups',id);directory(root);
+  fs.writeFileSync(path.join(root,'generator-exceptions-environment.before.credentials.env'),original,{flag:'wx',mode:0o600});
+  save(path.join(root,'generator-exceptions-activation.before.json'),{revision:before.revision,environmentSha256:digest(original),enabled:flags[GENERATOR_EXCEPTIONS_FLAG]==='true'});
+  let changed=false;
+  await activateWithRollback(async()=>{
+    sameCurrent(before,current());
+    atomic(target,replacement,digest(original));changed=true;
+    run('systemctl',['restart',SERVICE]);await waitBackend();
+  },async()=>{
+    const after=current();
+    for(const key of ['revision','backend','frontend','codeDigest','frontendDigest','proxyHash','secretFingerprint','dropin','baseUnit','liveOverride','unitFiles'])if(JSON.stringify(before[key])!==JSON.stringify(after[key]))throw new Error('Runtime changed outside the authorized feature activation');
+    if(hash(ENVIRONMENT[0])!==before.environment[0][1] || hash(target)!==digest(replacement))throw new Error('Concurrent environment change');
+    assertFeatureFlagsPreserved(flags,inspectionRuntimeFlags(),GENERATOR_EXCEPTIONS_FLAG);
+    save(path.join(root,'generator-exceptions-activation.complete.json'),{revision:expected,feature:GENERATOR_EXCEPTIONS_FLAG,enabled:true,beforeSha256:digest(original),afterSha256:digest(replacement),otherFlagsPreserved:true,capClosed:true,emailsDisabled:true,pushDisabled:true,businessDataModified:false});
+  },async()=>{
+    if(changed){atomic(target,original,digest(replacement));run('systemctl',['restart',SERVICE]);await waitBackend();}
+    save(path.join(root,'generator-exceptions-activation.rollback.json'),{environmentRestored:changed,businessDataModified:false});
+  });
+  return {activeRevision:expected,feature:GENERATOR_EXCEPTIONS_FLAG,enabled:true,backup:root,capClosed:true,emailsDisabled:true,pushDisabled:true,businessDataModified:false};
+}
+export const HOST_OPERATIONS: Record<string,string>=Object.freeze({
+  'backfill-generator-currents-dry':'SITREP-HOSTINGER-BACKFILL-DRY',
+  'backfill-generator-currents-apply':'SITREP-HOSTINGER-BACKFILL-APPLY',
+  'activate-generator-current-exceptions':'SITREP-HOSTINGER-GENERATOR-EXCEPTIONS',
+});
 async function main(): Promise<void> {
   const [operation,commit,expected,bundle,id,ack]=process.argv.slice(2);
   if(operation==='activate-inspection-field-model') {
     if(!SHA.test(commit) || !/^[0-9]+-[0-9]+$/.test(expected) || bundle!=='SITREP-HOSTINGER-INSPECTIONS' || id || ack)throw new Error('Explicit inspection activation identity and acknowledgement required');
     process.umask(0o077);console.log(JSON.stringify(await activateInspectionFieldModel(commit,expected)));return;
+  }
+  if(Object.prototype.hasOwnProperty.call(HOST_OPERATIONS,operation)) {
+    if(!SHA.test(commit) || !/^[0-9]+-[0-9]+$/.test(expected) || bundle!==HOST_OPERATIONS[operation] || id || ack)throw new Error('Explicit host operation identity and acknowledgement required');
+    process.umask(0o077);
+    const result=operation==='activate-generator-current-exceptions' ? await activateGeneratorCurrentExceptions(commit,expected)
+      : await backfillGeneratorCurrents(commit,expected,operation.endsWith('-apply')?'apply':'dry');
+    console.log(JSON.stringify(result));return;
   }
   if(operation==='preflight') {
     if(!SHA.test(commit) || expected || bundle || id || ack)throw new Error('Read-only preflight requires only the active revision');
