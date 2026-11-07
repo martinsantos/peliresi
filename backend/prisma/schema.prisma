@@ -127,6 +127,7 @@ model Generador {
   documentos   Documento[]
   renovaciones Renovacion[]
   inspecciones Inspeccion[]
+  excepcionesCorriente ExcepcionCorrienteGenerador[]
 
   @@map("generadores")
 }
@@ -338,6 +339,32 @@ model AdendaManifiesto {
 
   @@index([manifiestoId, createdAt])
   @@map("adendas_manifiesto")
+}
+
+// A Y outside the generator's registration, accepted once by the competent
+// authority. Immutable grant; it stays open until every listed Y is registered
+// in the generator's ficha (cierre records when and from which change).
+model ExcepcionCorrienteGenerador {
+  id String @id
+  generadorId String
+  origen String
+  origenId String
+  manifiestoId String
+  corrientes String[]
+  detalle Json
+  motivo String
+  otorgadaPorId String
+  impersonadoPorId String?
+  cerradaAt DateTime?
+  cierre Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  generador Generador @relation(fields: [generadorId], references: [id], onDelete: Restrict)
+
+  @@unique([origen, origenId])
+  @@index([generadorId, cerradaAt])
+  @@index([manifiestoId])
+  @@map("excepciones_corriente_generador")
 }
 
 // An operational observation is an intake, never an infraction or an inspection.
