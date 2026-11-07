@@ -169,7 +169,7 @@ La opción recomendada va primera en cada decisión.
 ### Requisitos antes de publicar
 
 1. **Migración**: el publicador sólo acepta migraciones listadas en `.github/workflows/hostinger-publication.yml`. Hay que autorizar expresamente `20261107120000_generator_current_exceptions` (aditiva). Esta rama no modifica esa configuración productiva.
-2. **Autoridad designada**: la regla usa la misma designación que las adendas (`MANIFEST_REVIEW_AUTHORITY_BY_ROLE=true` o la lista `MANIFEST_EXCEPTIONAL_REVIEWERS`). Sin designación nadie puede otorgar, y toda Y fuera de la ficha quedaría sin aprobación posible.
+2. **Autoridad de aplicación** (decidido el 7/11): el administrador general y los administradores sectoriales de generadores, transportes y operadores, activos y en su propia sesión. La designación es por rol (`MANIFEST_REVIEW_AUTHORITY_BY_ROLE=true`, ya activo en producción). Todos reciben las alertas. En la aprobación de adendas se mantiene, sin cambios, la política vigente de quién revisa adendas.
 3. **Completar la ficha en producción** con `backfillGeneratorCurrents` (primero dry-run para ver los conteos, después `--apply`), con autorización expresa sobre ese cambio de datos. Hasta entonces la pantalla sigue mostrando las Y del archivo migrado; no hay que retirar ese respaldo antes del completado.
 4. **Activar** `GENERATOR_Y_EXCEPTIONS_ENABLED=true` recién después del punto 3. Apagado, el sistema se comporta exactamente como antes.
 5. **Consulta previa de sólo lectura** que cuente cuántos generadores reales tienen ficha vacía y cuántos manifiestos abiertos declaran Y fuera de la ficha, para anticipar el impacto del primer día.

@@ -39,10 +39,10 @@ describe('switch and authority', () => {
     delete process.env.GENERATOR_Y_EXCEPTIONS_ENABLED;
     expect(generatorExceptionsEnabled()).toBe(false);
   });
-  it('only a designated general or generator-sector administrator, in their own session, grants', () => {
-    expect(canGrantGeneratorException({ id: 'a', rol: 'ADMIN' })).toBe(true);
-    expect(canGrantGeneratorException({ id: 'a', rol: 'ADMIN_GENERADOR' })).toBe(true);
-    expect(canGrantGeneratorException({ id: 'a', rol: 'ADMIN_OPERADOR' })).toBe(false);
+  it('the general administrator or any sector administrator, in their own session, grants', () => {
+    for (const rol of ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']) expect(canGrantGeneratorException({ id: 'a', rol })).toBe(true);
+    expect(canGrantGeneratorException({ id: 'a', rol: 'GENERADOR' })).toBe(false);
+    expect(canGrantGeneratorException({ id: 'a', rol: 'ADMIN_OPERADOR', activo: false })).toBe(false);
     expect(canGrantGeneratorException({ id: 'a', rol: 'OPERADOR' })).toBe(false);
     expect(canGrantGeneratorException({ id: 'a', rol: 'ADMIN', impersonatedBy: { id: 'x' } })).toBe(false);
     delete process.env.MANIFEST_REVIEW_AUTHORITY_BY_ROLE;
@@ -54,6 +54,7 @@ describe('grant', () => {
   it('records the exception once and notifies generator and authority in the bell only', async () => {
     const tx = makeTx({ ficha: 'Y8' });
     await grantGeneratorException(tx, grant);
+    expect(tx.usuario.findMany.mock.calls[0][0].where.rol).toEqual({ in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] });
     expect(tx.excepcionCorrienteGenerador.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ generadorId: 'g1', corrientes: ['Y34'], origen: 'ADENDA' }) }));
     expect(tx.notices.map((n: any) => n.usuarioId).sort()).toEqual(['u-auth', 'u-gen']);
     for (const n of tx.notices) {

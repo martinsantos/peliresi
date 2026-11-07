@@ -15,10 +15,12 @@ export function generatorExceptionsEnabled(): boolean {
   return !isTrainingSession() && process.env.GENERATOR_Y_EXCEPTIONS_ENABLED === 'true';
 }
 
-/** The competent authority for generator streams: general or generator-sector administrator, designated, own session. */
+/** Competent authority (decided 2026-11-07): the general administrator or any sector administrator
+ * (generators, carriers, operators), active, designated by role, in their own session. */
+export const GENERATOR_EXCEPTION_AUTHORITY_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
 export function canGrantGeneratorException(user: { id: string; rol: string; activo?: boolean; restricted?: boolean; impersonatedBy?: unknown } | undefined): boolean {
   if (!user || user.activo === false || user.restricted || user.impersonatedBy) return false;
-  return ['ADMIN', 'ADMIN_GENERADOR'].includes(user.rol) && designatedReviewAccount(user.id);
+  return GENERATOR_EXCEPTION_AUTHORITY_ROLES.includes(user.rol) && designatedReviewAccount(user.id);
 }
 
 /** Ficha and exceptions of one generator. `lock` serializes grants for that generator. */
@@ -42,7 +44,7 @@ async function generatorRecipients(tx: Tx, generador: { usuarioId: string; activ
   return ids.map(id => ({ id, accesosEmpresa: access.get(id) }));
 }
 async function authorityRecipients(tx: Tx) {
-  return tx.usuario.findMany({ where: { ...reviewAuthorityAccountFilter(), rol: { in: ['ADMIN', 'ADMIN_GENERADOR'] }, activo: true }, select: { id: true } });
+  return tx.usuario.findMany({ where: { ...reviewAuthorityAccountFilter(), rol: { in: GENERATOR_EXCEPTION_AUTHORITY_ROLES as ('ADMIN' | 'ADMIN_GENERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_OPERADOR')[] }, activo: true }, select: { id: true } });
 }
 
 type Notice = { key: string; titulo: string; mensaje: string; prioridad: 'ALTA' | 'URGENTE'; tipo: 'INFO_GENERAL' | 'ALERTA_SISTEMA'; url: string; manifiestoId: string | null; datos: Record<string, unknown> };
