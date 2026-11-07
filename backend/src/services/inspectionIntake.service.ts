@@ -52,15 +52,23 @@ export async function buildOperatorFinding(tx: Prisma.TransactionClient, input: 
 }
 export type OperatorFinding = Awaited<ReturnType<typeof buildOperatorFinding>>;
 
+/** Generator-ficha classification of the observed streams (only when the exception rule is enabled). */
+export type GeneratorCurrentsScope = { estado: string; corrientes: string[]; excepcionAbierta?: { id: string; corrientes: string[] } };
+const GENERATOR_SCOPE_MOTIVES: Record<string, string> = {
+  REQUIERE_EXCEPCION: 'Y_NO_INSCRIPTA_GENERADOR', BLOQUEADA: 'Y_NO_INSCRIPTA_REITERADA', SIN_FICHA: 'FICHA_GENERADOR_SIN_CORRIENTES',
+};
+
 export async function recordFindingIntakes(tx: Prisma.TransactionClient, input: {
-  adendaId: string; referencia: string; generadorId: string; creadoPorId: string; informe: OperatorFinding;
+  adendaId: string; referencia: string; generadorId: string; creadoPorId: string; informe: OperatorFinding; alcanceGenerador?: GeneratorCurrentsScope;
 }) {
   const report = input.informe;
   const general = { origen: 'INFORME_ADENDA', origenId: input.adendaId, referencia: input.referencia, creadoPorId: input.creadoPorId };
-  if (report.diferencias.length) {
+  const scopeMotive = input.alcanceGenerador ? GENERATOR_SCOPE_MOTIVES[input.alcanceGenerador.estado] : undefined;
+  if (report.diferencias.length || scopeMotive) {
     const generator = await tx.generador.findUniqueOrThrow({ where: { id: input.generadorId }, select: { razonSocial: true } });
     await recordInspectionIntake(tx, { ...general, tipoActor: 'GENERADOR', actorId: input.generadorId, actorNombre: generator.razonSocial,
-      motivos: [...new Set(report.diferencias.map(row => row.tipo))], evidencia: report });
+      motivos: [...new Set([...report.diferencias.map(row => row.tipo), ...(scopeMotive ? [scopeMotive] : [])])],
+      evidencia: input.alcanceGenerador ? { ...report, alcanceGenerador: input.alcanceGenerador } as unknown as Prisma.InputJsonValue : report });
   }
   const scope = report.alcanceOperador;
   const motives = scope.estado === 'SIN_DATOS_VERIFICABLES' ? ['ALCANCE_SIN_VERIFICAR'] : scope.corrientesNoRegistradas.length ? ['Y_NO_CONSTA_EN_FICHA_OPERADOR'] : [];

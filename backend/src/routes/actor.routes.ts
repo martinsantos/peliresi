@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { hasRole, isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess, requireActorRead } from '../middlewares/auth.middleware';
+import { generatorCurrentExceptions } from '../controllers/generatorCurrentException.controller';
 import {
     getGeneradores, getGeneradorById, createGenerador, updateGenerador, deleteGenerador,
     getTransportistas, getTransportistaById, createTransportista, updateTransportista, deleteTransportista,
@@ -71,6 +72,7 @@ router.post('/generadores/recordatorios', hasRole('ADMIN', 'ADMIN_GENERADOR'), c
  *       404:
  *         description: Generador no encontrado
  */
+router.get('/generadores/:id/excepciones-corriente', generatorCurrentExceptions);
 router.get('/generadores/:id', requireActorRead('generador'), getGeneradorById);
 
 /**

@@ -16,7 +16,9 @@ import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { notifyAddendumParties } from '../services/manifiestoAddendumNotice.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import { findingAtDestination } from '../domain/inspectionIntake';
-import { buildOperatorFinding, recordFindingIntakes } from '../services/inspectionIntake.service';
+import { buildOperatorFinding, recordFindingIntakes, type GeneratorCurrentsScope } from '../services/inspectionIntake.service';
+import { canGrantGeneratorException, evaluateGeneratorCurrents, generatorExceptionsEnabled, grantGeneratorException, noticeAuthorityRequired, noticeBlockedCurrents } from '../services/generatorCurrentException.service';
+import { currentsDecisionMessage } from '../domain/generatorCurrents';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (!manifestFeatureEnabled('MANIFEST_ADDENDA_ENABLED')) return next(new AppError('Adendas no habilitadas', 404));
@@ -137,8 +139,21 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
       revisiones: [],
       } });
       verifyReplay(created);
+      let alcanceGenerador: GeneratorCurrentsScope | undefined;
+      if (generatorExceptionsEnabled()) {
+        const { decision } = await evaluateGeneratorCurrents(tx, { generadorId: manifest.generadorId, manifiestoId: manifest.id, corrientes: command.residuos.map(row => row.corriente) });
+        const url = '/manifiestos/' + manifest.id + '/adendas?adenda=' + created.id;
+        if (decision.estado === 'REQUIERE_EXCEPCION' || decision.estado === 'BLOQUEADA' || decision.estado === 'SIN_FICHA') {
+          alcanceGenerador = { estado: decision.estado, corrientes: decision.estado === 'SIN_FICHA' ? [] : decision.corrientes,
+            ...(decision.estado === 'BLOQUEADA' ? { excepcionAbierta: { id: decision.excepcionAbierta.id, corrientes: decision.excepcionAbierta.corrientes } } : {}) };
+        }
+        if (decision.estado === 'BLOQUEADA') await noticeBlockedCurrents(tx, { generadorId: manifest.generadorId, manifiestoId: manifest.id, numero: manifest.numero,
+          corrientes: decision.corrientes, abierta: decision.excepcionAbierta, origenId: created.id, url, momento: 'ADENDA' });
+        if (decision.estado === 'REQUIERE_EXCEPCION') await noticeAuthorityRequired(tx, { generadorId: manifest.generadorId, manifiestoId: manifest.id, numero: manifest.numero,
+          corrientes: decision.corrientes, origenId: created.id, url, momento: 'ADENDA' });
+      }
       if (informeHallazgo) await recordFindingIntakes(tx, { adendaId: created.id, referencia: manifest.numero,
-        generadorId: manifest.generadorId, creadoPorId: req.user.id, informe: informeHallazgo });
+        generadorId: manifest.generadorId, creadoPorId: req.user.id, informe: informeHallazgo, alcanceGenerador });
       pushIds = await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id,req.user.rol);
       return created;
     }).catch(async (error: unknown) => {
@@ -180,10 +195,29 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
           throw new AppError('La observación quedó como antecedente de una rectificación aprobada. Revisá la rectificación.', 409);
         }
       }
+      // A Y outside the generator's ficha: only the authority grants the single exception; with one open, refuse.
+      let grant: string[] | null = null;
+      if (command.decision === 'APROBADA' && generatorExceptionsEnabled()) {
+        const observed = (current.residuos as unknown as { corriente: string }[]).map(row => row.corriente);
+        const { decision } = await evaluateGeneratorCurrents(tx, { generadorId: manifest.generadorId, manifiestoId: manifest.id, corrientes: observed, lock: true });
+        if (decision.estado === 'BLOQUEADA') throw new AppError(currentsDecisionMessage(decision, 'ADENDA') as string, 409);
+        if (decision.estado === 'REQUIERE_EXCEPCION') {
+          if (!canGrantGeneratorException(req.user)) throw new AppError(currentsDecisionMessage(decision, 'ADENDA') as string, 403);
+          grant = decision.corrientes;
+        }
+      }
       const updated = await tx.adendaManifiesto.updateMany({ where: { id: current.id, version: command.version }, data: {
         version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}), fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
       } });
       if (updated.count !== 1) throw new AppError('Otro revisor resolvió esta versión; recargá', 409);
+      if (grant) {
+        const exempted = grant;
+        await grantGeneratorException(tx, { generadorId: manifest.generadorId, origen: 'ADENDA', origenId: current.id, manifiestoId: manifest.id, numero: manifest.numero,
+          corrientes: exempted, motivo: command.nota, userId: req.user.id, impersonadoPorId: req.user.impersonatedBy?.id || null,
+          url: '/manifiestos/' + manifest.id + '/adendas?adenda=' + current.id,
+          detalle: { adendaId: current.id, versionAdenda: command.version + 1, revisionId: command.id,
+            observado: (current.residuos as unknown as { corriente: string }[]).filter(row => exempted.includes(row.corriente)) } as unknown as Prisma.InputJsonValue });
+      }
       if (command.decision === 'APROBADA') {
         await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
           '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id,

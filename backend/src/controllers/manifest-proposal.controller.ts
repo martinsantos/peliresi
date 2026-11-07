@@ -16,6 +16,7 @@ import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINAT
 const LEGACY_IN_SITU_MESSAGE = 'Esta propuesta anterior no tiene transporte aprobador. Creá una nueva propuesta con las tres partes para iniciar.';
 const CONFLICTING_STATE_MESSAGE = 'El estado de la propuesta no coincide con las decisiones o la coordinación registradas. Contactá a Ambiente para revisarlo; el historial se conserva.';
 import { agendaQuery } from '../domain/manifestAgenda';
+import { assertManifestCurrentsApprovable } from '../services/generatorCurrentException.service';
 
 // Under a short burst the pool can be busy with GPS and Monitor requests.
 // Wait within the API's overall deadline rather than failing after Prisma's
@@ -124,6 +125,8 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     if (!reject && value.events.some(e => e.tipo === APPROVAL_EVENTS[rol])) return value.manifest;
     if (!reject && legacyInSituWithoutCarrier(value.proposal)) throw new AppError(LEGACY_IN_SITU_MESSAGE, 409);
     if (value.manifest.estado !== 'PENDIENTE_APROBACION') throw new AppError(reject ? 'La propuesta ya no está pendiente. Actualizá y revisá su estado antes de continuar.' : 'La propuesta ya no admite aprobaciones', 409);
+    // A Y outside the generator's ficha: the authority grants the exception before any approval is recorded.
+    if (!reject) await assertManifestCurrentsApprovable(tx, id);
     const createdAt = await proposalEventTime(tx);
     const event = await tx.eventoManifiesto.create({ data: {
       manifiestoId: id, tipo: reject ? 'RECHAZO_PARTE' : APPROVAL_EVENTS[rol], usuarioId: req.user.id,

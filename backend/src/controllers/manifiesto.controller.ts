@@ -14,6 +14,8 @@ import { canAccessManifiesto } from '../utils/roleFilter';
 import { Prisma } from '@prisma/client';
 import { prepareTransportAssignment } from '../domain/manifiestoTransportAssignment';
 import { manifestCreationIntent, readManifestCreationReceipt, recordManifestCreation } from '../domain/manifestCreationIntent';
+import { evaluateGeneratorCurrents, generatorExceptionsEnabled, noticeAuthorityRequired, noticeBlockedCreation } from '../services/generatorCurrentException.service';
+import { currentsDecisionMessage } from '../domain/generatorCurrents';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
@@ -178,6 +180,16 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         }
       }
       if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: transportistaId!, operadorId });
+      // A Y outside the generator's ficha: with an open exception the manifest cannot be created;
+      // otherwise the authority must grant the single exception before the parties approve.
+      let requiresAuthority: string[] | null = null;
+      if (generatorExceptionsEnabled()) {
+        const codes = (await tx.tipoResiduo.findMany({ where: { id: { in: residuos.map(r => r.tipoResiduoId) } }, select: { codigo: true } })).map(t => t.codigo);
+        const { decision } = await evaluateGeneratorCurrents(tx, { generadorId, manifiestoId: '', corrientes: codes });
+        if (decision.estado === 'BLOQUEADA') throw Object.assign(new AppError(currentsDecisionMessage(decision, 'CREACION') as string, 409),
+          { bloqueoCorrientes: { generadorId, corrientes: decision.corrientes, abierta: decision.excepcionAbierta } });
+        if (decision.estado === 'REQUIERE_EXCEPCION') requiresAuthority = decision.corrientes;
+      }
       const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
       const numero = await generarNumeroManifiesto(tx);
 
@@ -240,6 +252,8 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         descripcion: JSON.stringify({ version: modalidad === 'IN_SITU' ? 2 : 1, modalidad, generadorId, transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
       } });
       if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId, req.user.rol);
+      if (requiresAuthority) await noticeAuthorityRequired(tx, { generadorId, manifiestoId: created.id, numero: created.numero, corrientes: requiresAuthority,
+        origenId: created.id, url: '/manifiestos/' + created.id, momento: 'MANIFIESTO' });
       if (intent) await recordManifestCreation(tx, intent, created.id);
       return created;
     });
@@ -249,6 +263,9 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       data: { manifiesto, replayed }
     });
   } catch (error) {
+    const blocked = (error as { bloqueoCorrientes?: Parameters<typeof noticeBlockedCreation>[0] }).bloqueoCorrientes;
+    // The refusal rolled back the creation; the alert is committed on its own.
+    if (blocked) await noticeBlockedCreation(blocked).catch(() => undefined);
     next(error);
   }
 };

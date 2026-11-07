@@ -5,6 +5,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { approvedOperatorModeChange } from '../domain/operatorModalities';
 import { notifyRenovacion } from '../services/renovacion-notification.service';
+import { closeCoveredGeneratorExceptions } from '../services/generatorCurrentException.service';
 import {
     ownRenovacionQuerySchema,
     canReviewRenovacion,
@@ -200,6 +201,8 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
                 if (Object.keys(safeChanges).length === 0) throw new AppError('La renovacion no contiene cambios aplicables', 409);
                 if (tipoActor === 'GENERADOR' && renovacion.generadorId) {
                     await tx.generador.update({ where: { id: renovacion.generadorId }, data: safeChanges as Prisma.GeneradorUpdateInput });
+                    // An approved renewal that registers an exempted Y closes that exception (history kept).
+                    if ('corrientesControl' in safeChanges) await closeCoveredGeneratorExceptions(tx, { generadorId: renovacion.generadorId, userId: req.user!.id, fuente: 'RENOVACION', referencia: renovacion.id });
                 } else if (tipoActor === 'OPERADOR' && renovacion.operadorId) {
                     const current = await tx.operador.findUnique({ where: { id: renovacion.operadorId }, select: { tipoOperador: true } });
                     if (!current) throw new AppError('Operador no encontrado', 404);

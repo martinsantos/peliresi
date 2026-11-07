@@ -8,6 +8,7 @@ import { multiGpsEnabled, transportGpsTargets } from '../controllers/transport-g
 import { getManifestProposal, approveManifestParty, getProposalAgenda, startManifestCoordination, getTrainingTasks } from '../controllers/manifest-proposal.controller';
 import { Router } from 'express';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
+import { grantManifestCurrentException, manifestCurrentException } from '../controllers/generatorCurrentException.controller';
 import {
     verificarManifiesto,
     getManifiestos,
@@ -80,6 +81,9 @@ router.get('/verificar/:numero', verificarManifiesto);
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+// Generator current-stream exception (fail-closed flag GENERATOR_Y_EXCEPTIONS_ENABLED).
+router.get('/:id/excepcion-corriente', manifestCurrentException);
+router.post('/:id/excepcion-corriente', grantManifestCurrentException);
 router.get('/cargas-en-curso',multiGpsEnabled,hasRole('TRANSPORTISTA'),transportGpsTargets);
 router.get('/relevos-asignados',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportHandoffs);
 router.post('/relevos-asignados/:tramoId/acceso',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportAccess);

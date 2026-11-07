@@ -12,6 +12,7 @@ import { parsePagination } from '../utils/pagination';
 import { directoryText, operatorDirectoryQuery } from '../services/actorDirectoryFilters';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
 import { fiscalCompanyRecipients } from '../services/fiscalCompanyNotice.service';
+import { closeCoveredGeneratorExceptions } from '../services/generatorCurrentException.service';
 import {
     buildFiscalWhere,
     combineWhere,
@@ -404,6 +405,8 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             }
         });
 
+        // Registering an exempted Y in the ficha closes that exception (history kept).
+        if (antes.corrientesControl !== actualizado.corrientesControl) await closeCoveredGeneratorExceptions(transaction, { generadorId: id, userId: req.user!.id, fuente: 'EDICION_FICHA' });
         await notifyCompanyActorChange(transaction, 'GENERADOR', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'GENERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
