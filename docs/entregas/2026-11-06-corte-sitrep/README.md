@@ -43,6 +43,10 @@ Desde la raíz del repo, seguir la cadena en este orden:
 - `frontend/src-v6/pages/inspecciones/InspectionSignaturePanel.tsx` presenta el encabezado. `InspectionEventualPage.tsx` en ese directorio consulta el origen y permite volver. `App.tsx` y `AppMobile.tsx` registran las rutas de ambas superficies.
 - `backend/src/services/inspectionFieldActPdf.service.ts` proyecta la parte declarada en el modelo compacto. Contrastar el PDF descargable con la pantalla y con una copia firmada en preview. El smoke de producción comprobó el enlace de pantalla.
 
+## Revisión independiente del 7 de noviembre
+
+[Informe de revisión](REVISION-20261107.md), en la rama `claude/revision-sitrep-20261107`, sin publicar. Se confirmó y corrigió en preview que vincular un antecedente eventual a un expediente que ya cerró la etapa de campo dejaba la firma del acta sin vigencia y sin posibilidad de volver a firmar. Desde esta rama, ese vínculo sólo se admite en BORRADOR, PLANIFICADA o EN_CAMPO. También se eliminó el oráculo 403/404 de la vista y la copia firmada para cuentas operativas. Quedan documentados, sin corregir, el regreso desde el eventual al bloque 1 de la hoja, los enlaces duplicados con dos externos y la falta de la parte externa en el PDF de expediente.
+
 ## Límites y pendientes para la próxima decisión
 
 **Prioridad 1 — Trazabilidad y permisos.** Repetir con observaciones vacías y editadas, dos partes externas, varios antecedentes y un expediente sin origen eventual. Probar el inspector asignado, otro inspector, jefatura y un actor operativo intentando acceso directo. Verificar que denegar acceso tampoco filtre nombre o existencia del expediente. Revisar PDF previo, PDF firmado y verificación de una firma histórica.

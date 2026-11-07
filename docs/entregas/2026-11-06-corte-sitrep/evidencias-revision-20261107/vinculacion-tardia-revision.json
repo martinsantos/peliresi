@@ -1,0 +1,104 @@
+{
+  "state": {
+    "tag": "rev-a7a0807f",
+    "eventualId": "38e321aa-e2d7-4b47-943e-bfb5a4005612",
+    "inspectionId": "cmw69geq9000910769s549ujh",
+    "numero": "IRP-2026-00020",
+    "firmaId": "cmw69gev0000s1076gkwdog3q",
+    "antecedentes": [
+      "6c574007de9f457854eb6ee2a4702e8c8abf2b47b5a11f4a7b3c5c5d3bd24373",
+      "84c66e29f135b593b9c355357c3958d3a17661bed7d148582ad41a835cb09794"
+    ]
+  },
+  "log": [
+    {
+      "name": "eventual",
+      "id": "38e321aa-e2d7-4b47-943e-bfb5a4005612",
+      "etapa": "REGISTRADO"
+    },
+    {
+      "name": "antecedentes",
+      "n": 2,
+      "tipos": [
+        "OPERADOR",
+        "TRANSPORTISTA"
+      ],
+      "nombres": [
+        "Externo operador rev-a7a0807f",
+        "Externo transporte rev-a7a0807f"
+      ]
+    },
+    {
+      "name": "expediente",
+      "id": "cmw69geq9000910769s549ujh",
+      "numero": "IRP-2026-00020",
+      "estado": "PLANIFICADA",
+      "tipoActor": null
+    },
+    {
+      "name": "vista con observaciones vacías",
+      "origenes": [
+        "Externo operador rev-a7a0807f"
+      ],
+      "pendientes": [
+        "Registrá lo observado antes de firmar."
+      ]
+    },
+    {
+      "name": "vista antes de firmar",
+      "origenes": [
+        "Externo operador rev-a7a0807f"
+      ],
+      "pendientes": [],
+      "firmas": 0
+    },
+    {
+      "name": "después de firmar",
+      "firmas": 1,
+      "hash": true
+    },
+    {
+      "name": "enviar a revisión",
+      "status": 200,
+      "estado": "EN_REVISION",
+      "message": "Estado actualizado. No se envio ninguna comunicacion externa."
+    },
+    {
+      "name": "vinculación tardía",
+      "status": 409,
+      "message": "Ese expediente ya cerró la etapa de campo: su acta no admite otra parte externa. Abrí una inspección nueva desde este antecedente."
+    },
+    {
+      "name": "vista tras vincular",
+      "origenes": [
+        "Externo operador rev-a7a0807f"
+      ],
+      "firmasVigentes": 1,
+      "hashCambio": false
+    },
+    {
+      "name": "pdfs",
+      "acta": 200,
+      "actaBytes": 52019,
+      "copiaFirmada": 200,
+      "copiaBytes": 51827
+    },
+    {
+      "name": "volver a firmar",
+      "status": 409,
+      "message": "El acta cambió. Revisá la versión actual antes de volver a firmar."
+    },
+    {
+      "name": "eventual desde inspección",
+      "status": 200,
+      "partes": [
+        {
+          "tipoActor": "OPERADOR",
+          "actorNombre": "Externo operador rev-a7a0807f"
+        }
+      ]
+    }
+  ],
+  "sentBefore": 0,
+  "sentAfter": 0
+}

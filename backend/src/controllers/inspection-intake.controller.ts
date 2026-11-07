@@ -7,6 +7,7 @@ import { isInspectionAdministrator, isInspectionGeneralManager, isInspectionStaf
 import { intakeDecisionSchema, intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import { canAccessInspection } from './inspeccion.controller';
+import { eventualLinkAllowed } from '../domain/inspectionEventualOrigin';
 
 export async function listInspectionIntakes(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -52,6 +53,7 @@ export async function decideInspectionIntake(req: AuthRequest, res: Response, ne
         inspection = await tx.inspeccion.findUnique({ where: { id: command.inspeccionId } });
         if (!inspection || !canAccessInspection(req.user, inspection)) throw new AppError('Expediente no encontrado', 404);
         assertIntakeInspection(current, inspection);
+        if (!eventualLinkAllowed(current, inspection)) throw new AppError('Ese expediente ya cerró la etapa de campo: su acta no admite otra parte externa. Abrí una inspección nueva desde este antecedente.', 409);
       }
       const reserved = await tx.antecedenteFiscalizacion.updateMany({ where: { id: current.id, version: command.version }, data: {
         estado: command.accion, version: { increment: 1 }, ...(inspection ? { inspeccionId: inspection.id } : {}),

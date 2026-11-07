@@ -18,4 +18,8 @@ export const INTAKE_REASON_LABELS: Record<string, string> = {
   Y_NO_CONSTA_EN_FICHA_OPERADOR: 'Y no registrada en la ficha del operador', ALCANCE_SIN_VERIFICAR: 'Alcance del operador sin verificar',
   PARTICIPANTE_SIN_ALTA: 'Participante sin alta', RELEVO_SIN_ALTA: 'Relevo sin alta', IDENTIDAD_INCOMPLETA: 'Identidad incompleta',
 };
+/** Mirrors the API rule: a declared external party joins the act only while the field stage is open. */
+export const EVENTUAL_LINK_STATES = ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'];
+export const eventualLinkAllowed = (intake: { origen: string }, inspection: { estado: string }) =>
+  intake.origen !== 'PARTICIPANTE_EVENTUAL' || EVENTUAL_LINK_STATES.includes(inspection.estado);
 export const INTAKE_STATE_LABELS: Record<string, string> = { PENDIENTE: 'Por evaluar', EN_EVALUACION: 'En evaluación', VINCULADA: 'Con inspección', DESCARTADA: 'Descartada con motivo' };

@@ -1,0 +1,109 @@
+{
+  "state": {
+    "tag": "rev-a13589c3",
+    "eventualId": "9d4a66ea-29f7-4d42-81fa-6338ea6c383d",
+    "inspectionId": "cmw697sb2001bkw5xal2ogjwn",
+    "numero": "IRP-2026-00019",
+    "firmaId": "cmw697sg5001ukw5xiur1fxg7",
+    "antecedentes": [
+      "e287ebc98f028fbc5e815731ffdecd581a587ca018ed03c6924ce847e7ff6d5b",
+      "78f2fe7b386032f3454b7bed98c0eee4bea38d962bdb4262fc98517723fc3c96"
+    ]
+  },
+  "log": [
+    {
+      "name": "eventual",
+      "id": "9d4a66ea-29f7-4d42-81fa-6338ea6c383d",
+      "etapa": "REGISTRADO"
+    },
+    {
+      "name": "antecedentes",
+      "n": 2,
+      "tipos": [
+        "OPERADOR",
+        "TRANSPORTISTA"
+      ],
+      "nombres": [
+        "Externo operador rev-a13589c3",
+        "Externo transporte rev-a13589c3"
+      ]
+    },
+    {
+      "name": "expediente",
+      "id": "cmw697sb2001bkw5xal2ogjwn",
+      "numero": "IRP-2026-00019",
+      "estado": "PLANIFICADA",
+      "tipoActor": null
+    },
+    {
+      "name": "vista con observaciones vacías",
+      "origenes": [
+        "Externo operador rev-a13589c3"
+      ],
+      "pendientes": [
+        "Registrá lo observado antes de firmar."
+      ]
+    },
+    {
+      "name": "vista antes de firmar",
+      "origenes": [
+        "Externo operador rev-a13589c3"
+      ],
+      "pendientes": [],
+      "firmas": 0
+    },
+    {
+      "name": "después de firmar",
+      "firmas": 1,
+      "hash": true
+    },
+    {
+      "name": "enviar a revisión",
+      "status": 200,
+      "estado": "EN_REVISION",
+      "message": "Estado actualizado. No se envio ninguna comunicacion externa."
+    },
+    {
+      "name": "vinculación tardía",
+      "status": 200,
+      "estado": "VINCULADA"
+    },
+    {
+      "name": "vista tras vincular",
+      "origenes": [
+        "Externo operador rev-a13589c3",
+        "Externo transporte rev-a13589c3"
+      ],
+      "firmasVigentes": 0,
+      "hashCambio": true
+    },
+    {
+      "name": "pdfs",
+      "acta": 200,
+      "actaBytes": 64060,
+      "copiaFirmada": 200,
+      "copiaBytes": 51800
+    },
+    {
+      "name": "volver a firmar",
+      "status": 409,
+      "message": "El acta cambió. Revisá la versión actual antes de volver a firmar."
+    },
+    {
+      "name": "eventual desde inspección",
+      "status": 200,
+      "partes": [
+        {
+          "tipoActor": "OPERADOR",
+          "actorNombre": "Externo operador rev-a13589c3"
+        },
+        {
+          "tipoActor": "TRANSPORTISTA",
+          "actorNombre": "Externo transporte rev-a13589c3"
+        }
+      ]
+    }
+  ],
+  "sentBefore": 0,
+  "sentAfter": 0
+}

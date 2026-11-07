@@ -1,0 +1,219 @@
+{
+  "twoCase": {
+    "numero": "IRP-2026-00021",
+    "inspeccion": "cmw69icid001n1076pxgkg3tn",
+    "eventual": "092db56a-dcfa-4276-8b17-47ac5f36004c",
+    "fecha": "2026-11-17",
+    "nombres": [
+      "Externo operador ui-924b88b9",
+      "Externo transporte ui-924b88b9"
+    ],
+    "ref": "BI-092db56a-dcfa-4276-8b17-47ac5f36004c"
+  },
+  "oneCase": {
+    "numero": "IRP-2026-00013",
+    "inspeccion": "cmw5kh9i400jbjmt28xk5u6r9",
+    "eventual": "8ce42625-924e-46c2-991a-6adc7512e607",
+    "fecha": "2026-11-16",
+    "nombres": [
+      "Externo de práctica web-generator-1c453905"
+    ],
+    "ref": "BI-8ce42625-924e-46c2-991a-6adc7512e607"
+  },
+  "results": [
+    {
+      "name": "setup",
+      "eventual": "092db56a-dcfa-4276-8b17-47ac5f36004c",
+      "numero": "IRP-2026-00021",
+      "inspeccion": "cmw69icid001n1076pxgkg3tn",
+      "link2": 200,
+      "nombres": [
+        "Externo operador ui-924b88b9",
+        "Externo transporte ui-924b88b9"
+      ]
+    },
+    {
+      "name": "acta web IRP-2026-00021",
+      "filasAgenda": 1,
+      "nombresEnEncabezado": [
+        true,
+        true
+      ],
+      "sinResponsable": false,
+      "enlacesOrigen": 2,
+      "enlaceAlto": 44,
+      "partesEnEventual": [
+        true,
+        true
+      ],
+      "estadoEventual": "registrado",
+      "volverAlto": 44,
+      "regreso": "/inspecciones/cmw69icid001n1076pxgkg3tn#firma",
+      "panelVisible": true,
+      "panelEnVista": false,
+      "actaSigueAbierta": false
+    },
+    {
+      "name": "acta web IRP-2026-00013",
+      "filasAgenda": 1,
+      "nombresEnEncabezado": [
+        true
+      ],
+      "sinResponsable": false,
+      "enlacesOrigen": 1,
+      "enlaceAlto": 44,
+      "partesEnEventual": [
+        true
+      ],
+      "estadoEventual": "tratado",
+      "volverAlto": 44,
+      "regreso": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9#firma",
+      "panelVisible": true,
+      "panelEnVista": false,
+      "actaSigueAbierta": false
+    },
+    {
+      "name": "acta app IRP-2026-00021",
+      "filasAgenda": 1,
+      "nombresEnEncabezado": [
+        true,
+        true
+      ],
+      "sinResponsable": false,
+      "enlacesOrigen": 2,
+      "enlaceAlto": 44,
+      "partesEnEventual": [
+        true,
+        true
+      ],
+      "estadoEventual": "registrado",
+      "volverAlto": 44,
+      "regreso": "/app/inspecciones/cmw69icid001n1076pxgkg3tn#firma",
+      "panelVisible": true,
+      "panelEnVista": false,
+      "actaSigueAbierta": false
+    },
+    {
+      "name": "acta app IRP-2026-00013",
+      "filasAgenda": 1,
+      "nombresEnEncabezado": [
+        true
+      ],
+      "sinResponsable": false,
+      "enlacesOrigen": 1,
+      "enlaceAlto": 44,
+      "partesEnEventual": [
+        true
+      ],
+      "estadoEventual": "tratado",
+      "volverAlto": 44,
+      "regreso": "/app/inspecciones/cmw5kh9i400jbjmt28xk5u6r9#firma",
+      "panelVisible": true,
+      "panelEnVista": false,
+      "actaSigueAbierta": false
+    },
+    {
+      "name": "denegado inspector2 web",
+      "seen": [
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "api": [
+            404
+          ],
+          "url": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "Sin conexión · comprobá el estado de guardado SITREPInspector Inicio Manifiestos Inspecciones Reportes Avisos Consultar actores Escanear QR Configuración Ayuda "
+        },
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "api": [
+            403
+          ],
+          "url": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "Sin conexión · comprobá el estado de guardado SITREPInspector Inicio Manifiestos Inspecciones Reportes Avisos Consultar actores Escanear QR Configuración Ayuda "
+        }
+      ]
+    },
+    {
+      "name": "denegado inspector2 app",
+      "seen": [
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "api": [
+            404
+          ],
+          "url": "/app/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "Inspección Inspector Volver a la inspección Eventual de origen No se pudo consultar este eventual desde la inspección. Reintentar"
+        },
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "api": [
+            403
+          ],
+          "url": "/app/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "Inspección Inspector Sin acceso a este expediente Tu cuenta no tiene permiso para consultar esta inspección. Reintentar Volver al listado"
+        }
+      ]
+    },
+    {
+      "name": "denegado generador web",
+      "seen": [
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "api": [],
+          "url": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "SITREP Acceso no disponible Este enlace no está disponible para tu rol actual. Podés continuar desde Inicio o revisar tu actividad en Mi perfil. QA generator 1d"
+        },
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "api": [],
+          "url": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "SITREP Acceso no disponible Este enlace no está disponible para tu rol actual. Podés continuar desde Inicio o revisar tu actividad en Mi perfil. QA generator 1d"
+        }
+      ]
+    },
+    {
+      "name": "denegado generador app",
+      "seen": [
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "api": [],
+          "url": "/app/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "SITREP Acceso no disponible Este enlace no está disponible para tu rol actual. Podés continuar desde Inicio o revisar tu actividad en Mi perfil. QA generator 1d"
+        },
+        {
+          "target": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "api": [],
+          "url": "/app/inspecciones/cmw5kh9i400jbjmt28xk5u6r9",
+          "revelaNombre": false,
+          "revelaNumero": false,
+          "revelaRef": false,
+          "extracto": "SITREP Acceso no disponible Este enlace no está disponible para tu rol actual. Podés continuar desde Inicio o revisar tu actividad en Mi perfil. QA generator 1d"
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "sentBefore": 0,
+  "sentAfter": 0
+}

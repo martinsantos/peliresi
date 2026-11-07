@@ -1,0 +1,1242 @@
+{
+  "cases": [
+    {
+      "numero": "IRP-2026-00013",
+      "inspeccion": {
+        "numero": "IRP-2026-00013",
+        "estado": "EN_CAMPO",
+        "tipoActor": null,
+        "inspectorId": "cmw3duuh900035uqww7dd5m74",
+        "version": 6
+      },
+      "links": [
+        {
+          "id": "bdf2e38a8743226b6a2bd4b2e8babff1450e85afd6e77bc72698abea3ec34707",
+          "origen": "PARTICIPANTE_EVENTUAL",
+          "origenId": "8ce42625-924e-46c2-991a-6adc7512e607",
+          "tipoActor": "OPERADOR",
+          "actorNombre": "Externo de práctica web-generator-1c453905",
+          "estado": "VINCULADA"
+        }
+      ],
+      "eventual": {
+        "etapa": "TRATADO"
+      },
+      "firmas": 0
+    },
+    {
+      "numero": "IRP-2026-00014",
+      "inspeccion": {
+        "numero": "IRP-2026-00014",
+        "estado": "EN_CAMPO",
+        "tipoActor": null,
+        "inspectorId": "cmw3duuh900035uqww7dd5m74",
+        "version": 6
+      },
+      "links": [
+        {
+          "id": "8135c459560330ec5bf1d5f6f34c342c732a6db4af2996db784b1364e1d12e40",
+          "origen": "PARTICIPANTE_EVENTUAL",
+          "origenId": "07e76623-c91a-4e4e-aa6a-9d7644ba7f52",
+          "tipoActor": "GENERADOR",
+          "actorNombre": "Externo de práctica web-carrier-6190acfc",
+          "estado": "VINCULADA"
+        }
+      ],
+      "eventual": {
+        "etapa": "TRATADO"
+      },
+      "firmas": 0
+    },
+    {
+      "numero": "IRP-2026-00015",
+      "inspeccion": {
+        "numero": "IRP-2026-00015",
+        "estado": "EN_CAMPO",
+        "tipoActor": null,
+        "inspectorId": "cmw3duuh900035uqww7dd5m74",
+        "version": 6
+      },
+      "links": [
+        {
+          "id": "793d657c0cc23db458df10ed42acb1c306ef2a2853a0b853c38f52f626d7d955",
+          "origen": "PARTICIPANTE_EVENTUAL",
+          "origenId": "2cb91b41-c26c-40a1-a346-19098a74bfdf",
+          "tipoActor": "TRANSPORTISTA",
+          "actorNombre": "Externo de práctica web-operator-7bc3e19d",
+          "estado": "VINCULADA"
+        }
+      ],
+      "eventual": {
+        "etapa": "TRATADO"
+      },
+      "firmas": 0
+    },
+    {
+      "numero": "IRP-2026-00016",
+      "inspeccion": {
+        "numero": "IRP-2026-00016",
+        "estado": "EN_CAMPO",
+        "tipoActor": null,
+        "inspectorId": "cmw3duuh900035uqww7dd5m74",
+        "version": 5
+      },
+      "links": [
+        {
+          "id": "6a39559e4f04f2efa21c208c80bb01d8ade44bec96b32000c9cb2128fba2ccef",
+          "origen": "PARTICIPANTE_EVENTUAL",
+          "origenId": "33f75d2b-31a5-4fdf-9c7c-e562f767b704",
+          "tipoActor": "OPERADOR",
+          "actorNombre": "Externo de práctica app-generator-8bedeb98",
+          "estado": "VINCULADA"
+        }
+      ],
+      "eventual": {
+        "etapa": "TRATADO"
+      },
+      "firmas": 0
+    },
+    {
+      "numero": "IRP-2026-00017",
+      "inspeccion": {
+        "numero": "IRP-2026-00017",
+        "estado": "EN_CAMPO",
+        "tipoActor": null,
+        "inspectorId": "cmw3duuh900035uqww7dd5m74",
+        "version": 5
+      },
+      "links": [
+        {
+          "id": "30a401956193280dbd764f7726e3a14088deee3f4b3396866688ece0ae5bbc39",
+          "origen": "PARTICIPANTE_EVENTUAL",
+          "origenId": "44609e12-cc26-498c-b528-ca18e11d00d0",
+          "tipoActor": "GENERADOR",
+          "actorNombre": "Externo de práctica app-carrier-191d2fdf",
+          "estado": "VINCULADA"
+        }
+      ],
+      "eventual": {
+        "etapa": "TRATADO"
+      },
+      "firmas": 0
+    },
+    {
+      "numero": "IRP-2026-00018",
+      "inspeccion": {
+        "numero": "IRP-2026-00018",
+        "estado": "EN_CAMPO",
+        "tipoActor": null,
+        "inspectorId": "cmw3duuh900035uqww7dd5m74",
+        "version": 5
+      },
+      "links": [
+        {
+          "id": "4b1d388cec882c544d5375441ad6ff3714c33afd848a1eb490a764404b2b14b3",
+          "origen": "PARTICIPANTE_EVENTUAL",
+          "origenId": "a0ddc5e9-a456-41e8-b0e4-08f00f8f6152",
+          "tipoActor": "TRANSPORTISTA",
+          "actorNombre": "Externo de práctica app-operator-527585a6",
+          "estado": "VINCULADA"
+        }
+      ],
+      "eventual": {
+        "etapa": "TRATADO"
+      },
+      "firmas": 0
+    }
+  ],
+  "users": {
+    "chief": {
+      "rol": "GENERADOR",
+      "esInspector": false,
+      "activo": true,
+      "inspectionManagementRole": {
+        "usuarioId": "cmw3duufk00005uqwigevdezi",
+        "role": "ADMIN_INSPECCIONES",
+        "activo": true,
+        "asignadoPorId": "cmw3duufk00005uqwigevdezi",
+        "updatedAt": "2026-11-05T10:08:37.560Z"
+      }
+    },
+    "sectorChief": {
+      "rol": "ADMIN_TRANSPORTISTA",
+      "esInspector": false,
+      "activo": true,
+      "inspectionManagementRole": {
+        "usuarioId": "cmw3duuh400015uqw2oo2t9pa",
+        "role": "ADMIN_INSPECCIONES",
+        "activo": true,
+        "asignadoPorId": "cmw3duufk00005uqwigevdezi",
+        "updatedAt": "2026-11-05T10:08:37.578Z"
+      }
+    },
+    "sector": {
+      "rol": "ADMIN_GENERADOR",
+      "esInspector": false,
+      "activo": true,
+      "inspectionManagementRole": null
+    },
+    "inspector": {
+      "rol": "GENERADOR",
+      "esInspector": true,
+      "activo": true,
+      "inspectionManagementRole": null
+    },
+    "generator": {
+      "rol": "GENERADOR",
+      "esInspector": false,
+      "activo": true,
+      "inspectionManagementRole": null
+    },
+    "carrier": {
+      "rol": "TRANSPORTISTA",
+      "esInspector": false,
+      "activo": true,
+      "inspectionManagementRole": null
+    },
+    "operator": {
+      "rol": "OPERADOR",
+      "esInspector": false,
+      "activo": true,
+      "inspectionManagementRole": null
+    },
+    "inspector2": {
+      "rol": "GENERADOR",
+      "esInspector": true,
+      "activo": true,
+      "inspectionManagementRole": null
+    }
+  },
+  "matrix": [
+    {
+      "user": "chief",
+      "name": "detalle",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "chief",
+      "name": "detalleInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "firmaVista",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "chief",
+      "name": "firmaVistaInexistente",
+      "status": 404,
+      "message": "Inspección no encontrada",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "actaPdf",
+      "status": 200,
+      "revela": [],
+      "bytes": 64837
+    },
+    {
+      "user": "chief",
+      "name": "actaPdfInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "expedientePdf",
+      "status": 200,
+      "revela": [],
+      "bytes": 48935
+    },
+    {
+      "user": "chief",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "eventualPropio",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "chief",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "intercambios",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "chief",
+      "name": "correosActa",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "chief",
+      "name": "listado",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "chief",
+      "name": "antecedentes",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "chief",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "detalle",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "sectorChief",
+      "name": "detalleInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "firmaVista",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "sectorChief",
+      "name": "firmaVistaInexistente",
+      "status": 404,
+      "message": "Inspección no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "actaPdf",
+      "status": 200,
+      "revela": [],
+      "bytes": 64837
+    },
+    {
+      "user": "sectorChief",
+      "name": "actaPdfInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "expedientePdf",
+      "status": 200,
+      "revela": [],
+      "bytes": 48935
+    },
+    {
+      "user": "sectorChief",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "eventualPropio",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "sectorChief",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "intercambios",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "sectorChief",
+      "name": "correosActa",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "sectorChief",
+      "name": "listado",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "sectorChief",
+      "name": "antecedentes",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "sectorChief",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "detalle",
+      "status": 403,
+      "message": "No autorizado para este expediente",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "detalleInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "firmaVista",
+      "status": 403,
+      "message": "No autorizado para preparar o capturar esta acta",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "firmaVistaInexistente",
+      "status": 404,
+      "message": "Inspección no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "actaPdf",
+      "status": 403,
+      "message": "No autorizado para este expediente",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "actaPdfInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "expedientePdf",
+      "status": 403,
+      "message": "No autorizado para este expediente",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "eventualPropio",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "intercambios",
+      "status": 403,
+      "message": "No autorizado para este intercambio de inspección",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "correosActa",
+      "status": 403,
+      "message": "No autorizado para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "listado",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "antecedentes",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "sector",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "detalle",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "inspector",
+      "name": "detalleInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "firmaVista",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "inspector",
+      "name": "firmaVistaInexistente",
+      "status": 404,
+      "message": "Inspección no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "actaPdf",
+      "status": 200,
+      "revela": [],
+      "bytes": 64837
+    },
+    {
+      "user": "inspector",
+      "name": "actaPdfInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "expedientePdf",
+      "status": 200,
+      "revela": [],
+      "bytes": 48935
+    },
+    {
+      "user": "inspector",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "eventualPropio",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "inspector",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "intercambios",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "inspector",
+      "name": "correosActa",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "inspector",
+      "name": "listado",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013"
+      ]
+    },
+    {
+      "user": "inspector",
+      "name": "antecedentes",
+      "status": 200,
+      "revela": [
+        "IRP-2026-00013",
+        "Externo de práctica web-generator-1c453905"
+      ]
+    },
+    {
+      "user": "inspector",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "detalle",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "detalleInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "firmaVista",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "firmaVistaInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "actaPdf",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "actaPdfInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "expedientePdf",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "eventualPropio",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "intercambios",
+      "status": 403,
+      "message": "No autorizado para este intercambio de inspección",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "correosActa",
+      "status": 403,
+      "message": "No autorizado para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "listado",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "antecedentes",
+      "status": 403,
+      "message": "Acceso reservado a fiscalización",
+      "revela": []
+    },
+    {
+      "user": "generator",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "detalle",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "detalleInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "firmaVista",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "firmaVistaInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "actaPdf",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "actaPdfInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "expedientePdf",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "eventualPropio",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "intercambios",
+      "status": 403,
+      "message": "No autorizado para este intercambio de inspección",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "correosActa",
+      "status": 403,
+      "message": "No autorizado para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "listado",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "antecedentes",
+      "status": 403,
+      "message": "Acceso reservado a fiscalización",
+      "revela": []
+    },
+    {
+      "user": "carrier",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "detalle",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "detalleInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "firmaVista",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "firmaVistaInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "actaPdf",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "actaPdfInexistente",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "expedientePdf",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "eventualPropio",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "intercambios",
+      "status": 403,
+      "message": "No autorizado para este intercambio de inspección",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "correosActa",
+      "status": 403,
+      "message": "No autorizado para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "listado",
+      "status": 403,
+      "message": "Se requiere perfil inspector o administrador autorizado",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "antecedentes",
+      "status": 403,
+      "message": "Acceso reservado a fiscalización",
+      "revela": []
+    },
+    {
+      "user": "operator",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "detalle",
+      "status": 403,
+      "message": "No autorizado para este expediente",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "detalleInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "firmaVista",
+      "status": 403,
+      "message": "No autorizado para preparar o capturar esta acta",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "firmaVistaInexistente",
+      "status": 404,
+      "message": "Inspección no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "actaPdf",
+      "status": 403,
+      "message": "No autorizado para este expediente",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "actaPdfInexistente",
+      "status": 404,
+      "message": "Inspeccion no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "expedientePdf",
+      "status": 403,
+      "message": "No autorizado para este expediente",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "copiaFirmadaFalsa",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "copiaFirmadaInexistente",
+      "status": 404,
+      "message": "Copia firmada no encontrada",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "eventualPropio",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "eventualAjeno",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "eventualInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "eventualEnInspeccionInexistente",
+      "status": 404,
+      "message": "Eventual no disponible para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "intercambios",
+      "status": 403,
+      "message": "No autorizado para este intercambio de inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "correosActa",
+      "status": 403,
+      "message": "No autorizado para esta inspección",
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "listado",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "antecedentes",
+      "status": 200,
+      "revela": []
+    },
+    {
+      "user": "inspector2",
+      "name": "participacion",
+      "status": 403,
+      "message": "Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.",
+      "revela": []
+    }
+  ],
+  "sentAfter": 0,
+  "sentBefore": 0
+}
