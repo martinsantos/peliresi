@@ -1,0 +1,103 @@
+{
+  "state": {
+    "tag": "rev-3c441d95",
+    "eventualId": "11286b9f-7416-4fb7-bd22-ec4a45b14cff",
+    "inspectionId": "cmw6afaad0009qizmtzt0t9qm",
+    "numero": "IRP-2026-00022",
+    "firmaId": "cmw6afafp000sqizml7m361v5",
+    "antecedentes": [
+      "338219ca09db8d1cab28ad6a2e35c464a62be5d56756c7ac9ac43a69e4946119",
+      "9c2cdd1405f41eacd1f3f2ef4faf63cd9ab3169cbd604709babef38aef7b62aa"
+    ]
+  },
+  "log": [
+    {
+      "name": "eventual",
+      "id": "11286b9f-7416-4fb7-bd22-ec4a45b14cff",
+      "etapa": "REGISTRADO"
+    },
+    {
+      "name": "antecedentes",
+      "n": 2,
+      "tipos": [
+        "OPERADOR",
+        "TRANSPORTISTA"
+      ],
+      "nombres": [
+        "Externo operador rev-3c441d95",
+        "Externo transporte rev-3c441d95"
+      ]
+    },
+    {
+      "name": "expediente",
+      "id": "cmw6afaad0009qizmtzt0t9qm",
+      "numero": "IRP-2026-00022",
+      "estado": "PLANIFICADA",
+      "tipoActor": null
+    },
+    {
+      "name": "vista con observaciones vacías",
+      "origenes": [
+        "Externo operador rev-3c441d95"
+      ],
+      "pendientes": [
+        "Registrá lo observado antes de firmar."
+      ]
+    },
+    {
+      "name": "vista antes de firmar",
+      "origenes": [
+        "Externo operador rev-3c441d95"
+      ],
+      "pendientes": [],
+      "firmas": 0
+    },
+    {
+      "name": "después de firmar",
+      "firmas": 1,
+      "hash": true
+    },
+    {
+      "name": "enviar a revisión",
+      "status": "omitido",
+      "estado": "EN_CAMPO"
+    },
+    {
+      "name": "vinculación tardía",
+      "status": 409,
+      "message": "El acta de ese expediente ya tiene firma: sumar otra parte externa la anularía. Abrí una inspección nueva desde este antecedente."
+    },
+    {
+      "name": "vista tras vincular",
+      "origenes": [
+        "Externo operador rev-3c441d95"
+      ],
+      "firmasVigentes": 1,
+      "hashCambio": false
+    },
+    {
+      "name": "pdfs",
+      "acta": 200,
+      "actaBytes": 51928,
+      "copiaFirmada": 200,
+      "copiaBytes": 51803
+    },
+    {
+      "name": "volver a firmar",
+      "status": 201,
+      "message": "Firma conservada con la versión revisada. No se enviaron correos."
+    },
+    {
+      "name": "eventual desde inspección",
+      "status": 200,
+      "partes": [
+        {
+          "tipoActor": "OPERADOR",
+          "actorNombre": "Externo operador rev-3c441d95"
+        }
+      ]
+    }
+  ],
+  "sentBefore": 0,
+  "sentAfter": 0
+}

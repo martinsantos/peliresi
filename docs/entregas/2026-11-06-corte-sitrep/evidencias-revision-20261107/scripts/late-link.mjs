@@ -70,7 +70,7 @@ step('después de firmar', { firmas: afterSign.firmas.length, hash: afterSign.co
 
 // 7. Field closed: inspector sends to review (no longer editable, cannot re-sign).
 current = must(await call(insp, 'GET', '/api/inspecciones/' + id), 200, 'detalle5');
-const review = await call(insp, 'POST', `/api/inspecciones/${id}/estado`, { estado: 'EN_REVISION', version: current.version });
+const review = process.env.STAY_IN_FIELD ? { status: 'omitido', body: { data: { estado: current.estado } } } : await call(insp, 'POST', `/api/inspecciones/${id}/estado`, { estado: 'EN_REVISION', version: current.version });
 step('enviar a revisión', { status: review.status, estado: review.body.data?.estado, message: review.body.message });
 
 // 8. Chief links the second external antecedent of the same eventual to this case.
@@ -94,6 +94,6 @@ for (const ev of [eventualId]) {
   step('eventual desde inspección', { status: src.status, partes: src.body.data?.partes });
 }
 const state = { tag, eventualId, inspectionId: id, numero: inspection.numero, firmaId: signed.id, antecedentes: intakes.map(i => i.id) };
-fs.writeFileSync(OUT + '/late-link-' + (process.env.TARGET || 'corte') + '-' + tag + '.json', JSON.stringify({ state, log, sentBefore, sentAfter: await db.emailQueue.count({ where: { estado: 'ENVIADO' } }) }, null, 2));
+fs.writeFileSync(OUT + '/late-link-' + (process.env.TARGET || 'corte') + (process.env.STAY_IN_FIELD ? '-campo' : '') + '-' + tag + '.json', JSON.stringify({ state, log, sentBefore, sentAfter: await db.emailQueue.count({ where: { estado: 'ENVIADO' } }) }, null, 2));
 console.log('STATE', JSON.stringify(state));
 await db.$disconnect();

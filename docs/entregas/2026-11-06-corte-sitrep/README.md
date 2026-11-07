@@ -45,7 +45,7 @@ Desde la raíz del repo, seguir la cadena en este orden:
 
 ## Revisión independiente del 7 de noviembre
 
-[Informe de revisión](REVISION-20261107.md), en la rama `claude/revision-sitrep-20261107`, sin publicar. Se confirmó y corrigió en preview que vincular un antecedente eventual a un expediente que ya cerró la etapa de campo dejaba la firma del acta sin vigencia y sin posibilidad de volver a firmar. Desde esta rama, ese vínculo sólo se admite en BORRADOR, PLANIFICADA o EN_CAMPO. También se eliminó el oráculo 403/404 de la vista y la copia firmada para cuentas operativas. Quedan documentados, sin corregir, el regreso desde el eventual al bloque 1 de la hoja, los enlaces duplicados con dos externos y la falta de la parte externa en el PDF de expediente.
+[Informe de revisión](REVISION-20261107.md), en la rama `claude/revision-sitrep-20261107`, sin publicar. Se confirmó y corrigió en preview que vincular un antecedente eventual a un expediente que ya cerró la etapa de campo dejaba la firma del acta sin vigencia y sin posibilidad de volver a firmar. Desde esta rama, ese vínculo sólo se admite en BORRADOR, PLANIFICADA o EN_CAMPO y mientras el acta no tenga firma (decisión del 7/11); si no, se abre una inspección nueva desde el antecedente. También se eliminó el oráculo 403/404 de la vista y la copia firmada para cuentas operativas. Quedan documentados, sin corregir, el regreso desde el eventual al bloque 1 de la hoja, los enlaces duplicados con dos externos y la falta de la parte externa en el PDF de expediente.
 
 ## Límites y pendientes para la próxima decisión
 

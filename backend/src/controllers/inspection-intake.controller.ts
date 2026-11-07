@@ -7,7 +7,7 @@ import { isInspectionAdministrator, isInspectionGeneralManager, isInspectionStaf
 import { intakeDecisionSchema, intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import { canAccessInspection } from './inspeccion.controller';
-import { eventualLinkAllowed } from '../domain/inspectionEventualOrigin';
+import { eventualLinkRefusal, EVENTUAL_LINK_MESSAGES } from '../domain/inspectionEventualOrigin';
 
 export async function listInspectionIntakes(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -53,7 +53,14 @@ export async function decideInspectionIntake(req: AuthRequest, res: Response, ne
         inspection = await tx.inspeccion.findUnique({ where: { id: command.inspeccionId } });
         if (!inspection || !canAccessInspection(req.user, inspection)) throw new AppError('Expediente no encontrado', 404);
         assertIntakeInspection(current, inspection);
-        if (!eventualLinkAllowed(current, inspection)) throw new AppError('Ese expediente ya cerró la etapa de campo: su acta no admite otra parte externa. Abrí una inspección nueva desde este antecedente.', 409);
+        if (current.origen === 'PARTICIPANTE_EVENTUAL') {
+          // Row lock: a signature in flight reserves this row too, so link and signature serialize.
+          await tx.$queryRaw`SELECT id FROM inspecciones WHERE id = ${inspection.id} FOR UPDATE`;
+          const fresh = await tx.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, select: { estado: true } });
+          const signed = (await tx.eventoInspeccion.count({ where: { inspeccionId: inspection.id, tipo: 'ACTA_FIRMADA' } })) > 0;
+          const refusal = eventualLinkRefusal(current, fresh, signed);
+          if (refusal) throw new AppError(EVENTUAL_LINK_MESSAGES[refusal], 409);
+        }
       }
       const reserved = await tx.antecedenteFiscalizacion.updateMany({ where: { id: current.id, version: command.version }, data: {
         estado: command.accion, version: { increment: 1 }, ...(inspection ? { inspeccionId: inspection.id } : {}),
