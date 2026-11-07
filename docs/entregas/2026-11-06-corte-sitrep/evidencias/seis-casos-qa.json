@@ -1,0 +1,245 @@
+{
+  "entorno": "preview aislado, identidades y expedientes artificiales",
+  "casos": [
+    {
+      "expediente": "IRP-2026-00013",
+      "idInspeccionQA": "cmw5kh9i400jbjmt28xk5u6r9",
+      "idEventualQA": "8ce42625-924e-46c2-991a-6adc7512e607",
+      "idAntecedenteQA": "bdf2e38a8743226b6a2bd4b2e8babff1450e85afd6e77bc72698abea3ec34707",
+      "rolCreador": "generador",
+      "rolExterno": "operador",
+      "creadoDesde": "web",
+      "estadoEventual": "TRATADO",
+      "eventos": 5,
+      "copiasNotaReintentada": 1,
+      "copiasAccionReintentada": 1,
+      "antecedentes": 1,
+      "vinculaciones": 1,
+      "agendadaDesde": "web",
+      "visitaDesde": "web",
+      "controles": 3,
+      "acta": [
+        {
+          "superficie": "web",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "c2a85671acbdda3c11f66233f3e6828e4a76d35808b36019fc506be7db4dd320"
+        },
+        {
+          "superficie": "app",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/app/inspecciones/cmw5kh9i400jbjmt28xk5u6r9/eventuales/8ce42625-924e-46c2-991a-6adc7512e607",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "c2a85671acbdda3c11f66233f3e6828e4a76d35808b36019fc506be7db4dd320"
+        }
+      ]
+    },
+    {
+      "expediente": "IRP-2026-00014",
+      "idInspeccionQA": "cmw5khn6300jmjmt2qihwziys",
+      "idEventualQA": "07e76623-c91a-4e4e-aa6a-9d7644ba7f52",
+      "idAntecedenteQA": "8135c459560330ec5bf1d5f6f34c342c732a6db4af2996db784b1364e1d12e40",
+      "rolCreador": "transportista",
+      "rolExterno": "generador",
+      "creadoDesde": "web",
+      "estadoEventual": "TRATADO",
+      "eventos": 5,
+      "copiasNotaReintentada": 1,
+      "copiasAccionReintentada": 1,
+      "antecedentes": 1,
+      "vinculaciones": 1,
+      "agendadaDesde": "web",
+      "visitaDesde": "web",
+      "controles": 3,
+      "acta": [
+        {
+          "superficie": "web",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/inspecciones/cmw5khn6300jmjmt2qihwziys/eventuales/07e76623-c91a-4e4e-aa6a-9d7644ba7f52",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "bcc7e52ef050ee5e1dd7a6b109b45e9b24fbf7256c492239c3d09e36fe1f893f"
+        },
+        {
+          "superficie": "app",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/app/inspecciones/cmw5khn6300jmjmt2qihwziys/eventuales/07e76623-c91a-4e4e-aa6a-9d7644ba7f52",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "bcc7e52ef050ee5e1dd7a6b109b45e9b24fbf7256c492239c3d09e36fe1f893f"
+        }
+      ]
+    },
+    {
+      "expediente": "IRP-2026-00015",
+      "idInspeccionQA": "cmw5khskb00jxjmt2zdqwojbo",
+      "idEventualQA": "2cb91b41-c26c-40a1-a346-19098a74bfdf",
+      "idAntecedenteQA": "793d657c0cc23db458df10ed42acb1c306ef2a2853a0b853c38f52f626d7d955",
+      "rolCreador": "operador",
+      "rolExterno": "transportista",
+      "creadoDesde": "web",
+      "estadoEventual": "TRATADO",
+      "eventos": 5,
+      "copiasNotaReintentada": 1,
+      "copiasAccionReintentada": 1,
+      "antecedentes": 1,
+      "vinculaciones": 1,
+      "agendadaDesde": "web",
+      "visitaDesde": "web",
+      "controles": 3,
+      "acta": [
+        {
+          "superficie": "web",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/inspecciones/cmw5khskb00jxjmt2zdqwojbo/eventuales/2cb91b41-c26c-40a1-a346-19098a74bfdf",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "4d8305db9ea531d825649a83c87132d38dadae4822ab5e991890caa6185a1057"
+        },
+        {
+          "superficie": "app",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/app/inspecciones/cmw5khskb00jxjmt2zdqwojbo/eventuales/2cb91b41-c26c-40a1-a346-19098a74bfdf",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "4d8305db9ea531d825649a83c87132d38dadae4822ab5e991890caa6185a1057"
+        }
+      ]
+    },
+    {
+      "expediente": "IRP-2026-00016",
+      "idInspeccionQA": "cmw5khy7n00k8jmt2ubu8ckt9",
+      "idEventualQA": "33f75d2b-31a5-4fdf-9c7c-e562f767b704",
+      "idAntecedenteQA": "6a39559e4f04f2efa21c208c80bb01d8ade44bec96b32000c9cb2128fba2ccef",
+      "rolCreador": "generador",
+      "rolExterno": "operador",
+      "creadoDesde": "app",
+      "estadoEventual": "TRATADO",
+      "eventos": 5,
+      "copiasNotaReintentada": 1,
+      "copiasAccionReintentada": 1,
+      "antecedentes": 1,
+      "vinculaciones": 1,
+      "agendadaDesde": "app",
+      "visitaDesde": "app",
+      "controles": 3,
+      "acta": [
+        {
+          "superficie": "app",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/app/inspecciones/cmw5khy7n00k8jmt2ubu8ckt9/eventuales/33f75d2b-31a5-4fdf-9c7c-e562f767b704",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "0e5e69e9fd3602abff8673a19e44dfc22e1933ab5ad52551c6e94849ac39f335"
+        },
+        {
+          "superficie": "web",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/inspecciones/cmw5khy7n00k8jmt2ubu8ckt9/eventuales/33f75d2b-31a5-4fdf-9c7c-e562f767b704",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "0e5e69e9fd3602abff8673a19e44dfc22e1933ab5ad52551c6e94849ac39f335"
+        }
+      ]
+    },
+    {
+      "expediente": "IRP-2026-00017",
+      "idInspeccionQA": "cmw5kidmb00kjjmt20e2bip6l",
+      "idEventualQA": "44609e12-cc26-498c-b528-ca18e11d00d0",
+      "idAntecedenteQA": "30a401956193280dbd764f7726e3a14088deee3f4b3396866688ece0ae5bbc39",
+      "rolCreador": "transportista",
+      "rolExterno": "generador",
+      "creadoDesde": "app",
+      "estadoEventual": "TRATADO",
+      "eventos": 5,
+      "copiasNotaReintentada": 1,
+      "copiasAccionReintentada": 1,
+      "antecedentes": 1,
+      "vinculaciones": 1,
+      "agendadaDesde": "app",
+      "visitaDesde": "app",
+      "controles": 3,
+      "acta": [
+        {
+          "superficie": "app",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/app/inspecciones/cmw5kidmb00kjjmt20e2bip6l/eventuales/44609e12-cc26-498c-b528-ca18e11d00d0",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "98e339316b12841903a8768d043b4006141017464611a5993228fffca2922998"
+        },
+        {
+          "superficie": "web",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/inspecciones/cmw5kidmb00kjjmt20e2bip6l/eventuales/44609e12-cc26-498c-b528-ca18e11d00d0",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "98e339316b12841903a8768d043b4006141017464611a5993228fffca2922998"
+        }
+      ]
+    },
+    {
+      "expediente": "IRP-2026-00018",
+      "idInspeccionQA": "cmw5kipwb00kujmt2gl089iuq",
+      "idEventualQA": "a0ddc5e9-a456-41e8-b0e4-08f00f8f6152",
+      "idAntecedenteQA": "4b1d388cec882c544d5375441ad6ff3714c33afd848a1eb490a764404b2b14b3",
+      "rolCreador": "operador",
+      "rolExterno": "transportista",
+      "creadoDesde": "app",
+      "estadoEventual": "TRATADO",
+      "eventos": 5,
+      "copiasNotaReintentada": 1,
+      "copiasAccionReintentada": 1,
+      "antecedentes": 1,
+      "vinculaciones": 1,
+      "agendadaDesde": "app",
+      "visitaDesde": "app",
+      "controles": 3,
+      "acta": [
+        {
+          "superficie": "app",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/app/inspecciones/cmw5kipwb00kujmt2gl089iuq/eventuales/a0ddc5e9-a456-41e8-b0e4-08f00f8f6152",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "bcdb30f2c6f32404a672e0e93796956cca596ca58adb5868477cb8c67fc902e0"
+        },
+        {
+          "superficie": "web",
+          "nombreEnEncabezado": true,
+          "observacionesIndependientes": true,
+          "enlaceVerificado": "/inspecciones/cmw5kipwb00kujmt2gl089iuq/eventuales/a0ddc5e9-a456-41e8-b0e4-08f00f8f6152",
+          "estadoLeido": "TRATADO",
+          "regreso": true,
+          "otroEventualBloqueado": true,
+          "hash": "bcdb30f2c6f32404a672e0e93796956cca596ca58adb5868477cb8c67fc902e0"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "rounds": [
+    {
+      "round": 0,
+      "sign": 409,
+      "link": 200,
+      "firmasGuardadas": 0,
+      "firmasVigentes": 0,
+      "origenes": 2,
+      "ok": true
+    },
+    {
+      "round": 1,
+      "sign": 201,
+      "link": 409,
+      "firmasGuardadas": 1,
+      "firmasVigentes": 1,
+      "origenes": 1,
+      "ok": true,
+      "nuevaInspeccion": "201 IRP-2026-00030"
+    },
+    {
+      "round": 2,
+      "sign": 201,
+      "link": 409,
+      "firmasGuardadas": 1,
+      "firmasVigentes": 1,
+      "origenes": 1,
+      "ok": true,
+      "nuevaInspeccion": "201 IRP-2026-00032"
+    },
+    {
+      "round": 3,
+      "sign": 201,
+      "link": 409,
+      "firmasGuardadas": 1,
+      "firmasVigentes": 1,
+      "origenes": 1,
+      "ok": true,
+      "nuevaInspeccion": "201 IRP-2026-00034"
+    }
+  ],
+  "sentBefore": 0,
+  "sentAfter": 0
+}

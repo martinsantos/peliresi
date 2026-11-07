@@ -10,6 +10,7 @@ import { prepareManifiestoSignature } from '../domain/manifiestoSignature';
 import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.service';
 import { resolveInspectionEvidence } from '../services/inspectionEvidence.service';
 import { exchangePartyForUser } from '../services/inspectionExchange.service';
+import { isInspectionStaff } from '../domain/inspectionOperations';
 
 const signatureSchema = z.object({
   version: z.number().int().positive(), contenidoSha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -18,6 +19,8 @@ const signatureSchema = z.object({
   imagen: z.string().max(175000), lecturaConfirmada: z.literal(true),
 }).strict();
 async function readInspection(req: AuthRequest) {
+  // Same gate as the dossier: an operational account learns nothing about whether the case exists.
+  if (!isInspectionStaff(req.user)) throw new AppError('Se requiere perfil inspector o administrador autorizado', 403);
   const i = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionActInclude });
   if (!i) throw new AppError('Inspección no encontrada', 404);
   if (!canAccessInspection(req.user, i)) throw new AppError('No autorizado para preparar o capturar esta acta', 403);
@@ -81,9 +84,8 @@ export async function signInspectionAct(req: AuthRequest, res: Response, next: N
 export async function downloadSignedInspectionAct(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const i = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionActInclude });
-    if (!i) throw new AppError('Inspección no encontrada', 404);
-    const party = exchangePartyForUser(req.user, i);
-    if (!canAccessInspection(req.user, i) && party !== 'INSPECCIONADO') throw new AppError('No autorizado para esta copia', 403);
+    // Missing case, foreign case and unknown copy answer alike: no existence oracle for third parties.
+    if (!i || (!canAccessInspection(req.user, i) && exchangePartyForUser(req.user, i) !== 'INSPECCIONADO')) throw new AppError('Copia firmada no encontrada', 404);
     const event = i.eventos.find(e => e.id === req.params.firmaId && e.tipo === 'ACTA_FIRMADA' && e.visibleActor);
     const meta = event?.metadata as any;
     if (!event || !meta?.snapshot || !meta?.firma) throw new AppError('Copia firmada no encontrada', 404);

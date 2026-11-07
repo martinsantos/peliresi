@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { OperatorFindingSummary } from '../../components/manifiestos/OperatorFindingSummary';
 import type { InspectionIntake, OperatorFinding } from '../../types/inspectionIntake';
-import { INTAKE_REASON_LABELS, INTAKE_STATE_LABELS } from '../../types/inspectionIntake';
+import { INTAKE_REASON_LABELS, INTAKE_STATE_LABELS, eventualLinkAllowed } from '../../types/inspectionIntake';
 import { INSPECTION_ACTOR_LABELS, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
 import { inspeccionService } from '../../services/inspeccion.service';
 
@@ -75,7 +75,7 @@ export function InspectionIntakePanel({ mobile, online, onCreate }: { mobile: bo
             {!item.actorId && !query.data?.puedeAbrirExterno && <p className="text-sm text-neutral-600">El jefe de inspecciones o el administrador general debe abrir este caso sin alta en el padrón.</p>}
             <label className="block text-sm font-semibold text-neutral-800">Motivo de evaluación<textarea value={reason} maxLength={1000} rows={2} className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white p-3 text-base font-normal" onChange={event => setReason(event.target.value)} /></label>
             <div className="flex flex-wrap gap-2"><Button disabled={stale || busy || reason.trim().length < 3} onClick={() => void decide('EN_EVALUACION')}>Tomar en evaluación</Button><Button variant="outline" disabled={stale || busy || reason.trim().length < 3} onClick={() => void decide('DESCARTADA')}>Descartar con motivo</Button></div>
-            <label className="block text-sm font-semibold text-neutral-800">Vincular a un expediente existente<select className="mt-1 h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-base font-normal" value={inspectionId} onChange={event => setInspectionId(event.target.value)}><option value="">Seleccionar expediente…</option>{candidates.data?.items.filter(inspection => item.actorId ? inspection.tipoActor === item.tipoActor : !inspection.tipoActor).map(inspection => <option key={inspection.id} value={inspection.id}>{inspection.numero}</option>)}</select></label>
+            <label className="block text-sm font-semibold text-neutral-800">Vincular a un expediente existente<select className="mt-1 h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-base font-normal" value={inspectionId} onChange={event => setInspectionId(event.target.value)}><option value="">Seleccionar expediente…</option>{candidates.data?.items.filter(inspection => (item.actorId ? inspection.tipoActor === item.tipoActor : !inspection.tipoActor) && eventualLinkAllowed(item, inspection)).map(inspection => <option key={inspection.id} value={inspection.id}>{inspection.numero}</option>)}</select></label>
             {candidates.isError && <p role="alert" className="text-sm text-error-800">No se pudieron cargar los expedientes. <button type="button" className="min-h-11 underline" onClick={() => void candidates.refetch()}>Reintentar expedientes</button></p>}
             {(candidates.data?.total || 0) > 100 && <p className="text-xs text-neutral-600">Se muestran los primeros 100 expedientes accesibles. La vinculación también puede realizarse desde administración.</p>}
             <Button variant="outline" disabled={stale || busy || !inspectionId || reason.trim().length < 3} onClick={() => void decide('VINCULADA')}>Vincular expediente</Button>

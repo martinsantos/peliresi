@@ -1,0 +1,23 @@
+{
+  "commit": "1e87f12bf73923e88c7e6a9dd96e6c230b4ac079",
+  "casos": [
+    {
+      "superficie": "web",
+      "encabezado": "Parte externa simulada",
+      "enlace": "/inspecciones/inspeccion-sintetica-solo-en-el-navegador/eventuales/eventual-sintetico-solo-en-el-navegador",
+      "regreso": true,
+      "apiReal": 0,
+      "traficoNoGETBloqueado": [],
+      "errores": []
+    },
+    {
+      "superficie": "app",
+      "encabezado": "Parte externa simulada",
+      "enlace": "/app/inspecciones/inspeccion-sintetica-solo-en-el-navegador/eventuales/eventual-sintetico-solo-en-el-navegador",
+      "regreso": true,
+      "apiReal": 0,
+      "traficoNoGETBloqueado": [],
+      "errores": []
+    }
+  ]
+}
