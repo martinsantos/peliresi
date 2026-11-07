@@ -5,6 +5,8 @@ import ManifiestoActions from '../../pages/manifiestos/components/ManifiestoActi
 import { EstadoManifiesto, type Manifiesto } from '../../types/models';
 
 vi.mock('../../pages/manifiestos/components/ManifestProposalApprovals', () => ({ ManifestProposalApprovals: () => <div>Panel de aprobaciones</div> }));
+// Has its own data query and tests (GeneratorCurrentException.test.tsx); this suite checks readiness only.
+vi.mock('../../pages/manifiestos/components/GeneratorCurrentExceptionPanel', () => ({ GeneratorCurrentExceptionPanel: () => null }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user', rol: 'GENERADOR', actorId: 'qa-actor' }, isRestricted: false }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
 const pending = { isPending: false };

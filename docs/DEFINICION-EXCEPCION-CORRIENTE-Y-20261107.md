@@ -1,6 +1,6 @@
 # Excepción por corriente Y no autorizada del generador · definición y análisis
 
-Estado: **propuesta para decisión**, sin código. Rama `claude/excepcion-corriente-generador-20261107`, creada sobre `1cbd582c`.
+Estado: **decidida e implementada en preview**, sin publicar. Rama `claude/excepcion-corriente-generador-20261107`, creada sobre `1cbd582c`. La regla vigente es la de la sección 5; la sección 7 resume la implementación, las pruebas y lo necesario para publicar.
 
 ## 1. La regla, en una página
 
@@ -101,3 +101,68 @@ La opción recomendada va primera en cada decisión.
 5. **Fuente de Y autorizadas.** (a) La ficha y, si está vacía, el padrón de inscripción. (b) Sólo la ficha. Con (b) se bloquearía a casi todos los generadores.
 6. **Desde cuándo cuenta.** (a) Desde la activación: las adendas anteriores se muestran en el historial pero no cuentan. (b) Retroactivo: podría bloquear generadores el primer día.
 7. **Alcance del conteo.** (a) Por generador inscripto, es decir por CUIT y actividad de generador. (b) Por establecimiento.
+
+## 7. Implementación, pruebas y requisitos para publicar
+
+### Qué quedó implementado
+
+| Pieza | Dónde |
+|---|---|
+| Ficha única de Y autorizadas y regla de una excepción abierta | `backend/src/domain/generatorCurrents.ts` |
+| Registro inmutable de excepciones | modelo `ExcepcionCorrienteGenerador`, migración aditiva `20261107120000_generator_current_exceptions` |
+| Completar la migración de corrientes | `backend/src/scripts/backfillGeneratorCurrents.ts` (dry-run por defecto, `--apply`, `--revert`, sólo conteos) |
+| Servicio: evaluación con bloqueo de fila, otorgamiento idempotente, cierre por alta, avisos | `backend/src/services/generatorCurrentException.service.ts` |
+| Adenda: clasificación al registrar; aprobación sólo por la autoridad la primera vez; bloqueo con excepción abierta | `controllers/manifiesto-adenda.controller.ts` |
+| Antecedente con motivos `Y_NO_INSCRIPTA_GENERADOR`, `Y_NO_INSCRIPTA_REITERADA`, `FICHA_GENERADOR_SIN_CORRIENTES` | `services/inspectionIntake.service.ts` |
+| Manifiesto: no se crea con excepción abierta; la autoridad otorga antes de cualquier aprobación de parte | `controllers/manifiesto.controller.ts`, `controllers/manifest-proposal.controller.ts` |
+| Cierre por alta en la ficha (edición o renovación aprobada) | `controllers/actor.controller.ts`, `controllers/renovacion.controller.ts` |
+| Endpoints | `GET/POST /api/manifiestos/:id/excepcion-corriente`, `GET /api/actores/generadores/:id/excepciones-corriente` |
+| Pantallas | panel en el manifiesto (`GeneratorCurrentExceptionPanel`), historial en la ficha del generador, pestaña Residuos (`GeneratorCurrentExceptionHistory`), etiquetas de antecedentes |
+| Manual de ayuda | Adendas → «Corriente que no figura en la ficha del generador» |
+
+**Detalles de comportamiento:**
+- Una excepción puede abarcar varias Y del mismo hecho. Queda abierta mientras alguna de ellas siga fuera de la ficha, y esa condición se evalúa en vivo, así que una ficha editada por cualquier vía se respeta.
+- La misma Y en el mismo manifiesto ya exceptuado es el mismo hecho, no una segunda vez. Una Y nueva en ese manifiesto sí cuenta como segunda vez.
+- Observar o rechazar una adenda nunca se bloquea. La recepción física nunca se bloquea.
+- Los generadores sin corrientes en la ficha no se bloquean: generan el antecedente `FICHA_GENERADOR_SIN_CORRIENTES`.
+- Los avisos van **sólo a la campana**: ALTA para la excepción otorgada o cerrada, URGENTE para la reiteración y la creación rechazada. No se envían correos ni push, y las listas de salida existentes no se tocaron. Agregar correo o push es una decisión aparte.
+- Las sesiones de capacitación (CAP) nunca cuentan ni bloquean.
+- **Fuera de alcance:** los eventuales (`baja-intensidad`) no aplican esta regla hasta que se decida. El lado del operador (Y no habilitada en su ficha) sigue como estaba.
+- El generador ve la regla en el manifiesto y en sus avisos. El historial completo está en la ficha del generador para administración y fiscalización; la API también se lo entrega a la propia cuenta del generador.
+
+### Pruebas ejecutadas (preview aislado, sin red, cuentas artificiales)
+
+- **Unitarias backend:**
+  - dominio: 13;
+  - servicio: 9;
+  - aprobación de adenda: 6;
+  - antecedente: 4;
+  - suites existentes de adendas, propuestas, manifiestos, renovaciones, actores e inspecciones: sin cambios con el interruptor apagado.
+- **Frontend:**
+  - tipado limpio;
+  - panel, historial y etiquetas: 6 pruebas nuevas;
+  - manual: 41 de 41.
+- **E2E por API** (`exc-e2e.mjs`):
+  - Y inscripta: aprueban las tres partes;
+  - Y no inscripta: las partes no pueden aprobar, el generador y la contraparte no pueden otorgar, la autoridad otorga y el reintento es idempotente;
+  - con la excepción abierta, ni otra Y ni la misma pueden crearse, y la autoridad recibe una alerta URGENTE;
+  - la adenda con otra Y queda bloqueada incluso para la autoridad, pero observarla sigue permitido;
+  - el alta en la ficha cierra la excepción;
+  - la contraparte no puede aprobar la rectificación y la autoridad sí, lo que otorga la nueva excepción;
+  - historial visible para el generador, oculto para otro actor;
+  - 0 avisos con correo y 0 correos enviados.
+- **Completado de ficha:** completa, no repite, deja auditoría y revierte sobre generadores artificiales.
+- **Visual en web (1365×900) y app (393×852):**
+  - panel del generador sin botón de otorgar;
+  - panel de la autoridad con motivo y botón de 44 px;
+  - excepción otorgada;
+  - historial en la ficha;
+  - 0 errores de página.
+
+### Requisitos antes de publicar
+
+1. **Migración**: el publicador sólo acepta migraciones listadas en `.github/workflows/hostinger-publication.yml`. Hay que autorizar expresamente `20261107120000_generator_current_exceptions` (aditiva). Esta rama no modifica esa configuración productiva.
+2. **Autoridad designada**: la regla usa la misma designación que las adendas (`MANIFEST_REVIEW_AUTHORITY_BY_ROLE=true` o la lista `MANIFEST_EXCEPTIONAL_REVIEWERS`). Sin designación nadie puede otorgar, y toda Y fuera de la ficha quedaría sin aprobación posible.
+3. **Completar la ficha en producción** con `backfillGeneratorCurrents` (primero dry-run para ver los conteos, después `--apply`), con autorización expresa sobre ese cambio de datos. Hasta entonces la pantalla sigue mostrando las Y del archivo migrado; no hay que retirar ese respaldo antes del completado.
+4. **Activar** `GENERATOR_Y_EXCEPTIONS_ENABLED=true` recién después del punto 3. Apagado, el sistema se comporta exactamente como antes.
+5. **Consulta previa de sólo lectura** que cuente cuántos generadores reales tienen ficha vacía y cuántos manifiestos abiertos declaran Y fuera de la ficha, para anticipar el impacto del primer día.

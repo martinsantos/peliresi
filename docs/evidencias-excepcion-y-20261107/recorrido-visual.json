@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "n": "setup",
+      "numero": "PRUEBA-2026-000013",
+      "contexto": false
+    },
+    {
+      "n": "generador web",
+      "texto": "Corriente no inscripta · Y34 Y34 no figura en la ficha del generador. La autoridad de aplicación debe otorgar la excepción antes de las aprobaciones. Ficha del generador: Y8",
+      "otorgar": 0
+    },
+    {
+      "n": "generador app",
+      "texto": "Corriente no inscripta · Y34 Y34 no figura en la ficha del generador. La autoridad de aplicación debe otorgar la excepción antes de las aprobaciones. Ficha del generador: Y8",
+      "otorgar": 0
+    },
+    {
+      "n": "autoridad app",
+      "botonDeshabilitado": true,
+      "alto": 44
+    },
+    {
+      "n": "autoridad web",
+      "botonDeshabilitado": true,
+      "alto": 44
+    },
+    {
+      "n": "otorgada web",
+      "texto": "Excepción otorgada · Y34 La autoridad de aplicación otorgó la única excepción disponible del generador. Queda abierta hasta el alta de Y34 en su ficha. Motivo: Generación puntual verificada por la aut"
+    },
+    {
+      "n": "historial web",
+      "abierta": 1,
+      "enlace": 4
+    }
+  ],
+  "errors": [],
+  "enviados": 0
+}

@@ -1,0 +1,170 @@
+{
+  "log": [
+    {
+      "name": "punto de partida",
+      "ficha": "Y8",
+      "noInscriptas": [
+        "Y34",
+        "Y12"
+      ]
+    },
+    {
+      "name": "1. manifiesto con Y8 (inscripta)",
+      "status": 201
+    },
+    {
+      "name": "1. estado",
+      "status": 200
+    },
+    {
+      "name": "1 · generador firma",
+      "status": 200
+    },
+    {
+      "name": "1 · transporte aprueba",
+      "status": 200
+    },
+    {
+      "name": "1 · operador aprueba",
+      "status": 200
+    },
+    {
+      "name": "2. manifiesto con Y34 (no inscripta)",
+      "status": 201
+    },
+    {
+      "name": "2. estado para el generador",
+      "status": 200
+    },
+    {
+      "name": "2. generador firma antes de la excepción",
+      "status": 409,
+      "message": "Y34 no figura en la ficha del generador. La autoridad de aplicación debe otorgar la excepción antes de las aprobaciones."
+    },
+    {
+      "name": "2. transporte aprueba antes de la excepción",
+      "status": 409,
+      "message": "Y34 no figura en la ficha del generador. La autoridad de aplicación debe otorgar la excepción antes de las aprobaciones."
+    },
+    {
+      "name": "2. el generador intenta otorgarla",
+      "status": 403,
+      "message": "Sólo la autoridad de aplicación designada, desde su propia sesión, otorga esta excepción"
+    },
+    {
+      "name": "2. la contraparte intenta otorgarla",
+      "status": 403,
+      "message": "Sólo la autoridad de aplicación designada, desde su propia sesión, otorga esta excepción"
+    },
+    {
+      "name": "2. estado para la autoridad",
+      "status": 200
+    },
+    {
+      "name": "2. la autoridad otorga la excepción",
+      "status": 201,
+      "message": "Excepción otorgada. Las partes ya pueden aprobar el manifiesto."
+    },
+    {
+      "name": "2. reintento del otorgamiento",
+      "status": 201,
+      "message": "Excepción otorgada. Las partes ya pueden aprobar el manifiesto."
+    },
+    {
+      "name": "2 · generador firma",
+      "status": 200
+    },
+    {
+      "name": "2 · transporte aprueba",
+      "status": 200
+    },
+    {
+      "name": "2 · operador aprueba",
+      "status": 200
+    },
+    {
+      "name": "3. otra Y no inscripta (Y12) con excepción abierta",
+      "status": 409,
+      "message": "No se puede crear el manifiesto: Y12 no figura en la ficha del generador y ya tiene una excepción abierta por Y34. Sólo el alta de esa corriente en la ficha permite una nueva excepción."
+    },
+    {
+      "name": "3. la misma Y (Y34) en otro manifiesto",
+      "status": 409,
+      "message": "No se puede crear el manifiesto: Y34 no figura en la ficha del generador y ya se exceptuó una vez sin que se diera de alta. Sólo el alta en la ficha permite volver a moverla."
+    },
+    {
+      "name": "3. alerta URGENTE a la autoridad",
+      "alertas": 12
+    },
+    {
+      "name": "4. adenda con Y12 (excepción abierta)",
+      "status": 201
+    },
+    {
+      "name": "4. la autoridad intenta aprobarla",
+      "status": 409,
+      "message": "No se puede aprobar la adenda: Y12 no figura en la ficha del generador y ya tiene una excepción abierta por Y34. Sólo el alta de esa corriente en la ficha permite una nueva excepción."
+    },
+    {
+      "name": "4. observarla sigue permitido",
+      "status": 200
+    },
+    {
+      "name": "5. alta de Y34 en la ficha",
+      "status": 200
+    },
+    {
+      "name": "5. excepción cerrada por alta",
+      "cerradaAt": true,
+      "cierre": "ALTA_EN_FICHA"
+    },
+    {
+      "name": "6. rectificación con Y12",
+      "status": 201
+    },
+    {
+      "name": "6. la contraparte intenta aprobar",
+      "status": 403,
+      "message": "Y12 no figura en la ficha del generador. Sólo la autoridad de aplicación puede aprobar esta adenda, y al hacerlo otorga la única excepción disponible del generador."
+    },
+    {
+      "name": "6. la autoridad aprueba y otorga",
+      "status": 200
+    },
+    {
+      "name": "7. historial del generador",
+      "status": 200
+    },
+    {
+      "name": "7. historial",
+      "ficha": [
+        "Y8",
+        "Y34"
+      ],
+      "disponible": false,
+      "excepciones": [
+        "ADENDA:Y12:ABIERTA",
+        "MANIFIESTO:Y34:CERRADA",
+        "ADENDA:Y12:CERRADA",
+        "MANIFIESTO:Y34:CERRADA",
+        "MANIFIESTO:Y34:CERRADA",
+        "MANIFIESTO:Y34:CERRADA",
+        "ADENDA:Y12:CERRADA",
+        "MANIFIESTO:Y34:CERRADA"
+      ]
+    },
+    {
+      "name": "7. otro actor no ve el historial",
+      "status": 404,
+      "message": "Generador no encontrado"
+    },
+    {
+      "name": "8. avisos y antecedentes",
+      "avisos": 194,
+      "conCorreo": 0,
+      "motivosAntecedenteAdenda": null
+    }
+  ],
+  "sentBefore": 0,
+  "sentAfter": 0
+}

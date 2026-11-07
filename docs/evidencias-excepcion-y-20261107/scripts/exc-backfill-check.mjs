@@ -1,0 +1,32 @@
+// Apply + idempotent re-apply + revert of the ficha backfill on ARTIFICIAL preview generators only.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+
+const X = '/qa/excepcion-y-20261107/backend';
+const pid = fs.readFileSync('/qa/alta-ocr-correcciones-20261106/relink-api.pid', 'utf8').trim();
+const env = Object.fromEntries(fs.readFileSync('/proc/' + pid + '/environ', 'utf8').split('\0').filter(Boolean).map(kv => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]));
+assert.match(env.DATABASE_URL, /127\.0\.0\.1:55441\/sitrep_ephemeral_qa_1a93\?schema=inspection_field_20261103/);
+const req = createRequire(X + '/package.json');
+const { PrismaClient } = req('@prisma/client');
+const { backfillGeneratorCurrents, BACKFILL_ACTION } = req(X + '/dist/scripts/backfillGeneratorCurrents.js');
+const db = new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } } });
+const empty = await db.generador.findMany({ where: { OR: [{ corrientesControl: null }, { corrientesControl: '' }], usuario: { email: { endsWith: '@example.invalid' } } }, select: { id: true, cuit: true }, take: 2 });
+assert.ok(empty.length >= 1, 'se necesita un generador artificial con ficha vacía');
+const synthetic = Object.fromEntries(empty.map((g, i) => [g.cuit, { cuit: g.cuit, categoriasControl: i ? ['Y9'] : ['Y48', 'Y8'] }]));
+const ids = empty.map(g => g.id);
+const only = { ...db, generador: { ...db.generador, findMany: (args) => db.generador.findMany({ ...args, where: { id: { in: ids } } }) }, $transaction: db.$transaction.bind(db), auditoria: db.auditoria };
+const applied = await backfillGeneratorCurrents(only, synthetic, 'apply');
+const after = await db.generador.findMany({ where: { id: { in: ids } }, select: { corrientesControl: true } });
+const again = await backfillGeneratorCurrents(only, synthetic, 'apply');
+const audits = await db.auditoria.count({ where: { accion: BACKFILL_ACTION, generadorId: { in: ids } } });
+const reverted = await backfillGeneratorCurrents(db, synthetic, 'revert');
+const restored = await db.generador.findMany({ where: { id: { in: ids } }, select: { corrientesControl: true } });
+console.log(JSON.stringify({ applied, fichas: after.map(g => g.corrientesControl), again, audits, reverted, restored: restored.map(g => g.corrientesControl) }));
+assert.equal(applied.completados, ids.length);
+assert.equal(again.completados, 0);
+assert.equal(audits, ids.length);
+assert.ok(restored.every(g => !g.corrientesControl));
+await db.auditoria.deleteMany({ where: { accion: BACKFILL_ACTION, generadorId: { in: ids } } });
+await db.$disconnect();
+console.log('ok: completa, no repite, audita y revierte');
