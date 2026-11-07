@@ -4,7 +4,7 @@ Estado: **propuesta para decisión**, sin código. Rama `claude/excepcion-corrie
 
 ## 1. La regla, en una página
 
-**Qué cuenta como corriente autorizada del generador.** Es cada Y que figura en la ficha del generador. Si la ficha no tiene corrientes cargadas, se toma la inscripción del padrón (ver punto 3). Es la misma lista que hoy muestra la pantalla del generador.
+**Qué cuenta como corriente autorizada del generador.** Es cada Y que figura en la ficha de inscripción del generador: los datos migrados a SITREP más las altas posteriores. Es la misma lista que hoy muestra la pantalla del generador. Ver el punto 3 sobre la migración incompleta.
 
 **Caso 1. Diferencia de cantidad, unidad o Y no observada, sobre una Y autorizada.**
 El operador registra la adenda al recibir y la autoridad o la contraparte la aprueba. Esto corrige el manifiesto y nada más: no hay que autorizar nada nuevo ni registrar una excepción.
@@ -31,7 +31,7 @@ La segunda vez para la misma Y, sin alta ni inspección conforme desde la excepc
 
 | Pieza | Hoy | Brecha |
 |---|---|---|
-| Y autorizadas del generador | La ficha `generador.corrientesControl` es texto libre y está **vacía en los 1.224 generadores importados**. Las Y reales de 1.208 generadores están en `backend/data/generadores-enrichment.json` (padrón de inscripción), que sólo usa la pantalla de detalle (`frontend/src-v6/pages/admin/GeneradorDetallePage.tsx:220`). | No hay una fuente única del lado del servidor. Hay que unificar «ficha y, si está vacía, padrón» en una sola función. |
+| Y autorizadas del generador | La migración guardó los datos de cada generador en su registro, pero **no copió sus corrientes Y**: `generador.corrientesControl` quedó vacío en los 1.224 importados (`scripts/import-generadores-excel.ts` no lo carga). Las Y migradas de 1.208 generadores quedaron en un archivo aparte, `backend/data/generadores-enrichment.json`, que sólo lee la pantalla de detalle cuando el registro está vacío (`frontend/src-v6/pages/admin/GeneradorDetallePage.tsx:220`). | Completar la migración: copiar esas Y al registro de cada generador para que la ficha sea la única fuente. |
 | Comparación al recibir | `wasteDifferences` (`backend/src/domain/inspectionIntake.ts:10`) compara lo observado contra **el manifiesto**. `Y_OMITIDA` significa «no estaba en el manifiesto», no «no está autorizada». | Falta comparar contra las Y autorizadas del generador. Del lado del operador eso ya existe (`alcanceOperador`, `inspectionIntake.service.ts:33`): es el patrón a replicar. |
 | Antecedentes por hallazgo | `recordFindingIntakes` (`inspectionIntake.service.ts:55`) abre un antecedente al generador por **cualquier** diferencia, incluida la cantidad. | Contradice el caso 1. Ver la decisión 6. |
 | Aprobación de adenda con Y nueva | `reviewAddendum` (`manifiesto-adenda.controller.ts:155`) permite aprobar a la contraparte o a la autoridad. `noticeNewCurrents` (`postFactoNotice.service.ts:12`) avisa después y aclara que «no modifica habilitaciones». | Nadie otorga la excepción explícitamente, no hay registro por generador e Y, no hay conteo y no hay bloqueo. |
@@ -45,17 +45,18 @@ La segunda vez para la misma Y, sin alta ni inspección conforme desde la excepc
 
 ## 3. Calidad de datos: el riesgo principal
 
-Si la regla mirara sólo la ficha, **todas** las Y de todos los generadores importados serían «no autorizadas» y el sistema bloquearía a todos desde el segundo manifiesto. Por eso:
+Con la migración incompleta, **todas** las Y de los generadores importados parecerían «no autorizadas» y el sistema bloquearía a todos desde el segundo manifiesto. Para el negocio la ficha es una sola, así que la solución es completar la migración, no leer dos fuentes:
 
-- La fuente es la ficha si tiene corrientes y, si no, el padrón de inscripción. Así quedan cubiertos 1.208 generadores.
-- Los 16 generadores sin Y en ninguna de las dos fuentes **no se bloquean**. Generan un antecedente «ficha sin corrientes verificables» para que la autoridad complete la ficha, igual que hoy hace el operador con `SIN_DATOS_VERIFICABLES`.
+- **Completar la ficha**, una sola vez: copiar al registro de cada generador las Y del archivo migrado. Sólo se completan registros vacíos, nunca se pisa una ficha editada después. Cada cambio queda trazado y es reversible. Se prueba primero en preview y en producción se corre sólo con autorización expresa sobre ese cambio de datos. Así quedan cubiertos 1.208 generadores.
+- Después, toda la plataforma (regla, pantalla, inspecciones y avisos) lee únicamente la ficha, y la pantalla deja de usar el archivo aparte.
+- Los 16 generadores que no tienen Y en la migración **no se bloquean**. Generan un antecedente «ficha sin corrientes verificables» para que la autoridad complete la ficha, igual que hoy hace el operador con `SIN_DATOS_VERIFICABLES`.
 - Antes de activar el bloqueo en producción hace falta una consulta de sólo lectura que cuente cuántos generadores reales quedarían alcanzados. Requiere tu autorización.
 
 ## 4. Implementación propuesta, por etapas
 
 Cada etapa lleva pruebas unitarias, prueba en preview con cuentas artificiales y documentación. El bloqueo se activa al final, con su propio flag.
 
-1. **Fuente única de Y autorizadas** del lado del servidor (ficha y, si está vacía, padrón), con la misma lista en la pantalla del generador y en el contraste de la inspección.
+1. **Completar la migración de la ficha**: copiar las Y migradas al registro de cada generador. Desde ahí, una sola lista de Y autorizadas para la regla, la pantalla del generador y el contraste de la inspección.
 2. **Registro de excepciones** inmutable por generador e Y: origen, autoridad, fecha, cantidad, estado (otorgada o levantada por alta o por inspección conforme). Reintento seguro con el mismo identificador.
 3. **Clasificación del hallazgo** al registrar la adenda: diferencia sobre Y autorizada, Y no autorizada en primera vez o Y no autorizada repetida.
 4. **Aprobación de la adenda**: si hay una Y no autorizada, sólo aprueba la autoridad y se registra la excepción. Si es repetida, se rechaza con un motivo explicado y se indica cómo levantar el bloqueo.
@@ -85,7 +86,7 @@ Cada etapa lleva pruebas unitarias, prueba en preview con cuentas artificiales y
 - Las diferencias de cantidad siguen abriendo antecedente, como hoy, sin registrar excepción.
 
 **Valores por defecto aplicados, salvo indicación en contrario:**
-- La fuente de Y autorizadas es la ficha y, si está vacía, el padrón de inscripción.
+- La fuente de Y autorizadas es la ficha de inscripción, una vez completada la migración de corrientes.
 - El conteo rige desde la activación: las adendas anteriores se muestran pero no cuentan.
 - El alcance es por generador inscripto (CUIT y actividad de generador).
 
