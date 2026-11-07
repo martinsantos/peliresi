@@ -65,7 +65,31 @@ Cada etapa lleva pruebas unitarias, prueba en preview con cuentas artificiales y
 8. **Pantallas**: historial de excepciones en la ficha del generador, motivo visible en la adenda y en la creación del manifiesto, y antecedente con la Y y el conteo.
 9. **Documentación**: manual de ayuda, flujo de adendas y PSIP.
 
-## 5. Decisiones abiertas
+## 5. Decisiones tomadas el 7/11 y regla resultante
+
+| Decisión | Elegido |
+|---|---|
+| Qué es la «segunda vez» | **Cualquier Y no autorizada**, aunque sea distinta de la primera. |
+| Inspección cerrada conforme | **No levanta nada.** Sólo el alta de la Y en la ficha. |
+| Y no autorizada declarada al crear el manifiesto | **Mismo control** que al recibir. |
+| Diferencia sólo de cantidad | **Se mantiene el antecedente** actual para la jefatura. |
+
+**Regla resultante, que reemplaza a la del punto 1 donde difieran:**
+
+- Cada generador tiene **una sola excepción disponible**. Una excepción queda *abierta* desde que la autoridad la otorga hasta que la Y exceptuada se da de alta en la ficha.
+- Con una excepción abierta, **cualquier** Y no autorizada, sea la misma u otra, queda bloqueada. Al recibir, la adenda no puede aprobarse y por lo tanto no hay certificado final. Al crear, el generador no puede generar el manifiesto. La recepción física nunca se bloquea.
+- Cuando todas las excepciones del generador quedaron cerradas por alta, puede recibir una nueva excepción.
+- Si la autoridad no da el alta, la excepción queda abierta indefinidamente y el generador no puede volver a mover ninguna Y no autorizada.
+- Una inspección conforme no cambia el estado de las excepciones. Queda en el historial como antecedente.
+- La primera vez, la Y no autorizada requiere la **aprobación de la autoridad de aplicación**, tanto en la adenda como en el manifiesto declarado desde el inicio. En el manifiesto es una aprobación adicional a las de las partes. La contraparte no puede otorgar una excepción.
+- Las diferencias de cantidad siguen abriendo antecedente, como hoy, sin registrar excepción.
+
+**Valores por defecto aplicados, salvo indicación en contrario:**
+- La fuente de Y autorizadas es la ficha y, si está vacía, el padrón de inscripción.
+- El conteo rige desde la activación: las adendas anteriores se muestran pero no cuentan.
+- El alcance es por generador inscripto (CUIT y actividad de generador).
+
+## 6. Decisiones originales (referencia)
 
 La opción recomendada va primera en cada decisión.
 
