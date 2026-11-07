@@ -134,6 +134,10 @@ La opción recomendada va primera en cada decisión.
 
 ### Pruebas ejecutadas (preview aislado, sin red, cuentas artificiales)
 
+- **Suites completas** (un worker, 1 CPU, 2 GiB, sin red):
+  - backend: 208 de 208 archivos; tras el último ajuste (409 para la contraparte e historial apagado) pasaron otra vez las 38 suites relacionadas;
+  - frontend: 360 de 360 archivos. Uno falló primero porque la copia del laboratorio no tenía `frontend/cloud-qa`; tras sincronizarla pasó.
+
 - **Unitarias backend:**
   - dominio: 13;
   - servicio: 9;
