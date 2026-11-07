@@ -44,7 +44,9 @@ describe('one open exception per generator', () => {
     expect(currentsDecisionMessage(d, 'ADENDA')).toContain('Sólo el alta de esa corriente en la ficha');
   });
   it('with an open exception, the same Y again in another manifest is refused', () => {
-    expect(decideGeneratorCurrents({ ...base, corrientes: ['Y34'], exceptions: [exception('e1', ['Y34'])] })).toMatchObject({ estado: 'BLOQUEADA' });
+    const d = decideGeneratorCurrents({ ...base, corrientes: ['Y34'], exceptions: [exception('e1', ['Y34'])] });
+    expect(d).toMatchObject({ estado: 'BLOQUEADA' });
+    expect(currentsDecisionMessage(d, 'CREACION')).toContain('ya se exceptuó una vez sin que se diera de alta');
   });
   it('the same manifest already exempted is the same event, not a second occurrence', () => {
     expect(decideGeneratorCurrents({ ...base, corrientes: ['Y34'], exceptions: [exception('e1', ['Y34'], 'm1')] })).toEqual({ estado: 'CUBIERTAS_POR_EXCEPCION', excepcionId: 'e1' });

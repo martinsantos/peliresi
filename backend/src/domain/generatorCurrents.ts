@@ -87,7 +87,11 @@ export function decideGeneratorCurrents(input: {
 export function currentsDecisionMessage(decision: CurrentsDecision, moment: 'ADENDA' | 'APROBACION' | 'CREACION'): string | null {
   if (decision.estado === 'BLOQUEADA') {
     const where = moment === 'CREACION' ? 'No se puede crear el manifiesto' : moment === 'ADENDA' ? 'No se puede aprobar la adenda' : 'No se puede aprobar el manifiesto';
-    return `${where}: ${decision.corrientes.join(', ')} no figura en la ficha del generador y ya tiene una excepción abierta por ${decision.excepcionAbierta.corrientes.join(', ')}. Sólo el alta de esa corriente en la ficha permite una nueva excepción.`;
+    const open = decision.excepcionAbierta.corrientes;
+    const repeated = decision.corrientes.every(y => open.includes(y));
+    return repeated
+      ? `${where}: ${decision.corrientes.join(', ')} no figura en la ficha del generador y ya se exceptuó una vez sin que se diera de alta. Sólo el alta en la ficha permite volver a moverla.`
+      : `${where}: ${decision.corrientes.join(', ')} no figura en la ficha del generador y ya tiene una excepción abierta por ${open.join(', ')}. Sólo el alta de esa corriente en la ficha permite una nueva excepción.`;
   }
   if (decision.estado === 'REQUIERE_EXCEPCION') {
     return moment === 'ADENDA'
